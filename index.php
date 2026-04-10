@@ -9,7 +9,7 @@
 <script src="JS/jquery.min.js"></script>
 <script src="JS/selection_drag_7.js"></script>
 <script src="JS/functions.js"></script>
-</head>
+</head> 
 
 <body style="margin-top: 20px;">
 <?php

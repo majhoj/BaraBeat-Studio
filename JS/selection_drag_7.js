@@ -188,7 +188,7 @@ function move(dx, dy) {
     transform:
       this.data("origTransform") +
       (this.data("origTransform") ? "T" : "t") +
-      [dx, dy],
+      [dx, dy], 
   });
   if (this.data("cloneThisDrag") && !this.data("alreadyCloned")) {
     this.data("alreadyCloned", true);
