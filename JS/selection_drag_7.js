@@ -201,7 +201,7 @@ function move(dx, dy) {
 	        fill: "#333"
     });
 		*/
-    }
+    } 
 
     id_alt = this.attr("id");
     class_alt = this.attr("class");
