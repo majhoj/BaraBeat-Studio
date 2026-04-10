@@ -1,91 +1,125 @@
 function createInstrumentChooser(s, x, y, startText = "Instrument", startFill = "gray") {
-    let instrumente = [
-        "Djembe 1",
-        "Djembe 2",
-        "Djembe 3",
-        "Kenkeni",
-        "Sangban",
-        "Dununba",
-        "Dreierbass"
-    ];
+  let instrumente = [
+    "Djembe 1",
+    "Djembe 2",
+    "Djembe 3",
+    "Kenkeni",
+    "Sangban",
+    "Dununba",
+    "Dreierbass",
+  ];
 
-    let chooserGruppe = s.g();
-    chooserGruppe.addClass("instrument-chooser");
-    let menuGruppe = s.g().attr({ display: "none" });
+  let chooserGruppe = s.g();
+  chooserGruppe.addClass("instrument-chooser");
+  let menuGruppe = s.g().attr({ display: "none" });
 
-    let instrumentText = s.text(0, 0, startText).attr({
-        class: "instrument-label",
-        fill: startFill,
-        "font-size": 16,
-        "font-family": "sans-serif",
-        cursor: "pointer"
+  let instrumentText = s.text(0, 0, startText).attr({
+    class: "instrument-label",
+    fill: startFill,
+    "font-size": 16,
+    "font-family": "sans-serif",
+    cursor: "pointer",
+  });
+
+  let zeilenHoehe = 22;
+  let menuBreite = 120;
+  let menuHoehe = instrumente.length * zeilenHoehe + 10;
+
+  let menuBg = s.rect(-5, 5, menuBreite, menuHoehe, 4, 4).attr({
+    fill: "#f0f0f0",
+    stroke: "#999",
+    "stroke-width": 1,
+  });
+
+  menuGruppe.add(menuBg);
+
+  instrumente.forEach(function (name, index) {
+    let eintrag = s.text(5, 22 + index * zeilenHoehe, name).attr({
+      fill: "#333",
+      "font-size": 14,
+      "font-family": "sans-serif",
+      cursor: "pointer",
     });
+    menuGruppe.add(eintrag);
+  });
 
-    let zeilenHoehe = 22;
-    let menuBreite = 120;
-    let menuHoehe = instrumente.length * zeilenHoehe + 10;
+  chooserGruppe.add(instrumentText, menuGruppe);
+  chooserGruppe.transform("translate(" + x + "," + y + ")");
 
-    let menuBg = s.rect(-5, 5, menuBreite, menuHoehe, 4, 4).attr({
-        fill: "#f0f0f0",
-        stroke: "#999",
-        "stroke-width": 1
-    });
+  bindInstrumentChooserInteraction(chooserGruppe, instrumentText, menuGruppe);
 
-    menuGruppe.add(menuBg);
+  return chooserGruppe;
+}
 
-    instrumente.forEach(function(name, index) {
-        let eintrag = s.text(5, 22 + index * zeilenHoehe, name).attr({
-            fill: "#333",
-            "font-size": 14,
-            "font-family": "sans-serif",
-            cursor: "pointer"
-        });
+/**
+ * Klick- und Drag-Verhalten für eine InstrumentChooser-Gruppe (neu oder nach DOM-Klon).
+ * dragEnd: optional z. B. stop_m — bei neuen Choosern aus createInstrumentChooser null.
+ */
+function bindInstrumentChooserInteraction(chooserGruppe, instrumentText, menuGruppe, dragEnd) {
+  let dragSchwelle = 5;
 
-        eintrag.click(function(event) {
-            instrumentText.attr({ text: name, fill: "#333" });
-            menuGruppe.attr({ display: "none" });
-            event.stopPropagation();
-        });
-
-        menuGruppe.add(eintrag);
-    });
-
-    chooserGruppe.add(instrumentText, menuGruppe);
-    chooserGruppe.transform("translate(" + x + "," + y + ")");
-
-    instrumentText.click(function(event) {
-        if (chooserGruppe.data("warDrag")) {
-            chooserGruppe.data("warDrag", false);
-            event.stopPropagation();
-            return;
-        }
-
-        let sichtbar = menuGruppe.attr("display") !== "none";
-        menuGruppe.attr({ display: sichtbar ? "none" : "inline" });
-        event.stopPropagation();
-    });
-
-    let dragSchwelle = 5;
-
-    function chooser_sel_start(x, y, event) {
-        chooserGruppe.data("warDrag", false);
-        sel_start.call(this, x, y, event);
+  instrumentText.click(function (event) {
+    if (chooserGruppe.data("warDrag")) {
+      chooserGruppe.data("warDrag", false);
+      event.stopPropagation();
+      return;
     }
+    let sichtbar = menuGruppe.attr("display") !== "none";
+    menuGruppe.attr({ display: sichtbar ? "none" : "inline" });
+    event.stopPropagation();
+  });
 
-    function chooser_move(dx, dy, px, py, event) {
-        if (!chooserGruppe.data("warDrag")) {
-            if (Math.abs(dx) < dragSchwelle && Math.abs(dy) < dragSchwelle) {
-                return;
-            }
-            chooserGruppe.data("warDrag", true);
+  menuGruppe.selectAll("text").forEach(function (eintrag) {
+    eintrag.click(function (event) {
+      let name = eintrag.attr("text");
+      instrumentText.attr({ text: name, fill: "#333" });
+      menuGruppe.attr({ display: "none" });
+      event.stopPropagation();
+    });
+  });
 
-            menuGruppe.attr({ display: "none" });
-        }
+  function chooser_sel_start(x, y, event) {
+    chooserGruppe.data("warDrag", false);
+    sel_start.call(this, x, y, event);
+  }
 
-        move.call(this, dx, dy, px, py, event);
+  function chooser_move(dx, dy, px, py, event) {
+    if (!chooserGruppe.data("warDrag")) {
+      if (Math.abs(dx) < dragSchwelle && Math.abs(dy) < dragSchwelle) {
+        return;
+      }
+      chooserGruppe.data("warDrag", true);
+      menuGruppe.attr({ display: "none" });
     }
+    move.call(this, dx, dy, px, py, event);
+  }
 
+  if (dragEnd) {
+    chooserGruppe.drag(chooser_move, chooser_sel_start, dragEnd);
+  } else {
     chooserGruppe.drag(chooser_move, chooser_sel_start);
+  }
+}
 
-    return chooserGruppe;
+/**
+ * Nach ele.clone(): alte Snap-Handler entfernen und an die echten Kindknoten neu binden.
+ */
+function rewireInstrumentChooser(chooserGruppe) {
+  var kids = chooserGruppe.children();
+  var instrumentText = kids[0];
+  var menuGruppe = kids[1];
+  if (!instrumentText || instrumentText.type !== "text") {
+    return;
+  }
+  if (!menuGruppe || menuGruppe.type !== "g") {
+    return;
+  }
+
+  chooserGruppe.undrag();
+  instrumentText.unclick();
+  menuGruppe.selectAll("text").forEach(function (t) {
+    t.unclick();
+  });
+
+  bindInstrumentChooserInteraction(chooserGruppe, instrumentText, menuGruppe, stop_m);
 }

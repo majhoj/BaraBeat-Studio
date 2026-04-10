@@ -154,19 +154,20 @@ function sel_move(dx, dy) {
         ele2.selectAll("g").forEach(function (sub) {
           sub.attr({ display: "none" });
         });
+        s.append(ele2);
+        rewireInstrumentChooser(ele2);
       } else {
         ele2.attr({ id: id_alt });
+        // if(ele2.attr("id")=="wiederholung") {
+        //    ele2.drag(move,sel_start,edit_text_wz_1);
+        //    ele2.dblclick(edit_text_wz);
+        //  };
+        if (ele2.attr("id") == "edit_text") {
+          ele2.dblclick(edit_text);
+        }
+        ele2.drag(move, sel_start, stop_m);
+        s.append(ele2);
       }
-      // if(ele2.attr("id")=="wiederholung") {
-      //    ele2.drag(move,sel_start,edit_text_wz_1);
-      //    ele2.dblclick(edit_text_wz);
-      //  };
-      if (ele2.attr("id") == "edit_text") {
-        ele2.dblclick(edit_text);
-      }
-      ele2.drag(move, sel_start, stop_m);
-      //ele2.attr({"fill": "red"});
-      s.append(ele2);
     });
   }
 
