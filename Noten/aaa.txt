@@ -1,0 +1,1 @@
+<binaer id="rhythmus"/><g id="tone_muffled" transform="matrix(1,0,0,1,137.5,-230)" class="shp" xmlns="http://www.w3.org/2000/svg"><circle cx="34" cy="173" r="7" transform="matrix(1,0,0,1,0,120)"></circle><line x1="27" x2="42" y1="302" y2="302" style="stroke-width: 2px;" stroke="#000000"></line><rect x="28" y="285" width="12" height="14" style="opacity: 0.001;"></rect></g>
