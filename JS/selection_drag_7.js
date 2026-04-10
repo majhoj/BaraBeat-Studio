@@ -121,7 +121,8 @@ function sel_move(dx, dy) {
   var dx = Snap.snapTo(gridSize, dx, 50);
   var dy = Snap.snapTo(gridSize1, dy, 50);
 
-  if (key_ged == "Alt") {
+  if (this.data("cloneThisDrag") && !this.data("alreadyCloned")) {
+    this.data("alreadyCloned", true);
     //selection = this.clone();
     chd1 = this.selectAll(".shp, #instrumentChooser");
 
@@ -140,8 +141,6 @@ function sel_move(dx, dy) {
       //ele2.attr({"fill": "red"});
       s.append(ele2);
     });
-
-    key_ged = "lt";
   }
 
   this.attr({
@@ -164,7 +163,7 @@ function move(dx, dy) {
       (this.data("origTransform") ? "T" : "t") +
       [dx, dy],
   });
-  if (key_ged == "Alt" && !this.data("alreadyCloned")) {
+  if (this.data("cloneThisDrag") && !this.data("alreadyCloned")) {
     this.data("alreadyCloned", true);
 
     //  this.data("alreadyCloned", true);
@@ -211,7 +210,6 @@ function move(dx, dy) {
       ele1.dblclick(edit_text);
     }
     ele1.drag(move, sel_start);
-    key_ged = "lt";
   }
 }
 
@@ -220,7 +218,9 @@ function start(event) {
   this.data("origTransform", this.transform().local);
 }
 
-function sel_start() {
+function sel_start(x, y, event) {
+  var ev = event && (event.originalEvent || event);
+  this.data("cloneThisDrag", !!(ev && ev.altKey));
   this.data("origTransform", this.transform().local);
   this.data("alreadyCloned", false);
 
