@@ -7,10 +7,10 @@ function nextInstrumentChooserId() {
 }
 
 function isInstrumentChooserNode(el) {
-  if (!el || typeof el.hasClass !== "function") {
+  if (!el || typeof el.attr !== "function") {
     return false;
   }
-  if (el.hasClass("instrument-chooser")) {
+  if (typeof el.hasClass === "function" && el.hasClass("instrument-chooser")) {
     return true;
   }
   var id = el.attr("id");

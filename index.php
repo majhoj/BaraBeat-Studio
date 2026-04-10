@@ -1,3 +1,9 @@
+<?php
+$jsSnap = @filemtime(__DIR__ . '/JS/snapNEU.svg.js') ?: 1;
+$jsJq = @filemtime(__DIR__ . '/JS/jquery.min.js') ?: 1;
+$jsSel = @filemtime(__DIR__ . '/JS/selection_drag_7.js') ?: 1;
+$jsFn = @filemtime(__DIR__ . '/JS/functions.js') ?: 1;
+?>
 <!doctype html>
 <html>
 <head>
@@ -5,10 +11,10 @@
 <meta name="viewport" content="width=device-width">
 <meta name="viewport" content="initial-scale=1.0">
 <title><BaraBeat-Studio></title>
-<script src="JS/snapNEU.svg.js"></script>
-<script src="JS/jquery.min.js"></script>
-<script src="JS/selection_drag_7.js"></script>
-<script src="JS/functions.js"></script>
+<script src="JS/snapNEU.svg.js?v=<?php echo $jsSnap; ?>"></script>
+<script src="JS/jquery.min.js?v=<?php echo $jsJq; ?>"></script>
+<script src="JS/selection_drag_7.js?v=<?php echo $jsSel; ?>"></script>
+<script src="JS/functions.js?v=<?php echo $jsFn; ?>"></script>
 </head> 
 
 <body style="margin-top: 20px;">
