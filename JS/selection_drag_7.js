@@ -127,6 +127,21 @@ function sel_move(dx, dy) {
     chd1 = this.selectAll(".shp, #instrumentChooser");
 
     chd1.forEach(function (ele) {
+      if (ele.attr("id") == "instrumentChooser") {
+        var bb = ele.getBBox();
+        var gm = ele.transform().globalMatrix;
+        var ax = gm.x(bb.x, bb.y + 13);
+        var ay = gm.y(bb.x, bb.y + 13);
+        var textEl = ele.select("text");
+        var alterText = textEl.attr("text");
+        var alteFarbe = textEl.attr("fill");
+        ele2 = createInstrumentChooser(s, ax, ay, alterText, alteFarbe).attr({
+          class: "shp",
+          id: "instrumentChooser",
+        });
+        s.append(ele2);
+        return;
+      }
       ele2 = ele.clone();
       id_alt = ele.attr("id");
       ele2.attr({ id: id_alt });
