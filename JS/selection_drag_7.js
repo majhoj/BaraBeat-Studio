@@ -206,7 +206,7 @@ function move(dx, dy) {
 
     id_alt = this.attr("id");
     class_alt = this.attr("class");
-    ele1.attr({ id: id_alt, class: class_alt });
+    //ele1.attr({ id: id_alt, class: class_alt });
     if (this.attr("id") == "edit_text") {
       ele1.dblclick(edit_text);
     }
