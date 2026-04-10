@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width">
 <meta name="viewport" content="initial-scale=1.0">
-<title>Rhythmen 68</title>
+<title><BaraBeat-Studio></title>
 <script src="JS/snapNEU.svg.js"></script>
 <script src="JS/jquery.min.js"></script>
 <script src="JS/selection_drag_7.js"></script>
