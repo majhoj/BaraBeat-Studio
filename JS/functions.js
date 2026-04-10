@@ -10,6 +10,7 @@ function createInstrumentChooser(s, x, y, startText = "Instrument", startFill = 
     ];
 
     let chooserGruppe = s.g();
+    chooserGruppe.addClass("instrument-chooser");
     let menuGruppe = s.g().attr({ display: "none" });
 
     let instrumentText = s.text(0, 0, startText).attr({

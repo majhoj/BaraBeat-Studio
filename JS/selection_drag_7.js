@@ -1,5 +1,25 @@
 // JavaScript Document
 
+var instrumentChooserIdSeq = 0;
+function nextInstrumentChooserId() {
+  instrumentChooserIdSeq += 1;
+  return "instrumentChooser-" + instrumentChooserIdSeq;
+}
+
+function isInstrumentChooserNode(el) {
+  if (!el || typeof el.hasClass !== "function") {
+    return false;
+  }
+  if (el.hasClass("instrument-chooser")) {
+    return true;
+  }
+  var id = el.attr("id");
+  return (
+    id === "instrumentChooser" ||
+    (typeof id === "string" && id.indexOf("instrumentChooser-") === 0)
+  );
+}
+
 // Die auswählbaren Elemente müssen der Klasse .shp angehören.
 // Entweder mit element.addClass('shp'); oder .attr({class: 'shp'}); hinzufügen
 
@@ -14,7 +34,7 @@ function UnGroup() {
     Wenn nicht, drag-Methode wieder hinzufügen und <br>
     Elemente wieder zu s hinzugügen. */
 
-    chd = selections.selectAll(".shp, #instrumentChooser");
+    chd = selections.selectAll(".shp, .instrument-chooser");
     if (typeof dx1 == "undefined") {
       chd.forEach(function (ele) {
         ele.drag(move, sel_start, stop_m);
@@ -81,7 +101,7 @@ function shadow_end(event) {
   g_data = [];
   idx = 0;
   key_ged = event.key;
-  s.selectAll(".shp, #instrumentChooser").forEach(function (el) {
+  s.selectAll(".shp, .instrument-chooser").forEach(function (el) {
     var mybounds = el.getBBox();
     if (Snap.path.isBBoxIntersect(mybounds, bounds)) {
       idx++;
@@ -109,7 +129,7 @@ function entfernen() {
   let key_ged_meta = event.metaKey;
   if (key_ged == "x" && key_ged_meta) {
     //	if(key_ged && key_ged_meta){
-    ele2 = selections.selectAll(".shp, #instrumentChooser");
+    ele2 = selections.selectAll(".shp, .instrument-chooser");
 
     ele2.forEach(function (ele) {
       ele2.remove();
@@ -124,12 +144,19 @@ function sel_move(dx, dy) {
   if (this.data("cloneThisDrag") && !this.data("alreadyCloned")) {
     this.data("alreadyCloned", true);
     //selection = this.clone();
-    chd1 = this.selectAll(".shp, #instrumentChooser");
+    chd1 = this.selectAll(".shp, .instrument-chooser");
 
     chd1.forEach(function (ele) {
       ele2 = ele.clone();
       id_alt = ele.attr("id");
-      ele2.attr({ id: id_alt });
+      if (isInstrumentChooserNode(ele)) {
+        ele2.attr({ id: nextInstrumentChooserId() });
+        ele2.selectAll("g").forEach(function (sub) {
+          sub.attr({ display: "none" });
+        });
+      } else {
+        ele2.attr({ id: id_alt });
+      }
       // if(ele2.attr("id")=="wiederholung") {
       //    ele2.drag(move,sel_start,edit_text_wz_1);
       //    ele2.dblclick(edit_text_wz);
@@ -168,7 +195,7 @@ function move(dx, dy) {
 
     //  this.data("alreadyCloned", true);
 
-    if (this.attr("id") != "instrumentChooser") {
+    if (!isInstrumentChooserNode(this)) {
       ele1 = this.clone();
 
       if (this.attr("id") == "wiederholung") {
@@ -182,7 +209,7 @@ function move(dx, dy) {
 			let chooser = createInstrumentChooser(s, ax, ay).attr({ id: "instrumentChooser" });
 		}*/
 
-    if (this.attr("id") == "instrumentChooser") {
+    if (isInstrumentChooserNode(this)) {
       ax = this.data("startX");
       ay = this.data("startY") + 13;
 
@@ -191,25 +218,28 @@ function move(dx, dy) {
       let alteFarbe = altesTextElement.attr("fill");
 
       //let chooser = createInstrumentChooser(s, ax, ay).attr({ id: "instrumentChooser" });
-      let chooser = createInstrumentChooser(s, ax, ay, alterText, alteFarbe).attr({
-        class: "shp",
-        id: "instrumentChooser",
-      });
+      ele1 = createInstrumentChooser(s, ax, ay, alterText, alteFarbe)
+        .addClass("shp")
+        .attr({
+          id: nextInstrumentChooserId(),
+        });
 
       /*  chooser.select("text").attr({
 	        text: alterText,
 	        fill: "#333"
     });
 		*/
-    } 
+    }
 
     id_alt = this.attr("id");
     class_alt = this.attr("class");
     //ele1.attr({ id: id_alt, class: class_alt });
-    if (this.attr("id") == "edit_text") {
+    if (this.attr("id") == "edit_text" && ele1) {
       ele1.dblclick(edit_text);
     }
-    ele1.drag(move, sel_start);
+    if (ele1 && !isInstrumentChooserNode(this)) {
+      ele1.drag(move, sel_start);
+    }
   }
 }
 

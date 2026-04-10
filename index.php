@@ -556,7 +556,7 @@ edit_text_wz = function () {
 
 function callPHPScript2()
 {   text1 = "";
-    editall = s.selectAll("#notenlinien, #basis, #edit, #tone, #bass, #slap, #tone_muffled, #slap_muffled, #tone_flam, #slap_flam, #in, #out, #edit_text, #wiederholung, #instrumentChooser");
+    editall = s.selectAll("#notenlinien, #basis, #edit, #tone, #bass, #slap, #tone_muffled, #slap_muffled, #tone_flam, #slap_flam, #in, #out, #edit_text, #wiederholung, .instrument-chooser, #instrumentChooser");
  // Noten im Abseits löschen
     editall.forEach(function(el) {
         ax = el.getBBox().cx;
@@ -565,7 +565,7 @@ function callPHPScript2()
         //text1 += el.toString();
 	});
 
-     editall = s.selectAll("#notenlinien, #basis, #edit, #tone, #bass, #slap, #tone_muffled, #slap_muffled, #tone_flam, #slap_flam, #in, #out, #edit_text, #wiederholung, #instrumentChooser");
+     editall = s.selectAll("#notenlinien, #basis, #edit, #tone, #bass, #slap, #tone_muffled, #slap_muffled, #tone_flam, #slap_flam, #in, #out, #edit_text, #wiederholung, .instrument-chooser, #instrumentChooser");
     editall.forEach(function(el) {
         text1 += el.toString();
 	});
@@ -663,7 +663,7 @@ function callPHPScript_lesen(anzahl){
       notenInTakt[i] = [f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f];
     }
   }
-  editall = s.selectAll("#edit_text, #wiederholung, #instrumentChooser");
+  editall = s.selectAll("#edit_text, #wiederholung, .instrument-chooser, #instrumentChooser");
   editall.forEach(function(el) {
     zeilenPlus = 0;
     zeilenMinus = 0;
@@ -721,7 +721,7 @@ function callPHPScript()
       text1 = '<tenaer id="rhythmus"/>';
     }
 
-    editall = s.selectAll("#edit, #tone, #bass, #slap, #tone_muffled, #slap_muffled, #tone_flam, #slap_flam, #bass_slap_flam, #in, #out, #edit_text, #wiederholung, #instrumentChooser");
+    editall = s.selectAll("#edit, #tone, #bass, #slap, #tone_muffled, #slap_muffled, #tone_flam, #slap_flam, #bass_slap_flam, #in, #out, #edit_text, #wiederholung, .instrument-chooser, #instrumentChooser");
  // Noten im Abseits löschen
     editall.forEach(function(el) {
         ax = el.getBBox().cx;
@@ -730,7 +730,7 @@ function callPHPScript()
         //text1 += el.toString();
 	});
 
-    editall = s.selectAll("#edit, #tone, #bass, #slap, #tone_muffled, #slap_muffled, #tone_flam, #slap_flam, #bass_slap_flam, #in, #out, #edit_text, #wiederholung, #instrumentChooser");
+    editall = s.selectAll("#edit, #tone, #bass, #slap, #tone_muffled, #slap_muffled, #tone_flam, #slap_flam, #bass_slap_flam, #in, #out, #edit_text, #wiederholung, .instrument-chooser, #instrumentChooser");
     editall.forEach(function(el) {
         text1 += el.toString();
 	});
@@ -809,7 +809,7 @@ document.querySelector('#button3').addEventListener('click', () => {callPHPScrip
 document.querySelector('#button4').addEventListener('click',viererNoten);
 document.querySelector('#button5').addEventListener('click',dreierNoten);
 document.querySelector('#button7').addEventListener('click', ev => {
-chooser = createInstrumentChooser(s, 125, 140).attr({ class: "shp", id: "instrumentChooser" })
+chooser = createInstrumentChooser(s, 125, 140).addClass("shp").attr({ id: nextInstrumentChooserId() })
 });
 
 document.querySelector('#button6').addEventListener('click', ev => {
@@ -856,7 +856,7 @@ function onSVGLoaded(data) {
     }
     //geom_note = data.select("#rhythmus");
    // alert(geom_note);
-    geom = data.selectAll("#edit, #tone, #bass, #slap, #tone_muffled, #slap_muffled, #tone_flam, #slap_flam, #bass_slap_flam, #in, #out, #edit_text, #wiederholung, #instrumentChooser");
+    geom = data.selectAll("#edit, #tone, #bass, #slap, #tone_muffled, #slap_muffled, #tone_flam, #slap_flam, #bass_slap_flam, #in, #out, #edit_text, #wiederholung, .instrument-chooser, #instrumentChooser");
 
     s.append(geom);
     geom.forEach(function(el) {
@@ -872,7 +872,7 @@ function onSVGLoaded(data) {
 	   el.dblclick(edit_text_wz);
 	});
 
-    geom = s.selectAll("#instrumentChooser");
+    geom = s.selectAll(".instrument-chooser, #instrumentChooser");
     geom.forEach(function(el) {
 
       ax = el.getBBox().cx-35;
@@ -881,7 +881,7 @@ function onSVGLoaded(data) {
       let altesTextElement = el.select("text");
       let alterText = altesTextElement.attr("text");
       let alteFarbe = altesTextElement.attr("fill");
-      let chooser = createInstrumentChooser(s, ax, ay, alterText, alteFarbe).attr({class: "shp", id: "instrumentChooser" });
+      let chooser = createInstrumentChooser(s, ax, ay, alterText, alteFarbe).addClass("shp").attr({ id: nextInstrumentChooserId() });
       el.remove();
 
 
@@ -893,7 +893,7 @@ function onSVGLoaded(data) {
 
 function get_value(e)
 {
-    all = s.selectAll("#edit, #tone, #bass, #slap, #tone_muffled, #slap_muffled, #tone_flam, #slap_flam, #bass_slap_flam, #in, #out, #edit_text, #wiederholung, #instrumentChooser");
+    all = s.selectAll("#edit, #tone, #bass, #slap, #tone_muffled, #slap_muffled, #tone_flam, #slap_flam, #bass_slap_flam, #in, #out, #edit_text, #wiederholung, .instrument-chooser, #instrumentChooser");
     all.forEach(function(el) {
         el.remove();
     });
