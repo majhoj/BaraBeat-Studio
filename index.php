@@ -15,7 +15,7 @@ $jsFn = @filemtime(__DIR__ . '/JS/functions.js') ?: 1;
 <script src="JS/jquery.min.js?v=<?php echo $jsJq; ?>"></script>
 <script src="JS/selection_drag_7.js?v=<?php echo $jsSel; ?>"></script>
 <script src="JS/functions.js?v=<?php echo $jsFn; ?>"></script>
-</head> 
+</head>
 
 <body style="margin-top: 20px;">
 <?php
@@ -629,6 +629,7 @@ text1 = '<svg height="1480" version="1.1" width="1050" xmlns="http://www.w3.org/
         document.getElementById('auswahl').innerHTML = iofield;
            });
         }
+        setTimeout(callPHPScript1, 1000);
     });
     }
 }

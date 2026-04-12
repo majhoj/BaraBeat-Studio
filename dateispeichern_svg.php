@@ -4,7 +4,7 @@ $dateiname = $_POST[b];
 $dateiname = $dateiname.".svg";
 //$zeile = "Per GET wurde der Name $name übergeben \r\n";
 //header("HTTP/1.0 204 No Content");
-file_put_contents("../Noten/SVG/".$dateiname, $inhalt);
+file_put_contents("Noten/SVG/".$dateiname, $inhalt);
 echo "&nbsp&nbsp".$dateiname." wurde gesichert";
 
 //$inhalt = $_POST["inhalt"];
