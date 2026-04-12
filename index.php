@@ -617,7 +617,7 @@ text1 = '<svg height="1480" version="1.1" width="1050" xmlns="http://www.w3.org/
         else{
             l = dateiname.length-4;
             dateiname = dateiname.substr(0,l);
-            $.post("PHP/dateispeichern_svg.php",
+            $.post("dateispeichern_svg.php",
                    {
                 a: text1,
                 b: dateiname
@@ -763,7 +763,7 @@ function callPHPScript()
             check = confirm('Die Datei "'+dateiname + '" existiert schon!\nSoll die Datei überschrieben werden?', '');
             if (check == true) {
 
-            $.post("PHP/dateispeichern.php",
+            $.post("dateispeichern.php",
                    {
                 a: text1,
                 b: dateiname
@@ -782,7 +782,7 @@ function callPHPScript()
              else{
             l = dateiname.length-4;
             dateiname = dateiname.substr(0,l);
-            $.post("PHP/dateispeichern.php",
+            $.post("dateispeichern.php",
                    {
                 a: text1,
                 b: dateiname
