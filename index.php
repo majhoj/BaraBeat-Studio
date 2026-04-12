@@ -78,7 +78,7 @@ var canv = s.rect(0,0,1050,1480).attr({fill:"white", stroke:"black", strokeWidth
 canv.drag(shadow_move, shadow_start, shadow_end);
 
     y = 172;
-	  z = 202;
+	z = 202;
     k = 0;
     yN = 172;
 
@@ -102,8 +102,8 @@ function viererNoten()
     rhythm = 'binaer';
         //Grid festlegen
     gridSize = (850/34)/2;
-    gridSize1 = 10;
-    gridSize2 = 25;
+    gridSizeY = 5;
+    gridSizeX = 29;
     gridSize_Wz = 24;
 
     clear_all();
@@ -143,10 +143,12 @@ function viererNoten()
 function dreierNoten(){
     rhythm = 'tenaer';
   //Grid festlegen
-  gridSize = (850/26)/2;
-  gridSize1 = 10;
-  gridSize2 = 34;
-  gridSize_Wz = 26;
+    gridSize = (850/26)/2;
+    gridSizeX = 34; // Verschiebung der Noten in X-Richtung
+    gridSize_Wz = 26; // Verschiebung der Wiederholung in X-Richtung
+    gridSizeY = 5; // Verschiebung der Noten in Y-Richtung
+
+
 
 
   clear_all();
@@ -211,10 +213,10 @@ function dreierNoten(){
 
 
 //	Flam Slap
-  x = cx-8, y = cy+88;
+  x = cx-8, y = cy+87;
    // slap = s.polygon(x,y,x+8,y-14,x+16,y);
-  slap_0 = s.rect(x,y-12,20,12).attr({ opacity: 0.001 })
-  slap_a1 = s.line(x,y,x+12,y-12).attr({ stroke:"black", strokeWidth: 2 });
+    slap_0 = s.rect(x,y-12,20,12).attr({ opacity: 0.001 })
+    slap_a1 = s.line(x,y,x+12,y-12).attr({ stroke:"black", strokeWidth: 2 });
 	slap_a2 = s.line(x,y-12,x+12,y).attr({ stroke:"black", strokeWidth: 2 });
 	x = cx-2;
 	slap_b1 = s.line(x,y,x+12,y-12).attr({ stroke:"black", strokeWidth: 2 });
@@ -283,70 +285,72 @@ function dreierNoten(){
 
   // Legende schreiben
 
-    cx = 122, cy = 1380;
+    cx = 162, cy = 1380;
 
 	tx = cx-70; ty = cy-214;
     ton_c = ton.clone().attr({id: "basis", transform: "t" + tx + "," + ty});
-    s.text( cx-5, cy, "Tone").attr({id: "basis", 'font-size':15, 'font-family':'sans-serif'});
+    s.text( cx-25, cy-35.5, "Tone").attr({id: "basis", 'font-size':15, 'font-family':'sans-serif'});
 
     cx += 88;
-	bx = cx-81; by = cy-234;
+	bx = cx-91; by = cy-234;
     bass_c = bass.clone().attr({id: "basis", transform: "t" + bx + "," + by});
-	cx -= 15;
-    s.text( cx, cy, "Bass").attr({id: "basis", 'font-size':15, 'font-family':'sans-serif'});
+	cx -= 45;
+    s.text( cx, cy-35.5, "Bass").attr({id: "basis", 'font-size':15, 'font-family':'sans-serif'});
 
-    cx += 82;
+    cx += 97;
 	sx = cx-76; sy = cy-254;
     slap_c = slap.clone().attr({id: "basis", transform: "t" + sx + "," + sy});
-	cx -= 12;
-    s.text( cx, cy, "Slap/Glocke").attr({id: "basis", 'font-size':15, 'font-family':'sans-serif'});
+	cx -= 30;
+    s.text( cx, cy-35.5, "Slap/Glocke").attr({id: "basis", 'font-size':15, 'font-family':'sans-serif'});
 
-    cx += 140;
+    cx += 155;
 	ftx = cx-81; fty = cy-274;
     flam_ton_c = flam_ton.clone().attr({id: "basis", transform: "t" + ftx + "," + fty});
-	cx -= 12;
-    s.text( cx, cy, "Flam mit Tones").attr({id: "basis", 'font-size':15, 'font-family':'sans-serif'});
+	cx -= 30;
+    s.text( cx, cy-35.5, "Flam mit Tones").attr({id: "basis", 'font-size':15, 'font-family':'sans-serif'});
 
-    cx += 152;
+    cx += 172;
 	fsx = cx-78; fsy = cy-294;
     flam_slap_c = flam_slap.clone().attr({id: "basis", transform: "t" + fsx + "," + fsy});
-	cx -= 10;
-    s.text( cx, cy, "Flam mit Slaps").attr({id: "basis", 'font-size':15, 'font-family':'sans-serif'});
+	cx -= 28;
+    s.text( cx, cy-35.5, "Flam mit Slaps").attr({id: "basis", 'font-size':15, 'font-family':'sans-serif'});
 
-	cx += 155;
-	fsx = cx-78; fsy = cy-314;
+	cx += 170;
+	fsx = cx-78; fsy = cy-313.5;
     flam_bass_slap_c = flam_bass_slap.clone().attr({id: "basis", transform: "t" + fsx + "," + fsy});
-	cx -= 10;
-    s.text( cx, cy, "Flam mit Bass und Slaps").attr({id: "basis", 'font-size':15, 'font-family':'sans-serif'});
+	cx -= 28;
+    s.text( cx, cy-35.5, "Flam mit Bass und Slaps").attr({id: "basis", 'font-size':15, 'font-family':'sans-serif'});
 
-    cx = 130, cy = 1410;
+    cx = 170, cy = 1410;
 	sgx = cx-78; sgy = cy-332;
     ton_g_c = ton_g.clone().attr({id: "basis", transform: "t" + sgx + "," + sgy});
-	cx -= 10;
-    s.text( cx, cy, "gedämpfter Tone").attr({id: "basis", 'font-size':15, 'font-family':'sans-serif'});
+	cx -= 30;
+    s.text( cx, cy-35.5, "gedämpfter Tone").attr({id: "basis", 'font-size':15, 'font-family':'sans-serif'});
+
+    cx += 178;
+	sgx = cx-78; sgy = cy-352;
+    slap_g_c = slap_g.clone().attr({id: "basis", transform: "t" + sgx + "," + sgy});
+	cx -= 30;
+    s.text( cx, cy-35.5, "gedämpfter Slap").attr({id: "basis", 'font-size':15, 'font-family':'sans-serif'});
 
     cx += 170;
-	sgx = cx-78; sgy = cy-355;
-    slap_g_c = slap_g.clone().attr({id: "basis", transform: "t" + sgx + "," + sgy});
-	cx -= 10;
-    s.text( cx, cy, "gedämpfter Slap").attr({id: "basis", 'font-size':15, 'font-family':'sans-serif'});
-
-    cx += 160;
 	ix = cx-73; iy = cy-377;
     In_c = In.clone().attr({id: "basis", transform: "t" + ix + "," + iy});
-	cx -= 10;
-    s.text( cx, cy, "In").attr({id: "basis", 'font-size':15, 'font-family':'sans-serif'});
+	cx -= 28;
+    s.text( cx, cy-35.5, "In").attr({id: "basis", 'font-size':15, 'font-family':'sans-serif'});
 
-    cx += 55;
+    cx += 72;
 	ox = cx-73; oy = cy-400;
 	Out_c = Out.clone().attr({id: "basis", transform: "t" + ox + "," + oy});
-	cx -= 10;
-    s.text( cx, cy, "Out").attr({id: "basis", 'font-size':15, 'font-family':'sans-serif'});
+	cx -= 28;
+    s.text( cx, cy-35.5, "Out").attr({id: "basis", 'font-size':15, 'font-family':'sans-serif'});
 
 	//wz_d.attr({text: "11"});
-	px = cx-5; py = cy-450;
+    cx += 14;
+	px = cx-5; py = cy-445;
 	wz_g_c = wz_g.clone().attr({transform: "t" + px + "," + py});
-    s.text( px+60, cy, "Wiederholung").attr({'font-size':15, 'font-family':'sans-serif'});
+    cx -= -38;
+    s.text( cx, cy-35.5, "Wiederholung").attr({'font-size':15, 'font-family':'sans-serif'});
 
 
 
@@ -358,7 +362,7 @@ flag_move = false; ddx=0; ddy=0; dddx=0; dddy=0; //mdx=0; mdy=0;
 
 var move1 = function(dx,dy,x,y) {
     var dx = Snap.snapTo(gridSize, dx, 50);
-    var dy = Snap.snapTo(gridSize1, dy, 50);
+    var dy = Snap.snapTo(gridSizeY, dy, 50);
     this.attr({
         transform: this.data('origTransform') + (this.data('origTransform') ? "T" : "t") + [dx, dy]
     });
@@ -378,61 +382,61 @@ var stop1 = function() {
 
 // Duplicate der Noten erzeugen
    edit_ton = function () {
-		e = ton_c.clone().attr({ class: 'shp',  id: "tone", transform: "t" + (dddx + gridSize2) +"," + dddy} );
+		e = ton_c.clone().attr({ class: 'shp',  id: "tone", transform: "t" + (dddx + gridSizeX) +"," + dddy} );
 		e.drag(move,sel_start);}
 	ton.click(edit_ton);
 	ton.touchstart(edit_ton);
 
 	edit_bass = function () {
-		e = bass_c.clone().attr({ class: 'shp',  id: "bass", transform: "t" + (dddx + gridSize2) +"," + dddy} );
+		e = bass_c.clone().attr({ class: 'shp',  id: "bass", transform: "t" + (dddx + gridSizeX) +"," + dddy} );
 		e.drag(move,sel_start);}
     bass.click(edit_bass);
     bass.touchstart(edit_bass);
 
 	edit_slap = function () {
-		e = slap_c.clone().attr({ class: 'shp',  id: "slap", transform: "t" + (dddx + gridSize2) +"," + dddy} );
+		e = slap_c.clone().attr({ class: 'shp',  id: "slap", transform: "t" + (dddx + gridSizeX) +"," + dddy} );
 		e.drag(move,sel_start);}
     slap.click(edit_slap);
     slap.touchstart(edit_slap);
 
 	edit_ton_g = function () {
-		e = ton_g_c.clone().attr({ class: 'shp',  id: "tone_muffled", transform: "t" + (dddx + gridSize2) +"," + dddy} );
+		e = ton_g_c.clone().attr({ class: 'shp',  id: "tone_muffled", transform: "t" + (dddx + gridSizeX) +"," + dddy} );
 		e.drag(move,sel_start);}
     ton_g.click(edit_ton_g);
 	ton_g.touchstart(edit_ton_g);
 
 	edit_slap_g = function () {
-		e = slap_g_c.clone().attr({ class: 'shp',  id: "slap_muffled", transform: "t" + (dddx + gridSize2) +"," + dddy} );
+		e = slap_g_c.clone().attr({ class: 'shp',  id: "slap_muffled", transform: "t" + (dddx + gridSizeX) +"," + dddy} );
 		e.drag(move,sel_start);}
     slap_g.click(edit_slap_g);
     slap_g.touchstart(edit_slap_g);
 
 	edit_flam = function () {
-		e = flam_ton_c.clone().attr({ class: 'shp',  id: "tone_flam", transform: "t" + (dddx + gridSize2) +"," + dddy} );
+		e = flam_ton_c.clone().attr({ class: 'shp',  id: "tone_flam", transform: "t" + (dddx + gridSizeX) +"," + dddy} );
 		e.drag(move,sel_start);}
     flam_ton.touchstart(edit_flam);
     flam_ton.click(edit_flam);
 
 	edit_flam_slap = function () {
-		e = flam_slap_c.clone().attr({ class: 'shp',  id: "slap_flam", transform: "t" + (dddx + gridSize2) +"," + dddy} );
+		e = flam_slap_c.clone().attr({ class: 'shp',  id: "slap_flam", transform: "t" + (dddx + gridSizeX) +"," + dddy} );
 		e.drag(move,sel_start);}
     flam_slap.click(edit_flam_slap);
     flam_slap.touchstart(edit_flam_slap);
 
 	edit_flam_bass_slap = function () {
-		e = flam_bass_slap_c.clone().attr({ class: 'shp',  id: "bass_slap_flam", transform: "t" + (dddx + gridSize2) +"," + dddy} );
+		e = flam_bass_slap_c.clone().attr({ class: 'shp',  id: "bass_slap_flam", transform: "t" + (dddx + gridSizeX) +"," + dddy} );
 		e.drag(move,sel_start);}
     flam_bass_slap.click(edit_flam_bass_slap);
     flam_bass_slap.touchstart(edit_flam_bass_slap);
 
 	edit_in = function () {
-		e = In_c.clone().attr({ class: 'shp',  id: "in", transform: "t" + (dddx + gridSize2) +"," + dddy} );
+		e = In_c.clone().attr({ class: 'shp',  id: "in", transform: "t" + (dddx + gridSizeX) +"," + dddy} );
 		e.drag(move,sel_start);}
     In.click(edit_in);
     In.touchstart(edit_in);
 
     edit_out = function () {
-		e = Out_c.clone().attr({ class: 'shp',  id: "out", transform: "t" + (dddx + gridSize2) +"," + dddy} );
+		e = Out_c.clone().attr({ class: 'shp',  id: "out", transform: "t" + (dddx + gridSizeX) +"," + dddy} );
 		e.drag(move,sel_start);}
     Out.click(edit_out);
     Out.touchstart(edit_out);
@@ -467,69 +471,6 @@ var stop1 = function() {
     text_z_g.click(edit_text_z_g);
     text_z_g.touchstart(edit_text_z_g);
 
-
-
-/*
-    wz_g.click(edit_wz_g);
-    text_z_g.touchstart(edit_wz_g);
-
-    */
-/*
-	edit_text_wz = function(){
-        elx = this.getBBox().x ;
-        ely = this.getBBox().y ;
-      //  console.log("elx = "+ elx + ", ely = " + ely);
-      //  console.log(this.attr("id"));
-            this.remove();
-            var temp = window.alert;
-            window.alert = function() {};
-            if(elx == 515 || elx == 940){
-                text_i = prompt('Gib hier die Anzahl der Wiederholungen ein!', '');
-            }
-            else{
-                text_i = " ";
-            }
-             var titlen = Snap.parse('<g id="wiederholung_clon" transform="matrix(1,0,0,1,19,-48)" class="shp" xmlns="http://www.w3.org/2000/svg"><rect x="-5" y="-14.425" width="10" height="20" style="opacity: 0.101;"></rect><circle cx="0" cy="-9.925" r="2.5"></circle><circle cx="0" cy="-1.925" r="2.5"></circle><text x="0" y="14.425" style="font-size: 12px; font-family: sans-serif; font-weight: bold; text-anchor: middle;">'+text_i+'</text></g>');
-             window.alert = temp;
-
-            s.append( titlen );
-            geome = s.selectAll("#wiederholung_clon");
-            geome.forEach(function(el) {
-            el.attr({id: "wiederholung", transform: "t" + (elx+5) +"," + (ely+14.425)} );
-            el.attr({class: "shp"});
-            el.drag(move,sel_start,edit_text_wz_1);
-            el.dblclick(edit_text_wz);
-           });
-    }
-
-    edit_text_wz_1 = function(){
-        elx = this.getBBox().x ;
-        ely = this.getBBox().y ;
-      //  console.log("elx_1 = "+ elx + ", ely_1 = " + ely);
-      //  console.log(this.attr("id"));
-        //console.log("www_1 = " + wiederholungszeichen(this));
-            this.remove();
-            var temp = window.alert;
-            window.alert = function() {};
-            if(elx == 515 || elx == 940){
-                text_i = " "; // prompt('Gib hier die Anzahl der Wiederholungen ein!', '');
-            }
-            else{
-                text_i = " ";
-            }
-             var titlen = Snap.parse('<g id="wiederholung_clon" transform="matrix(1,0,0,1,19,-48)" class="shp" xmlns="http://www.w3.org/2000/svg"><rect x="-5" y="-14.425" width="10" height="20" style="opacity: 0.501;"></rect><circle cx="0" cy="-9.925" r="2.5"></circle><circle cx="0" cy="-1.925" r="2.5"></circle><text x="0" y="14.425" style="font-size: 12px; font-family: sans-serif; font-weight: bold; text-anchor: middle;">'+text_i+'</text></g>');
-             window.alert = temp;
-
-            s.append( titlen );
-            geome = s.selectAll("#wiederholung_clon");
-            geome.forEach(function(el) {
-            el.attr({id: "wiederholung", transform: "t" + (elx+5) +"," + (ely+14.425)} );
-            el.attr({class: "shp"});
-            el.drag(move,sel_start);
-            el.dblclick(edit_text_wz);
-           });
-    }
-*/
 
 edit_text_wz = function () {
      let textEl = this.select('text');
