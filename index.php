@@ -41,12 +41,126 @@ echo $datei;
     </div>
 
 <script>
+var edit_title;
+var edit_text;
+var y = 172;
+var z = 202;
+var k = 0;
+var yN = 172;
+var gridSize = (850 / 34) / 2;
+var gridSizeY = 5;
+var gridSizeX = 29;
+var gridSize_Wz = 24;
+var cx;
+var cy;
+var dc;
+var ton;
+var bass;
+var slap;
+var flam_ton;
+var flam_slap;
+var flam_bass_slap;
+var ton_g;
+var slap_g;
+var In;
+var Out;
+var text_z_g;
+var wz_g;
+var ton_c;
+var bass_c;
+var slap_c;
+var flam_ton_c;
+var flam_slap_c;
+var flam_bass_slap_c;
+var ton_g_c;
+var slap_g_c;
+var In_c;
+var Out_c;
+var wz_g_c;
+var dall;
+var flag_move = false;
+var ddx = 0;
+var ddy = 0;
+var dddx = 0;
+var dddy = 0;
+var textTouchStartX;
+var textTouchStartY;
+var textTouchEndX;
+var textTouchEndY;
+var loadedTitle = '';
+var chooser;
+var x;
+var e;
+var slap_a;
+var slap_b;
+var flam_ton_a;
+var flam_ton_b;
+var slap_0;
+var slap_a1;
+var slap_a2;
+var slap_b1;
+var slap_b2;
+var flam_bass_0;
+var flam_bass;
+var slap_a3;
+var slap_a4;
+var ton_g_a;
+var ton_g_b;
+var slap_a5;
+var slap_a6;
+var slap_g_b;
+var in_c;
+var in_a;
+var in_b;
+var out_c;
+var out_a;
+var out_b;
+var dt;
+var text_z;
+var text_z1;
+var wz_c;
+var wz_a;
+var wz_b;
+var wz_d;
+var tx;
+var ty;
+var bx;
+var by;
+var sx;
+var sy;
+var ftx;
+var fty;
+var fsx;
+var fsy;
+var sgx;
+var sgy;
+var ix;
+var iy;
+var ox;
+var oy;
+var px;
+var py;
+var edit_ton;
+var edit_bass;
+var edit_slap;
+var edit_ton_g;
+var edit_slap_g;
+var edit_flam;
+var edit_flam_slap;
+var edit_flam_bass_slap;
+var edit_in;
+var edit_out;
+var edit_text_a;
+var edit_text_b;
+var edit_text_z_g;
+var edit_text_wz;
+var edit_wz_g;
 
-var elem = document.querySelector('body');
+const elem = document.querySelector('body');
 elem.addEventListener("keydown", shadow_end );
-var elem1 = document.querySelector('body');
+const elem1 = document.querySelector('body');
 elem1.addEventListener("keydown", start);
-var elem2 = document.querySelector('body');
+const elem2 = document.querySelector('body');
 elem2.addEventListener("keydown", entfernen);
 /*
 elem.addEventListener ("keydown", function (event) {
@@ -54,19 +168,17 @@ elem.addEventListener ("keydown", function (event) {
 });
 */
 
-
-let myObjectString = "TEST";
 // Funktionen
 edit_title = function(){
-    text_a = (this.attr('text'));
-    text_i = prompt('Gib hier bitte den gewünschten Text ein!', text_a);
+    const text_a = this.attr('text');
+    const text_i = prompt('Gib hier bitte den gewünschten Text ein!', text_a);
     if (text_i == null) {return;}
     this.attr({text: text_i});
 }
 
 edit_text = function(){
-    text_a = (this.attr('text'));
-    text_i = prompt('Gib hier bitte den gewünschten Text ein!', text_a);
+    const text_a = this.attr('text');
+    const text_i = prompt('Gib hier bitte den gewünschten Text ein!', text_a);
     if (text_i == null) {return;}
     this.attr({text: text_i});
 }
@@ -77,15 +189,10 @@ var s = Snap(1050,1480).attr({ id: "myRect1" });
 var canv = s.rect(0,0,1050,1480).attr({fill:"white", stroke:"black", strokeWidth: 0.5, opacity: 0.300, id: "myRect2" });
 canv.drag(shadow_move, shadow_start, shadow_end);
 
-    y = 172;
-	z = 202;
-    k = 0;
-    yN = 172;
-
 function clear_all()
 {
-    all = s.selectAll("#notenlinien, #edit, #tone, #bass, #slap, #tone_muffled, #slap_muffled, #tone_flam, #slap_flam, #bass_slap_flam, #in, #out, #edit_text, #wiederholung");
-    all.forEach(function(el) {
+    const elementsToClear = s.selectAll("#notenlinien, #edit, #tone, #bass, #slap, #tone_muffled, #slap_muffled, #tone_flam, #slap_flam, #bass_slap_flam, #in, #out, #edit_text, #wiederholung");
+    elementsToClear.forEach(function(el) {
         el.remove();
     });
 }
@@ -109,31 +216,32 @@ function viererNoten()
     clear_all();
     //titel.attr({text: "Enter the name of the Rhythm"});
 
-    k1 = ["Ja","Pi","Du","Pa"];
+    const countSyllables = ["Ja","Pi","Du","Pa"];
+    k = 0;
 
     //let zeilenAnzahl = 10;
 
     for (var j=0; j < zeilenAnzahl; j++){
-        c = s.rect(100, yN-10+j*120, 3, 60).attr({ id: "notenlinien" });
-        c = s.rect(525, yN-10+j*120, 3, 60).attr({ id: "notenlinien" });
-        c = s.rect(950, yN-10+j*120, 3, 60).attr({ id: "notenlinien" });
-		zaehl = s.text(90, yN+30+j*120, j+1).attr({ id: 'notenlinien', 'font-size':24, 'font-family':'sans-serif', 'font-weight':'bold', 'fill':"#a0a0a0", 'text-anchor':'end' });
+        s.rect(100, yN-10+j*120, 3, 60).attr({ id: "notenlinien" });
+        s.rect(525, yN-10+j*120, 3, 60).attr({ id: "notenlinien" });
+        s.rect(950, yN-10+j*120, 3, 60).attr({ id: "notenlinien" });
+		s.text(90, yN+30+j*120, j+1).attr({ id: 'notenlinien', 'font-size':24, 'font-family':'sans-serif', 'font-weight':'bold', 'fill':"#a0a0a0", 'text-anchor':'end' });
         for (var i=1; i < 34; i++){
-            x = 100 + (850/34)*i
+            const x = 100 + (850/34)*i;
             if (i != 17){
-               var text = s.text( x-3, yN+j*120-4, k1[k]).attr({ id: 'notenlinien', 'font-size':10});
-               k++;
-                if (k==4){k=0}
-                c = s.rect(x, yN+j*120, 1.5, 40).attr({ id: "notenlinien" });
+	               s.text( x-3, yN+j*120-4, countSyllables[k]).attr({ id: 'notenlinien', 'font-size':10});
+	               k++;
+	                if (k==4){k=0}
+	                s.rect(x, yN+j*120, 1.5, 40).attr({ id: "notenlinien" });
             }
 
             if (i == 1 || i == 5 || i == 9 || i == 13 || i == 18 || i == 22 || i == 26 || i == 30){
-				k2 = Math.trunc((i+4) / 4);
-				if(k2>4){k2-=4};
-				var text = s.text( x-3, yN+j*120-14, k2).attr({ id: 'notenlinien', 'font-size':10});
-                b = (850/34)*3
-                c = s.rect(x, yN+j*120, b, 1.5).attr({ id: "notenlinien" });
-                c = s.rect(x, yN+j*120+5, b, 1.5).attr({ id: "notenlinien" });
+				let beatNumber = Math.trunc((i+4) / 4);
+					if(beatNumber>4){beatNumber-=4};
+					s.text( x-3, yN+j*120-14, beatNumber).attr({ id: 'notenlinien', 'font-size':10});
+	                const b = (850/34)*3;
+	                s.rect(x, yN+j*120, b, 1.5).attr({ id: "notenlinien" });
+	                s.rect(x, yN+j*120+5, b, 1.5).attr({ id: "notenlinien" });
             }
         }
     }
@@ -152,30 +260,31 @@ function dreierNoten(){
 
 
   clear_all();
-   k1 = ["Ja","Pi","Du"];
+   const countSyllables = ["Ja","Pi","Du"];
+   k = 0;
     //titel.attr({text: "Enter the name of the Rhythm"});
 
      for (var j=0; j < 10; j++){
-        c = s.rect(100, yN-10+j*120, 3, 60).attr({ id: "notenlinien" });
-        c = s.rect(525, yN-10+j*120, 3, 60).attr({ id: "notenlinien" });
-        c = s.rect(950, yN-10+j*120, 3, 60).attr({ id: "notenlinien" });
-		zaehl = s.text(90, yN+30+j*120, j+1).attr({id: "notenlinien", 'font-size':24, 'font-family':'sans-serif', 'font-weight':'bold', 'fill':"#a0a0a0", 'text-anchor':'end' });
+        s.rect(100, yN-10+j*120, 3, 60).attr({ id: "notenlinien" });
+        s.rect(525, yN-10+j*120, 3, 60).attr({ id: "notenlinien" });
+        s.rect(950, yN-10+j*120, 3, 60).attr({ id: "notenlinien" });
+		s.text(90, yN+30+j*120, j+1).attr({id: "notenlinien", 'font-size':24, 'font-family':'sans-serif', 'font-weight':'bold', 'fill':"#a0a0a0", 'text-anchor':'end' });
         for (var i=1; i < 26; i++){
-            x = 100 + (850/26)*i
+            const x = 100 + (850/26)*i;
             if (i != 13){
-               var text = s.text( x-3, yN+j*120-4, k1[k]).attr({id: "notenlinien", 'font-size':10});
-               k++;
-                if (k==3){k=0}
-                c = s.rect(x, yN+j*120, 1.5, 40).attr({ id: "notenlinien" });
+	               s.text( x-3, yN+j*120-4, countSyllables[k]).attr({id: "notenlinien", 'font-size':10});
+	               k++;
+	                if (k==3){k=0}
+	                s.rect(x, yN+j*120, 1.5, 40).attr({ id: "notenlinien" });
             }
 
             if (i == 1 || i == 4 || i == 7 || i == 10 || i == 14 || i == 17 || i == 20 || i == 23){
-				k2 = Math.trunc((i+3) / 3);
-				if(k2>4){k2-=4};
-				var text = s.text( x-3, yN+j*120-16, k2).attr({id: "notenlinien", 'font-size':10});
-                b = (850/39)*3
-                c = s.rect(x, yN+j*120, b, 1.5).attr({ id: "notenlinien" });
-                c = s.rect(x, yN+j*120+5, b, 1.5).attr({ id: "notenlinien" });
+				let beatNumber = Math.trunc((i+3) / 3);
+					if(beatNumber>4){beatNumber-=4};
+					s.text( x-3, yN+j*120-16, beatNumber).attr({id: "notenlinien", 'font-size':10});
+	                const b = (850/39)*3;
+	                s.rect(x, yN+j*120, b, 1.5).attr({ id: "notenlinien" });
+	                s.rect(x, yN+j*120+5, b, 1.5).attr({ id: "notenlinien" });
             }
         }
     }
@@ -358,8 +467,6 @@ function dreierNoten(){
 
 
 // Funktionen zum Verschieben
-flag_move = false; ddx=0; ddy=0; dddx=0; dddy=0; //mdx=0; mdy=0;
-
 var move1 = function(dx,dy,x,y) {
     var dx = Snap.snapTo(gridSize, dx, 50);
     var dy = Snap.snapTo(gridSizeY, dy, 50);
@@ -443,26 +550,26 @@ var stop1 = function() {
 
 
 	edit_text_a = function(){
-	eltx1 = this.getBBox().x
-    elty1 = this.getBBox().y
-	}
+	textTouchStartX = this.getBBox().x
+    textTouchStartY = this.getBBox().y
+		}
 
 	edit_text_b = function(){
-		eltx2 = this.getBBox().x
-		elty2 = this.getBBox().y
-		if (eltx2 == eltx1 && elty2 == elty1){
-			text_a = (this.attr('text'));
-			text_i = prompt('Gib hier bitte den gewünschten Text ein!', text_a);
-			if (text_i == null) {return;}
-			this.attr({text: text_i});
+			textTouchEndX = this.getBBox().x
+			textTouchEndY = this.getBBox().y
+			if (textTouchEndX == textTouchStartX && textTouchEndY == textTouchStartY){
+				const text_a = this.attr('text');
+				const text_i = prompt('Gib hier bitte den gewünschten Text ein!', text_a);
+				if (text_i == null) {return;}
+				this.attr({text: text_i});
+			}
 		}
-	}
 
-    edit_text_z_g = function () {
-        elx = this.getBBox().cx + dddx+19;
-        ely = this.getBBox().y + dddy+12;
-        text_i = prompt('Gib hier bitte den gewünschten Text ein!', '');
-      var t = s.text(elx+3.5, ely, text_i).attr({ class: 'shp',  id: 'edit_text' , 'font-size':14, 'font-family': 'sans-serif'});
+	    edit_text_z_g = function () {
+	        const elx = this.getBBox().cx + dddx+19;
+	        const ely = this.getBBox().y + dddy+12;
+	        const text_i = prompt('Gib hier bitte den gewünschten Text ein!', '');
+	      var t = s.text(elx+3.5, ely, text_i).attr({ class: 'shp',  id: 'edit_text' , 'font-size':14, 'font-family': 'sans-serif'});
 		t.drag(move,sel_start);
         t.dblclick(edit_text);
 		t.touchstart(edit_text_a);
@@ -502,38 +609,38 @@ edit_text_wz = function () {
 // Als SVG speichern
 
 function callPHPScript2()
-{   text1 = "";
-    editall = s.selectAll("#notenlinien, #basis, #edit, #tone, #bass, #slap, #tone_muffled, #slap_muffled, #tone_flam, #slap_flam, #in, #out, #edit_text, #wiederholung, .instrument-chooser, #instrumentChooser");
+{   let svgContent = "";
+    let elementsToExport = s.selectAll("#notenlinien, #basis, #edit, #tone, #bass, #slap, #tone_muffled, #slap_muffled, #tone_flam, #slap_flam, #in, #out, #edit_text, #wiederholung, .instrument-chooser, #instrumentChooser");
  // Noten im Abseits löschen
-    editall.forEach(function(el) {
-        ax = el.getBBox().cx;
-        ay = el.getBBox().cy;
+    elementsToExport.forEach(function(el) {
+        const ax = el.getBBox().cx;
+        const ay = el.getBBox().cy;
         if(ax<0 || ax >1050 || ay<0 || ay>1480){el.remove();}
-        //text1 += el.toString();
+        //svgContent += el.toString();
+			});
+
+     elementsToExport = s.selectAll("#notenlinien, #basis, #edit, #tone, #bass, #slap, #tone_muffled, #slap_muffled, #tone_flam, #slap_flam, #in, #out, #edit_text, #wiederholung, .instrument-chooser, #instrumentChooser");
+    elementsToExport.forEach(function(el) {
+        svgContent += el.toString();
 	});
 
-     editall = s.selectAll("#notenlinien, #basis, #edit, #tone, #bass, #slap, #tone_muffled, #slap_muffled, #tone_flam, #slap_flam, #in, #out, #edit_text, #wiederholung, .instrument-chooser, #instrumentChooser");
-    editall.forEach(function(el) {
-        text1 += el.toString();
-	});
+//var svgContent = document.getElementById('myRect1').innerHTML;
 
-//var text1 = document.getElementById('myRect1').innerHTML;
-
-//text1 = w.toString();
-text2 =   text1.replaceAll('style="f', 'f');
-text3 =   text2.replaceAll('font-size: 10px;', 'font-size="10px"');
-text4 =   text3.replaceAll('font-size: 12px;', 'font-size="12px"');
-text5 =   text4.replaceAll('font-size: 24px;', 'font-size="24px"');
-text6 =   text5.replaceAll('font-size: 15px;', 'font-size="15px"');
-text7 =   text6.replaceAll('font-size: 14px;', 'font-size="14px"');
-text8 =   text7.replaceAll('font-family: sans-serif;', 'font-family="Tahoma"');
-text9 =   text8.replaceAll('font-weight: bold;', 'font-weight="bold"');
-//text1 =   text9.replaceAll('text-anchor: end;', 'text-anchor="end"');
-text1 = '<svg height="1480" version="1.1" width="1050" xmlns="http://www.w3.org/2000/svg" id="myRect1"><desc>Created with Snap</desc><defs></defs>' + text1 + '</svg>';
+//svgContent = w.toString();
+	const svgWithoutStylePrefix = svgContent.replaceAll('style="f', 'f');
+	const svgWithFont10 = svgWithoutStylePrefix.replaceAll('font-size: 10px;', 'font-size="10px"');
+	const svgWithFont12 = svgWithFont10.replaceAll('font-size: 12px;', 'font-size="12px"');
+	const svgWithFont24 = svgWithFont12.replaceAll('font-size: 24px;', 'font-size="24px"');
+	const svgWithFont15 = svgWithFont24.replaceAll('font-size: 15px;', 'font-size="15px"');
+	const svgWithFont14 = svgWithFont15.replaceAll('font-size: 14px;', 'font-size="14px"');
+	const svgWithTahoma = svgWithFont14.replaceAll('font-family: sans-serif;', 'font-family="Tahoma"');
+	const svgWithBoldText = svgWithTahoma.replaceAll('font-weight: bold;', 'font-weight="bold"');
+	//svgContent = svgWithBoldText.replaceAll('text-anchor: end;', 'text-anchor="end"');
+	svgContent = '<svg height="1480" version="1.1" width="1050" xmlns="http://www.w3.org/2000/svg" id="myRect1"><desc>Created with Snap</desc><defs></defs>' + svgWithBoldText + '</svg>';
 
 
     //var textdatei = s.text( 45, z+820, text1).attr({'font-size':10});
-    name = (titel.attr('text'));
+	    const name = titel.attr('text');
    //name1 = name + ".txt";
     pruf(name);
     function pruf(dateiname)
@@ -549,18 +656,18 @@ text1 = '<svg height="1480" version="1.1" width="1050" xmlns="http://www.w3.org/
         $('#iofield').val(data);
         var iofield = $('input[name=iofield]').val();
         if(iofield == "true"){
-        l = dateiname.length-4;
-        dateiname = dateiname.substr(0,l);
-            check = prompt('Die Datei "'+dateiname + '" existiert schon!\nGib einen anderen Dateinamen ein!', '');
-            if (check == null) {return;}
-            pruf(check);
-        }
-        else{
-            l = dateiname.length-4;
-            dateiname = dateiname.substr(0,l);
+	        let l = dateiname.length-4;
+	        dateiname = dateiname.substr(0,l);
+	            const check = prompt('Die Datei "'+dateiname + '" existiert schon!\nGib einen anderen Dateinamen ein!', '');
+	            if (check == null) {return;}
+	            pruf(check);
+	        }
+	        else{
+	            const l = dateiname.length-4;
+	            dateiname = dateiname.substr(0,l);
             $.post("dateispeichern_svg.php",
                    {
-                a: text1,
+                a: svgContent,
                 b: dateiname
             },
            function (data) {
@@ -611,11 +718,11 @@ function callPHPScript_lesen(anzahl){
       notenInTakt[i] = [f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f,f];
     }
   }
-  editall = s.selectAll("#edit_text, #wiederholung, .instrument-chooser, #instrumentChooser");
+  const editall = s.selectAll("#edit_text, #wiederholung, .instrument-chooser, #instrumentChooser");
   editall.forEach(function(el) {
-    zeilenPlus = 0;
-    zeilenMinus = 0;
-    ax = el.getBBox().cx;
+    let zeilenPlus = 0;
+    let zeilenMinus = 0;
+    let ax = el.getBBox().cx;
     if(rhythm == 'binaer'){
       ax = Math.round(((ax-25)/12.5)-7);
       if (ax > 32) {
@@ -628,8 +735,8 @@ function callPHPScript_lesen(anzahl){
          zeilenPlus = 1;
        };
      }
-    inhalt = el.attr('text');
-    ay = el.getBBox().cy;
+    const inhalt = el.attr('text');
+    let ay = el.getBBox().cy;
     if(el.attr('id') == "wiederholung"){
       zeilenMinus = 2;
     }
@@ -663,28 +770,28 @@ function callPHPScript()
 
 
     if(rhythm=='binaer'){
-      text1 = '<binaer id="rhythmus"/>';
+      var serializedRhythm = '<binaer id="rhythmus"/>';
     }
     else{
-      text1 = '<tenaer id="rhythmus"/>';
+      var serializedRhythm = '<tenaer id="rhythmus"/>';
     }
 
-    editall = s.selectAll("#edit, #tone, #bass, #slap, #tone_muffled, #slap_muffled, #tone_flam, #slap_flam, #bass_slap_flam, #in, #out, #edit_text, #wiederholung, .instrument-chooser, #instrumentChooser");
+    let elementsToSave = s.selectAll("#edit, #tone, #bass, #slap, #tone_muffled, #slap_muffled, #tone_flam, #slap_flam, #bass_slap_flam, #in, #out, #edit_text, #wiederholung, .instrument-chooser, #instrumentChooser");
  // Noten im Abseits löschen
-    editall.forEach(function(el) {
-        ax = el.getBBox().cx;
-        ay = el.getBBox().cy;
+    elementsToSave.forEach(function(el) {
+        const ax = el.getBBox().cx;
+        const ay = el.getBBox().cy;
         if(ax<70 || ax >1050 || ay<0 || ay>1480){el.remove();}
-        //text1 += el.toString();
-	});
+        //serializedRhythm += el.toString();
+			});
 
-    editall = s.selectAll("#edit, #tone, #bass, #slap, #tone_muffled, #slap_muffled, #tone_flam, #slap_flam, #bass_slap_flam, #in, #out, #edit_text, #wiederholung, .instrument-chooser, #instrumentChooser");
-    editall.forEach(function(el) {
-        text1 += el.toString();
+    elementsToSave = s.selectAll("#edit, #tone, #bass, #slap, #tone_muffled, #slap_muffled, #tone_flam, #slap_flam, #bass_slap_flam, #in, #out, #edit_text, #wiederholung, .instrument-chooser, #instrumentChooser");
+    elementsToSave.forEach(function(el) {
+        serializedRhythm += el.toString();
 	});
 
     //var textdatei = s.text( 45, z+820, text1).attr({'font-size':10});
-    name = (titel.attr('text'));
+	    const name = titel.attr('text');
    //name1 = name + ".txt";
     pruf(name);
      function pruf(dateiname)
@@ -700,14 +807,14 @@ function callPHPScript()
         $('#iofield').val(data);
         var iofield = $('input[name=iofield]').val();
         if(iofield == "true"){
-        l = dateiname.length-4;
-        dateiname = dateiname.substr(0,l);
-            check = confirm('Die Datei "'+dateiname + '" existiert schon!\nSoll die Datei überschrieben werden?', '');
-            if (check == true) {
+	        let l = dateiname.length-4;
+	        dateiname = dateiname.substr(0,l);
+	            const check = confirm('Die Datei "'+dateiname + '" existiert schon!\nSoll die Datei überschrieben werden?', '');
+	            if (check == true) {
 
             $.post("dateispeichern.php",
                    {
-                a: text1,
+                a: serializedRhythm,
                 b: dateiname
             },
            function (data) {
@@ -722,11 +829,11 @@ function callPHPScript()
 
         }
              else{
-            l = dateiname.length-4;
-            dateiname = dateiname.substr(0,l);
+	            const l = dateiname.length-4;
+	            dateiname = dateiname.substr(0,l);
             $.post("dateispeichern.php",
                    {
-                a: text1,
+                a: serializedRhythm,
                 b: dateiname
             },
            function (data) {
@@ -743,9 +850,6 @@ function callPHPScript()
     }
 
 }
-
-
-'use strict';
 
 let scrollOn = false;
 
@@ -804,7 +908,7 @@ function onSVGLoaded(data) {
     }
     //geom_note = data.select("#rhythmus");
    // alert(geom_note);
-    geom = data.selectAll("#edit, #tone, #bass, #slap, #tone_muffled, #slap_muffled, #tone_flam, #slap_flam, #bass_slap_flam, #in, #out, #edit_text, #wiederholung, .instrument-chooser, #instrumentChooser");
+	    let geom = data.selectAll("#edit, #tone, #bass, #slap, #tone_muffled, #slap_muffled, #tone_flam, #slap_flam, #bass_slap_flam, #in, #out, #edit_text, #wiederholung, .instrument-chooser, #instrumentChooser");
 
     s.append(geom);
     geom.forEach(function(el) {
@@ -823,8 +927,8 @@ function onSVGLoaded(data) {
     geom = s.selectAll(".instrument-chooser, #instrumentChooser");
     geom.forEach(function(el) {
 
-      ax = el.getBBox().cx-35;
-      ay = el.getBBox().cy+5;
+	      const ax = el.getBBox().cx-35;
+	      const ay = el.getBBox().cy+5;
     //  alert(ax);
       let altesTextElement = el.select("text");
       let alterText = altesTextElement.attr("text");
@@ -835,13 +939,13 @@ function onSVGLoaded(data) {
 
 });
 
-    titel.attr({text: t2});
+	    titel.attr({text: loadedTitle});
 
 }
 
 function get_value(e)
 {
-    all = s.selectAll("#edit, #tone, #bass, #slap, #tone_muffled, #slap_muffled, #tone_flam, #slap_flam, #bass_slap_flam, #in, #out, #edit_text, #wiederholung, .instrument-chooser, #instrumentChooser");
+	    const all = s.selectAll("#edit, #tone, #bass, #slap, #tone_muffled, #slap_muffled, #tone_flam, #slap_flam, #bass_slap_flam, #in, #out, #edit_text, #wiederholung, .instrument-chooser, #instrumentChooser");
     all.forEach(function(el) {
         el.remove();
     });
@@ -854,12 +958,12 @@ if(datei_name!=""){
 }
 
 
-    t1 = '../Noten/' + t;
-    l = t.length-4;
-    t2 = t.substr(0,l);
+    const selectedFilePath = '../Noten/' + t;
+    const fileNameLengthWithoutExtension = t.length-4;
+    loadedTitle = t.substr(0,fileNameLengthWithoutExtension);
       $.post("PHP/dateiladen.php",
     {
-        b: t1
+        b: selectedFilePath
     },
 
     function (data) {
