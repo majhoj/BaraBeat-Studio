@@ -20,6 +20,18 @@ function isInstrumentChooserNode(el) {
   );
 }
 
+function suppressChooserClickAfterDrag(chooserElement) {
+  if (!isInstrumentChooserNode(chooserElement)) {
+    return;
+  }
+
+  chooserElement.data("warDrag", true);
+  var chooserChildren = chooserElement.children();
+  if (chooserChildren[1] && chooserChildren[1].type === "g") {
+    chooserChildren[1].attr({ display: "none" });
+  }
+}
+
 // Die auswählbaren Elemente müssen der Klasse .shp angehören.
 // Entweder mit element.addClass('shp'); oder .attr({class: 'shp'}); hinzufügen
 
@@ -37,7 +49,11 @@ function UnGroup() {
     chd = selections.selectAll(".shp, .instrument-chooser");
     if (typeof dx1 == "undefined") {
       chd.forEach(function (ele) {
-        ele.drag(move, sel_start, stop_m);
+        if (isInstrumentChooserNode(ele)) {
+          rewireInstrumentChooser(ele);
+        } else {
+          ele.drag(move, sel_start, stop_m);
+        }
         s.append(ele);
       });
     }
@@ -51,7 +67,11 @@ function UnGroup() {
       if (transf === "") {
         dx3 = dx2;
         dy3 = dy2;
-        ele.drag(sel_move, sel_start, stop_m);
+        if (isInstrumentChooserNode(ele)) {
+          rewireInstrumentChooser(ele);
+        } else {
+          ele.drag(sel_move, sel_start, stop_m);
+        }
         s.append(ele);
       } else {
         transf = transf.split(",");
@@ -59,7 +79,11 @@ function UnGroup() {
         dy3 = dy2 + Number(transf[1]);
       }
       ele.transform("t" + dx3 + ", " + dy3);
-      ele.drag(move, sel_start, stop_m);
+      if (isInstrumentChooserNode(ele)) {
+        rewireInstrumentChooser(ele);
+      } else {
+        ele.drag(move, sel_start, stop_m);
+      }
       s.append(ele);
     });
   }
@@ -141,6 +165,10 @@ function sel_move(dx, dy) {
   var dx = Snap.snapTo(gridSize, dx, 50);
   var dy = Snap.snapTo(gridSize1, dy, 50);
 
+  this.selectAll(".instrument-chooser").forEach(function (chooserElement) {
+    suppressChooserClickAfterDrag(chooserElement);
+  });
+
   if (this.data("cloneThisDrag") && !this.data("alreadyCloned")) {
     this.data("alreadyCloned", true);
     //selection = this.clone();
@@ -154,13 +182,14 @@ function sel_move(dx, dy) {
         ele2.selectAll("g").forEach(function (sub) {
           sub.attr({ display: "none" });
         });
+        suppressChooserClickAfterDrag(ele2);
         s.append(ele2);
         rewireInstrumentChooser(ele2);
       } else {
         ele2.attr({ id: id_alt });
         // if(ele2.attr("id")=="wiederholung") {
         //    ele2.drag(move,sel_start,edit_text_wz_1);
-        //    ele2.dblclick(edit_text_wz);
+        //    ele2.dblclick(cycleRepeatCount);
         //  };
         if (ele2.attr("id") == "edit_text") {
           ele2.dblclick(edit_text);
@@ -200,7 +229,7 @@ function move(dx, dy) {
       ele1 = this.clone();
 
       if (this.attr("id") == "wiederholung") {
-        ele1.dblclick(edit_text_wz);
+        ele1.dblclick(cycleRepeatCount);
       }
     }
 

@@ -50,10 +50,10 @@ var yN = 172;
 var gridSize = (850 / 34) / 2;
 var gridSizeY = 5;
 var gridSizeX = 29;
-var gridSize_Wz = 24;
-var cx;
-var cy;
-var dc;
+var repeatMarkerGridOffsetX = 24;
+var paletteOriginX;
+var paletteOriginY;
+var paletteFrame;
 var ton;
 var bass;
 var slap;
@@ -65,7 +65,7 @@ var slap_g;
 var In;
 var Out;
 var text_z_g;
-var wz_g;
+var repeatMarkerGroup;
 var ton_c;
 var bass_c;
 var slap_c;
@@ -77,12 +77,12 @@ var slap_g_c;
 var In_c;
 var Out_c;
 var wz_g_c;
-var dall;
-var flag_move = false;
-var ddx = 0;
-var ddy = 0;
-var dddx = 0;
-var dddy = 0;
+var paletteGroup;
+var isDragging = false;
+var paletteDragDeltaX = 0;
+var paletteDragDeltaY = 0;
+var paletteOffsetX = 0;
+var paletteOffsetY = 0;
 var textTouchStartX;
 var textTouchStartY;
 var textTouchEndX;
@@ -118,10 +118,10 @@ var out_b;
 var dt;
 var text_z;
 var text_z1;
-var wz_c;
-var wz_a;
-var wz_b;
-var wz_d;
+var repeatMarkerHitbox;
+var repeatMarkerDotTop;
+var repeatMarkerDotBottom;
+var repeatMarkerCountText;
 var tx;
 var ty;
 var bx;
@@ -140,21 +140,21 @@ var ox;
 var oy;
 var px;
 var py;
-var edit_ton;
-var edit_bass;
-var edit_slap;
-var edit_ton_g;
-var edit_slap_g;
-var edit_flam;
-var edit_flam_slap;
-var edit_flam_bass_slap;
-var edit_in;
-var edit_out;
-var edit_text_a;
-var edit_text_b;
-var edit_text_z_g;
-var edit_text_wz;
-var edit_wz_g;
+var insertTone;
+var insertBass;
+var insertSlap;
+var insertMuffledTone;
+var insertMuffledSlap;
+var insertFlamTone;
+var insertFlamSlap;
+var insertFlamBassSlap;
+var insertInMarker;
+var insertOutMarker;
+var captureTextTouchStart;
+var handleTextTouchEnd;
+var insertTextField;
+var cycleRepeatCount;
+var insertRepeatMarker;
 
 const elem = document.querySelector('body');
 elem.addEventListener("keydown", shadow_end );
@@ -211,7 +211,7 @@ function viererNoten()
     gridSize = (850/34)/2;
     gridSizeY = 5;
     gridSizeX = 29;
-    gridSize_Wz = 24;
+    repeatMarkerGridOffsetX = 24;
 
     clear_all();
     //titel.attr({text: "Enter the name of the Rhythm"});
@@ -253,7 +253,7 @@ function dreierNoten(){
   //Grid festlegen
     gridSize = (850/26)/2;
     gridSizeX = 34; // Verschiebung der Noten in X-Richtung
-    gridSize_Wz = 26; // Verschiebung der Wiederholung in X-Richtung
+    repeatMarkerGridOffsetX = 26; // Verschiebung der Wiederholung in X-Richtung
     gridSizeY = 5; // Verschiebung der Noten in Y-Richtung
 
 
@@ -293,20 +293,20 @@ function dreierNoten(){
 // Noten zeichnen und initialisieren
 
 //	Anfangskoordinaten
-    cx = 33, cy = z-30;
+    paletteOriginX = 33, paletteOriginY = z-30;
 
  //	Kartusche
-    dc = s.rect(cx-12,cy-14,26,262,3,3).attr({fill:"lightgrey", stroke:"black", strokeWidth: 0.5 });
+    paletteFrame = s.rect(paletteOriginX-12,paletteOriginY-14,26,262,3,3).attr({fill:"lightgrey", stroke:"black", strokeWidth: 0.5 });
 
 //	Tone
-    ton = s.circle(cx+1,cy+1,7);
+    ton = s.circle(paletteOriginX+1,paletteOriginY+1,7);
 
 //	Bass
-    x = cx-6; y = cy+15;
+    x = paletteOriginX-6; y = paletteOriginY+15;
     bass = s.rect(x+1,y,12,12);
 
  //	Slap
-    x = cx-5, y = cy+47;
+    x = paletteOriginX-5, y = paletteOriginY+47;
    // slap = s.polygon(x,y,x+8,y-14,x+16,y);
    	slap_c = s.rect(x,y-12,12,12).attr({ opacity: 0.001 })
    	slap_a = s.line(x,y,x+12,y-12).attr({ stroke:"black", strokeWidth: 2 });
@@ -314,69 +314,69 @@ function dreierNoten(){
 	  slap = s.g(slap_a,slap_b,slap_c);
 
  //	Flam Ton
-    x = cx+4, y = cy+62;
+    x = paletteOriginX+4, y = paletteOriginY+62;
 	  flam_ton_a = s.circle(x,y,6).attr({fill:"white", stroke:"black", strokeWidth: 2 });
-    x = cx-2;
+    x = paletteOriginX-2;
 	flam_ton_b = s.circle(x,y,6).attr({fill:"black", stroke:"black", strokeWidth: 2 });
 	flam_ton = s.g(flam_ton_a,flam_ton_b);
 
 
 //	Flam Slap
-  x = cx-8, y = cy+87;
+  x = paletteOriginX-8, y = paletteOriginY+87;
    // slap = s.polygon(x,y,x+8,y-14,x+16,y);
     slap_0 = s.rect(x,y-12,20,12).attr({ opacity: 0.001 })
     slap_a1 = s.line(x,y,x+12,y-12).attr({ stroke:"black", strokeWidth: 2 });
 	slap_a2 = s.line(x,y-12,x+12,y).attr({ stroke:"black", strokeWidth: 2 });
-	x = cx-2;
+	x = paletteOriginX-2;
 	slap_b1 = s.line(x,y,x+12,y-12).attr({ stroke:"black", strokeWidth: 2 });
 	slap_b2 = s.line(x,y-12,x+12,y).attr({ stroke:"black", strokeWidth: 2 });
 	flam_slap = s.g(slap_0,slap_a1,slap_a2,slap_b1,slap_b2);
 
 //	Flam Bass_Slap
-	x = cx-8; y = cy+95;
+	x = paletteOriginX-8; y = paletteOriginY+95;
 	flam_bass_0 = s.rect(x,y-12,12,12).attr({ opacity: 0.001 })
 	flam_bass= s.rect(x+1,y,12,12);
-	x = cx-2; y = cy+107;
+	x = paletteOriginX-2; y = paletteOriginY+107;
 	slap_a3 = s.line(x,y,x+12,y-12).attr({ stroke:"black", strokeWidth: 2 });
 	slap_a4 = s.line(x,y-12,x+12,y).attr({ stroke:"black", strokeWidth: 2 });
 	flam_bass_slap = s.g(flam_bass_0,flam_bass,slap_a3,slap_a4).attr({ fill:"white", stroke:"black", strokeWidth: 2 });
 
 //	Tone gedämpft
-	x=cx-5; y = cy+125;
+	x=paletteOriginX-5; y = paletteOriginY+125;
   ton_g_c = s.rect(x,y-12,12,14).attr({ opacity: 0.001 })
- 	x=cx-50; y = cy-88;
+ 	x=paletteOriginX-50; y = paletteOriginY-88;
 	ton_g_a = ton.clone().attr({transform: "t" + 0 + "," + 120});
-	x=cx-6; y = cy+130;
+	x=paletteOriginX-6; y = paletteOriginY+130;
 	ton_g_b = s.line(x,y,x+15,y).attr({ stroke:"black", strokeWidth: 2 });
   ton_g = s.g(ton_g_a,ton_g_b,ton_g_c);
 
 //	Slap gedämpft
- 	x=cx-5; y = cy+147;
+ 	x=paletteOriginX-5; y = paletteOriginY+147;
   slap_g_c = s.rect(x,y-12,12,14).attr({ opacity: 0.001 })
 	slap_a5 = s.line(x,y,x+12,y-12).attr({ stroke:"black", strokeWidth: 2 });
 	slap_a6 = s.line(x,y-12,x+12,y).attr({ stroke:"black", strokeWidth: 2 });
-	x=cx-6; y = cy+150;
+	x=paletteOriginX-6; y = paletteOriginY+150;
 	slap_g_b = s.line(x,y,x+15,y).attr({ stroke:"black", strokeWidth: 2 });
   slap_g = s.g(slap_a5,slap_a6,slap_g_b,slap_g_c);
 
 //	In
-  x = cx+1; y = cy+156;
+  x = paletteOriginX+1; y = paletteOriginY+156;
 	in_c = s.rect(x-6,y,12,20).attr({ opacity: 0.001})
   in_a = s.line(x,y,x,y+12).attr({ stroke:"black", strokeWidth: 3 });
-  x = cx-5; y=cy+168;
+  x = paletteOriginX-5; y=paletteOriginY+168;
   in_b = s.polygon(x,y,x+6,y+7,x+12,y);
   In = s.g(in_a,in_b,in_c);
 
 //	Out
-  x = cx+1; y = cy+185;
+  x = paletteOriginX+1; y = paletteOriginY+185;
 	out_c = s.rect(x-6,y-8,12,20).attr({ opacity: 0.001 })
   out_a = s.line(x,y,x,y+12).attr({ stroke:"black", strokeWidth: 3 });
-  x = cx-5;
+  x = paletteOriginX-5;
   out_b = s.polygon(x,y,x+6,y-7,x+12,y);
   Out = s.g(out_a,out_b,out_c);
 
 //	Text
-  x = cx-6, y= cy +230;
+  x = paletteOriginX-6, y= paletteOriginY +230;
   dt = s.rect(x,y-26,14,15).attr({fill:"white", stroke:"black", strokeWidth: 1 });
   text_z = s.line(x+3,y-21,x+11,y-21).attr({ stroke:"black", strokeWidth: 2.5 });
   text_z1 = s.line(x+7,y-21,x+7,y-14).attr({ stroke:"black", strokeWidth: 2.5 });
@@ -385,85 +385,36 @@ function dreierNoten(){
 	y+=20;
 
 //	Wiederholungszeichen
-	wz_c = s.rect(cx-4,y-27,10,20).attr({ opacity: 0.001 })
-  wz_a = s.circle(cx+1,cy+228,2.5);
-	wz_b = s.circle(cx+1,cy+236,2.5);
-  wz_d = s.text(cx+1, cy+252, " ").attr({ 'font-size':12, 'font-family':'sans-serif', 'font-weight':'bold', 'text-anchor':'middle' });
-	wz_g= s.g(wz_c,wz_a,wz_b,wz_d);
+	repeatMarkerHitbox = s.rect(paletteOriginX-4,y-27,10,20).attr({ opacity: 0.001 })
+  repeatMarkerDotTop = s.circle(paletteOriginX+1,paletteOriginY+228,2.5);
+	repeatMarkerDotBottom = s.circle(paletteOriginX+1,paletteOriginY+236,2.5);
+  repeatMarkerCountText = s.text(paletteOriginX+1, paletteOriginY+252, " ").attr({ 'font-size':12, 'font-family':'sans-serif', 'font-weight':'bold', 'text-anchor':'middle' });
+	repeatMarkerGroup= s.g(repeatMarkerHitbox,repeatMarkerDotTop,repeatMarkerDotBottom,repeatMarkerCountText);
 
 
   // Legende schreiben
+  
+  function addLegendEntry(symbol, label, symbolX, symbolY, labelOffsetX, labelOffsetY) {
+    const legendClone = symbol.clone().attr({id: "basis", transform: "t" + symbolX + "," + symbolY});
+    s.text(symbolX + labelOffsetX, symbolY + labelOffsetY, label).attr({
+      id: "basis",
+      'font-size':15,
+      'font-family':'sans-serif'
+    });
+    return legendClone;
+  }
+  ton_c = addLegendEntry(ton, "Tone", 92, 1166, 45, 178);
+  bass_c = addLegendEntry(bass, "Bass", 157, 1146, 46, 198);
+  slap_c = addLegendEntry(slap, "Slap/Glocke", 222, 1126, 45, 218);
+  flam_ton_c = addLegendEntry(flam_ton, "Flam mit Tones", 337, 1105, 49, 240);
+  flam_slap_c = addLegendEntry(flam_slap, "Flam mit Slaps", 475, 1087, 49, 259);
+  flam_bass_slap_c = addLegendEntry(flam_bass_slap, "Flam mit Bass und Slaps", 613, 1069, 49, 279);
 
-    cx = 162, cy = 1380;
-
-	tx = cx-70; ty = cy-214;
-    ton_c = ton.clone().attr({id: "basis", transform: "t" + tx + "," + ty});
-    s.text( cx-25, cy-35.5, "Tone").attr({id: "basis", 'font-size':15, 'font-family':'sans-serif'});
-
-    cx += 88;
-	bx = cx-91; by = cy-234;
-    bass_c = bass.clone().attr({id: "basis", transform: "t" + bx + "," + by});
-	cx -= 45;
-    s.text( cx, cy-35.5, "Bass").attr({id: "basis", 'font-size':15, 'font-family':'sans-serif'});
-
-    cx += 97;
-	sx = cx-76; sy = cy-254;
-    slap_c = slap.clone().attr({id: "basis", transform: "t" + sx + "," + sy});
-	cx -= 30;
-    s.text( cx, cy-35.5, "Slap/Glocke").attr({id: "basis", 'font-size':15, 'font-family':'sans-serif'});
-
-    cx += 155;
-	ftx = cx-81; fty = cy-274;
-    flam_ton_c = flam_ton.clone().attr({id: "basis", transform: "t" + ftx + "," + fty});
-	cx -= 30;
-    s.text( cx, cy-35.5, "Flam mit Tones").attr({id: "basis", 'font-size':15, 'font-family':'sans-serif'});
-
-    cx += 172;
-	fsx = cx-78; fsy = cy-294;
-    flam_slap_c = flam_slap.clone().attr({id: "basis", transform: "t" + fsx + "," + fsy});
-	cx -= 28;
-    s.text( cx, cy-35.5, "Flam mit Slaps").attr({id: "basis", 'font-size':15, 'font-family':'sans-serif'});
-
-	cx += 170;
-	fsx = cx-78; fsy = cy-313.5;
-    flam_bass_slap_c = flam_bass_slap.clone().attr({id: "basis", transform: "t" + fsx + "," + fsy});
-	cx -= 28;
-    s.text( cx, cy-35.5, "Flam mit Bass und Slaps").attr({id: "basis", 'font-size':15, 'font-family':'sans-serif'});
-
-    cx = 170, cy = 1410;
-	sgx = cx-78; sgy = cy-332;
-    ton_g_c = ton_g.clone().attr({id: "basis", transform: "t" + sgx + "," + sgy});
-	cx -= 30;
-    s.text( cx, cy-35.5, "gedämpfter Tone").attr({id: "basis", 'font-size':15, 'font-family':'sans-serif'});
-
-    cx += 178;
-	sgx = cx-78; sgy = cy-352;
-    slap_g_c = slap_g.clone().attr({id: "basis", transform: "t" + sgx + "," + sgy});
-	cx -= 30;
-    s.text( cx, cy-35.5, "gedämpfter Slap").attr({id: "basis", 'font-size':15, 'font-family':'sans-serif'});
-
-    cx += 170;
-	ix = cx-73; iy = cy-377;
-    In_c = In.clone().attr({id: "basis", transform: "t" + ix + "," + iy});
-	cx -= 28;
-    s.text( cx, cy-35.5, "In").attr({id: "basis", 'font-size':15, 'font-family':'sans-serif'});
-
-    cx += 72;
-	ox = cx-73; oy = cy-400;
-	Out_c = Out.clone().attr({id: "basis", transform: "t" + ox + "," + oy});
-	cx -= 28;
-    s.text( cx, cy-35.5, "Out").attr({id: "basis", 'font-size':15, 'font-family':'sans-serif'});
-
-	//wz_d.attr({text: "11"});
-    cx += 14;
-	px = cx-5; py = cy-445;
-	wz_g_c = wz_g.clone().attr({transform: "t" + px + "," + py});
-    cx -= -38;
-    s.text( cx, cy-35.5, "Wiederholung").attr({'font-size':15, 'font-family':'sans-serif'});
-
-
-
-
+  ton_g_c = addLegendEntry(ton_g, "gedämpfter Tone", 92, 1078, 48, 299);
+  slap_g_c = addLegendEntry(slap_g, "gedämpfter Slap", 240, 1058, 48, 319);
+  In_c = addLegendEntry(In, "In", 382, 1034, 44, 343);
+  Out_c = addLegendEntry(Out, "Out", 424, 1011, 44, 366);
+  wz_g_c = addLegendEntry(repeatMarkerGroup, "Wiederholung", 475, 968, 44, 409);
 
 
 // Funktionen zum Verschieben
@@ -473,88 +424,88 @@ var move1 = function(dx,dy,x,y) {
     this.attr({
         transform: this.data('origTransform') + (this.data('origTransform') ? "T" : "t") + [dx, dy]
     });
-    ddx = dx; ddy = dy;
+    paletteDragDeltaX = dx; paletteDragDeltaY = dy;
 }
 
 var stop1 = function() {
-    dddx += ddx; dddy += ddy;
-    ddx = 0; ddy = 0;
-    //document.getElementById('auswahl').innerHTML = "dddx = " + dddx + ", dddy = " + dddy;
+    paletteOffsetX += paletteDragDeltaX; paletteOffsetY += paletteDragDeltaY;
+    paletteDragDeltaX = 0; paletteDragDeltaY = 0;
+    //document.getElementById('auswahl').innerHTML = "paletteOffsetX = " + paletteOffsetX + ", paletteOffsetY = " + paletteOffsetY;
    // console.log('finished dragging');
 }
 
 //	Kartusche zeichnen
-	dall = s.g(dc,ton,bass,slap,ton_g,slap_g,flam_ton,flam_slap,flam_bass_slap,In,Out,text_z_g,wz_g);
-	dall.drag(move1,sel_start,stop1);
+	paletteGroup = s.g(paletteFrame,ton,bass,slap,ton_g,slap_g,flam_ton,flam_slap,flam_bass_slap,In,Out,text_z_g,repeatMarkerGroup);
+	paletteGroup.drag(move1,sel_start,stop1);
 
 // Duplicate der Noten erzeugen
-   edit_ton = function () {
-		e = ton_c.clone().attr({ class: 'shp',  id: "tone", transform: "t" + (dddx + gridSizeX) +"," + dddy} );
+   insertTone = function () {
+		e = ton_c.clone().attr({ class: 'shp',  id: "tone", transform: "t" + (paletteOffsetX + gridSizeX) +"," + paletteOffsetY} );
 		e.drag(move,sel_start);}
-	ton.click(edit_ton);
-	ton.touchstart(edit_ton);
+	ton.click(insertTone);
+	ton.touchstart(insertTone);
 
-	edit_bass = function () {
-		e = bass_c.clone().attr({ class: 'shp',  id: "bass", transform: "t" + (dddx + gridSizeX) +"," + dddy} );
+	insertBass = function () {
+		e = bass_c.clone().attr({ class: 'shp',  id: "bass", transform: "t" + (paletteOffsetX + gridSizeX) +"," + paletteOffsetY} );
 		e.drag(move,sel_start);}
-    bass.click(edit_bass);
-    bass.touchstart(edit_bass);
+    bass.click(insertBass);
+    bass.touchstart(insertBass);
 
-	edit_slap = function () {
-		e = slap_c.clone().attr({ class: 'shp',  id: "slap", transform: "t" + (dddx + gridSizeX) +"," + dddy} );
+	insertSlap = function () {
+		e = slap_c.clone().attr({ class: 'shp',  id: "slap", transform: "t" + (paletteOffsetX + gridSizeX) +"," + paletteOffsetY} );
 		e.drag(move,sel_start);}
-    slap.click(edit_slap);
-    slap.touchstart(edit_slap);
+    slap.click(insertSlap);
+    slap.touchstart(insertSlap);
 
-	edit_ton_g = function () {
-		e = ton_g_c.clone().attr({ class: 'shp',  id: "tone_muffled", transform: "t" + (dddx + gridSizeX) +"," + dddy} );
+	insertMuffledTone = function () {
+		e = ton_g_c.clone().attr({ class: 'shp',  id: "tone_muffled", transform: "t" + (paletteOffsetX + gridSizeX) +"," + paletteOffsetY} );
 		e.drag(move,sel_start);}
-    ton_g.click(edit_ton_g);
-	ton_g.touchstart(edit_ton_g);
+    ton_g.click(insertMuffledTone);
+	ton_g.touchstart(insertMuffledTone);
 
-	edit_slap_g = function () {
-		e = slap_g_c.clone().attr({ class: 'shp',  id: "slap_muffled", transform: "t" + (dddx + gridSizeX) +"," + dddy} );
+	insertMuffledSlap = function () {
+		e = slap_g_c.clone().attr({ class: 'shp',  id: "slap_muffled", transform: "t" + (paletteOffsetX + gridSizeX) +"," + paletteOffsetY} );
 		e.drag(move,sel_start);}
-    slap_g.click(edit_slap_g);
-    slap_g.touchstart(edit_slap_g);
+    slap_g.click(insertMuffledSlap);
+    slap_g.touchstart(insertMuffledSlap);
 
-	edit_flam = function () {
-		e = flam_ton_c.clone().attr({ class: 'shp',  id: "tone_flam", transform: "t" + (dddx + gridSizeX) +"," + dddy} );
+	insertFlamTone = function () {
+		e = flam_ton_c.clone().attr({ class: 'shp',  id: "tone_flam", transform: "t" + (paletteOffsetX + gridSizeX) +"," + paletteOffsetY} );
 		e.drag(move,sel_start);}
-    flam_ton.touchstart(edit_flam);
-    flam_ton.click(edit_flam);
+    flam_ton.touchstart(insertFlamTone);
+    flam_ton.click(insertFlamTone);
 
-	edit_flam_slap = function () {
-		e = flam_slap_c.clone().attr({ class: 'shp',  id: "slap_flam", transform: "t" + (dddx + gridSizeX) +"," + dddy} );
+	insertFlamSlap = function () {
+		e = flam_slap_c.clone().attr({ class: 'shp',  id: "slap_flam", transform: "t" + (paletteOffsetX + gridSizeX) +"," + paletteOffsetY} );
 		e.drag(move,sel_start);}
-    flam_slap.click(edit_flam_slap);
-    flam_slap.touchstart(edit_flam_slap);
+    flam_slap.click(insertFlamSlap);
+    flam_slap.touchstart(insertFlamSlap);
 
-	edit_flam_bass_slap = function () {
-		e = flam_bass_slap_c.clone().attr({ class: 'shp',  id: "bass_slap_flam", transform: "t" + (dddx + gridSizeX) +"," + dddy} );
+	insertFlamBassSlap = function () {
+		e = flam_bass_slap_c.clone().attr({ class: 'shp',  id: "bass_slap_flam", transform: "t" + (paletteOffsetX + gridSizeX) +"," + paletteOffsetY} );
 		e.drag(move,sel_start);}
-    flam_bass_slap.click(edit_flam_bass_slap);
-    flam_bass_slap.touchstart(edit_flam_bass_slap);
+    flam_bass_slap.click(insertFlamBassSlap);
+    flam_bass_slap.touchstart(insertFlamBassSlap);
 
-	edit_in = function () {
-		e = In_c.clone().attr({ class: 'shp',  id: "in", transform: "t" + (dddx + gridSizeX) +"," + dddy} );
+	insertInMarker = function () {
+		e = In_c.clone().attr({ class: 'shp',  id: "in", transform: "t" + (paletteOffsetX + gridSizeX) +"," + paletteOffsetY} );
 		e.drag(move,sel_start);}
-    In.click(edit_in);
-    In.touchstart(edit_in);
+    In.click(insertInMarker);
+    In.touchstart(insertInMarker);
 
-    edit_out = function () {
-		e = Out_c.clone().attr({ class: 'shp',  id: "out", transform: "t" + (dddx + gridSizeX) +"," + dddy} );
+    insertOutMarker = function () {
+		e = Out_c.clone().attr({ class: 'shp',  id: "out", transform: "t" + (paletteOffsetX + gridSizeX) +"," + paletteOffsetY} );
 		e.drag(move,sel_start);}
-    Out.click(edit_out);
-    Out.touchstart(edit_out);
+    Out.click(insertOutMarker);
+    Out.touchstart(insertOutMarker);
 
 
-	edit_text_a = function(){
+	captureTextTouchStart = function(){
 	textTouchStartX = this.getBBox().x
     textTouchStartY = this.getBBox().y
-		}
+			}
 
-	edit_text_b = function(){
+	handleTextTouchEnd = function(){
 			textTouchEndX = this.getBBox().x
 			textTouchEndY = this.getBBox().y
 			if (textTouchEndX == textTouchStartX && textTouchEndY == textTouchStartY){
@@ -565,21 +516,21 @@ var stop1 = function() {
 			}
 		}
 
-	    edit_text_z_g = function () {
-	        const elx = this.getBBox().cx + dddx+19;
-	        const ely = this.getBBox().y + dddy+12;
-	        const text_i = prompt('Gib hier bitte den gewünschten Text ein!', '');
-	      var t = s.text(elx+3.5, ely, text_i).attr({ class: 'shp',  id: 'edit_text' , 'font-size':14, 'font-family': 'sans-serif'});
-		t.drag(move,sel_start);
-        t.dblclick(edit_text);
-		t.touchstart(edit_text_a);
-		t.touchend(edit_text_b);
-	}
-    text_z_g.click(edit_text_z_g);
-    text_z_g.touchstart(edit_text_z_g);
+		    insertTextField = function () {
+		        const elx = this.getBBox().cx + paletteOffsetX+19;
+		        const ely = this.getBBox().y + paletteOffsetY+12;
+		        const text_i = prompt('Gib hier bitte den gewünschten Text ein!', '');
+		      var t = s.text(elx+3.5, ely, text_i).attr({ class: 'shp',  id: 'edit_text' , 'font-size':14, 'font-family': 'sans-serif'});
+			t.drag(move,sel_start);
+	        t.dblclick(edit_text);
+			t.touchstart(captureTextTouchStart);
+			t.touchend(handleTextTouchEnd);
+		}
+    text_z_g.click(insertTextField);
+    text_z_g.touchstart(insertTextField);
 
 
-edit_text_wz = function () {
+cycleRepeatCount = function () {
      let textEl = this.select('text');
      let wert = textEl.node.textContent.trim();
 
@@ -593,15 +544,15 @@ edit_text_wz = function () {
             }
         }
         textEl.attr({ text: zahl === 0 ? '' : String(zahl) });
- }
-
-	edit_wz_g = function () {
-		e = wz_g_c.clone().attr({class: 'shp',  id: "wiederholung", transform: "t" + (dddx + gridSize_Wz) +"," + (dddy + 2)} );
-        e.drag(move,sel_start);
-        e.dblclick(edit_text_wz);
 	 }
-   wz_g.click(edit_wz_g);
-   wz_g.touchstart(edit_wz_g);
+
+		insertRepeatMarker = function () {
+		e = wz_g_c.clone().attr({class: 'shp',  id: "wiederholung", transform: "t" + (paletteOffsetX + repeatMarkerGridOffsetX) +"," + (paletteOffsetY + 2)} );
+        e.drag(move,sel_start);
+        e.dblclick(cycleRepeatCount);
+		 }
+   repeatMarkerGroup.click(insertRepeatMarker);
+   repeatMarkerGroup.touchstart(insertRepeatMarker);
 
 
 
@@ -893,13 +844,15 @@ function callPHPScript1()
         //console.log ($('#iofield'));
         //console.log ($('input[name=iofield]').val());
 
-        var iofield = $('input[name=iofield]').val();
-        document.getElementById('auswahl').innerHTML = iofield;
+        const fileListMarkup = $('input[name=iofield]').val();
+        document.getElementById('auswahl').innerHTML = fileListMarkup;
      });
     //alert("Ja");
 }
 
 function onSVGLoaded(data) {
+    const loadedElementsSelector = "#edit, #tone, #bass, #slap, #tone_muffled, #slap_muffled, #tone_flam, #slap_flam, #bass_slap_flam, #in, #out, #edit_text, #wiederholung, .instrument-chooser, #instrumentChooser";
+
     if(data.select("#rhythmus")=='<binaer id="rhythmus"/>'){
         viererNoten();
     }
@@ -908,36 +861,37 @@ function onSVGLoaded(data) {
     }
     //geom_note = data.select("#rhythmus");
    // alert(geom_note);
-	    let geom = data.selectAll("#edit, #tone, #bass, #slap, #tone_muffled, #slap_muffled, #tone_flam, #slap_flam, #bass_slap_flam, #in, #out, #edit_text, #wiederholung, .instrument-chooser, #instrumentChooser");
+	    let loadedElements = data.selectAll(loadedElementsSelector);
 
-    s.append(geom);
-    geom.forEach(function(el) {
-        el.attr({class: "shp"});
-        el.drag(move,sel_start);
-      });
-    geom = s.selectAll("#edit_text");
-    geom.forEach(function(el) {
+	    s.append(loadedElements);
+	    loadedElements.forEach(function(el) {
+	        if (isInstrumentChooserNode(el)) {
+	          return;
+	        }
+	        el.attr({class: "shp"});
+	        el.drag(move,sel_start);
+	      });
+
+    const loadedTextElements = s.selectAll("#edit_text");
+    loadedTextElements.forEach(function(el) {
 	   el.dblclick(edit_text);
 	});
-    geom = s.selectAll("#wiederholung");
-    geom.forEach(function(el) {
-	   el.dblclick(edit_text_wz);
+
+    const loadedRepeatElements = s.selectAll("#wiederholung");
+    loadedRepeatElements.forEach(function(el) {
+	   el.dblclick(cycleRepeatCount);
 	});
 
-    geom = s.selectAll(".instrument-chooser, #instrumentChooser");
-    geom.forEach(function(el) {
-
-	      const ax = el.getBBox().cx-35;
-	      const ay = el.getBBox().cy+5;
-    //  alert(ax);
-      let altesTextElement = el.select("text");
-      let alterText = altesTextElement.attr("text");
-      let alteFarbe = altesTextElement.attr("fill");
-      let chooser = createInstrumentChooser(s, ax, ay, alterText, alteFarbe).addClass("shp").attr({ id: nextInstrumentChooserId() });
-      el.remove();
-
-
-});
+	    const loadedInstrumentChoosers = s.selectAll(".instrument-chooser, #instrumentChooser");
+	    loadedInstrumentChoosers.forEach(function(el) {
+	      el.addClass("shp");
+	      el.addClass("instrument-chooser");
+	      el.attr({ id: nextInstrumentChooserId() });
+	      el.selectAll("g").forEach(function(sub) {
+	        sub.attr({ display: "none" });
+	      });
+	      rewireInstrumentChooser(el);
+	    });
 
 	    titel.attr({text: loadedTitle});
 
@@ -945,22 +899,23 @@ function onSVGLoaded(data) {
 
 function get_value(e)
 {
-	    const all = s.selectAll("#edit, #tone, #bass, #slap, #tone_muffled, #slap_muffled, #tone_flam, #slap_flam, #bass_slap_flam, #in, #out, #edit_text, #wiederholung, .instrument-chooser, #instrumentChooser");
-    all.forEach(function(el) {
+	    const loadedElementsToRemove = s.selectAll("#edit, #tone, #bass, #slap, #tone_muffled, #slap_muffled, #tone_flam, #slap_flam, #bass_slap_flam, #in, #out, #edit_text, #wiederholung, .instrument-chooser, #instrumentChooser");
+    loadedElementsToRemove.forEach(function(el) {
         el.remove();
     });
 
+let selectedFileName;
 if(e){
- var t = e.options[e.selectedIndex].text;
+ selectedFileName = e.options[e.selectedIndex].text;
 }
 if(datei_name!=""){
-    var t = datei_name;
+    selectedFileName = datei_name;
 }
 
 
-    const selectedFilePath = '../Noten/' + t;
-    const fileNameLengthWithoutExtension = t.length-4;
-    loadedTitle = t.substr(0,fileNameLengthWithoutExtension);
+    const selectedFilePath = '../Noten/' + selectedFileName;
+    const fileNameLengthWithoutExtension = selectedFileName.length-4;
+    loadedTitle = selectedFileName.substr(0,fileNameLengthWithoutExtension);
       $.post("PHP/dateiladen.php",
     {
         b: selectedFilePath
@@ -969,9 +924,9 @@ if(datei_name!=""){
     function (data) {
         // die textausgabe zurück ins feld schreiben
         $('#iofield').val(data);
-        var iofield = $('input[name=iofield]').val();
+        const loadedSvgMarkup = $('input[name=iofield]').val();
          // alert(iofield);
-		Snap.loadStr(iofield, onSVGLoaded);
+		Snap.loadStr(loadedSvgMarkup, onSVGLoaded);
     });
 }
 

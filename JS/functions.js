@@ -53,9 +53,10 @@ function createInstrumentChooser(s, x, y, startText = "Instrument", startFill = 
 
 /**
  * Klick- und Drag-Verhalten für eine InstrumentChooser-Gruppe (neu oder nach DOM-Klon).
- * dragEnd: optional z. B. stop_m — bei neuen Choosern aus createInstrumentChooser null.
+ * Instrument-Chooser verwenden bewusst kein separates dragEnd wie stop_m,
+ * damit geladenes und neu erzeugtes Verhalten identisch bleibt.
  */
-function bindInstrumentChooserInteraction(chooserGruppe, instrumentText, menuGruppe, dragEnd) {
+function bindInstrumentChooserInteraction(chooserGruppe, instrumentText, menuGruppe) {
   let dragSchwelle = 5;
 
   instrumentText.click(function (event) {
@@ -94,11 +95,7 @@ function bindInstrumentChooserInteraction(chooserGruppe, instrumentText, menuGru
     move.call(this, dx, dy, px, py, event);
   }
 
-  if (dragEnd) {
-    chooserGruppe.drag(chooser_move, chooser_sel_start, dragEnd);
-  } else {
-    chooserGruppe.drag(chooser_move, chooser_sel_start);
-  }
+  chooserGruppe.drag(chooser_move, chooser_sel_start);
 }
 
 /**
@@ -121,5 +118,5 @@ function rewireInstrumentChooser(chooserGruppe) {
     t.unclick();
   });
 
-  bindInstrumentChooserInteraction(chooserGruppe, instrumentText, menuGruppe, stop_m);
+  bindInstrumentChooserInteraction(chooserGruppe, instrumentText, menuGruppe);
 }
