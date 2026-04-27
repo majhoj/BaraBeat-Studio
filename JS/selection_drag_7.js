@@ -1,6 +1,18 @@
 // JavaScript Document
 
 var instrumentChooserIdSeq = 0;
+var box = null;
+var selections = null;
+var lastKeyPressed = null;
+var selectionDragState = {
+  currentDx: undefined,
+  currentDy: undefined,
+  accumulatedDx: 0,
+  accumulatedDy: 0,
+  dragOffsetDx: 0,
+  dragOffsetDy: 0,
+};
+
 function nextInstrumentChooserId() {
   instrumentChooserIdSeq += 1;
   return "instrumentChooser-" + instrumentChooserIdSeq;
@@ -32,13 +44,86 @@ function suppressChooserClickAfterDrag(chooserElement) {
   }
 }
 
+function createChooserClone(sourceElement) {
+  var startX = sourceElement.data("startX");
+  var startY = sourceElement.data("startY") + 13;
+  var textElement = sourceElement.select("text");
+  var chooserText = textElement.attr("text");
+  var chooserColor = textElement.attr("fill");
+
+  return createInstrumentChooser(s, startX, startY, chooserText, chooserColor)
+    .addClass("shp")
+    .attr({
+      id: nextInstrumentChooserId(),
+    });
+}
+
+function createElementClone(sourceElement) {
+  if (isInstrumentChooserNode(sourceElement)) {
+    return createChooserClone(sourceElement);
+  }
+
+  return sourceElement.clone().attr({
+    id: sourceElement.attr("id"),
+    class: sourceElement.attr("class"),
+  });
+}
+
+function bindClonedElement(clonedElement) {
+  if (isInstrumentChooserNode(clonedElement)) {
+    clonedElement.selectAll("g").forEach(function (sub) {
+      sub.attr({ display: "none" });
+    });
+    suppressChooserClickAfterDrag(clonedElement);
+    rewireInstrumentChooser(clonedElement);
+    return clonedElement;
+  }
+
+  if (clonedElement.attr("id") == "wiederholung") {
+    clonedElement.dblclick(cycleRepeatCount);
+  }
+  if (clonedElement.attr("id") == "edit_text") {
+    clonedElement.dblclick(edit_text);
+  }
+  clonedElement.drag(move, sel_start, stop_m);
+  return clonedElement;
+}
+
+function appendBoundClone(sourceElement) {
+  var clonedElement = createElementClone(sourceElement);
+  bindClonedElement(clonedElement);
+  s.append(clonedElement);
+  return clonedElement;
+}
+
 // Die auswählbaren Elemente müssen der Klasse .shp angehören.
 // Entweder mit element.addClass('shp'); oder .attr({class: 'shp'}); hinzufügen
 
-dx2 = 0;
-dy2 = 0;
-dxx1 = 0;
-dyy1 = 0;
+var selectableElementSelector = ".shp, .instrument-chooser";
+
+function bindElementDrag(element, dragMoveHandler) {
+  if (isInstrumentChooserNode(element)) {
+    rewireInstrumentChooser(element);
+    return element;
+  }
+
+  element.drag(dragMoveHandler, sel_start, stop_m);
+  return element;
+}
+
+function appendUngroupedElement(element) {
+  bindElementDrag(element, move);
+  s.append(element);
+  return element;
+}
+
+function getSelectedElements(groupElement) {
+  return groupElement.selectAll(selectableElementSelector);
+}
+
+function getSelectableCanvasElements() {
+  return s.selectAll(selectableElementSelector);
+}
 
 function UnGroup() {
   if (selections) {
@@ -46,53 +131,39 @@ function UnGroup() {
     Wenn nicht, drag-Methode wieder hinzufügen und <br>
     Elemente wieder zu s hinzugügen. */
 
-    chd = selections.selectAll(".shp, .instrument-chooser");
-    if (typeof dx1 == "undefined") {
-      chd.forEach(function (ele) {
-        if (isInstrumentChooserNode(ele)) {
-          rewireInstrumentChooser(ele);
-        } else {
-          ele.drag(move, sel_start, stop_m);
-        }
-        s.append(ele);
+    const selectedElements = getSelectedElements(selections);
+    if (typeof selectionDragState.currentDx == "undefined") {
+      selectedElements.forEach(function (ele) {
+        appendUngroupedElement(ele);
       });
     }
-    dx2 = dx2 + dxx1;
-    dy2 = dy2 + dyy1;
-    chd.forEach(function (ele) {
-      transf = ele.matrix.toTransformString();
+    selectionDragState.accumulatedDx += selectionDragState.dragOffsetDx;
+    selectionDragState.accumulatedDy += selectionDragState.dragOffsetDy;
+    selectedElements.forEach(function (ele) {
+      var transformString = ele.matrix.toTransformString();
+      var nextDx;
+      var nextDy;
 
       /*Prüfen ob die Auswahl zum ersten Mal verschoben wird.
       Dann ist trans undefiniert */
-      if (transf === "") {
-        dx3 = dx2;
-        dy3 = dy2;
-        if (isInstrumentChooserNode(ele)) {
-          rewireInstrumentChooser(ele);
-        } else {
-          ele.drag(sel_move, sel_start, stop_m);
-        }
-        s.append(ele);
+      if (transformString === "") {
+        nextDx = selectionDragState.accumulatedDx;
+        nextDy = selectionDragState.accumulatedDy;
       } else {
-        transf = transf.split(",");
-        dx3 = dx2 + Number(transf[0].substr(1));
-        dy3 = dy2 + Number(transf[1]);
+        transformString = transformString.split(",");
+        nextDx = selectionDragState.accumulatedDx + Number(transformString[0].substr(1));
+        nextDy = selectionDragState.accumulatedDy + Number(transformString[1]);
       }
-      ele.transform("t" + dx3 + ", " + dy3);
-      if (isInstrumentChooserNode(ele)) {
-        rewireInstrumentChooser(ele);
-      } else {
-        ele.drag(move, sel_start, stop_m);
-      }
-      s.append(ele);
+      ele.transform("t" + nextDx + ", " + nextDy);
+      appendUngroupedElement(ele);
     });
   }
-  dx2 = dx2 - dxx1;
-  dy2 = dy2 - dyy1;
-  dx1 = 0;
-  dy1 = 0;
-  dxx1 = 0;
-  dyy1 = 0;
+  selectionDragState.accumulatedDx -= selectionDragState.dragOffsetDx;
+  selectionDragState.accumulatedDy -= selectionDragState.dragOffsetDy;
+  selectionDragState.currentDx = 0;
+  selectionDragState.currentDy = 0;
+  selectionDragState.dragOffsetDx = 0;
+  selectionDragState.dragOffsetDy = 0;
 }
 
 function shadow_start(x, y, event) {
@@ -122,48 +193,78 @@ function shadow_move(dx, dy, x, y, event) {
 function shadow_end(event) {
   var bounds = box.getBBox();
   box.remove();
-  g_data = [];
-  idx = 0;
-  key_ged = event.key;
-  s.selectAll(".shp, .instrument-chooser").forEach(function (el) {
+  box = null;
+  var matchedElements = [];
+  lastKeyPressed = event.key;
+  getSelectableCanvasElements().forEach(function (el) {
     var mybounds = el.getBBox();
     if (Snap.path.isBBoxIntersect(mybounds, bounds)) {
-      idx++;
-      g_data.push(el);
+      matchedElements.push(el);
     }
   });
-  if (idx > 0) {
+  if (matchedElements.length > 0) {
     selections = s.g();
-    g_data.forEach(function (el) {
+    matchedElements.forEach(function (el) {
       el.undrag();
     });
-    selections.add(g_data);
+    selections.add(matchedElements);
     selections.drag(sel_move, sel_start, stop_m);
     selections.attr({ opacity: 0.5 });
   }
 }
 
 var gridSize = 850 / 26 / 2;
-var gridSize1 = 10;
+var gridSize1 = 5;
+var noteGridYOffset = -4;
+
+function getElementSnapReferenceY(element, bbox) {
+  var elementId = element && typeof element.attr === "function" ? element.attr("id") : "";
+  var snapReferenceY = bbox.cy;
+
+  if (elementId === "tone_muffled") {
+    return bbox.y + 8;
+  }
+  if (elementId === "slap_muffled") {
+    return bbox.y + 6;
+  }
+  if (elementId === "in") {
+    return bbox.y + 8;
+  }
+  if (elementId === "out") {
+    return bbox.y + 9;
+  }
+  if (elementId === "flam_ton") {
+    return snapReferenceY + 2;
+  }
+  if (elementId === "bass_slap_flam") {
+    return snapReferenceY + 1;
+  }
+  return snapReferenceY;
+}
+
+function snapDeltaWithYOffset(startY, deltaY) {
+  var snappedY = Snap.snapTo(gridSize1, startY + deltaY - noteGridYOffset, 50) + noteGridYOffset;
+  return snappedY - startY;
+}
 
 function entfernen() {
-  let key_ged = event.key;
+  let pressedKey = event.key;
 
   //(event.key + " " + event.metaKey)
-  let key_ged_meta = event.metaKey;
-  if (key_ged == "x" && key_ged_meta) {
+  let pressedMetaKey = event.metaKey;
+  if (pressedKey == "x" && pressedMetaKey && selections) {
     //	if(key_ged && key_ged_meta){
-    ele2 = selections.selectAll(".shp, .instrument-chooser");
+    const selectedElements = getSelectedElements(selections);
 
-    ele2.forEach(function (ele) {
-      ele2.remove();
+    selectedElements.forEach(function (ele) {
+      ele.remove();
     });
   }
 }
 
 function sel_move(dx, dy) {
   var dx = Snap.snapTo(gridSize, dx, 50);
-  var dy = Snap.snapTo(gridSize1, dy, 50);
+  var dy = snapDeltaWithYOffset(this.data("startSnapY"), dy);
 
   this.selectAll(".instrument-chooser").forEach(function (chooserElement) {
     suppressChooserClickAfterDrag(chooserElement);
@@ -171,33 +272,9 @@ function sel_move(dx, dy) {
 
   if (this.data("cloneThisDrag") && !this.data("alreadyCloned")) {
     this.data("alreadyCloned", true);
-    //selection = this.clone();
-    chd1 = this.selectAll(".shp, .instrument-chooser");
-
-    chd1.forEach(function (ele) {
-      ele2 = ele.clone();
-      id_alt = ele.attr("id");
-      if (isInstrumentChooserNode(ele)) {
-        ele2.attr({ id: nextInstrumentChooserId() });
-        ele2.selectAll("g").forEach(function (sub) {
-          sub.attr({ display: "none" });
-        });
-        suppressChooserClickAfterDrag(ele2);
-        s.append(ele2);
-        rewireInstrumentChooser(ele2);
-      } else {
-        ele2.attr({ id: id_alt });
-        // if(ele2.attr("id")=="wiederholung") {
-        //    ele2.drag(move,sel_start,edit_text_wz_1);
-        //    ele2.dblclick(cycleRepeatCount);
-        //  };
-        if (ele2.attr("id") == "edit_text") {
-          ele2.dblclick(edit_text);
-        }
-        ele2.drag(move, sel_start, stop_m);
-        s.append(ele2);
-      }
-    });
+    getSelectedElements(this).forEach(function (ele) {
+      appendBoundClone(ele);
+    }.bind(this));
   }
 
   this.attr({
@@ -207,13 +284,13 @@ function sel_move(dx, dy) {
       [dx, dy],
   });
   // dx, dy sind die Werte um die die Gruppe verschoben wurde.
-  dx1 = dx;
-  dy1 = dy;
+  selectionDragState.currentDx = dx;
+  selectionDragState.currentDy = dy;
 }
 
 function move(dx, dy) {
   var dx = Snap.snapTo(gridSize, dx, 50);
-  var dy = Snap.snapTo(gridSize1, dy, 50);
+  var dy = snapDeltaWithYOffset(this.data("startSnapY"), dy);
   this.attr({
     transform:
       this.data("origTransform") +
@@ -222,59 +299,12 @@ function move(dx, dy) {
   });
   if (this.data("cloneThisDrag") && !this.data("alreadyCloned")) {
     this.data("alreadyCloned", true);
-
-    //  this.data("alreadyCloned", true);
-
-    if (!isInstrumentChooserNode(this)) {
-      ele1 = this.clone();
-
-      if (this.attr("id") == "wiederholung") {
-        ele1.dblclick(cycleRepeatCount);
-      }
-    }
-
-    /*if(this.attr("id")=="instrumentChooser") {
-			ax = this.data('startX');
-			ay = this.data('startY') + 13;
-			let chooser = createInstrumentChooser(s, ax, ay).attr({ id: "instrumentChooser" });
-		}*/
-
-    if (isInstrumentChooserNode(this)) {
-      ax = this.data("startX");
-      ay = this.data("startY") + 13;
-
-      let altesTextElement = this.select("text");
-      let alterText = altesTextElement.attr("text");
-      let alteFarbe = altesTextElement.attr("fill");
-
-      //let chooser = createInstrumentChooser(s, ax, ay).attr({ id: "instrumentChooser" });
-      ele1 = createInstrumentChooser(s, ax, ay, alterText, alteFarbe)
-        .addClass("shp")
-        .attr({
-          id: nextInstrumentChooserId(),
-        });
-
-      /*  chooser.select("text").attr({
-	        text: alterText,
-	        fill: "#333"
-    });
-		*/
-    }
-
-    id_alt = this.attr("id");
-    class_alt = this.attr("class");
-    //ele1.attr({ id: id_alt, class: class_alt });
-    if (this.attr("id") == "edit_text" && ele1) {
-      ele1.dblclick(edit_text);
-    }
-    if (ele1 && !isInstrumentChooserNode(this)) {
-      ele1.drag(move, sel_start);
-    }
+    appendBoundClone(this);
   }
 }
 
 function start(event) {
-  key_ged = event.key;
+  lastKeyPressed = event.key;
   this.data("origTransform", this.transform().local);
 }
 
@@ -287,10 +317,11 @@ function sel_start(x, y, event) {
   let bbox = this.getBBox();
   this.data("startX", bbox.x);
   this.data("startY", bbox.y);
+  this.data("startSnapY", getElementSnapReferenceY(this, bbox));
 }
 
 function stop_m() {
   // Die Verschiebungswerte werden mit jeder Verschiebung der Gruppe addiert, bis die Gruppe aufgelöst wird.
-  dxx1 += dx1;
-  dyy1 += dy1;
+  selectionDragState.dragOffsetDx += selectionDragState.currentDx;
+  selectionDragState.dragOffsetDy += selectionDragState.currentDy;
 }

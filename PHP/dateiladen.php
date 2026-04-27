@@ -1,10 +1,16 @@
 <?php
-$ein = $_POST["b"];
+$dateiname = basename($_POST["b"] ?? "");
+$pfad = __DIR__ . "/../Noten/" . $dateiname;
 
-einlesen($ein);
+if ($dateiname === "" || !is_file($pfad)) {
+    echo "";
+    exit;
+}
+
+einlesen($pfad);
 function einlesen($arg1)
-    {
+{
     $zitate = file_get_contents($arg1);
     echo $zitate;
- }
+}
 ?>

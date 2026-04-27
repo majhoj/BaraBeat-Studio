@@ -2,7 +2,7 @@
 
 
 // Öffnet ein Unterverzeichnis mit dem Namen "daten"
-$verzeichnis = openDir("../Noten");
+$verzeichnis = openDir(__DIR__ . "/../Noten");
 
 // In Array einlesen und sortieren
 
@@ -35,7 +35,7 @@ foreach($dat_array as $file) {
      // Link erstellen
      //echo "<a href=\"Noten/$file\">$file</a><br>\n";
 
-  echo  '<option value="p'.$i.'">'.$file.'</option>';
+  echo  '<option value="p'.$i.'">' . htmlspecialchars($file, ENT_QUOTES, 'UTF-8') . '</option>';
 
  }
 }
