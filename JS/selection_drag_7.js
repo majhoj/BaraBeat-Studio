@@ -1,6 +1,7 @@
 // JavaScript Document
 
 var instrumentChooserIdSeq = 0;
+var functionChooserIdSeq = 0;
 var box = null;
 var selections = null;
 var lastKeyPressed = null;
@@ -18,6 +19,11 @@ function nextInstrumentChooserId() {
   return "instrumentChooser-" + instrumentChooserIdSeq;
 }
 
+function nextFunctionChooserId() {
+  functionChooserIdSeq += 1;
+  return "functionChooser-" + functionChooserIdSeq;
+}
+
 function isInstrumentChooserNode(el) {
   if (!el || typeof el.attr !== "function") {
     return false;
@@ -32,8 +38,26 @@ function isInstrumentChooserNode(el) {
   );
 }
 
+function isFunctionChooserNode(el) {
+  if (!el || typeof el.attr !== "function") {
+    return false;
+  }
+  if (typeof el.hasClass === "function" && el.hasClass("function-chooser")) {
+    return true;
+  }
+  var id = el.attr("id");
+  return (
+    id === "functionChooser" ||
+    (typeof id === "string" && id.indexOf("functionChooser-") === 0)
+  );
+}
+
+function isChooserNode(el) {
+  return isInstrumentChooserNode(el) || isFunctionChooserNode(el);
+}
+
 function suppressChooserClickAfterDrag(chooserElement) {
-  if (!isInstrumentChooserNode(chooserElement)) {
+  if (!isChooserNode(chooserElement)) {
     return;
   }
 
@@ -51,6 +75,14 @@ function createChooserClone(sourceElement) {
   var chooserText = textElement.attr("text");
   var chooserColor = textElement.attr("fill");
 
+  if (isFunctionChooserNode(sourceElement)) {
+    return createFunctionChooser(s, startX, startY, chooserText, chooserColor)
+      .addClass("shp")
+      .attr({
+        id: nextFunctionChooserId(),
+      });
+  }
+
   return createInstrumentChooser(s, startX, startY, chooserText, chooserColor)
     .addClass("shp")
     .attr({
@@ -59,7 +91,7 @@ function createChooserClone(sourceElement) {
 }
 
 function createElementClone(sourceElement) {
-  if (isInstrumentChooserNode(sourceElement)) {
+  if (isChooserNode(sourceElement)) {
     return createChooserClone(sourceElement);
   }
 
@@ -70,12 +102,16 @@ function createElementClone(sourceElement) {
 }
 
 function bindClonedElement(clonedElement) {
-  if (isInstrumentChooserNode(clonedElement)) {
+  if (isChooserNode(clonedElement)) {
     clonedElement.selectAll("g").forEach(function (sub) {
       sub.attr({ display: "none" });
     });
     suppressChooserClickAfterDrag(clonedElement);
-    rewireInstrumentChooser(clonedElement);
+    if (isFunctionChooserNode(clonedElement)) {
+      rewireFunctionChooser(clonedElement);
+    } else {
+      rewireInstrumentChooser(clonedElement);
+    }
     return clonedElement;
   }
 
@@ -99,11 +135,15 @@ function appendBoundClone(sourceElement) {
 // Die auswählbaren Elemente müssen der Klasse .shp angehören.
 // Entweder mit element.addClass('shp'); oder .attr({class: 'shp'}); hinzufügen
 
-var selectableElementSelector = ".shp, .instrument-chooser";
+var selectableElementSelector = ".shp, .instrument-chooser, .function-chooser";
 
 function bindElementDrag(element, dragMoveHandler) {
-  if (isInstrumentChooserNode(element)) {
-    rewireInstrumentChooser(element);
+  if (isChooserNode(element)) {
+    if (isFunctionChooserNode(element)) {
+      rewireFunctionChooser(element);
+    } else {
+      rewireInstrumentChooser(element);
+    }
     return element;
   }
 

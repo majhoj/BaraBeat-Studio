@@ -30,11 +30,13 @@ $jsFn = @filemtime(__DIR__ . '/JS/functions.js') ?: 1;
             <input type="button" id="button" value="Datei speichern" />
             <input type="button" id="button2" value="Als SVG speichern" />
             <input type="button" id="button3" value="Noten lesen" />
+            <input type="button" id="button10" value="Audiotest" />
             <input type="button" id="button4" value="Binäres Notenblatt" />
             <input type="button" id="button5" value="Tenäres Notenblatt" />
             <input type="button" id="button8" value="Tenäres 9/8 Notenblatt" />
             <input type="button" id="button6" value="Scroll" />
             <input type="button" id="button7" value="Instrument" />
+            <input type="button" id="button9" value="Funktion" />
         </form>
     </div>
 
@@ -114,9 +116,11 @@ var insertTone,
 
 const canvasElementSelector = "#edit, #tone, #bass, #slap, #tone_muffled, #slap_muffled, #tone_flam, #slap_flam, #bass_slap_flam, #in, #out, #edit_text, #wiederholung";
 const instrumentChooserSelector = ".instrument-chooser, #instrumentChooser";
-const removableCanvasElementSelector = canvasElementSelector + ", " + instrumentChooserSelector;
+const functionChooserSelector = ".function-chooser, #functionChooser";
+const chooserSelector = instrumentChooserSelector + ", " + functionChooserSelector;
+const removableCanvasElementSelector = canvasElementSelector + ", " + chooserSelector;
 const exportableElementSelector = "#notenlinien, #basis, " + removableCanvasElementSelector;
-const readableElementSelector = "#edit_text, #wiederholung, " + instrumentChooserSelector;
+const readableElementSelector = "#edit_text, #wiederholung, " + chooserSelector;
 const phpEndpointBase = "PHP/";
 const fileListEndpoint = "auswahlliste.php";
 const loadFileEndpoint = "dateiladen.php";
@@ -292,11 +296,15 @@ function createEditableTextElement(x, y, textContent) {
 
 function clear_all() {
     resetSelectionArtifacts();
-    removeCanvasElements("#notenlinien, .shp, " + instrumentChooserSelector);
+    removeCanvasElements("#notenlinien, .shp, " + chooserSelector);
 }
 
 function addInitialInstrumentChooser(x, y) {
     return createInstrumentChooser(s, x, y).addClass("shp").attr({ id: nextInstrumentChooserId() });
+}
+
+function addInitialFunctionChooser(x, y) {
+    return createFunctionChooser(s, x, y).addClass("shp").attr({ id: nextFunctionChooserId() });
 }
 
 function drawRhythmSheet(config) {
@@ -304,6 +312,7 @@ function drawRhythmSheet(config) {
     const beatBarWidth = config.beatBarWidth;
     const initialChooserX = 100 + gridLineStepX * config.beatStartIndices[0];
     const shouldAddInitialChooser = config.addInitialChooser !== false;
+    const shouldResetTitle = config.resetTitle !== false;
 
     rhythm = config.rhythmName;
     gridSize = config.gridSizeValue;
@@ -312,9 +321,6 @@ function drawRhythmSheet(config) {
     repeatMarkerGridOffsetX = config.repeatMarkerOffsetXValue;
 
     clear_all();
-    if (shouldAddInitialChooser) {
-        addInitialInstrumentChooser(initialChooserX, 140);
-    }
     syllableIndex = 0;
 
     for (var j = 0; j < zeilenAnzahl; j++) {
@@ -358,6 +364,15 @@ function drawRhythmSheet(config) {
                 s.rect(x, staffStartY + j * 120 + 5, beatBarWidth, 1.5).attr({ id: "notenlinien" });
             }
         }
+    }
+
+    if (shouldAddInitialChooser) {
+        addInitialInstrumentChooser(initialChooserX, 140);
+        addInitialFunctionChooser(initialChooserX + 135, 140);
+    }
+
+    if (shouldResetTitle) {
+        titel.attr({ text: "Enter the name of the Rhythm" });
     }
 }
 
@@ -441,7 +456,8 @@ function viererNotenOhneStartChooser() {
         gridSizeValue: (850 / 34) / 2,
         gridSizeXValue: 29,
         repeatMarkerOffsetXValue: 24,
-        addInitialChooser: false
+        addInitialChooser: false,
+        resetTitle: false
     });
 }
 
@@ -461,7 +477,8 @@ function dreierNotenOhneStartChooser() {
         gridSizeValue: (850 / 26) / 2,
         gridSizeXValue: 34,
         repeatMarkerOffsetXValue: 26,
-        addInitialChooser: false
+        addInitialChooser: false,
+        resetTitle: false
     });
 }
 
@@ -481,7 +498,8 @@ function neunerNotenOhneStartChooser() {
         gridSizeValue: (850 / 20) / 2,
         gridSizeXValue: 45.5,
         repeatMarkerOffsetXValue: 35,
-        addInitialChooser: false
+        addInitialChooser: false,
+        resetTitle: false
     });
 }
 
@@ -617,10 +635,10 @@ flam_ton_c = addLegendEntry(flam_ton, "Flam mit Tones", 337, 1105, 49, 240);
 flam_slap_c = addLegendEntry(flam_slap, "Flam mit Slaps", 475, 1087, 49, 259);
 flam_bass_slap_c = addLegendEntry(flam_bass_slap, "Flam mit Bass und Slaps", 613, 1069, 49, 279);
 ton_g_c = addLegendEntry(ton_g, "gedämpfter Tone", 92, 1078, 48, 299);
-slap_g_c = addLegendEntry(slap_g, "gedämpfter Slap", 240, 1058, 48, 319);
-In_c = addLegendEntry(In, "In", 382, 1034, 44, 343);
-Out_c = addLegendEntry(Out, "Out", 424, 1011, 44, 366);
-repeatMarkerLegendClone = addLegendEntry(repeatMarkerGroup, "Wiederholung", 475, 968, 44, 409);
+slap_g_c = addLegendEntry(slap_g, "gedämpfter Slap / Klick", 240, 1058, 48, 319);
+In_c = addLegendEntry(In, "In", 428, 1034, 44, 343);
+Out_c = addLegendEntry(Out, "Out", 470, 1011, 44, 366);
+repeatMarkerLegendClone = addLegendEntry(repeatMarkerGroup, "Wiederholung", 521, 968, 44, 409);
 
 
 // Funktionen zum Verschieben
@@ -690,7 +708,7 @@ cycleRepeatCount = function () {
     let zahl = parseInt(wert, 10);
 
     if (isNaN(zahl)) {
-        zahl = 1;
+        zahl = 2;
     } else {
         zahl++;
         if (zahl > 4) {
@@ -824,7 +842,7 @@ function createEmptyRepeatBoundary(boundaryIndex) {
 }
 
 function getElementReadPosition(element) {
-    if (isInstrumentChooserNode(element)) {
+    if (isInstrumentChooserNode(element) || isFunctionChooserNode(element)) {
         const transformState = typeof element.transform === 'function' ? element.transform() : null;
         const localMatrix = transformState && transformState.localMatrix ? transformState.localMatrix : null;
         if (localMatrix) {
@@ -918,10 +936,10 @@ function getStepIndexWithinBar(lineSlotIndex, stepsPerBar) {
 }
 
 function getElementLabelText(element) {
-    if (isInstrumentChooserNode(element)) {
+    if (isInstrumentChooserNode(element) || isFunctionChooserNode(element)) {
         const chooserLabel = element.select("text");
         const chooserText = chooserLabel ? (chooserLabel.attr('text') || chooserLabel.node.textContent || '') : '';
-        if (chooserText == 'Instrument') {
+        if (chooserText == 'Instrument' || chooserText == 'Funktion') {
             return '';
         }
         return chooserText;
@@ -936,7 +954,7 @@ function getElementLabelText(element) {
 function normalizeRepeatCount(repeatText, repeatSide) {
     const trimmedRepeatText = String(repeatText).trim();
     if (trimmedRepeatText === '') {
-        return repeatSide == 'end' ? 'loop' : true;
+        return repeatSide == 'end' ? 1 : true;
     }
     if (!isNaN(Number(trimmedRepeatText))) {
         return Number(trimmedRepeatText);
@@ -956,10 +974,6 @@ function buildRepeatRanges(repeatBoundaries) {
             return Math.abs(markerA.x - markerA.boundaryLineX) - Math.abs(markerB.x - markerB.boundaryLineX);
         });
 
-        sortedStartMarkers.forEach(function (startMarker) {
-            repeatStartStack.push(startMarker);
-        });
-
         sortedEndMarkers.forEach(function (endMarker) {
             const matchingStartMarker = repeatStartStack.pop();
             if (!matchingStartMarker) {
@@ -972,6 +986,10 @@ function buildRepeatRanges(repeatBoundaries) {
                 endBar: endMarker.boundaryIndex,
                 count: endMarker.count
             });
+        });
+
+        sortedStartMarkers.forEach(function (startMarker) {
+            repeatStartStack.push(startMarker);
         });
     });
 
@@ -1004,7 +1022,7 @@ function applyRepeatMarkersToBars(rhythmBars, repeatBoundaries) {
 }
 
 function mergePercussionNote(currentSymbol, noteId, instrumentName) {
-    if (instrumentName == 'Kenkeni' || instrumentName == 'Sangban' || instrumentName == 'Doundoun') {
+    if (instrumentName == 'Kenkeni' || instrumentName == 'Sangban' || instrumentName == 'Doundoun' || instrumentName == 'Dununba') {
         if (noteId == 'slap' && currentSymbol == 'f') {
             return 'Bell';
         }
@@ -1014,11 +1032,20 @@ function mergePercussionNote(currentSymbol, noteId, instrumentName) {
         if (noteId == 'tone_muffled' && currentSymbol == 'f') {
             return 'Muffled';
         }
+        if (noteId == 'slap_muffled' && currentSymbol == 'f') {
+            return 'Klick';
+        }
         if (noteId == 'tone_muffled' && currentSymbol == 'Bell') {
             return 'Bell_Muffled';
         }
+        if (noteId == 'slap_muffled' && currentSymbol == 'Bell') {
+            return 'Bell_Klick';
+        }
         if (noteId == 'slap' && currentSymbol == 'Muffled') {
             return 'Bell_Muffled';
+        }
+        if (noteId == 'slap' && currentSymbol == 'Klick') {
+            return 'Bell_Klick';
         }
         if (noteId == 'slap' && currentSymbol == 'Open') {
             return 'Bell_Open';
@@ -1093,23 +1120,44 @@ function mergePercussionNote(currentSymbol, noteId, instrumentName) {
 function propagateBarInstruments(rhythmBars) {
     let currentInstrument = '';
     let currentLabel = '';
+
     rhythmBars.forEach(function (bar) {
+        if (!bar) {
+            return;
+        }
+
+        if (bar.label === 'Leer' && !bar.instrument) {
+            bar.effectiveInstrument = 'Leer';
+            bar.effectiveLabel = 'Leer';
+            currentInstrument = '';
+            currentLabel = '';
+            return;
+        }
+
         if (bar.instrument) {
-            bar.effectiveInstrument = bar.instrument;
-            if (bar.instrument.search(/^End/i) === 0) {
+            if (bar.instrument === 'Leer') {
+                bar.effectiveInstrument = 'Leer';
+                bar.effectiveLabel = 'Leer';
                 currentInstrument = '';
-            } else {
-                currentInstrument = bar.instrument;
+                currentLabel = '';
+                return;
             }
+            currentInstrument = bar.instrument;
+            bar.effectiveInstrument = bar.instrument;
         } else {
-            bar.effectiveInstrument = currentInstrument;
+            bar.effectiveInstrument = currentInstrument || 'Leer';
         }
 
         if (bar.label) {
-            bar.effectiveLabel = bar.label;
+            if (bar.label === 'Leer') {
+                bar.effectiveLabel = 'Leer';
+                currentLabel = '';
+                return;
+            }
             currentLabel = bar.label;
+            bar.effectiveLabel = bar.label;
         } else {
-            bar.effectiveLabel = currentLabel;
+            bar.effectiveLabel = currentInstrument ? (currentLabel || 'Leer') : 'Leer';
         }
     });
 }
@@ -1125,11 +1173,24 @@ function buildBarSummary(rhythmBars) {
         const displayEndMarkers = endMarkers.map(function (marker) {
             return marker === 'loop' ? 'bis Stop' : marker;
         });
+        const controlSummary = bar.controls.length === 0
+            ? 'keine'
+            : bar.controls
+                .slice()
+                .sort(function (controlA, controlB) {
+                    return controlA.stepIndex - controlB.stepIndex;
+                })
+                .map(function (control) {
+                    const controlLabel = control.type === 'in' ? 'In' : 'Out';
+                    return controlLabel + '@' + (control.stepIndex + 1);
+                })
+                .join(', ');
         summaryText +=
             'Takt ' + bar.index + ': ' +
             (bar.effectiveInstrument || '') + ', ' +
             (bar.effectiveLabel || '') + ', Wiederholungsmarker = Start[' +
             displayStartMarkers.join(', ') + '], Ende[' + displayEndMarkers.join(', ') + ']\n' +
+            'Steuerung [' + (bar.index - 1) + '] = [' + controlSummary + ']\n' +
             'Schlaege [' + (bar.index - 1) + '] = [' + bar.notes.join(',') + ']\n';
     });
     return summaryText;
@@ -1149,7 +1210,149 @@ function buildRepeatRangeSummary(repeatRanges) {
     return rangeSummaryText;
 }
 
-function callPHPScript_lesen(anzahl) {
+function mapInstrumentNameForPlayer(instrumentName) {
+    const instrumentMap = {
+        'Djembe 1': 'Djembe_1',
+        'Djembe 2': 'Djembe_2',
+        'Djembe 3': 'Djembe_3',
+        'Dununba': 'Doundoun'
+    };
+    if (!instrumentName || instrumentName === 'Leer') {
+        return '';
+    }
+    return instrumentMap[instrumentName] || instrumentName;
+}
+
+function mapLabelForPlayer(label) {
+    if (!label || label === 'Leer') {
+        return '';
+    }
+    if (label.indexOf('Begleitpattern') === 0 || label.indexOf('Begleitung') === 0) {
+        return 'Begleitung';
+    }
+    if (label.indexOf('Call') === 0) {
+        return 'Call';
+    }
+    if (label.indexOf('Echauffement') === 0) {
+        return 'Echauffement';
+    }
+    if (label.indexOf('Outro') === 0) {
+        return 'Outro';
+    }
+    return label;
+}
+
+function getPlayerRepeatValue(repeatMarkers, markerType) {
+    if (!Array.isArray(repeatMarkers) || repeatMarkers.length === 0) {
+        return false;
+    }
+    const firstMarker = repeatMarkers[0];
+    if (firstMarker === 'loop') {
+        return markerType === 'end' ? 'loop' : true;
+    }
+    return firstMarker;
+}
+
+function buildPlayerRowsFromRhythmBars(rhythmBars, repeatRanges) {
+    function getExplicitPlayerInstrument(bar) {
+        if (!bar) {
+            return '';
+        }
+        if (bar.instrument && bar.instrument !== 'Leer') {
+            return bar.instrument;
+        }
+        return '';
+    }
+
+    function getEffectivePlayerInstrument(bar) {
+        if (!bar) {
+            return '';
+        }
+        if (bar.effectiveInstrument && bar.effectiveInstrument !== 'Leer') {
+            return bar.effectiveInstrument;
+        }
+        return '';
+    }
+
+    function getExplicitPlayerLabel(bar) {
+        if (!bar) {
+            return '';
+        }
+        if (bar.label && bar.label !== 'Leer') {
+            return bar.label;
+        }
+        return '';
+    }
+
+    function getEffectivePlayerLabel(bar) {
+        if (!bar) {
+            return '';
+        }
+        if (bar.effectiveLabel && bar.effectiveLabel !== 'Leer') {
+            return bar.effectiveLabel;
+        }
+        return '';
+    }
+
+    const playerRows = [{
+        Name: titel.attr('text'),
+        Rhythmus: rhythm,
+        RepeatRanges: repeatRanges || []
+    }];
+
+    for (let rowIndex = 0; rowIndex < zeilenAnzahl; rowIndex++) {
+        const leftBar = rhythmBars[rowIndex * 2];
+        const rightBar = rhythmBars[rowIndex * 2 + 1];
+        const leftExplicitInstrument = mapInstrumentNameForPlayer(getExplicitPlayerInstrument(leftBar));
+        const rightExplicitInstrument = mapInstrumentNameForPlayer(getExplicitPlayerInstrument(rightBar));
+        const leftEffectiveInstrument = mapInstrumentNameForPlayer(getEffectivePlayerInstrument(leftBar));
+        const rightEffectiveInstrument = mapInstrumentNameForPlayer(getEffectivePlayerInstrument(rightBar));
+        const leftExplicitLabel = mapLabelForPlayer(getExplicitPlayerLabel(leftBar));
+        const rightExplicitLabel = mapLabelForPlayer(getExplicitPlayerLabel(rightBar));
+        const leftEffectiveLabel = mapLabelForPlayer(getEffectivePlayerLabel(leftBar));
+        const rightEffectiveLabel = mapLabelForPlayer(getEffectivePlayerLabel(rightBar));
+        const leftLabel = leftExplicitLabel || leftEffectiveLabel;
+        const rightLabel = rightExplicitLabel || rightEffectiveLabel;
+        const leftUsesAllDjembes = !leftExplicitInstrument && (leftLabel === 'Echauffement' || leftLabel === 'Outro');
+        const rightUsesAllDjembes = !rightExplicitInstrument && (rightLabel === 'Echauffement' || rightLabel === 'Outro');
+
+        playerRows.push({
+            Instrument_1: leftExplicitInstrument || leftEffectiveInstrument,
+            InstrumentMode_1: leftUsesAllDjembes ? 'allUsedDjembes' : 'single',
+            Bezeichner_1: leftLabel,
+            Wiederholung_1: leftBar ? [
+                getPlayerRepeatValue(leftBar.repeat.start, 'start'),
+                getPlayerRepeatValue(leftBar.repeat.end, 'end')
+            ] : [false, false],
+            Instrument_2: rightExplicitInstrument || rightEffectiveInstrument,
+            InstrumentMode_2: rightUsesAllDjembes ? 'allUsedDjembes' : 'single',
+            Bezeichner_2: rightLabel,
+            Wiederholung_2: rightBar ? [
+                getPlayerRepeatValue(rightBar.repeat.start, 'start'),
+                getPlayerRepeatValue(rightBar.repeat.end, 'end')
+            ] : [false, false],
+            Reihe: (leftBar ? leftBar.notes : []).concat(rightBar ? rightBar.notes : [])
+        });
+    }
+
+    return playerRows;
+}
+
+function openAudioTestWindow(playerRows) {
+    const form = document.createElement('form');
+    form.action = 'Audio/audioplayer.php';
+    form.method = 'POST';
+    form.target = '_blank';
+    form.innerHTML = '<input type="hidden" name="myObj" />';
+    document.body.appendChild(form);
+    form.querySelector('input[name="myObj"]').value = JSON.stringify(playerRows);
+    form.submit();
+    form.remove();
+}
+
+function callPHPScript_lesen(anzahl, options) {
+    const readOptions = options || {};
+    const shouldShowAlert = readOptions.showAlert !== false;
     const takteAnzahl = anzahl * 2;
     const readConfig = getReadRhythmConfig();
     const rhythmBars = [];
@@ -1197,6 +1400,8 @@ function callPHPScript_lesen(anzahl) {
 
         if (isInstrumentChooserNode(el)) {
             rhythmBar.instrument = elementText;
+        } else if (isFunctionChooserNode(el)) {
+            rhythmBar.label = elementText;
         } else {
             rhythmBar.label = elementText;
         }
@@ -1246,7 +1451,16 @@ function callPHPScript_lesen(anzahl) {
     console.log('readRhythmBars', rhythmBars);
     console.log('readRepeatBoundaries', repeatBoundaries);
     console.log('readRepeatRanges', repeatRanges);
-    alert(notenText);
+    if (shouldShowAlert) {
+        alert(notenText);
+    }
+
+    return {
+        rhythmBars: rhythmBars,
+        repeatBoundaries: repeatBoundaries,
+        repeatRanges: repeatRanges,
+        summaryText: notenText
+    };
 }
 
 function runReadRhythm() {
@@ -1255,6 +1469,19 @@ function runReadRhythm() {
     } catch (error) {
         console.error('callPHPScript_lesen failed', error);
         alert('Fehler beim Auslesen: ' + error.message);
+    }
+}
+
+function runAudioTest() {
+    try {
+        const readResult = callPHPScript_lesen(zeilenAnzahl, { showAlert: false });
+        const playerRows = buildPlayerRowsFromRhythmBars(readResult.rhythmBars, readResult.repeatRanges);
+        window.lastPlayerRows = playerRows;
+        console.log('playerRows', playerRows);
+        openAudioTestWindow(playerRows);
+    } catch (error) {
+        console.error('runAudioTest failed', error);
+        alert('Fehler beim Audiotest: ' + error.message);
     }
 }
 
@@ -1306,11 +1533,15 @@ document.addEventListener('DOMContentLoaded', function () {
     document.querySelector('#button').addEventListener('click', callPHPScript);
     document.querySelector('#button2').addEventListener('click', callPHPScript2);
     document.querySelector('#button3').addEventListener('click', runReadRhythm);
+    document.querySelector('#button10').addEventListener('click', runAudioTest);
     document.querySelector('#button4').addEventListener('click', viererNoten);
     document.querySelector('#button5').addEventListener('click', dreierNoten);
     document.querySelector('#button8').addEventListener('click', neunerNoten);
     document.querySelector('#button7').addEventListener('click', function () {
         addInitialInstrumentChooser(125, 140);
+    });
+    document.querySelector('#button9').addEventListener('click', function () {
+        addInitialFunctionChooser(260, 140);
     });
 
     document.querySelector('#button6').addEventListener('click', function () {
@@ -1343,7 +1574,7 @@ function onSVGLoaded(data) {
     let loadedElements = data.selectAll(removableCanvasElementSelector);
     s.append(loadedElements);
     loadedElements.forEach(function (el) {
-        if (isInstrumentChooserNode(el)) {
+        if (isInstrumentChooserNode(el) || isFunctionChooserNode(el)) {
             return;
         }
         if (el.attr("id") == "edit_text") {
@@ -1372,6 +1603,17 @@ function onSVGLoaded(data) {
             sub.attr({ display: "none" });
         });
         rewireInstrumentChooser(el);
+    });
+
+    const loadedFunctionChoosers = s.selectAll(functionChooserSelector);
+    loadedFunctionChoosers.forEach(function (el) {
+        el.addClass("shp");
+        el.addClass("function-chooser");
+        el.attr({ id: nextFunctionChooserId() });
+        el.selectAll("g").forEach(function (sub) {
+            sub.attr({ display: "none" });
+        });
+        rewireFunctionChooser(el);
     });
 
     titel.attr({ text: loadedTitle });
