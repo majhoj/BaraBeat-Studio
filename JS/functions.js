@@ -17,8 +17,8 @@ function createMenuChooser(s, x, y, config) {
   let menuHoehe = config.options.length * zeilenHoehe + 10;
 
   let menuBg = s.rect(-5, 5, menuBreite, menuHoehe, 4, 4).attr({
-    fill: "#f0f0f0",
-    fillOpacity: 0.8,
+    fill: "#f7f7f7",
+    fillOpacity: 0.92,
     stroke: "#999",
     "stroke-width": 1,
   });
@@ -70,6 +70,18 @@ function setChooserText(chooserGruppe, textValue, fillValue = "#333") {
   });
 }
 
+function bringChooserToFront(chooserGruppe, menuGruppe) {
+  if (typeof s !== "undefined" && s && typeof s.append === "function") {
+    s.append(chooserGruppe);
+  }
+  if (typeof chooserGruppe.toFront === "function") {
+    chooserGruppe.toFront();
+  }
+  if (menuGruppe && typeof menuGruppe.toFront === "function") {
+    menuGruppe.toFront();
+  }
+}
+
 function findLinkedFunctionChooser(instrumentChooserGruppe) {
   let instrumentPosition = getChooserPosition(instrumentChooserGruppe);
   let bestFunctionChooser = null;
@@ -102,9 +114,11 @@ function createInstrumentChooser(s, x, y, startText = "Instrument", startFill = 
     startFill: startFill,
     menuWidth: 120,
     options: [
+      "Djembe",
       "Djembe 1",
       "Djembe 2",
       "Djembe 3",
+      "Bässe",
       "Kenkeni",
       "Sangban",
       "Dununba",
@@ -164,8 +178,8 @@ function bindChooserInteraction(chooserGruppe, chooserText, menuGruppe, onSelect
       return;
     }
     let sichtbar = menuGruppe.attr("display") !== "none";
-    if (!sichtbar && typeof chooserGruppe.toFront === "function") {
-      chooserGruppe.toFront();
+    if (!sichtbar) {
+      bringChooserToFront(chooserGruppe, menuGruppe);
     }
     menuGruppe.attr({ display: sichtbar ? "none" : "inline" });
     event.stopPropagation();
@@ -188,9 +202,7 @@ function bindChooserInteraction(chooserGruppe, chooserText, menuGruppe, onSelect
 
   function chooser_sel_start(x, y, event) {
     chooserGruppe.data("warDrag", false);
-    if (typeof chooserGruppe.toFront === "function") {
-      chooserGruppe.toFront();
-    }
+    bringChooserToFront(chooserGruppe, menuGruppe);
     sel_start.call(this, x, y, event);
   }
 

@@ -133,6 +133,22 @@ h2 {
   max-width: 420px;
 }
 
+.secondary-button {
+  flex: 0 0 auto;
+  min-height: 56px;
+  padding: 0 18px;
+  border: var(--border);
+  border-radius: var(--borderRad);
+  background-color: var(--dgrey);
+  cursor: pointer;
+  font: inherit;
+}
+
+.secondary-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 /* play button */
 [data-playing] {
   align-self: stretch;

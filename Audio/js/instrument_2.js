@@ -70,13 +70,13 @@ class Instrumente {
     }
   }
 
-  play(name, time_i) {
+  play(name, time_i, gainMultiplier = 1) {
     if (Object.prototype.hasOwnProperty.call(this._snd, name)) {
       const sampleSource = this._audioCtx.createBufferSource();
       const vol_tone = this._audioCtx.createGain();
 
       sampleSource.buffer = this._snd[name];
-      vol_tone.gain.value = this._vol;
+      vol_tone.gain.value = this._vol * Math.max(0, Number(gainMultiplier) || 1);
 
       sampleSource.connect(vol_tone).connect(this._outputNode);
 

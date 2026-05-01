@@ -5,6 +5,7 @@ var functionChooserIdSeq = 0;
 var box = null;
 var selections = null;
 var lastKeyPressed = null;
+var altKeyIsDown = false;
 var selectionDragState = {
   currentDx: undefined,
   currentDy: undefined,
@@ -13,6 +14,22 @@ var selectionDragState = {
   dragOffsetDx: 0,
   dragOffsetDy: 0,
 };
+
+window.addEventListener("keydown", function (event) {
+  if (event.key === "Alt") {
+    altKeyIsDown = true;
+  }
+});
+
+window.addEventListener("keyup", function (event) {
+  if (event.key === "Alt") {
+    altKeyIsDown = false;
+  }
+});
+
+window.addEventListener("blur", function () {
+  altKeyIsDown = false;
+});
 
 function nextInstrumentChooserId() {
   instrumentChooserIdSeq += 1;
@@ -69,8 +86,9 @@ function suppressChooserClickAfterDrag(chooserElement) {
 }
 
 function createChooserClone(sourceElement) {
-  var startX = sourceElement.data("startX");
-  var startY = sourceElement.data("startY") + 13;
+  var chooserBounds = sourceElement.getBBox();
+  var startX = chooserBounds.x;
+  var startY = chooserBounds.y + 13;
   var textElement = sourceElement.select("text");
   var chooserText = textElement.attr("text");
   var chooserColor = textElement.attr("fill");
@@ -306,7 +324,7 @@ function sel_move(dx, dy) {
   var dx = Snap.snapTo(gridSize, dx, 50);
   var dy = snapDeltaWithYOffset(this.data("startSnapY"), dy);
 
-  this.selectAll(".instrument-chooser").forEach(function (chooserElement) {
+  this.selectAll(".instrument-chooser, .function-chooser").forEach(function (chooserElement) {
     suppressChooserClickAfterDrag(chooserElement);
   });
 
@@ -350,7 +368,7 @@ function start(event) {
 
 function sel_start(x, y, event) {
   var ev = event && (event.originalEvent || event);
-  this.data("cloneThisDrag", !!(ev && ev.altKey));
+  this.data("cloneThisDrag", !!((ev && ev.altKey) || altKeyIsDown));
   this.data("origTransform", this.transform().local);
   this.data("alreadyCloned", false);
 
