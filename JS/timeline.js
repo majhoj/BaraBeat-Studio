@@ -1,7 +1,7 @@
 // Abschnittstimeline: Zustand, Bibliothek, Rendering, Drag/Drop und Metadaten
 const timelineDjembeTargets = ['Djembe_1', 'Djembe_2', 'Djembe_3'];
 const timelineBassTargets = ['Kenkeni', 'Sangban', 'Doundoun'];
-const timelineMetadataVersion = 3;
+const timelineMetadataVersion = 4;
 const defaultTimelineSwingProfiles = {
     binaer: [6, -5, 6, 10],
     tenaer: [0, -15, -10],
@@ -196,7 +196,13 @@ function buildPatternIdentitySignature(pattern) {
                     return (control.type || '') + '@' + Number(control.stepIndex);
                 }).join(',')
                 : '';
-            return noteSignature + '||' + controlSignature;
+            const repeatStartSignature = Array.isArray(bar.repeat && bar.repeat.start)
+                ? bar.repeat.start.join(',')
+                : String(bar.repeat && bar.repeat.start || '');
+            const repeatEndSignature = Array.isArray(bar.repeat && bar.repeat.end)
+                ? bar.repeat.end.join(',')
+                : String(bar.repeat && bar.repeat.end || '');
+            return noteSignature + '||' + controlSignature + '||' + repeatStartSignature + '||' + repeatEndSignature;
         }).join('||')
         : '';
 
@@ -247,6 +253,13 @@ function collapseDuplicatePatterns(patterns, rhythmBars) {
     });
 
     return uniquePatterns;
+}
+
+function cloneTimelineRepeatMarkers(markerValue) {
+    if (Array.isArray(markerValue)) {
+        return markerValue.slice();
+    }
+    return markerValue;
 }
 
 function getUsedGenericDjembeTargets(patterns) {
@@ -370,36 +383,18 @@ function buildPatternLibraryFromRhythmBars(rhythmBars) {
         hasExplicitIntroDjembes: hasExplicitSingleDjembePattern(rhythmBars, 'Intro')
     };
     let currentPattern = null;
-    let previousBar = null;
-
-    function hasRepeatMarker(markerValue) {
-        if (Array.isArray(markerValue)) {
-            return markerValue.length > 0;
-        }
-        return Boolean(markerValue);
-    }
-
     rhythmBars.forEach(function (bar) {
         const labelInfo = getPlayerLabelInfo(bar.effectiveLabel || bar.label);
         const sourceInstrumentName = resolvePatternSourceInstrumentName(bar, labelInfo);
         const patternInstrument = normalizePatternInstrumentName(sourceInstrumentName);
         if (!patternInstrument || !labelInfo.type || !labelInfo.raw) {
             currentPattern = null;
-            previousBar = bar;
             return;
         }
 
-        const shouldSplitAtRepeatBoundary = previousBar &&
-            currentPattern &&
-            currentPattern.sourceInstrument === sourceInstrumentName &&
-            currentPattern.labelName === labelInfo.raw &&
-            (hasRepeatMarker(previousBar.repeat && previousBar.repeat.end) ||
-             hasRepeatMarker(bar.repeat && bar.repeat.start));
-
         if (!currentPattern ||
             currentPattern.sourceInstrument !== sourceInstrumentName ||
-            currentPattern.labelName !== labelInfo.raw ||
-            shouldSplitAtRepeatBoundary) {
+            currentPattern.labelName !== labelInfo.raw) {
             const counterKey = sourceInstrumentName + '|' + labelInfo.raw;
             patternCounters[counterKey] = (patternCounters[counterKey] || 0) + 1;
             const patternOccurrence = patternCounters[counterKey];
@@ -424,6 +419,10 @@ function buildPatternLibraryFromRhythmBars(rhythmBars) {
             patternSourceKey: currentPattern.sourceKey,
             patternBarIndex: currentPattern.bars.length,
             label: labelInfo.type,
+            repeat: {
+                start: cloneTimelineRepeatMarkers(bar.repeat && bar.repeat.start),
+                end: cloneTimelineRepeatMarkers(bar.repeat && bar.repeat.end)
+            },
             controls: Array.isArray(bar.controls) ? bar.controls.map(function (control) {
                 return {
                     type: control.type,
@@ -434,7 +433,6 @@ function buildPatternLibraryFromRhythmBars(rhythmBars) {
         });
         bar.patternSourceKey = currentPattern.sourceKey;
         bar.patternBarIndex = currentPattern.bars.length - 1;
-        previousBar = bar;
     });
 
     assignGenericDjembeDefaults(patterns);
@@ -577,6 +575,7 @@ function buildDefaultTimelineEntriesFromRhythmBars(rhythmBars, repeatRanges, pat
     const defaultEntries = [];
     let previousPatternSourceKey = '';
     let previousPatternBarIndex = -1;
+    let previousSourceBarIndex = -1;
 
     patternLibrary.forEach(function (pattern) {
         patternBySourceKey[pattern.sourceKey] = pattern;
@@ -588,16 +587,21 @@ function buildDefaultTimelineEntriesFromRhythmBars(rhythmBars, repeatRanges, pat
             return;
         }
 
+        const sourceBarIndex = Number(bar.sourceBarIndex || bar.index);
+        const isInternalRepeatOfSameSourceBar = previousPatternSourceKey === bar.patternSourceKey &&
+            Number(bar.patternBarIndex) === 0 &&
+            sourceBarIndex === previousSourceBarIndex;
         const isPatternStart = previousPatternSourceKey !== bar.patternSourceKey ||
             Number(bar.patternBarIndex) === 0 ||
             Number(bar.patternBarIndex) <= previousPatternBarIndex;
 
-        if (isPatternStart) {
+        if (isPatternStart && !isInternalRepeatOfSameSourceBar) {
             defaultEntries.push(cloneTimelineEntryFromPattern(matchedPattern));
         }
 
         previousPatternSourceKey = bar.patternSourceKey;
         previousPatternBarIndex = Number(bar.patternBarIndex);
+        previousSourceBarIndex = sourceBarIndex;
     });
 
     return defaultEntries;
@@ -605,7 +609,18 @@ function buildDefaultTimelineEntriesFromRhythmBars(rhythmBars, repeatRanges, pat
 
 function computePatternLibraryHash(patternLibrary) {
     return patternLibrary.map(function (pattern) {
-        return pattern.sourceKey + ':' + pattern.bars.length;
+        const repeatSignature = Array.isArray(pattern.bars)
+            ? pattern.bars.map(function (bar) {
+                const repeatStartSignature = Array.isArray(bar.repeat && bar.repeat.start)
+                    ? bar.repeat.start.join(',')
+                    : String(bar.repeat && bar.repeat.start || '');
+                const repeatEndSignature = Array.isArray(bar.repeat && bar.repeat.end)
+                    ? bar.repeat.end.join(',')
+                    : String(bar.repeat && bar.repeat.end || '');
+                return repeatStartSignature + '>' + repeatEndSignature;
+            }).join(',')
+            : '';
+        return pattern.sourceKey + ':' + pattern.bars.length + ':' + repeatSignature;
     }).join('|');
 }
 
@@ -699,6 +714,10 @@ function buildTimelinePlayerPayload(patternLibrary, timelineEntries) {
                     return {
                         sourceBarIndex: bar.sourceBarIndex,
                         label: bar.label,
+                        repeat: {
+                            start: cloneTimelineRepeatMarkers(bar.repeat && bar.repeat.start),
+                            end: cloneTimelineRepeatMarkers(bar.repeat && bar.repeat.end)
+                        },
                         controls: Array.isArray(bar.controls) ? bar.controls.map(function (control) {
                             return {
                                 type: control.type,
@@ -878,6 +897,44 @@ function getTimelineTargetSignature(targetInstruments) {
         .join('|');
 }
 
+function getTimelineRepeatMarkerList(markerValue) {
+    if (Array.isArray(markerValue)) {
+        return markerValue.filter(function (marker) {
+            return marker !== false && marker !== null && marker !== undefined && marker !== '';
+        });
+    }
+    if (markerValue === false || markerValue === null || markerValue === undefined || markerValue === '') {
+        return [];
+    }
+    return [markerValue];
+}
+
+function buildTimelinePatternBarSummary(pattern) {
+    const bars = pattern && Array.isArray(pattern.bars) ? pattern.bars : [];
+    if (bars.length === 0) {
+        return '';
+    }
+
+    const summaryParts = [];
+    for (let barIndex = 0; barIndex < bars.length; barIndex++) {
+        const bar = bars[barIndex] || {};
+        const repeatStartMarkers = getTimelineRepeatMarkerList(bar.repeat && bar.repeat.start);
+        const repeatEndMarkers = getTimelineRepeatMarkerList(bar.repeat && bar.repeat.end);
+        let repeatCount = 1;
+
+        if (repeatStartMarkers.length > 0 && repeatEndMarkers.length > 0) {
+            const markerCount = repeatEndMarkers[0] === 'loop'
+                ? 1
+                : Number(repeatEndMarkers[0]) || 0;
+            repeatCount = markerCount + 1;
+        }
+
+        summaryParts.push('Takt ' + (barIndex + 1) + (repeatCount > 1 ? ' ' + repeatCount + 'x' : ''));
+    }
+
+    return summaryParts.join(', ');
+}
+
 function buildTimelineGroupSummary(group, patternLibrary) {
     const patternById = {};
     const summaryParts = [];
@@ -920,6 +977,9 @@ function buildTimelineGroupSummary(group, patternLibrary) {
 
     return {
         totalBars: totalBars || 0,
+        barText: summaryParts.length === 1
+            ? buildTimelinePatternBarSummary(patternById[summaryParts[0].patternId])
+            : '',
         text: summaryParts.length <= 1
             ? ''
             : summaryParts.map(function (part) {
@@ -1561,7 +1621,8 @@ function renderTimelineSequence() {
             const groupSummary = buildTimelineGroupSummary(group, timelineState.sourcePatterns);
             const metaEl = document.createElement('small');
             const displayedBarCount = groupSummary.totalBars || (Array.isArray(pattern.bars) ? pattern.bars.length : 0);
-            metaEl.textContent = 'Takte: ' + displayedBarCount + (!groupSummary.text && group.count > 1 ? ' | Wiederholung x' + group.count : '');
+            metaEl.textContent = groupSummary.barText ||
+                ('Takte: ' + displayedBarCount + (!groupSummary.text && group.count > 1 ? ' | Wiederholung x' + group.count : ''));
             mainWrap.appendChild(titleEl);
             mainWrap.appendChild(metaEl);
             if (groupSummary.text) {

@@ -190,6 +190,81 @@ function sanitizeRepeatRanges(repeatRangesInput) {
     });
 }
 
+function normalizeRepeatMarkerList(markerValue) {
+  if (Array.isArray(markerValue)) {
+    return markerValue.filter(function (marker) {
+      return marker !== false && marker !== null && marker !== undefined && marker !== '';
+    });
+  }
+  if (markerValue === false || markerValue === null || markerValue === undefined || markerValue === '') {
+    return [];
+  }
+  return [markerValue];
+}
+
+function buildRepeatRangesFromPatternBars(patternBars) {
+  if (!Array.isArray(patternBars) || patternBars.length === 0) {
+    return [];
+  }
+
+  const repeatBoundaries = new Array(patternBars.length + 1).fill(null).map(function (_, boundaryIndex) {
+    return {
+      index: boundaryIndex,
+      startMarkers: [],
+      endMarkers: []
+    };
+  });
+
+  patternBars.forEach(function (bar, barIndex) {
+    const repeatInfo = bar && bar.repeat ? bar.repeat : {};
+    normalizeRepeatMarkerList(repeatInfo.start).forEach(function (marker) {
+      repeatBoundaries[barIndex].startMarkers.push({
+        boundaryIndex: barIndex,
+        count: marker
+      });
+    });
+    normalizeRepeatMarkerList(repeatInfo.end).forEach(function (marker) {
+      repeatBoundaries[barIndex + 1].endMarkers.push({
+        boundaryIndex: barIndex + 1,
+        count: marker
+      });
+    });
+  });
+
+  const repeatRanges = [];
+  const repeatStartStack = [];
+  repeatBoundaries.forEach(function (boundary) {
+    boundary.endMarkers.forEach(function (endMarker) {
+      const matchingStartMarker = repeatStartStack.pop();
+      if (!matchingStartMarker) {
+        return;
+      }
+      repeatRanges.push({
+        startBar: matchingStartMarker.boundaryIndex + 1,
+        endBar: endMarker.boundaryIndex,
+        count: endMarker.count
+      });
+    });
+    boundary.startMarkers.forEach(function (startMarker) {
+      repeatStartStack.push(startMarker);
+    });
+  });
+
+  return sanitizeRepeatRanges(repeatRanges);
+}
+
+function expandPatternBars(pattern) {
+  const patternBars = pattern && Array.isArray(pattern.bars) ? pattern.bars : [];
+  if (patternBars.length === 0) {
+    return [];
+  }
+  const patternRepeatRanges = buildRepeatRangesFromPatternBars(patternBars);
+  if (patternRepeatRanges.length === 0) {
+    return patternBars;
+  }
+  return expandBarsWithRepeats(patternBars, patternRepeatRanges, 1, patternBars.length);
+}
+
 const playerConfig = Array.isArray(obj) && obj.length > 0 ? obj[0] : {};
 const repeatRanges = sanitizeRepeatRanges(playerConfig.RepeatRanges);
 const isTimelineMode = Boolean(playerConfig.TimelineMode);
@@ -338,11 +413,7 @@ function appendSectionToSteuerung(section, sectionIndex) {
 }
 
 function flattenPatternNotes(pattern) {
-  if (!pattern || !Array.isArray(pattern.bars)) {
-    return [];
-  }
-
-  return pattern.bars.reduce(function (allNotes, bar) {
+  return expandPatternBars(pattern).reduce(function (allNotes, bar) {
     if (!bar || !Array.isArray(bar.notes)) {
       return allNotes;
     }
@@ -351,14 +422,15 @@ function flattenPatternNotes(pattern) {
 }
 
 function getPatternOutStep(pattern) {
-  if (!pattern || !Array.isArray(pattern.bars)) {
+  const patternBars = expandPatternBars(pattern);
+  if (patternBars.length === 0) {
     return null;
   }
 
   let stepOffset = 0;
 
-  for (let barIndex = 0; barIndex < pattern.bars.length; barIndex++) {
-    const bar = pattern.bars[barIndex];
+  for (let barIndex = 0; barIndex < patternBars.length; barIndex++) {
+    const bar = patternBars[barIndex];
     const barNotes = bar && Array.isArray(bar.notes) ? bar.notes : [];
     const barControls = bar && Array.isArray(bar.controls) ? bar.controls : [];
     const outControl = barControls
@@ -623,7 +695,7 @@ function buildFlatBarsFromTimeline(config) {
           }, [])
       : [];
 
-    pattern.bars.forEach(function (bar) {
+    expandPatternBars(pattern).forEach(function (bar) {
       flatBars.push({
         index: flatBars.length + 1,
         instrument: '',
