@@ -3,6 +3,8 @@ $jsSnap = @filemtime(__DIR__ . '/JS/snapNEU.svg.js') ?: 1;
 $jsJq = @filemtime(__DIR__ . '/JS/jquery.min.js') ?: 1;
 $jsSel = @filemtime(__DIR__ . '/JS/selection_drag_7.js') ?: 1;
 $jsFn = @filemtime(__DIR__ . '/JS/functions.js') ?: 1;
+$jsTimeline = @filemtime(__DIR__ . '/JS/timeline.js') ?: 1;
+$cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
 ?>
 <!doctype html>
 <html>
@@ -15,251 +17,63 @@ $jsFn = @filemtime(__DIR__ . '/JS/functions.js') ?: 1;
     <script src="JS/jquery.min.js?v=<?php echo $jsJq; ?>"></script>
     <script src="JS/selection_drag_7.js?v=<?php echo $jsSel; ?>"></script>
     <script src="JS/functions.js?v=<?php echo $jsFn; ?>"></script>
-    <style>
-        #timelinePanel {
-            position: fixed;
-            top: 46px;
-            left: 12px;
-            right: 12px;
-            z-index: 20;
-            display: none;
-            background: rgba(255, 255, 255, 0.98);
-            border: 1px solid #777;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
-            padding: 14px;
-            font-family: sans-serif;
-            max-height: calc(100vh - 64px);
-            overflow: auto;
-        }
-
-        .timeline-panel-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-            margin-bottom: 12px;
-        }
-
-        .timeline-panel-title {
-            font-size: 18px;
-            font-weight: bold;
-        }
-
-        .timeline-panel-actions {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .timeline-swing-control {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 14px;
-            color: #333;
-        }
-
-        .timeline-swing-control input {
-            width: 72px;
-            padding: 4px 6px;
-            font-size: 14px;
-        }
-
-        .timeline-tempo-control {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 14px;
-            color: #333;
-        }
-
-        .timeline-tempo-control input {
-            width: 72px;
-            padding: 4px 6px;
-            font-size: 14px;
-        }
-
-        .timeline-swing-profile {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 13px;
-            color: #333;
-            flex-wrap: wrap;
-        }
-
-        .timeline-swing-profile label {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-        }
-
-        .timeline-swing-profile input {
-            width: 52px;
-            padding: 4px 6px;
-            font-size: 13px;
-        }
-
-        .timeline-panel-body {
-            display: grid;
-            grid-template-columns: minmax(240px, 320px) 1fr;
-            gap: 14px;
-            align-items: start;
-            min-height: 0;
-        }
-
-        .timeline-column {
-            border: 1px solid #ccc;
-            background: #fafafa;
-            min-height: 180px;
-            padding: 10px;
-            max-height: calc(100vh - 170px);
-            overflow: auto;
-        }
-
-        .timeline-column h3 {
-            margin: 0 0 10px;
-            font-size: 16px;
-        }
-
-        .timeline-pattern-list,
-        .timeline-sequence-list {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            min-height: 80px;
-        }
-
-        .timeline-card {
-            border: 1px solid #666;
-            background: white;
-            padding: 8px;
-            min-width: 180px;
-            max-width: 240px;
-            cursor: grab;
-        }
-
-        .timeline-card strong,
-        .timeline-entry-main strong {
-            display: block;
-            margin-bottom: 4px;
-        }
-
-        .timeline-card small,
-        .timeline-entry-main small {
-            color: #444;
-        }
-
-        .timeline-card-actions,
-        .timeline-entry-actions {
-            display: flex;
-            gap: 6px;
-            margin-top: 8px;
-            flex-wrap: wrap;
-        }
-
-        .timeline-sequence-list {
-            align-items: stretch;
-            padding-bottom: 6px;
-            flex-direction: column;
-        }
-
-        .timeline-entry {
-            display: flex;
-            gap: 10px;
-            align-items: flex-start;
-            border: 2px solid #222;
-            background: #f1f1f1;
-            padding: 8px;
-            min-width: 220px;
-            max-width: 300px;
-            flex: 0 0 260px;
-        }
-
-        .timeline-sequence-row {
-            display: flex;
-            flex-wrap: nowrap;
-            gap: 10px;
-            align-items: stretch;
-            width: 100%;
-            overflow-x: auto;
-            padding-bottom: 4px;
-        }
-
-        .timeline-entry-main {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .timeline-entry-targets {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin-top: 8px;
-            font-size: 13px;
-        }
-
-        .timeline-entry-targets label {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-        }
-
-        .timeline-dropzone {
-            border: 1px dashed #999;
-            color: #666;
-            min-height: 72px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 8px;
-            width: 100%;
-            background: #fff;
-        }
-
-        .timeline-dropzone-inline {
-            width: auto;
-            min-width: 120px;
-            flex: 0 0 auto;
-        }
-
-        .timeline-column-note {
-            margin: 0 0 10px;
-            color: #555;
-            font-size: 13px;
-        }
-    </style>
+    <script src="JS/timeline.js?v=<?php echo $jsTimeline; ?>"></script>
+    <link rel="stylesheet" href="CSS/index_style.css?v=<?php echo $cssIndex; ?>">
 </head>
 
-<body style="margin-top: 20px;">
+<body class="app-body">
     <?php
     $file_name = $_GET["file"] ?? "";
     echo "<script>datei_name = " . json_encode($file_name) . ";</script>";
     ?>
 
-    <div style="position: fixed; top: 0;">
-        <form action="" name="uploadForm">
-            <span id="auswahl" name="auswahl"></span>
+    <nav id="appMenuBar" aria-label="Hauptmenü">
+        <details class="app-menu">
+            <summary>Datei</summary>
+            <div class="app-menu-panel">
+                <div class="menu-file-picker">
+                    <span>Datei laden</span>
+                    <span id="auswahl" name="auswahl"></span>
+                </div>
+                <button type="button" id="button">Datei speichern</button>
+                <button type="button" id="button2">Als SVG speichern</button>
+                <button type="button" id="button12">Als PDF speichern</button>
+            </div>
+        </details>
+        <details class="app-menu">
+            <summary>Notenblatt</summary>
+            <div class="app-menu-panel">
+                <button type="button" id="button4">Binäres Notenblatt</button>
+                <button type="button" id="button5">Tenäres Notenblatt</button>
+                <button type="button" id="button8">Tenäres 9/8 Notenblatt</button>
+                <button type="button" id="button3">Noten lesen</button>
+            </div>
+        </details>
+        <details class="app-menu">
+            <summary>Einfügen</summary>
+            <div class="app-menu-panel">
+                <button type="button" id="button7">Instrument-Chooser</button>
+                <button type="button" id="button9">Funktions-Chooser</button>
+            </div>
+        </details>
+        <details class="app-menu">
+            <summary>Werkzeuge</summary>
+            <div class="app-menu-panel">
+                <button type="button" id="button10">Audiotest</button>
+                <button type="button" id="button11">Abschnittstimeline</button>
+                <button type="button" id="button6">Scroll</button>
+            </div>
+        </details>
+        <form action="" name="uploadForm" class="hidden-upload-form">
             <input type="hidden" size="40" id="iofield" name="iofield" />
-            <input type="button" id="button" value="Datei speichern" />
-            <input type="button" id="button2" value="Als SVG speichern" />
-            <input type="button" id="button3" value="Noten lesen" />
-            <input type="button" id="button10" value="Audiotest" />
-            <input type="button" id="button4" value="Binäres Notenblatt" />
-            <input type="button" id="button5" value="Tenäres Notenblatt" />
-            <input type="button" id="button8" value="Tenäres 9/8 Notenblatt" />
-            <input type="button" id="button6" value="Scroll" />
-            <input type="button" id="button7" value="Instrument" />
-            <input type="button" id="button9" value="Funktion" />
-            <input type="button" id="button11" value="Abschnittstimeline" />
         </form>
-    </div>
+    </nav>
 
-    <div id="timelinePanel">
+    <div id="timelinePanel" hidden>
         <div class="timeline-panel-header">
             <div>
                 <div class="timeline-panel-title">Abschnittstimeline</div>
-                <div id="timelineStatus" style="font-size:13px; color:#555;">Pattern werden aus dem Notenblatt gelesen.</div>
+                <div id="timelineStatus" class="timeline-status">Pattern werden aus dem Notenblatt gelesen.</div>
             </div>
             <div class="timeline-panel-actions">
                 <label class="timeline-tempo-control" for="timelineTempo">
@@ -294,7 +108,7 @@ $jsFn = @filemtime(__DIR__ . '/JS/functions.js') ?: 1;
         <div class="timeline-panel-body">
             <section class="timeline-column">
                 <h3>Pattern-Bibliothek</h3>
-                <p class="timeline-column-note">Jede Passage aus dem Notenblatt erscheint hier einmal. Ziehen oder mit <code>+</code> in die Timeline legen.</p>
+                <p class="timeline-column-note">Jede Passage aus dem Notenblatt erscheint hier einmal. Ziehen oder ueber <code>+</code> ans Ende der Timeline anfuegen.</p>
                 <div id="timelinePatternList" class="timeline-pattern-list"></div>
             </section>
             <section class="timeline-column">
@@ -394,42 +208,6 @@ const saveTextEndpoint = "dateispeichern.php";
 const saveSvgEndpoint = "dateispeichern_svg.php";
 const checkTextFileEndpoint = "dateivorhanden.php";
 const checkSvgFileEndpoint = "dateivorhanden_svg.php";
-const timelineDjembeTargets = ['Djembe_1', 'Djembe_2', 'Djembe_3'];
-const timelineBassTargets = ['Kenkeni', 'Sangban', 'Doundoun'];
-const timelineMetadataVersion = 3;
-const defaultTimelineSwingProfiles = {
-    binaer: [6, -5, 6, 10],
-    tenaer: [0, -15, -10],
-    neunaer: [0, 15, 10]
-};
-const defaultTimelineFeelOffsets = {
-    Kenkeni: 0,
-    Sangban: 0,
-    Doundoun: 0,
-    Dreierbass: 0,
-    Djembe_1: 0,
-    Djembe_2: 0,
-    Djembe_3: 0
-};
-const timelineState = {
-    visible: false,
-    nextEntryId: 1,
-    nextBlockId: 1,
-    nextParallelGroupId: 1,
-    sourceHash: '',
-    sourcePatterns: [],
-    sourceLibraryGroups: [],
-    entries: [],
-    tempo: 100,
-    swingFactor: 0,
-    swingProfile: {
-        binaer: defaultTimelineSwingProfiles.binaer.slice(),
-        tenaer: defaultTimelineSwingProfiles.tenaer.slice(),
-        neunaer: defaultTimelineSwingProfiles.neunaer.slice()
-    },
-    feelOffsets: Object.assign({}, defaultTimelineFeelOffsets)
-};
-
 const bodyElement = document.body;
 bodyElement.addEventListener("keydown", shadow_end);
 bodyElement.addEventListener("keydown", start);
@@ -553,6 +331,10 @@ function resolveInsertOffset(offsetValue) {
     return typeof offsetValue === 'function' ? offsetValue() : offsetValue;
 }
 
+function resolveInsertTemplate(templateValue) {
+    return typeof templateValue === 'function' ? templateValue() : templateValue;
+}
+
 function createPaletteClone(templateElement, elementId, offsetX, offsetY) {
     const resolvedOffsetX = resolveInsertOffset(offsetX);
     const resolvedOffsetY = resolveInsertOffset(offsetY);
@@ -567,7 +349,11 @@ function createPaletteClone(templateElement, elementId, offsetX, offsetY) {
 
 function bindPaletteInsert(sourceElement, templateElement, elementId, offsetX, offsetY, afterCreate) {
     const insertElement = function () {
-        insertedElement = createPaletteClone(templateElement, elementId, offsetX, offsetY);
+        const resolvedTemplateElement = resolveInsertTemplate(templateElement);
+        if (!resolvedTemplateElement) {
+            return;
+        }
+        insertedElement = createPaletteClone(resolvedTemplateElement, elementId, offsetX, offsetY);
         if (afterCreate) {
             afterCreate(insertedElement);
         }
@@ -604,6 +390,7 @@ function clear_all() {
     timelineState.sourceLibraryGroups = [];
     timelineState.entries = [];
     timelineState.sourceHash = '';
+    timelineState.sheetHash = '';
     timelineState.tempo = 100;
     timelineState.swingFactor = 0;
     timelineState.swingProfile = normalizeAllTimelineSwingProfiles();
@@ -611,81 +398,40 @@ function clear_all() {
     renderTimelinePanel();
 }
 
-function normalizeTimelineSwingFactor(rawValue) {
-    const numericValue = Number(rawValue);
-    if (!Number.isFinite(numericValue)) {
-        return 0;
+function snapElementToVerticalTarget(element) {
+    if (!element || typeof element.getBBox !== 'function' || typeof element.transform !== 'function') {
+        return element;
     }
-    return Math.max(0, Math.min(100, Math.round(numericValue)));
-}
 
-function normalizeTimelineTempo(rawValue) {
-    const numericValue = Number(rawValue);
-    if (!Number.isFinite(numericValue)) {
-        return 100;
+    const bbox = element.getBBox();
+    const referenceY = typeof getElementSnapReferenceY === 'function'
+        ? getElementSnapReferenceY(element, bbox)
+        : bbox.cy;
+    const snappedY = typeof snapToVerticalTargets === 'function'
+        ? snapToVerticalTargets(referenceY)
+        : referenceY;
+    const deltaY = snappedY - referenceY;
+
+    if (Math.abs(deltaY) < 0.001) {
+        return element;
     }
-    return Math.max(30, Math.min(180, Math.round(numericValue)));
-}
 
-function normalizeTimelineFeelOffset(rawValue) {
-    const numericValue = Number(rawValue);
-    if (!Number.isFinite(numericValue)) {
-        return 0;
-    }
-    return Math.max(-50, Math.min(50, Math.round(numericValue)));
-}
-
-function normalizeSwingProfileValue(rawValue) {
-    const numericValue = Number(rawValue);
-    if (!Number.isFinite(numericValue)) {
-        return 0;
-    }
-    return Math.max(-100, Math.min(100, Math.round(numericValue)));
-}
-
-function getCurrentTimelineSwingProfileKey() {
-    if (rhythm === 'tenaer') {
-        return 'tenaer';
-    }
-    if (rhythm === 'neunaer') {
-        return 'neunaer';
-    }
-    return 'binaer';
-}
-
-function normalizeTimelineSwingProfile(rawProfile, profileKey) {
-    const safeProfileKey = defaultTimelineSwingProfiles[profileKey] ? profileKey : 'binaer';
-    const defaultProfile = defaultTimelineSwingProfiles[safeProfileKey];
-    const profileValues = Array.isArray(rawProfile) ? rawProfile.slice(0, defaultProfile.length) : [];
-    while (profileValues.length < defaultProfile.length) {
-        profileValues.push(defaultProfile[profileValues.length]);
-    }
-    return profileValues.slice(0, defaultProfile.length).map(normalizeSwingProfileValue);
-}
-
-function normalizeAllTimelineSwingProfiles(rawProfiles) {
-    const profileSource = rawProfiles || {};
-    return {
-        binaer: normalizeTimelineSwingProfile(profileSource.binaer, 'binaer'),
-        tenaer: normalizeTimelineSwingProfile(profileSource.tenaer, 'tenaer'),
-        neunaer: normalizeTimelineSwingProfile(profileSource.neunaer, 'neunaer')
-    };
-}
-
-function normalizeTimelineFeelOffsets(rawOffsets) {
-    const offsetSource = rawOffsets || {};
-    return Object.keys(defaultTimelineFeelOffsets).reduce(function (normalizedOffsets, instrumentName) {
-        normalizedOffsets[instrumentName] = normalizeTimelineFeelOffset(offsetSource[instrumentName]);
-        return normalizedOffsets;
-    }, {});
+    const transformState = element.transform();
+    const localMatrix = transformState && transformState.localMatrix ? transformState.localMatrix : null;
+    const nextX = localMatrix ? localMatrix.e : 0;
+    const nextY = (localMatrix ? localMatrix.f : 0) + deltaY;
+    element.transform("translate(" + nextX + "," + nextY + ")");
+    return element;
 }
 
 function addInitialInstrumentChooser(x, y) {
-    return createInstrumentChooser(s, x, y).addClass("shp").attr({ id: nextInstrumentChooserId() });
+    const chooserElement = createInstrumentChooser(s, x, y).addClass("shp").attr({ id: nextInstrumentChooserId() });
+    return snapElementToVerticalTarget(chooserElement);
 }
 
 function addInitialFunctionChooser(x, y) {
-    return createFunctionChooser(s, x, y).addClass("shp").attr({ id: nextFunctionChooserId() });
+    const chooserElement = createFunctionChooser(s, x, y).addClass("shp").attr({ id: nextFunctionChooserId() });
+    return snapElementToVerticalTarget(chooserElement);
 }
 
 function drawRhythmSheet(config) {
@@ -751,6 +497,8 @@ function drawRhythmSheet(config) {
         addInitialInstrumentChooser(initialChooserX, 140);
         addInitialFunctionChooser(initialChooserX + 135, 140);
     }
+
+    renderLegend(initialChooserX);
 
     if (shouldResetTitle) {
         titel.attr({ text: "Enter the name of the Rhythm" });
@@ -999,27 +747,42 @@ repeatMarkerCountText = s.text(paletteOriginX + 1, paletteOriginY + 252, " ").at
 repeatMarkerGroup = s.g(repeatMarkerHitbox, repeatMarkerDotTop, repeatMarkerDotBottom, repeatMarkerCountText);
 
 // Legende schreiben
-function addLegendEntry(symbol, label, symbolX, symbolY, labelOffsetX, labelOffsetY) {
-    const legendClone = symbol.clone().attr({ id: "basis", transform: "t" + symbolX + "," + symbolY });
-    s.text(symbolX + labelOffsetX, symbolY + labelOffsetY, label).attr({
+function addLegendEntry(symbol, label, symbolX, symbolY, labelOffsetX, labelOffsetY, legendOffsetX) {
+    const shiftedSymbolX = symbolX + legendOffsetX;
+    const legendClone = symbol.clone();
+    s.append(legendClone);
+    legendClone.attr({ id: "basis", transform: "t" + shiftedSymbolX + "," + symbolY });
+    legendClone.addClass("legend-entry");
+    s.text(shiftedSymbolX + labelOffsetX, symbolY + labelOffsetY, label).attr({
         id: "basis",
+        class: "legend-entry",
         'font-size': 15,
         'font-family': 'sans-serif'
     });
     return legendClone;
 }
 
-ton_c = addLegendEntry(ton, "Tone", 92, 1166, 45, 178);
-bass_c = addLegendEntry(bass, "Bass", 157, 1146, 46, 198);
-slap_c = addLegendEntry(slap, "Slap/Glocke", 222, 1126, 45, 218);
-flam_ton_c = addLegendEntry(flam_ton, "Flam mit Tones", 337, 1105, 49, 240);
-flam_slap_c = addLegendEntry(flam_slap, "Flam mit Slaps", 475, 1087, 49, 259);
-flam_bass_slap_c = addLegendEntry(flam_bass_slap, "Flam mit Bass und Slaps", 613, 1069, 49, 279);
-ton_g_c = addLegendEntry(ton_g, "gedämpfter Tone", 92, 1078, 48, 299);
-slap_g_c = addLegendEntry(slap_g, "gedämpfter Slap / Klick", 240, 1058, 48, 319);
-In_c = addLegendEntry(In, "In", 428, 1034, 44, 343);
-Out_c = addLegendEntry(Out, "Out", 470, 1011, 44, 366);
-repeatMarkerLegendClone = addLegendEntry(repeatMarkerGroup, "Wiederholung", 521, 968, 44, 409);
+function renderLegend(initialChooserX) {
+    const legendAnchorX = Number.isFinite(initialChooserX) ? initialChooserX : 125;
+    const toneLegendReferenceLeft = 92 + ton.getBBox().x;
+    const legendOffsetX = legendAnchorX - toneLegendReferenceLeft;
+
+    removeCanvasElements(".legend-entry");
+
+    ton_c = addLegendEntry(ton, "Tone", 92, 1166, 45, 178, legendOffsetX);
+    bass_c = addLegendEntry(bass, "Bass", 157, 1146, 46, 198, legendOffsetX);
+    slap_c = addLegendEntry(slap, "Slap/Glocke", 222, 1126, 45, 218, legendOffsetX);
+    flam_ton_c = addLegendEntry(flam_ton, "Flam mit Tones", 337, 1105, 49, 240, legendOffsetX);
+    flam_slap_c = addLegendEntry(flam_slap, "Flam mit Slaps", 475, 1087, 49, 259, legendOffsetX);
+    flam_bass_slap_c = addLegendEntry(flam_bass_slap, "Flam mit Bass und Slaps", 613, 1069, 49, 279, legendOffsetX);
+    ton_g_c = addLegendEntry(ton_g, "gedämpfter Tone", 92, 1078, 48, 299, legendOffsetX);
+    slap_g_c = addLegendEntry(slap_g, "gedämpfter Slap / Klick", 240, 1058, 48, 319, legendOffsetX);
+    In_c = addLegendEntry(In, "In", 428, 1034, 44, 343, legendOffsetX);
+    Out_c = addLegendEntry(Out, "Out", 470, 1011, 44, 366, legendOffsetX);
+    repeatMarkerLegendClone = addLegendEntry(repeatMarkerGroup, "Wiederholung", 521, 968, 44, 409, legendOffsetX);
+}
+
+renderLegend(125);
 
 
 // Funktionen zum Verschieben
@@ -1045,16 +808,16 @@ paletteGroup = s.g(paletteFrame, ton, bass, slap, ton_g, slap_g, flam_ton, flam_
 paletteGroup.drag(move1, sel_start, stop1);
 
 // Duplicate der Noten erzeugen
-	insertTone = bindPaletteInsert(ton, ton_c, "tone", function () { return gridSizeX; }, 0);
-	insertBass = bindPaletteInsert(bass, bass_c, "bass", function () { return gridSizeX; }, 0);
-	insertSlap = bindPaletteInsert(slap, slap_c, "slap", function () { return gridSizeX; }, 0);
-	insertMuffledTone = bindPaletteInsert(ton_g, ton_g_c, "tone_muffled", function () { return gridSizeX; }, 0);
-	insertMuffledSlap = bindPaletteInsert(slap_g, slap_g_c, "slap_muffled", function () { return gridSizeX; }, 0);
-	insertFlamTone = bindPaletteInsert(flam_ton, flam_ton_c, "tone_flam", function () { return gridSizeX; }, 0);
-	insertFlamSlap = bindPaletteInsert(flam_slap, flam_slap_c, "slap_flam", function () { return gridSizeX; }, 0);
-	insertFlamBassSlap = bindPaletteInsert(flam_bass_slap, flam_bass_slap_c, "bass_slap_flam", function () { return gridSizeX; }, 0);
-	insertInMarker = bindPaletteInsert(In, In_c, "in", function () { return gridSizeX; }, -2);
-insertOutMarker = bindPaletteInsert(Out, Out_c, "out", function () { return gridSizeX; }, 0);
+	insertTone = bindPaletteInsert(ton, function () { return ton_c; }, "tone", function () { return gridSizeX; }, 0);
+	insertBass = bindPaletteInsert(bass, function () { return bass_c; }, "bass", function () { return gridSizeX; }, 0);
+	insertSlap = bindPaletteInsert(slap, function () { return slap_c; }, "slap", function () { return gridSizeX; }, 0);
+	insertMuffledTone = bindPaletteInsert(ton_g, function () { return ton_g_c; }, "tone_muffled", function () { return gridSizeX; }, 0);
+	insertMuffledSlap = bindPaletteInsert(slap_g, function () { return slap_g_c; }, "slap_muffled", function () { return gridSizeX; }, 0);
+	insertFlamTone = bindPaletteInsert(flam_ton, function () { return flam_ton_c; }, "tone_flam", function () { return gridSizeX; }, 0);
+	insertFlamSlap = bindPaletteInsert(flam_slap, function () { return flam_slap_c; }, "slap_flam", function () { return gridSizeX; }, 0);
+	insertFlamBassSlap = bindPaletteInsert(flam_bass_slap, function () { return flam_bass_slap_c; }, "bass_slap_flam", function () { return gridSizeX; }, 0);
+	insertInMarker = bindPaletteInsert(In, function () { return In_c; }, "in", function () { return gridSizeX; }, -2);
+insertOutMarker = bindPaletteInsert(Out, function () { return Out_c; }, "out", function () { return gridSizeX; }, 0);
 
 captureTextTouchStart = function () {
     textTouchStartX = this.getBBox().x;
@@ -1101,7 +864,7 @@ cycleRepeatCount = function () {
 
 insertRepeatMarker = bindPaletteInsert(
     repeatMarkerGroup,
-    repeatMarkerLegendClone,
+    function () { return repeatMarkerLegendClone; },
     "wiederholung",
     function () { return repeatMarkerGridOffsetX; },
     2,
@@ -1113,9 +876,15 @@ insertRepeatMarker = bindPaletteInsert(
 
 // Als SVG speichern
 
-function callPHPScript2() {
+function buildExportSvgContent() {
     let svgContent = "";
     let elementsToExport = s.selectAll(exportableElementSelector);
+    let contentBounds = {
+        minX: Infinity,
+        minY: Infinity,
+        maxX: -Infinity,
+        maxY: -Infinity
+    };
     // Noten im Abseits löschen
     elementsToExport.forEach(function (el) {
         if (el.attr('id') == 'timeline_metadata') {
@@ -1130,18 +899,41 @@ function callPHPScript2() {
 
     elementsToExport = s.selectAll(exportableElementSelector);
     elementsToExport.forEach(function (el) {
+        if (el.attr('id') != 'timeline_metadata') {
+            const bbox = el.getBBox();
+            if (bbox && Number.isFinite(bbox.x) && Number.isFinite(bbox.y)) {
+                contentBounds.minX = Math.min(contentBounds.minX, bbox.x);
+                contentBounds.minY = Math.min(contentBounds.minY, bbox.y);
+                contentBounds.maxX = Math.max(contentBounds.maxX, bbox.x + bbox.width);
+                contentBounds.maxY = Math.max(contentBounds.maxY, bbox.y + bbox.height);
+            }
+        }
         svgContent += el.toString();
     });
 
-    const svgWithoutStylePrefix = svgContent.replaceAll('style="f', 'f');
-    const svgWithFont10 = svgWithoutStylePrefix.replaceAll('font-size: 10px;', 'font-size="10px"');
-    const svgWithFont12 = svgWithFont10.replaceAll('font-size: 12px;', 'font-size="12px"');
-    const svgWithFont24 = svgWithFont12.replaceAll('font-size: 24px;', 'font-size="24px"');
-    const svgWithFont15 = svgWithFont24.replaceAll('font-size: 15px;', 'font-size="15px"');
-    const svgWithFont14 = svgWithFont15.replaceAll('font-size: 14px;', 'font-size="14px"');
-    const svgWithTahoma = svgWithFont14.replaceAll('font-family: sans-serif;', 'font-family="Tahoma"');
-    const svgWithBoldText = svgWithTahoma.replaceAll('font-weight: bold;', 'font-weight="bold"');
-    svgContent = '<svg height="1480" version="1.1" width="1050" xmlns="http://www.w3.org/2000/svg" id="myRect1"><desc>Created with Snap</desc><defs></defs>' + svgWithBoldText + '</svg>';
+    const hasFiniteBounds = Number.isFinite(contentBounds.minX) &&
+        Number.isFinite(contentBounds.minY) &&
+        Number.isFinite(contentBounds.maxX) &&
+        Number.isFinite(contentBounds.maxY);
+    const exportPadding = 18;
+    const viewBoxX = hasFiniteBounds ? Math.max(0, contentBounds.minX - exportPadding) : 0;
+    const viewBoxY = hasFiniteBounds ? Math.max(0, contentBounds.minY - exportPadding) : 0;
+    const viewBoxWidth = hasFiniteBounds
+        ? Math.max(1, (contentBounds.maxX - contentBounds.minX) + exportPadding * 2)
+        : 1050;
+    const viewBoxHeight = hasFiniteBounds
+        ? Math.max(1, (contentBounds.maxY - contentBounds.minY) + exportPadding * 2)
+        : 1480;
+
+    return '<svg height="' + viewBoxHeight + '" version="1.1" width="' + viewBoxWidth + '" viewBox="' +
+        [viewBoxX, viewBoxY, viewBoxWidth, viewBoxHeight].join(' ') +
+        '" preserveAspectRatio="xMidYMin meet" xmlns="http://www.w3.org/2000/svg" id="myRect1"><desc>Created with Snap</desc><defs></defs>' +
+        svgContent +
+        '</svg>';
+}
+
+function callPHPScript2() {
+    const svgContent = buildExportSvgContent();
 
     const name = titel.attr('text');
     saveContentWithCheck({
@@ -1158,6 +950,65 @@ function callPHPScript2() {
             retryCheckName(replacementName);
         }
     });
+}
+
+function exportCurrentSheetAsPdf() {
+    const svgContent = buildExportSvgContent();
+    const documentTitle = titel.attr('text') || 'Notenblatt';
+    const printWindow = window.open('', '_blank');
+
+    if (!printWindow) {
+        alert('Das PDF-Fenster konnte nicht geöffnet werden. Bitte Pop-up-Blocker prüfen.');
+        return;
+    }
+
+    const html = `<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>${String(documentTitle).replace(/[&<>"]/g, function (char) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[char];
+  })}</title>
+  <style>
+    @page { size: A4 portrait; margin: 8mm; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: white;
+    }
+    body {
+      display: block;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    svg {
+      width: 188mm;
+      max-width: 100%;
+      max-height: 279mm;
+      height: auto;
+      display: block;
+      margin: 0 auto;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+  </style>
+</head>
+<body>
+${svgContent}
+<script>
+  window.addEventListener('load', function () {
+    setTimeout(function () {
+      window.focus();
+      window.print();
+    }, 150);
+  });
+<\/script>
+</body>
+</html>`;
+
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
 }
 
 
@@ -1738,1623 +1589,6 @@ function buildPlayerRowsFromRhythmBars(rhythmBars, repeatRanges) {
     return playerRows;
 }
 
-function normalizePatternInstrumentName(instrumentName) {
-    const normalizedName = String(instrumentName || '').trim();
-    if (!normalizedName || normalizedName === 'Leer') {
-        return '';
-    }
-    if (normalizedName.indexOf('Djembe') === 0) {
-        return 'Djembe';
-    }
-    if (normalizedName === 'Bässe') {
-        return 'Bässe';
-    }
-    if (normalizedName === 'Dununba') {
-        return 'Doundoun';
-    }
-    return normalizedName;
-}
-
-function isSpecificDjembeName(instrumentName) {
-    return instrumentName === 'Djembe 1' ||
-        instrumentName === 'Djembe 2' ||
-        instrumentName === 'Djembe 3';
-}
-
-function resolvePatternSourceInstrumentName(bar, labelInfo) {
-    const explicitInstrumentName = String(bar && bar.instrument || '').trim();
-    const effectiveInstrumentName = String(bar && (bar.effectiveInstrument || bar.instrument) || '').trim();
-
-    if (explicitInstrumentName && explicitInstrumentName !== 'Leer') {
-        return explicitInstrumentName;
-    }
-
-    if ((labelInfo.type === 'Intro' || labelInfo.type === 'Echauffement' || labelInfo.type === 'Outro') &&
-        isSpecificDjembeName(effectiveInstrumentName)) {
-        return 'Djembe';
-    }
-
-    return effectiveInstrumentName;
-}
-
-function buildPatternDisplayName(pattern, occurrenceIndex) {
-    const labelText = pattern.labelName || pattern.labelType || 'Passage';
-    const instrumentText = pattern.instrument || 'Instrument';
-    return 'P' + occurrenceIndex + ' - ' + instrumentText + ' / ' + labelText;
-}
-
-function buildPatternIdentitySignature(pattern) {
-    if (!pattern) {
-        return '';
-    }
-
-    const serializedBars = Array.isArray(pattern.bars)
-        ? pattern.bars.map(function (bar) {
-            const noteSignature = Array.isArray(bar.notes) ? bar.notes.join(',') : '';
-            const controlSignature = Array.isArray(bar.controls)
-                ? bar.controls.map(function (control) {
-                    return (control.type || '') + '@' + Number(control.stepIndex);
-                }).join(',')
-                : '';
-            return noteSignature + '||' + controlSignature;
-        }).join('||')
-        : '';
-
-    return [
-        pattern.instrument || '',
-        pattern.sourceInstrument || '',
-        pattern.labelType || '',
-        pattern.labelName || '',
-        serializedBars
-    ].join('###');
-}
-
-function collapseDuplicatePatterns(patterns, rhythmBars) {
-    const uniquePatterns = [];
-    const canonicalBySignature = {};
-    const canonicalBySourceKey = {};
-    const canonicalByPatternId = {};
-
-    (patterns || []).forEach(function (pattern) {
-        const signature = buildPatternIdentitySignature(pattern);
-        const existingPattern = canonicalBySignature[signature];
-
-        if (!existingPattern) {
-            pattern.aliasSourceKeys = [pattern.sourceKey];
-            pattern.aliasPatternIds = [pattern.id];
-            canonicalBySignature[signature] = pattern;
-            canonicalBySourceKey[pattern.sourceKey] = pattern;
-            canonicalByPatternId[pattern.id] = pattern;
-            uniquePatterns.push(pattern);
-            return;
-        }
-
-        existingPattern.aliasSourceKeys.push(pattern.sourceKey);
-        existingPattern.aliasPatternIds.push(pattern.id);
-        canonicalBySourceKey[pattern.sourceKey] = existingPattern;
-        canonicalByPatternId[pattern.id] = existingPattern;
-    });
-
-    (rhythmBars || []).forEach(function (bar) {
-        const canonicalPattern = canonicalBySourceKey[bar.patternSourceKey];
-        if (!canonicalPattern) {
-            return;
-        }
-        bar.patternSourceKey = canonicalPattern.sourceKey;
-        if (canonicalPattern.aliasPatternIds && canonicalPattern.aliasPatternIds.length > 0) {
-            bar.patternId = canonicalPattern.id;
-        }
-    });
-
-    return uniquePatterns;
-}
-
-function getUsedGenericDjembeTargets(patterns) {
-    const begleitungPatterns = patterns.filter(function (pattern) {
-        return pattern.instrument === 'Djembe' && pattern.labelType === 'Begleitung';
-    });
-    const genericVoiceCount = Math.min(
-        timelineDjembeTargets.length,
-        Math.max(1, begleitungPatterns.length)
-    );
-
-    return timelineDjembeTargets.slice(0, genericVoiceCount);
-}
-
-function assignGenericDjembeDefaults(patterns) {
-    const usedGenericTargets = getUsedGenericDjembeTargets(patterns);
-    let nextGenericTargetIndex = 0;
-
-    patterns.forEach(function (pattern) {
-        if (pattern.instrument !== 'Djembe' || pattern.defaultTargets.length > 0) {
-            return;
-        }
-
-        if (pattern.labelType === 'Intro' ||
-            pattern.labelType === 'Echauffement' ||
-            pattern.labelType === 'Outro') {
-            pattern.defaultTargets = usedGenericTargets.slice();
-            return;
-        }
-
-        if (pattern.labelType === 'Begleitung') {
-            const targetName = usedGenericTargets[Math.min(nextGenericTargetIndex, usedGenericTargets.length - 1)] || 'Djembe_1';
-            pattern.defaultTargets = [targetName];
-            nextGenericTargetIndex += 1;
-            return;
-        }
-
-        if (pattern.labelType === 'Call') {
-            pattern.defaultTargets = [usedGenericTargets[0] || 'Djembe_1'];
-            return;
-        }
-
-        pattern.defaultTargets = [usedGenericTargets[0] || 'Djembe_1'];
-    });
-}
-
-function collectUsedSheetDjembeTargets(rhythmBars) {
-    const usedTargets = [];
-    const targetMap = {
-        'Djembe 1': 'Djembe_1',
-        'Djembe 2': 'Djembe_2',
-        'Djembe 3': 'Djembe_3'
-    };
-
-    rhythmBars.forEach(function (bar) {
-        const sourceInstrumentName = String(bar && (bar.effectiveInstrument || bar.instrument) || '').trim();
-        const mappedTarget = targetMap[sourceInstrumentName];
-        if (!mappedTarget || usedTargets.indexOf(mappedTarget) !== -1) {
-            return;
-        }
-        usedTargets.push(mappedTarget);
-    });
-
-    return usedTargets;
-}
-
-function hasExplicitSingleDjembePattern(rhythmBars, labelType) {
-    return rhythmBars.some(function (bar) {
-        if (!bar) {
-            return false;
-        }
-        const sourceInstrumentName = String(bar.effectiveInstrument || bar.instrument || '').trim();
-        const labelInfo = getPlayerLabelInfo(bar.effectiveLabel || bar.label);
-        return labelInfo.type === labelType &&
-            (sourceInstrumentName === 'Djembe 1' ||
-             sourceInstrumentName === 'Djembe 2' ||
-             sourceInstrumentName === 'Djembe 3');
-    });
-}
-
-function getDefaultTargetsForPattern(pattern, originalInstrumentName, timelineContext) {
-    const originalName = String(originalInstrumentName || '').trim();
-    const context = timelineContext || {};
-    const usedSheetDjembeTargets = Array.isArray(context.usedSheetDjembeTargets)
-        ? context.usedSheetDjembeTargets
-        : [];
-    const hasExplicitIntroDjembes = Boolean(context.hasExplicitIntroDjembes);
-
-    if (pattern.instrument === 'Djembe') {
-        if (originalName === 'Djembe 1') {
-            return ['Djembe_1'];
-        }
-        if (originalName === 'Djembe 2') {
-            return ['Djembe_2'];
-        }
-        if (originalName === 'Djembe 3') {
-            return ['Djembe_3'];
-        }
-        if ((pattern.labelType === 'Echauffement' || pattern.labelType === 'Outro') && usedSheetDjembeTargets.length > 0) {
-            return usedSheetDjembeTargets.slice();
-        }
-        if (pattern.labelType === 'Intro' && !hasExplicitIntroDjembes && usedSheetDjembeTargets.length > 0) {
-            return usedSheetDjembeTargets.slice();
-        }
-        return [];
-    }
-
-    if (pattern.instrument === 'Bässe') {
-        return timelineBassTargets.slice();
-    }
-
-    const mappedInstrument = mapInstrumentNameForPlayer(pattern.instrument);
-    return mappedInstrument ? [mappedInstrument] : [];
-}
-
-function buildPatternLibraryFromRhythmBars(rhythmBars) {
-    let patterns = [];
-    const patternCounters = {};
-    const timelineContext = {
-        usedSheetDjembeTargets: collectUsedSheetDjembeTargets(rhythmBars),
-        hasExplicitIntroDjembes: hasExplicitSingleDjembePattern(rhythmBars, 'Intro')
-    };
-    let currentPattern = null;
-    let previousBar = null;
-
-    function hasRepeatMarker(markerValue) {
-        if (Array.isArray(markerValue)) {
-            return markerValue.length > 0;
-        }
-        return Boolean(markerValue);
-    }
-
-    rhythmBars.forEach(function (bar) {
-        const labelInfo = getPlayerLabelInfo(bar.effectiveLabel || bar.label);
-        const sourceInstrumentName = resolvePatternSourceInstrumentName(bar, labelInfo);
-        const patternInstrument = normalizePatternInstrumentName(sourceInstrumentName);
-        if (!patternInstrument || !labelInfo.type || !labelInfo.raw) {
-            currentPattern = null;
-            previousBar = bar;
-            return;
-        }
-
-        const shouldSplitAtRepeatBoundary = previousBar &&
-            currentPattern &&
-            currentPattern.sourceInstrument === sourceInstrumentName &&
-            currentPattern.labelName === labelInfo.raw &&
-            (hasRepeatMarker(previousBar.repeat && previousBar.repeat.end) ||
-             hasRepeatMarker(bar.repeat && bar.repeat.start));
-
-        if (!currentPattern ||
-            currentPattern.sourceInstrument !== sourceInstrumentName ||
-            currentPattern.labelName !== labelInfo.raw ||
-            shouldSplitAtRepeatBoundary) {
-            const counterKey = sourceInstrumentName + '|' + labelInfo.raw;
-            patternCounters[counterKey] = (patternCounters[counterKey] || 0) + 1;
-            const patternOccurrence = patternCounters[counterKey];
-            currentPattern = {
-                id: 'pattern-' + (patterns.length + 1),
-                sourceKey: counterKey + '|' + patternOccurrence,
-                instrument: patternInstrument,
-                sourceInstrument: sourceInstrumentName,
-                labelType: labelInfo.type,
-                labelName: labelInfo.raw,
-                name: '',
-                defaultTargets: [],
-                bars: []
-            };
-            currentPattern.name = buildPatternDisplayName(currentPattern, patterns.length + 1);
-            currentPattern.defaultTargets = getDefaultTargetsForPattern(currentPattern, sourceInstrumentName, timelineContext);
-            patterns.push(currentPattern);
-        }
-
-        currentPattern.bars.push({
-            sourceBarIndex: bar.index,
-            patternSourceKey: currentPattern.sourceKey,
-            patternBarIndex: currentPattern.bars.length,
-            label: labelInfo.type,
-            controls: Array.isArray(bar.controls) ? bar.controls.map(function (control) {
-                return {
-                    type: control.type,
-                    stepIndex: control.stepIndex
-                };
-            }) : [],
-            notes: bar.notes.slice()
-        });
-        bar.patternSourceKey = currentPattern.sourceKey;
-        bar.patternBarIndex = currentPattern.bars.length - 1;
-        previousBar = bar;
-    });
-
-    assignGenericDjembeDefaults(patterns);
-    patterns = collapseDuplicatePatterns(patterns, rhythmBars);
-    return patterns;
-}
-
-function cloneTimelineEntryFromPattern(pattern, overrides) {
-    const overrideConfig = overrides || {};
-    const nextId = timelineState.nextEntryId++;
-    return {
-        id: overrideConfig.id || ('timeline-entry-' + nextId),
-        blockId: overrideConfig.blockId || '',
-        parallelGroupId: overrideConfig.parallelGroupId || '',
-        patternId: pattern.id,
-        patternSourceKey: pattern.sourceKey,
-        handMode: pattern.instrument === 'Djembe'
-            ? String(overrideConfig.handMode || 'auto')
-            : '',
-        swingFactor: overrideConfig.swingFactor === null || overrideConfig.swingFactor === undefined
-            ? null
-            : normalizeTimelineSwingFactor(overrideConfig.swingFactor),
-        targetInstruments: Array.isArray(overrideConfig.targetInstruments) && overrideConfig.targetInstruments.length > 0
-            ? overrideConfig.targetInstruments.slice()
-            : pattern.defaultTargets.slice()
-    };
-}
-
-function cloneTimelineEntry(entry) {
-    if (!entry) {
-        return null;
-    }
-
-    const sourcePattern = findPatternById(entry.patternId);
-    if (!sourcePattern) {
-        return null;
-    }
-
-    return cloneTimelineEntryFromPattern(sourcePattern, {
-        blockId: entry.blockId || '',
-        parallelGroupId: entry.parallelGroupId || '',
-        handMode: entry.handMode || 'auto',
-        swingFactor: entry.swingFactor,
-        targetInstruments: Array.isArray(entry.targetInstruments) ? entry.targetInstruments.slice() : []
-    });
-}
-
-function nextTimelineBlockId() {
-    const nextId = timelineState.nextBlockId++;
-    return 'timeline-block-' + nextId;
-}
-
-function nextTimelineParallelGroupId() {
-    const nextId = timelineState.nextParallelGroupId++;
-    return 'timeline-parallel-' + nextId;
-}
-
-function syncTimelineBlockIdSequence(entries) {
-    let maxBlockId = 0;
-    let maxParallelGroupId = 0;
-
-    (entries || []).forEach(function (entry) {
-        const blockIdMatch = String(entry && entry.blockId || '').match(/^timeline-block-(\d+)$/);
-        if (!blockIdMatch) {
-        } else {
-            maxBlockId = Math.max(maxBlockId, Number(blockIdMatch[1]) || 0);
-        }
-        const parallelGroupMatch = String(entry && entry.parallelGroupId || '').match(/^timeline-parallel-(\d+)$/);
-        if (!parallelGroupMatch) {
-            return;
-        }
-        maxParallelGroupId = Math.max(maxParallelGroupId, Number(parallelGroupMatch[1]) || 0);
-    });
-
-    timelineState.nextBlockId = maxBlockId + 1;
-    timelineState.nextParallelGroupId = maxParallelGroupId + 1;
-}
-
-function buildDefaultTimelineEntries(patternLibrary) {
-    return patternLibrary.map(function (pattern) {
-        return cloneTimelineEntryFromPattern(pattern);
-    });
-}
-
-function expandTimelineBarsWithRepeats(rhythmBars, repeatRangesToApply, startBarIndex, endBarIndex) {
-    const expandedBars = [];
-    let currentBarIndex = startBarIndex;
-
-    while (currentBarIndex <= endBarIndex) {
-        const matchingRanges = repeatRangesToApply
-            .filter(function (repeatRange) {
-                return repeatRange.startBar === currentBarIndex && repeatRange.endBar <= endBarIndex;
-            })
-            .sort(function (rangeA, rangeB) {
-                return rangeB.endBar - rangeA.endBar;
-            });
-
-        const matchingRange = matchingRanges[0];
-        if (!matchingRange) {
-            expandedBars.push(rhythmBars[currentBarIndex - 1]);
-            currentBarIndex += 1;
-            continue;
-        }
-
-        const repeatedSegment = expandTimelineBarsWithRepeats(
-            rhythmBars,
-            repeatRangesToApply.filter(function (repeatRange) {
-                return repeatRange.startBar >= matchingRange.startBar &&
-                    repeatRange.endBar <= matchingRange.endBar &&
-                    !(repeatRange.startBar === matchingRange.startBar && repeatRange.endBar === matchingRange.endBar);
-            }),
-            matchingRange.startBar,
-            matchingRange.endBar
-        );
-
-        expandedBars.push.apply(expandedBars, repeatedSegment);
-        if (matchingRange.count === 'loop') {
-            expandedBars.push.apply(expandedBars, repeatedSegment);
-        } else {
-            const repeatCount = Number(matchingRange.count) || 0;
-            for (let repeatIndex = 0; repeatIndex < repeatCount; repeatIndex++) {
-                expandedBars.push.apply(expandedBars, repeatedSegment);
-            }
-        }
-
-        currentBarIndex = matchingRange.endBar + 1;
-    }
-
-    return expandedBars;
-}
-
-function buildDefaultTimelineEntriesFromRhythmBars(rhythmBars, repeatRanges, patternLibrary) {
-    const patternBySourceKey = {};
-    const expandedBars = expandTimelineBarsWithRepeats(
-        rhythmBars,
-        Array.isArray(repeatRanges) ? repeatRanges : [],
-        1,
-        rhythmBars.length
-    );
-    const defaultEntries = [];
-    let previousPatternSourceKey = '';
-    let previousPatternBarIndex = -1;
-
-    patternLibrary.forEach(function (pattern) {
-        patternBySourceKey[pattern.sourceKey] = pattern;
-    });
-
-    expandedBars.forEach(function (bar) {
-        const matchedPattern = patternBySourceKey[bar.patternSourceKey];
-        if (!matchedPattern) {
-            return;
-        }
-
-        const isPatternStart = previousPatternSourceKey !== bar.patternSourceKey ||
-            Number(bar.patternBarIndex) === 0 ||
-            Number(bar.patternBarIndex) <= previousPatternBarIndex;
-
-        if (isPatternStart) {
-            defaultEntries.push(cloneTimelineEntryFromPattern(matchedPattern));
-        }
-
-        previousPatternSourceKey = bar.patternSourceKey;
-        previousPatternBarIndex = Number(bar.patternBarIndex);
-    });
-
-    return defaultEntries;
-}
-
-function computePatternLibraryHash(patternLibrary) {
-    return patternLibrary.map(function (pattern) {
-        return pattern.sourceKey + ':' + pattern.bars.length;
-    }).join('|');
-}
-
-function syncTimelineEntriesWithPatternLibrary(patternLibrary, existingEntries) {
-    const patternById = {};
-    const patternBySourceKey = {};
-    const matchedSourceKeys = [];
-    patternLibrary.forEach(function (pattern) {
-        patternById[pattern.id] = pattern;
-        patternBySourceKey[pattern.sourceKey] = pattern;
-        (pattern.aliasSourceKeys || []).forEach(function (aliasSourceKey) {
-            patternBySourceKey[aliasSourceKey] = pattern;
-        });
-        (pattern.aliasPatternIds || []).forEach(function (aliasPatternId) {
-            patternById[aliasPatternId] = pattern;
-        });
-    });
-
-    const syncedEntries = (existingEntries || []).map(function (entry) {
-        const matchedPattern = patternBySourceKey[entry.patternSourceKey] || patternById[entry.patternId];
-        if (!matchedPattern) {
-            return null;
-        }
-        matchedSourceKeys.push(matchedPattern.sourceKey);
-
-        let targetInstruments = Array.isArray(entry.targetInstruments) ? entry.targetInstruments.slice() : [];
-        if (matchedPattern.instrument === 'Djembe') {
-            targetInstruments = targetInstruments.filter(function (targetName) {
-                return timelineDjembeTargets.indexOf(targetName) !== -1;
-            });
-            if (targetInstruments.length === 0) {
-                targetInstruments = matchedPattern.defaultTargets.slice();
-            }
-        } else if (matchedPattern.instrument === 'Bässe') {
-            targetInstruments = targetInstruments.filter(function (targetName) {
-                return timelineBassTargets.indexOf(targetName) !== -1;
-            });
-            if (targetInstruments.length === 0) {
-                targetInstruments = matchedPattern.defaultTargets.slice();
-            }
-        } else {
-            targetInstruments = matchedPattern.defaultTargets.slice();
-        }
-
-        return {
-            id: entry.id || ('timeline-entry-' + timelineState.nextEntryId++),
-            blockId: entry.blockId || '',
-            parallelGroupId: entry.parallelGroupId || '',
-            patternId: matchedPattern.id,
-            patternSourceKey: matchedPattern.sourceKey,
-            handMode: matchedPattern.instrument === 'Djembe'
-                ? String(entry.handMode || 'auto')
-                : '',
-            swingFactor: entry.swingFactor === null || entry.swingFactor === undefined
-                ? null
-                : normalizeTimelineSwingFactor(entry.swingFactor),
-            targetInstruments: targetInstruments
-        };
-    }).filter(Boolean);
-
-    patternLibrary.forEach(function (pattern) {
-        if (matchedSourceKeys.indexOf(pattern.sourceKey) !== -1) {
-            return;
-        }
-        syncedEntries.push(cloneTimelineEntryFromPattern(pattern));
-    });
-
-    return syncedEntries;
-}
-
-function buildTimelinePlayerPayload(patternLibrary, timelineEntries) {
-    return [{
-        Name: titel.attr('text'),
-        Rhythmus: rhythm,
-        TimelineMode: true,
-        Tempo: normalizeTimelineTempo(timelineState.tempo),
-        SwingFactor: normalizeTimelineSwingFactor(timelineState.swingFactor),
-        SwingProfile: normalizeAllTimelineSwingProfiles(timelineState.swingProfile),
-        FeelOffsets: normalizeTimelineFeelOffsets(timelineState.feelOffsets),
-        RepeatRanges: [],
-        PatternLibrary: patternLibrary.map(function (pattern) {
-            return {
-                id: pattern.id,
-                sourceKey: pattern.sourceKey,
-                name: pattern.name,
-                instrument: pattern.instrument,
-                sourceInstrument: pattern.sourceInstrument,
-                label: pattern.labelType,
-                labelName: pattern.labelName,
-                bars: pattern.bars.map(function (bar) {
-                    return {
-                        sourceBarIndex: bar.sourceBarIndex,
-                        label: bar.label,
-                        controls: Array.isArray(bar.controls) ? bar.controls.map(function (control) {
-                            return {
-                                type: control.type,
-                                stepIndex: control.stepIndex
-                            };
-                        }) : [],
-                        notes: bar.notes.slice()
-                    };
-                })
-            };
-        }),
-        TimelineEntries: timelineEntries.map(function (entry) {
-            return {
-                id: entry.id,
-                blockId: entry.blockId || '',
-                parallelGroupId: entry.parallelGroupId || '',
-                patternId: entry.patternId,
-                patternSourceKey: entry.patternSourceKey,
-                handMode: entry.handMode || '',
-                swingFactor: entry.swingFactor === null || entry.swingFactor === undefined
-                    ? null
-                    : normalizeTimelineSwingFactor(entry.swingFactor),
-                targetInstruments: Array.isArray(entry.targetInstruments) ? entry.targetInstruments.slice() : []
-            };
-        })
-    }];
-}
-
-function findPatternById(patternId) {
-    return timelineState.sourcePatterns.find(function (pattern) {
-        return pattern.id === patternId;
-    }) || null;
-}
-
-function updateTimelineMetadataNode() {
-    const existingMetadataNode = s.select(timelineMetadataSelector);
-    if (existingMetadataNode) {
-        existingMetadataNode.remove();
-    }
-
-    const metadataPayload = JSON.stringify({
-        version: timelineMetadataVersion,
-        sourceHash: timelineState.sourceHash,
-        tempo: normalizeTimelineTempo(timelineState.tempo),
-        swingFactor: normalizeTimelineSwingFactor(timelineState.swingFactor),
-        swingProfile: normalizeAllTimelineSwingProfiles(timelineState.swingProfile),
-        feelOffsets: normalizeTimelineFeelOffsets(timelineState.feelOffsets),
-        entries: timelineState.entries.map(function (entry) {
-            return {
-                id: entry.id,
-                blockId: entry.blockId || '',
-                parallelGroupId: entry.parallelGroupId || '',
-                patternId: entry.patternId,
-                patternSourceKey: entry.patternSourceKey,
-                handMode: entry.handMode || '',
-                swingFactor: entry.swingFactor === null || entry.swingFactor === undefined
-                    ? null
-                    : normalizeTimelineSwingFactor(entry.swingFactor),
-                targetInstruments: Array.isArray(entry.targetInstruments) ? entry.targetInstruments.slice() : []
-            };
-        })
-    });
-    const encodedPayload = window.btoa(unescape(encodeURIComponent(metadataPayload)));
-    const metadataNode = document.createElementNS('http://www.w3.org/2000/svg', 'desc');
-    metadataNode.setAttribute('id', 'timeline_metadata');
-    metadataNode.textContent = encodedPayload;
-    s.node.appendChild(metadataNode);
-}
-
-function readTimelineMetadata(data) {
-    const metadataElement = data && typeof data.select === 'function'
-        ? data.select(timelineMetadataSelector)
-        : s.select(timelineMetadataSelector);
-    if (!metadataElement) {
-        return null;
-    }
-
-    const metadataText = metadataElement.attr('data-timeline') || metadataElement.attr('text') || metadataElement.node.textContent || '';
-    if (!metadataText) {
-        return null;
-    }
-
-    try {
-        const decodedText = metadataElement.node && metadataElement.node.tagName && metadataElement.node.tagName.toLowerCase() === 'desc'
-            ? decodeURIComponent(escape(window.atob(metadataText)))
-            : metadataText;
-        return JSON.parse(decodedText);
-    } catch (error) {
-        console.warn('Timeline-Metadaten konnten nicht gelesen werden', error);
-        return null;
-    }
-}
-
-function syncTimelineStateFromReadResult(readResult, options) {
-    const syncOptions = options || {};
-    const patternLibrary = buildPatternLibraryFromRhythmBars(readResult.rhythmBars);
-    const newSourceHash = computePatternLibraryHash(patternLibrary);
-    const canReusePersistedEntries = Array.isArray(syncOptions.persistedEntries) &&
-        syncOptions.persistedVersion === timelineMetadataVersion &&
-        syncOptions.persistedSourceHash === newSourceHash;
-    const fallbackEntries = buildDefaultTimelineEntriesFromRhythmBars(
-        readResult.rhythmBars,
-        readResult.repeatRanges,
-        patternLibrary
-    );
-    const currentEntries = canReusePersistedEntries
-        ? syncOptions.persistedEntries
-        : fallbackEntries;
-    const syncedEntries = syncTimelineEntriesWithPatternLibrary(patternLibrary, currentEntries);
-
-    timelineState.sourcePatterns = patternLibrary;
-    timelineState.sourceLibraryGroups = buildPatternLibraryBlocks(fallbackEntries, patternLibrary);
-    timelineState.sourceHash = newSourceHash;
-    timelineState.entries = syncedEntries.length > 0 ? syncedEntries : fallbackEntries;
-    syncTimelineBlockIdSequence(timelineState.entries);
-    timelineState.tempo = normalizeTimelineTempo(syncOptions.tempo ?? timelineState.tempo);
-    timelineState.swingFactor = normalizeTimelineSwingFactor(syncOptions.swingFactor ?? timelineState.swingFactor);
-    timelineState.swingProfile = normalizeAllTimelineSwingProfiles(syncOptions.swingProfile);
-    timelineState.feelOffsets = normalizeTimelineFeelOffsets(syncOptions.feelOffsets);
-
-    updateTimelineMetadataNode();
-    renderTimelinePanel();
-}
-
-function buildCurrentTimelineSyncOptions() {
-    return {
-        tempo: timelineState.tempo,
-        swingFactor: timelineState.swingFactor,
-        swingProfile: normalizeAllTimelineSwingProfiles(timelineState.swingProfile),
-        feelOffsets: normalizeTimelineFeelOffsets(timelineState.feelOffsets),
-        persistedEntries: timelineState.entries.map(function (entry) {
-            return {
-                id: entry.id,
-                blockId: entry.blockId || '',
-                parallelGroupId: entry.parallelGroupId || '',
-                patternId: entry.patternId,
-                patternSourceKey: entry.patternSourceKey,
-                handMode: entry.handMode || '',
-                swingFactor: entry.swingFactor === null || entry.swingFactor === undefined
-                    ? null
-                    : normalizeTimelineSwingFactor(entry.swingFactor),
-                targetInstruments: Array.isArray(entry.targetInstruments) ? entry.targetInstruments.slice() : []
-            };
-        }),
-        persistedVersion: timelineMetadataVersion,
-        persistedSourceHash: timelineState.sourceHash
-    };
-}
-
-function getTimelineDragPayload(rawPayload) {
-    if (!rawPayload) {
-        return null;
-    }
-    try {
-        return JSON.parse(rawPayload);
-    } catch (error) {
-        return null;
-    }
-}
-
-function getTimelineTargetSignature(targetInstruments) {
-    return (Array.isArray(targetInstruments) ? targetInstruments.slice() : [])
-        .sort()
-        .join('|');
-}
-
-function buildTimelineGroupSummary(group, patternLibrary) {
-    const patternById = {};
-    const summaryParts = [];
-    const sequenceIndexByPatternId = {};
-    let nextSequenceIndex = 1;
-    let currentRun = null;
-    let totalBars = 0;
-
-    (patternLibrary || []).forEach(function (pattern) {
-        patternById[pattern.id] = pattern;
-    });
-
-    (group.entries || []).forEach(function (entry) {
-        const pattern = patternById[entry.patternId] || null;
-        if (!sequenceIndexByPatternId[entry.patternId]) {
-            sequenceIndexByPatternId[entry.patternId] = nextSequenceIndex++;
-        }
-
-        const sequenceLabel = 'Takt ' + sequenceIndexByPatternId[entry.patternId];
-        if (currentRun && currentRun.patternId === entry.patternId) {
-            currentRun.count += 1;
-            return;
-        }
-
-        if (currentRun) {
-            summaryParts.push(currentRun);
-        }
-
-        currentRun = {
-            patternId: entry.patternId,
-            label: sequenceLabel,
-            count: 1
-        };
-        totalBars += pattern && Array.isArray(pattern.bars) ? pattern.bars.length : 0;
-    });
-
-    if (currentRun) {
-        summaryParts.push(currentRun);
-    }
-
-    return {
-        totalBars: totalBars || 0,
-        text: summaryParts.length <= 1
-            ? ''
-            : summaryParts.map(function (part) {
-                return part.label + (part.count > 1 ? ' | Wiederholung x' + part.count : '');
-            }).join(', ')
-    };
-}
-
-function buildTimelineDisplayGroups(entries, patternLibrary) {
-    const groups = [];
-    const patternById = {};
-
-    (patternLibrary || []).forEach(function (pattern) {
-        patternById[pattern.id] = pattern;
-    });
-
-    (entries || []).forEach(function (entry, entryIndex) {
-        const previousGroup = groups.length > 0 ? groups[groups.length - 1] : null;
-        const targetSignature = getTimelineTargetSignature(entry.targetInstruments);
-        const pattern = patternById[entry.patternId] || null;
-        const labelName = pattern ? (pattern.labelName || pattern.name || '') : '';
-        const swingSignature = entry.swingFactor === null || entry.swingFactor === undefined
-            ? ''
-            : String(normalizeTimelineSwingFactor(entry.swingFactor));
-        const handSignature = pattern && pattern.instrument === 'Djembe'
-            ? String(entry.handMode || 'auto')
-            : '';
-        const blockId = String(entry.blockId || '');
-        const parallelGroupId = String(entry.parallelGroupId || '');
-
-        if (previousGroup &&
-            previousGroup.labelName === labelName &&
-            previousGroup.targetSignature === targetSignature &&
-            previousGroup.swingSignature === swingSignature &&
-            previousGroup.handSignature === handSignature &&
-            previousGroup.blockId === blockId &&
-            previousGroup.parallelGroupId === parallelGroupId) {
-            previousGroup.entries.push(entry);
-            previousGroup.count += 1;
-            previousGroup.endIndex = entryIndex + 1;
-            return;
-        }
-
-        groups.push({
-            patternId: entry.patternId,
-            labelName: labelName,
-            targetSignature: targetSignature,
-            swingSignature: swingSignature,
-            handSignature: handSignature,
-            blockId: blockId,
-            parallelGroupId: parallelGroupId,
-            entries: [entry],
-            count: 1,
-            startIndex: entryIndex,
-            endIndex: entryIndex + 1
-        });
-    });
-
-    return groups;
-}
-
-function getTimelineEntryCloneSignature(entry) {
-    if (!entry) {
-        return '';
-    }
-
-    const targetSignature = getTimelineTargetSignature(entry.targetInstruments);
-    const swingSignature = entry.swingFactor === null || entry.swingFactor === undefined
-        ? ''
-        : String(normalizeTimelineSwingFactor(entry.swingFactor));
-
-    return [
-        entry.patternId || '',
-        entry.patternSourceKey || '',
-        entry.handMode || '',
-        swingSignature,
-        targetSignature
-    ].join('::');
-}
-
-function getTimelineGroupRepeatInfo(group) {
-    const entries = group && Array.isArray(group.entries) ? group.entries : [];
-    const totalCount = entries.length;
-
-    if (totalCount <= 1) {
-        return {
-            unitLength: totalCount,
-            repeatCount: totalCount > 0 ? 1 : 0
-        };
-    }
-
-    const entrySignatures = entries.map(getTimelineEntryCloneSignature);
-
-    for (let unitLength = 1; unitLength <= totalCount; unitLength++) {
-        if (totalCount % unitLength !== 0) {
-            continue;
-        }
-
-        let isRepeatedUnit = true;
-        for (let entryIndex = 0; entryIndex < totalCount; entryIndex++) {
-            if (entrySignatures[entryIndex] !== entrySignatures[entryIndex % unitLength]) {
-                isRepeatedUnit = false;
-                break;
-            }
-        }
-
-        if (isRepeatedUnit) {
-            return {
-                unitLength: unitLength,
-                repeatCount: totalCount / unitLength
-            };
-        }
-    }
-
-    return {
-        unitLength: totalCount,
-        repeatCount: 1
-    };
-}
-
-function buildPatternLibraryGroups(patternLibrary) {
-    const groups = [];
-
-    (patternLibrary || []).forEach(function (pattern) {
-        const previousGroup = groups.length > 0 ? groups[groups.length - 1] : null;
-        const groupKey = [
-            pattern.instrument || '',
-            pattern.sourceInstrument || '',
-            pattern.labelType || '',
-            pattern.labelName || ''
-        ].join('::');
-
-        if (previousGroup && previousGroup.groupKey === groupKey) {
-            previousGroup.patterns.push(pattern);
-            return;
-        }
-
-        groups.push({
-            groupKey: groupKey,
-            patterns: [pattern]
-        });
-    });
-
-    return groups;
-}
-
-function buildPatternLibraryBlocks(defaultEntries, patternLibrary) {
-    const blocks = [];
-    const patternById = {};
-
-    (patternLibrary || []).forEach(function (pattern) {
-        patternById[pattern.id] = pattern;
-    });
-
-    (defaultEntries || []).forEach(function (entry) {
-        const pattern = patternById[entry.patternId] || null;
-        if (!pattern) {
-            return;
-        }
-
-        const groupKey = [
-            pattern.instrument || '',
-            pattern.sourceInstrument || '',
-            pattern.labelType || '',
-            pattern.labelName || ''
-        ].join('::');
-        const previousBlock = blocks.length > 0 ? blocks[blocks.length - 1] : null;
-
-        if (!previousBlock || previousBlock.groupKey !== groupKey) {
-            blocks.push({
-                groupKey: groupKey,
-                entries: [entry],
-                patterns: [pattern]
-            });
-            return;
-        }
-
-        previousBlock.entries.push(entry);
-        if (!previousBlock.patterns.some(function (existingPattern) {
-            return existingPattern.id === pattern.id;
-        })) {
-            previousBlock.patterns.push(pattern);
-        }
-    });
-
-    return blocks;
-}
-
-function buildPatternLibraryGroupSummary(patternGroup) {
-    const patterns = patternGroup && Array.isArray(patternGroup.patterns) ? patternGroup.patterns : [];
-    const summaryParts = [];
-
-    patterns.forEach(function (pattern, patternIndex) {
-        const barCount = Array.isArray(pattern.bars) ? pattern.bars.length : 0;
-        if (barCount <= 0) {
-            return;
-        }
-        summaryParts.push('Takt ' + (patternIndex + 1) + (barCount > 1 ? ' (' + barCount + ' Takte)' : ''));
-    });
-
-    return summaryParts.join(', ');
-}
-
-function getPatternById(patternLibrary, patternId) {
-    return (patternLibrary || []).find(function (pattern) {
-        return pattern.id === patternId;
-    }) || null;
-}
-
-function doTimelineTargetsOverlap(targetsA, targetsB) {
-    const leftTargets = Array.isArray(targetsA) ? targetsA : [];
-    const rightTargets = Array.isArray(targetsB) ? targetsB : [];
-    return leftTargets.some(function (targetName) {
-        return rightTargets.indexOf(targetName) !== -1;
-    });
-}
-
-function buildTimelineVisualRows(entryGroups, patternLibrary) {
-    const rows = [];
-    let rowIndex = 0;
-
-    while (rowIndex < entryGroups.length) {
-        const firstGroup = entryGroups[rowIndex];
-        const firstEntry = firstGroup && firstGroup.entries ? firstGroup.entries[0] : null;
-        const firstPattern = firstEntry ? getPatternById(patternLibrary, firstEntry.patternId) : null;
-
-        if (!firstPattern) {
-            rows.push([firstGroup]);
-            rowIndex += 1;
-            continue;
-        }
-
-        const currentRow = [firstGroup];
-        const currentTargets = getTimelineTargetSignature(firstEntry.targetInstruments).split('|').filter(Boolean);
-        const rowParallelGroupId = String(firstGroup.parallelGroupId || '');
-        let nextIndex = rowIndex + 1;
-
-        while (nextIndex < entryGroups.length) {
-            const nextGroup = entryGroups[nextIndex];
-            const nextEntry = nextGroup && nextGroup.entries ? nextGroup.entries[0] : null;
-            const nextPattern = nextEntry ? getPatternById(patternLibrary, nextEntry.patternId) : null;
-            if (!nextPattern) {
-                break;
-            }
-            if (rowParallelGroupId) {
-                if (String(nextGroup.parallelGroupId || '') !== rowParallelGroupId) {
-                    break;
-                }
-            } else if (nextPattern.labelType !== firstPattern.labelType) {
-                break;
-            } else if ((firstGroup.blockId || nextGroup.blockId) && firstGroup.blockId !== nextGroup.blockId) {
-                break;
-            }
-            if (!rowParallelGroupId && nextGroup.count !== firstGroup.count) {
-                break;
-            }
-            if (doTimelineTargetsOverlap(currentTargets, nextEntry.targetInstruments)) {
-                break;
-            }
-
-            currentRow.push(nextGroup);
-            nextEntry.targetInstruments.forEach(function (targetName) {
-                if (currentTargets.indexOf(targetName) === -1) {
-                    currentTargets.push(targetName);
-                }
-            });
-            nextIndex += 1;
-        }
-
-        rows.push(currentRow);
-        rowIndex = nextIndex;
-    }
-
-    return rows;
-}
-
-function buildPatternDisplayLabelMap(patternLibrary) {
-    const patternGroups = buildPatternLibraryGroups(patternLibrary);
-    const displayNameByPatternId = {};
-
-    patternGroups.forEach(function (patternGroup, groupIndex) {
-        const firstPattern = patternGroup.patterns[0];
-        const labelText = firstPattern.labelName || firstPattern.labelType || 'Passage';
-        const instrumentText = firstPattern.instrument || 'Instrument';
-        const displayName = 'P' + (groupIndex + 1) + ' - ' + instrumentText + ' / ' + labelText;
-
-        patternGroup.patterns.forEach(function (pattern) {
-            displayNameByPatternId[pattern.id] = displayName;
-        });
-    });
-
-    return {
-        groups: patternGroups,
-        displayNameByPatternId: displayNameByPatternId
-    };
-}
-
-function insertTimelineEntryAtIndex(payload, targetIndex) {
-    const insertIndex = Math.max(0, Math.min(targetIndex, timelineState.entries.length));
-
-    if (!payload) {
-        return;
-    }
-
-    if (payload.type === 'pattern') {
-        const sourcePattern = findPatternById(payload.patternId);
-        if (!sourcePattern) {
-            return;
-        }
-        timelineState.entries.splice(insertIndex, 0, cloneTimelineEntryFromPattern(sourcePattern));
-        updateTimelineMetadataNode();
-        renderTimelinePanel();
-        return;
-    }
-
-    if (payload.type === 'pattern-group') {
-        const sourceEntries = Array.isArray(payload.entries) ? payload.entries : [];
-        const newBlockId = nextTimelineBlockId();
-        const entriesToInsert = sourceEntries.map(function (entry) {
-            const sourcePattern = findPatternById(entry.patternId);
-            if (!sourcePattern) {
-                return null;
-            }
-            return cloneTimelineEntryFromPattern(sourcePattern, {
-                blockId: newBlockId,
-                handMode: entry.handMode || 'auto',
-                swingFactor: entry.swingFactor,
-                targetInstruments: Array.isArray(entry.targetInstruments) ? entry.targetInstruments.slice() : []
-            });
-        }).filter(Boolean);
-        if (entriesToInsert.length === 0) {
-            return;
-        }
-        timelineState.entries.splice.apply(timelineState.entries, [insertIndex, 0].concat(entriesToInsert));
-        updateTimelineMetadataNode();
-        renderTimelinePanel();
-        return;
-    }
-
-    if (payload.type === 'timeline-entry-group') {
-        const groupStartIndex = Number(payload.startIndex);
-        const groupCount = Number(payload.count);
-        if (!Number.isFinite(groupStartIndex) || !Number.isFinite(groupCount) || groupCount < 1) {
-            return;
-        }
-        const movedEntries = timelineState.entries.splice(groupStartIndex, groupCount);
-        const adjustedIndex = groupStartIndex < insertIndex ? insertIndex - groupCount : insertIndex;
-        movedEntries.forEach(function (entry) {
-            entry.parallelGroupId = '';
-        });
-        timelineState.entries.splice.apply(timelineState.entries, [adjustedIndex, 0].concat(movedEntries));
-        updateTimelineMetadataNode();
-        renderTimelinePanel();
-    }
-}
-
-function ensureParallelGroupForRow(rowGroups) {
-    const groups = Array.isArray(rowGroups) ? rowGroups.filter(Boolean) : [];
-    if (groups.length === 0) {
-        return '';
-    }
-
-    const existingParallelGroupId = String(groups[0].parallelGroupId || '');
-    if (existingParallelGroupId) {
-        return existingParallelGroupId;
-    }
-
-    const newParallelGroupId = nextTimelineParallelGroupId();
-    groups.forEach(function (group) {
-        (group.entries || []).forEach(function (entry) {
-            entry.parallelGroupId = newParallelGroupId;
-        });
-        group.parallelGroupId = newParallelGroupId;
-    });
-
-    return newParallelGroupId;
-}
-
-function insertTimelineEntryParallelToRow(payload, rowGroups) {
-    const groups = Array.isArray(rowGroups) ? rowGroups.filter(Boolean) : [];
-    if (groups.length === 0) {
-        return;
-    }
-
-    const parallelGroupId = ensureParallelGroupForRow(groups);
-    const insertIndex = groups[groups.length - 1].endIndex;
-
-    if (payload.type === 'pattern-group') {
-        const sourceEntries = Array.isArray(payload.entries) ? payload.entries : [];
-        const newBlockId = nextTimelineBlockId();
-        const entriesToInsert = sourceEntries.map(function (entry) {
-            const sourcePattern = findPatternById(entry.patternId);
-            if (!sourcePattern) {
-                return null;
-            }
-            return cloneTimelineEntryFromPattern(sourcePattern, {
-                blockId: newBlockId,
-                parallelGroupId: parallelGroupId,
-                handMode: entry.handMode || 'auto',
-                swingFactor: entry.swingFactor,
-                targetInstruments: Array.isArray(entry.targetInstruments) ? entry.targetInstruments.slice() : []
-            });
-        }).filter(Boolean);
-        if (entriesToInsert.length === 0) {
-            return;
-        }
-        timelineState.entries.splice.apply(timelineState.entries, [insertIndex, 0].concat(entriesToInsert));
-        updateTimelineMetadataNode();
-        renderTimelinePanel();
-        return;
-    }
-
-    if (payload.type === 'timeline-entry-group') {
-        const groupStartIndex = Number(payload.startIndex);
-        const groupCount = Number(payload.count);
-        if (!Number.isFinite(groupStartIndex) || !Number.isFinite(groupCount) || groupCount < 1) {
-            return;
-        }
-        const movedEntries = timelineState.entries.splice(groupStartIndex, groupCount);
-        const adjustedIndex = groupStartIndex < insertIndex ? insertIndex - groupCount : insertIndex;
-        movedEntries.forEach(function (entry) {
-            entry.parallelGroupId = parallelGroupId;
-        });
-        timelineState.entries.splice.apply(timelineState.entries, [adjustedIndex, 0].concat(movedEntries));
-        updateTimelineMetadataNode();
-        renderTimelinePanel();
-    }
-}
-
-function createTimelineDropzone(targetIndex) {
-    const dropzone = document.createElement('div');
-    dropzone.className = 'timeline-dropzone';
-    dropzone.textContent = targetIndex === timelineState.entries.length
-        ? 'Pattern hier ablegen'
-        : 'Hier einfügen';
-    dropzone.addEventListener('dragover', function (event) {
-        event.preventDefault();
-    });
-    dropzone.addEventListener('drop', function (event) {
-        event.preventDefault();
-        const payload = getTimelineDragPayload(event.dataTransfer.getData('text/plain'));
-        insertTimelineEntryAtIndex(payload, targetIndex);
-    });
-    return dropzone;
-}
-
-function createTimelineParallelDropzone(rowGroups) {
-    const dropzone = document.createElement('div');
-    dropzone.className = 'timeline-dropzone timeline-dropzone-inline';
-    dropzone.textContent = 'Parallel hier';
-    bindParallelDropTarget(dropzone, rowGroups);
-    return dropzone;
-}
-
-function bindParallelDropTarget(targetEl, rowGroups) {
-    if (!targetEl) {
-        return;
-    }
-
-    targetEl.addEventListener('dragover', function (event) {
-        event.preventDefault();
-    });
-    targetEl.addEventListener('drop', function (event) {
-        event.preventDefault();
-        event.stopPropagation();
-        const payload = getTimelineDragPayload(event.dataTransfer.getData('text/plain'));
-        insertTimelineEntryParallelToRow(payload, rowGroups);
-    });
-}
-
-function renderTimelinePatternLibrary() {
-    const listEl = document.getElementById('timelinePatternList');
-    const patternDisplayInfo = buildPatternDisplayLabelMap(timelineState.sourcePatterns);
-    const patternGroups = Array.isArray(timelineState.sourceLibraryGroups) && timelineState.sourceLibraryGroups.length > 0
-        ? timelineState.sourceLibraryGroups
-        : patternDisplayInfo.groups;
-    listEl.innerHTML = '';
-
-    patternGroups.forEach(function (patternGroup) {
-        const firstPattern = patternGroup.patterns[0];
-        const blockSummary = buildTimelineGroupSummary({
-            entries: patternGroup.entries || []
-        }, timelineState.sourcePatterns);
-        const totalBars = blockSummary.totalBars || patternGroup.patterns.reduce(function (sum, pattern) {
-            return sum + (Array.isArray(pattern.bars) ? pattern.bars.length : 0);
-        }, 0);
-
-        const card = document.createElement('div');
-        card.className = 'timeline-card';
-        card.draggable = true;
-        card.addEventListener('dragstart', function (event) {
-            event.dataTransfer.setData('text/plain', JSON.stringify({
-                type: 'pattern-group',
-                entries: (patternGroup.entries || []).map(function (entry) {
-                    return {
-                        patternId: entry.patternId,
-                        handMode: entry.handMode || 'auto',
-                        swingFactor: entry.swingFactor === null || entry.swingFactor === undefined
-                            ? null
-                            : normalizeTimelineSwingFactor(entry.swingFactor),
-                        targetInstruments: Array.isArray(entry.targetInstruments) ? entry.targetInstruments.slice() : []
-                    };
-                })
-            }));
-        });
-
-        const patternTitle = document.createElement('strong');
-        patternTitle.textContent = patternDisplayInfo.displayNameByPatternId[firstPattern.id] || firstPattern.name;
-        const patternMeta = document.createElement('small');
-        patternMeta.textContent = totalBars + ' Takt(e)';
-        const patternSummary = blockSummary.text || buildPatternLibraryGroupSummary(patternGroup);
-        const actionWrap = document.createElement('div');
-        actionWrap.className = 'timeline-card-actions';
-        const addButton = document.createElement('button');
-        addButton.type = 'button';
-        addButton.textContent = '+';
-        addButton.addEventListener('click', function () {
-            const newBlockId = nextTimelineBlockId();
-            const newEntries = (patternGroup.entries || []).map(function (entry) {
-                const sourcePattern = findPatternById(entry.patternId);
-                if (!sourcePattern) {
-                    return null;
-                }
-                return cloneTimelineEntryFromPattern(sourcePattern, {
-                    blockId: newBlockId,
-                    handMode: entry.handMode || 'auto',
-                    swingFactor: entry.swingFactor,
-                    targetInstruments: Array.isArray(entry.targetInstruments) ? entry.targetInstruments.slice() : []
-                });
-            });
-            timelineState.entries.push.apply(timelineState.entries, newEntries.filter(Boolean));
-            updateTimelineMetadataNode();
-            renderTimelinePanel();
-        });
-
-        actionWrap.appendChild(addButton);
-        card.appendChild(patternTitle);
-        card.appendChild(patternMeta);
-        if (patternSummary) {
-            const summaryEl = document.createElement('small');
-            summaryEl.textContent = patternSummary;
-            summaryEl.style.display = 'block';
-            summaryEl.style.marginTop = '4px';
-            card.appendChild(summaryEl);
-        }
-        card.appendChild(actionWrap);
-        listEl.appendChild(card);
-    });
-}
-
-function renderTimelineSequence() {
-    const sequenceEl = document.getElementById('timelineSequence');
-    const patternDisplayInfo = buildPatternDisplayLabelMap(timelineState.sourcePatterns);
-    const entryGroups = buildTimelineDisplayGroups(timelineState.entries, timelineState.sourcePatterns);
-    const visualRows = buildTimelineVisualRows(entryGroups, timelineState.sourcePatterns);
-    sequenceEl.innerHTML = '';
-
-    if (visualRows.length === 0) {
-        sequenceEl.appendChild(createTimelineDropzone(0));
-        return;
-    }
-
-    visualRows.forEach(function (rowGroups) {
-        if (!rowGroups || rowGroups.length === 0) {
-            return;
-        }
-
-        sequenceEl.appendChild(createTimelineDropzone(rowGroups[0].startIndex));
-        const rowEl = document.createElement('div');
-        rowEl.className = 'timeline-sequence-row';
-        bindParallelDropTarget(rowEl, rowGroups);
-
-        rowGroups.forEach(function (group) {
-            const entry = group.entries[0];
-            const pattern = findPatternById(group.patternId);
-            if (!pattern) {
-                return;
-            }
-            const repeatInfo = getTimelineGroupRepeatInfo(group);
-
-            const entryCard = document.createElement('div');
-            entryCard.className = 'timeline-entry';
-            entryCard.draggable = true;
-            bindParallelDropTarget(entryCard, rowGroups);
-            entryCard.addEventListener('dragstart', function (event) {
-                event.dataTransfer.setData('text/plain', JSON.stringify({
-                    type: 'timeline-entry-group',
-                    startIndex: group.startIndex,
-                    count: group.count
-                }));
-            });
-
-            const mainWrap = document.createElement('div');
-            mainWrap.className = 'timeline-entry-main';
-            const titleEl = document.createElement('strong');
-            titleEl.textContent = patternDisplayInfo.displayNameByPatternId[pattern.id] || pattern.name;
-            const groupSummary = buildTimelineGroupSummary(group, timelineState.sourcePatterns);
-            const metaEl = document.createElement('small');
-            const displayedBarCount = groupSummary.totalBars || (Array.isArray(pattern.bars) ? pattern.bars.length : 0);
-            metaEl.textContent = 'Takte: ' + displayedBarCount + (!groupSummary.text && group.count > 1 ? ' | Wiederholung x' + group.count : '');
-            mainWrap.appendChild(titleEl);
-            mainWrap.appendChild(metaEl);
-            if (groupSummary.text) {
-                const summaryEl = document.createElement('small');
-                summaryEl.textContent = groupSummary.text;
-                summaryEl.style.display = 'block';
-                summaryEl.style.marginTop = '4px';
-                mainWrap.appendChild(summaryEl);
-            }
-
-            const swingWrap = document.createElement('div');
-            swingWrap.className = 'timeline-entry-targets';
-            const swingLabelEl = document.createElement('label');
-            swingLabelEl.appendChild(document.createTextNode('Swing'));
-            const swingInputEl = document.createElement('input');
-            swingInputEl.type = 'number';
-            swingInputEl.min = '0';
-            swingInputEl.max = '100';
-            swingInputEl.step = '1';
-            swingInputEl.placeholder = String(normalizeTimelineSwingFactor(timelineState.swingFactor));
-            swingInputEl.value = entry.swingFactor === null || entry.swingFactor === undefined
-                ? ''
-                : String(normalizeTimelineSwingFactor(entry.swingFactor));
-            swingInputEl.style.width = '60px';
-            swingInputEl.addEventListener('change', function () {
-                const normalizedValue = swingInputEl.value === ''
-                    ? null
-                    : normalizeTimelineSwingFactor(swingInputEl.value);
-                group.entries.forEach(function (groupEntry) {
-                    groupEntry.swingFactor = normalizedValue;
-                });
-                swingInputEl.value = normalizedValue === null ? '' : String(normalizedValue);
-                updateTimelineMetadataNode();
-                renderTimelinePanel();
-            });
-            swingLabelEl.appendChild(swingInputEl);
-            swingWrap.appendChild(swingLabelEl);
-            mainWrap.appendChild(swingWrap);
-
-            if (pattern.instrument === 'Djembe') {
-                const handWrap = document.createElement('div');
-                handWrap.className = 'timeline-entry-targets';
-                const handLabelEl = document.createElement('label');
-                handLabelEl.appendChild(document.createTextNode('Handsatz'));
-                const handSelectEl = document.createElement('select');
-                [
-                    { value: 'auto', label: 'Auto' },
-                    { value: 'h2h', label: 'H2H' },
-                    { value: 'hoh', label: 'HOH' }
-                ].forEach(function (optionData) {
-                    const optionEl = document.createElement('option');
-                    optionEl.value = optionData.value;
-                    optionEl.textContent = optionData.label;
-                    handSelectEl.appendChild(optionEl);
-                });
-                handSelectEl.value = entry.handMode || 'auto';
-                handSelectEl.addEventListener('change', function () {
-                    group.entries.forEach(function (groupEntry) {
-                        groupEntry.handMode = handSelectEl.value;
-                    });
-                    updateTimelineMetadataNode();
-                    renderTimelinePanel();
-                });
-                handLabelEl.appendChild(handSelectEl);
-                handWrap.appendChild(handLabelEl);
-                mainWrap.appendChild(handWrap);
-            }
-
-            if (pattern.instrument === 'Djembe' || pattern.instrument === 'Bässe') {
-                const targetWrap = document.createElement('div');
-                targetWrap.className = 'timeline-entry-targets';
-                const selectableTargets = pattern.instrument === 'Djembe'
-                    ? timelineDjembeTargets
-                    : timelineBassTargets;
-                selectableTargets.forEach(function (targetName) {
-                    const labelEl = document.createElement('label');
-                    const checkboxEl = document.createElement('input');
-                    checkboxEl.type = 'checkbox';
-                    checkboxEl.checked = entry.targetInstruments.indexOf(targetName) !== -1;
-                    checkboxEl.addEventListener('change', function () {
-                        group.entries.forEach(function (groupEntry) {
-                            if (checkboxEl.checked) {
-                                if (groupEntry.targetInstruments.indexOf(targetName) === -1) {
-                                    groupEntry.targetInstruments.push(targetName);
-                                }
-                            } else {
-                                groupEntry.targetInstruments = groupEntry.targetInstruments.filter(function (name) {
-                                    return name !== targetName;
-                                });
-                                if (groupEntry.targetInstruments.length === 0) {
-                                    groupEntry.targetInstruments = [targetName];
-                                    checkboxEl.checked = true;
-                                }
-                            }
-                        });
-                        updateTimelineMetadataNode();
-                    });
-                    labelEl.appendChild(checkboxEl);
-                    labelEl.appendChild(document.createTextNode(targetName.replace('_', ' ')));
-                    targetWrap.appendChild(labelEl);
-                });
-                mainWrap.appendChild(targetWrap);
-            } else {
-                const fixedTargetEl = document.createElement('div');
-                fixedTargetEl.className = 'timeline-entry-targets';
-                fixedTargetEl.textContent = 'Instrument: ' + pattern.instrument;
-                mainWrap.appendChild(fixedTargetEl);
-            }
-
-            const actionWrap = document.createElement('div');
-            actionWrap.className = 'timeline-entry-actions';
-            const cloneButton = document.createElement('button');
-            cloneButton.type = 'button';
-            cloneButton.textContent = 'Klon';
-            cloneButton.addEventListener('click', function () {
-                const sourceEntries = group.entries.slice(0, repeatInfo.unitLength);
-                const clonedEntries = sourceEntries.map(function (groupEntry) {
-                    return cloneTimelineEntry(groupEntry);
-                }).filter(Boolean);
-                if (clonedEntries.length === 0) {
-                    return;
-                }
-                timelineState.entries.splice.apply(timelineState.entries, [group.endIndex, 0].concat(clonedEntries));
-                updateTimelineMetadataNode();
-                renderTimelinePanel();
-            });
-
-            const reduceButton = document.createElement('button');
-            reduceButton.type = 'button';
-            reduceButton.textContent = '-';
-            reduceButton.disabled = repeatInfo.repeatCount <= 1;
-            reduceButton.addEventListener('click', function () {
-                if (repeatInfo.repeatCount <= 1 || repeatInfo.unitLength <= 0) {
-                    return;
-                }
-                timelineState.entries.splice(group.endIndex - repeatInfo.unitLength, repeatInfo.unitLength);
-                updateTimelineMetadataNode();
-                renderTimelinePanel();
-            });
-
-            const removeButton = document.createElement('button');
-            removeButton.type = 'button';
-            removeButton.textContent = 'Entfernen';
-            removeButton.addEventListener('click', function () {
-                timelineState.entries.splice(group.startIndex, group.count);
-                updateTimelineMetadataNode();
-                renderTimelinePanel();
-            });
-
-            actionWrap.appendChild(cloneButton);
-            actionWrap.appendChild(reduceButton);
-            actionWrap.appendChild(removeButton);
-
-            entryCard.appendChild(mainWrap);
-            entryCard.appendChild(actionWrap);
-            rowEl.appendChild(entryCard);
-        });
-
-        rowEl.appendChild(createTimelineParallelDropzone(rowGroups));
-        sequenceEl.appendChild(rowEl);
-    });
-
-    sequenceEl.appendChild(createTimelineDropzone(timelineState.entries.length));
-}
-
-function renderTimelinePanel() {
-    const panelEl = document.getElementById('timelinePanel');
-    const statusEl = document.getElementById('timelineStatus');
-    const tempoInputEl = document.getElementById('timelineTempo');
-    const swingInputEl = document.getElementById('timelineSwingFactor');
-    const feelInputMap = {
-        Kenkeni: document.getElementById('timelineFeelKenkeni'),
-        Sangban: document.getElementById('timelineFeelSangban'),
-        Doundoun: document.getElementById('timelineFeelDoundoun'),
-        Dreierbass: document.getElementById('timelineFeelDreierbass'),
-        Djembe_1: document.getElementById('timelineFeelDjembe1'),
-        Djembe_2: document.getElementById('timelineFeelDjembe2'),
-        Djembe_3: document.getElementById('timelineFeelDjembe3')
-    };
-    const swingProfileWrapEl = document.getElementById('timelineSwingProfile');
-    const swingProfileInputs = [
-        document.getElementById('timelineSwingAnchor1'),
-        document.getElementById('timelineSwingAnchor2'),
-        document.getElementById('timelineSwingAnchor3'),
-        document.getElementById('timelineSwingAnchor4')
-    ];
-    const patternDisplayInfo = buildPatternDisplayLabelMap(timelineState.sourcePatterns);
-    const timelineDisplayGroups = buildTimelineDisplayGroups(timelineState.entries, timelineState.sourcePatterns);
-    const timelineVisualRows = buildTimelineVisualRows(timelineDisplayGroups, timelineState.sourcePatterns);
-    if (!panelEl || !statusEl) {
-        return;
-    }
-
-    if (tempoInputEl) {
-        tempoInputEl.value = normalizeTimelineTempo(timelineState.tempo);
-    }
-    if (swingInputEl) {
-        swingInputEl.value = normalizeTimelineSwingFactor(timelineState.swingFactor);
-    }
-    const currentFeelOffsets = normalizeTimelineFeelOffsets(timelineState.feelOffsets);
-    Object.keys(feelInputMap).forEach(function (instrumentName) {
-        if (feelInputMap[instrumentName]) {
-            feelInputMap[instrumentName].value = currentFeelOffsets[instrumentName];
-        }
-    });
-    if (swingProfileWrapEl) {
-        swingProfileWrapEl.style.display = 'inline-flex';
-    }
-    const currentProfileKey = getCurrentTimelineSwingProfileKey();
-    const currentProfile = normalizeTimelineSwingProfile(
-        timelineState.swingProfile && timelineState.swingProfile[currentProfileKey],
-        currentProfileKey
-    );
-    swingProfileInputs.forEach(function (inputEl, inputIndex) {
-        if (!inputEl) {
-            return;
-        }
-        const inputLabel = inputEl.closest('label');
-        const isActive = inputIndex < currentProfile.length;
-        if (inputLabel) {
-            inputLabel.style.display = isActive ? 'inline-flex' : 'none';
-        }
-        if (isActive) {
-            inputEl.value = currentProfile[inputIndex];
-        }
-    });
-    const profileTitleEl = swingProfileWrapEl ? swingProfileWrapEl.querySelector('span') : null;
-    if (profileTitleEl) {
-        profileTitleEl.textContent = currentProfileKey === 'binaer'
-            ? 'Profil 16/8'
-            : (currentProfileKey === 'tenaer' ? 'Profil 12/8' : 'Profil 9/8');
-    }
-
-    panelEl.style.display = timelineState.visible ? 'block' : 'none';
-    const sourceLibraryGroupCount = Array.isArray(timelineState.sourceLibraryGroups) && timelineState.sourceLibraryGroups.length > 0
-        ? timelineState.sourceLibraryGroups.length
-        : patternDisplayInfo.groups.length;
-    statusEl.textContent = sourceLibraryGroupCount + ' Pattern aus dem Blatt, ' +
-        timelineVisualRows.length + ' Eintrag/Eintaege in der Timeline.';
-
-    if (!timelineState.visible) {
-        return;
-    }
-
-    renderTimelinePatternLibrary();
-    renderTimelineSequence();
-}
-
 function openAudioTestWindow(playerRows) {
     const form = document.createElement('form');
     form.action = 'Audio/audioplayer.php';
@@ -3492,7 +1726,7 @@ function runReadRhythm() {
 function runAudioTest() {
     try {
         const readResult = callPHPScript_lesen(zeilenAnzahl, { showAlert: false });
-        syncTimelineStateFromReadResult(readResult, buildCurrentTimelineSyncOptions());
+        syncTimelineStateFromReadResultIfNeeded(readResult, buildCurrentTimelineSyncOptions());
         const playerPayload = buildTimelinePlayerPayload(timelineState.sourcePatterns, timelineState.entries);
         window.lastPlayerRows = playerPayload;
         console.log('playerRows', playerPayload);
@@ -3552,9 +1786,35 @@ function callPHPScript() {
 
 let scrollOn = false;
 
+function closeAppMenus() {
+    document.querySelectorAll('#appMenuBar details.app-menu[open]').forEach(function (menuEl) {
+        menuEl.open = false;
+    });
+}
+
 document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('#appMenuBar details.app-menu').forEach(function (menuEl) {
+        menuEl.addEventListener('toggle', function () {
+            if (!menuEl.open) {
+                return;
+            }
+            document.querySelectorAll('#appMenuBar details.app-menu').forEach(function (otherMenu) {
+                if (otherMenu !== menuEl) {
+                    otherMenu.open = false;
+                }
+            });
+        });
+    });
+
+    document.addEventListener('click', function (event) {
+        if (!event.target.closest('#appMenuBar')) {
+            closeAppMenus();
+        }
+    });
+
     document.querySelector('#button').addEventListener('click', callPHPScript);
     document.querySelector('#button2').addEventListener('click', callPHPScript2);
+    document.querySelector('#button12').addEventListener('click', exportCurrentSheetAsPdf);
     document.querySelector('#button3').addEventListener('click', runReadRhythm);
     document.querySelector('#button10').addEventListener('click', runAudioTest);
     document.querySelector('#button4').addEventListener('click', viererNoten);
@@ -3569,7 +1829,7 @@ document.addEventListener('DOMContentLoaded', function () {
     document.querySelector('#button11').addEventListener('click', function () {
         try {
             const readResult = callPHPScript_lesen(zeilenAnzahl, { showAlert: false });
-            syncTimelineStateFromReadResult(readResult, buildCurrentTimelineSyncOptions());
+            syncTimelineStateFromReadResultIfNeeded(readResult, buildCurrentTimelineSyncOptions());
             timelineState.visible = !timelineState.visible;
             renderTimelinePanel();
         } catch (error) {
@@ -3644,6 +1904,29 @@ document.addEventListener('DOMContentLoaded', function () {
         } else {
             canv.attr({ fill: "white" });
         }
+    });
+
+    [
+        '#button',
+        '#button2',
+        '#button12',
+        '#button3',
+        '#button4',
+        '#button5',
+        '#button6',
+        '#button7',
+        '#button8',
+        '#button9',
+        '#button10',
+        '#button11'
+    ].forEach(function (selector) {
+        const buttonEl = document.querySelector(selector);
+        if (!buttonEl) {
+            return;
+        }
+        buttonEl.addEventListener('click', function () {
+            closeAppMenus();
+        });
     });
 });
 
@@ -3749,6 +2032,7 @@ function onSVGLoaded(data) {
 
 function get_value(e) {
     removeCanvasElements(removableCanvasElementSelector);
+    closeAppMenus();
 
     let selectedFileName;
     if (e) {

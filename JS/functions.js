@@ -43,6 +43,94 @@ function createMenuChooser(s, x, y, config) {
   return chooserGruppe;
 }
 
+function requestChooserLabel(defaultName, promptText) {
+  return new Promise(function (resolve) {
+    let overlay = document.createElement("div");
+    overlay.className = "chooser-dialog-backdrop";
+
+    let dialog = document.createElement("div");
+    dialog.className = "chooser-dialog";
+
+    let message = document.createElement("p");
+    message.className = "chooser-dialog-text";
+    message.textContent = promptText;
+
+    let input = document.createElement("input");
+    input.type = "text";
+    input.className = "chooser-dialog-input";
+    input.value = defaultName;
+
+    let actions = document.createElement("div");
+    actions.className = "chooser-dialog-actions";
+
+    let cancelButton = document.createElement("button");
+    cancelButton.type = "button";
+    cancelButton.textContent = "Abbrechen";
+
+    let okButton = document.createElement("button");
+    okButton.type = "button";
+    okButton.textContent = "OK";
+
+    function closeDialog(result) {
+      overlay.remove();
+      resolve(result);
+    }
+
+    cancelButton.addEventListener("click", function () {
+      closeDialog(null);
+    });
+
+    okButton.addEventListener("click", function () {
+      let configuredName = input.value.trim();
+      closeDialog(configuredName === "" ? defaultName : configuredName);
+    });
+
+    input.addEventListener("keydown", function (event) {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        okButton.click();
+      }
+      if (event.key === "Escape") {
+        event.preventDefault();
+        cancelButton.click();
+      }
+    });
+
+    overlay.addEventListener("click", function (event) {
+      if (event.target === overlay) {
+        cancelButton.click();
+      }
+    });
+
+    actions.append(cancelButton, okButton);
+    dialog.append(message, input, actions);
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+
+    window.requestAnimationFrame(function () {
+      input.focus();
+      let endPosition = input.value.length;
+      input.setSelectionRange(endPosition, endPosition);
+    });
+  });
+}
+
+function getChooserLabelSeed(name, chooserText) {
+  let currentText = chooserText && typeof chooserText.attr === "function"
+    ? String(chooserText.attr("text") || "").trim()
+    : "";
+
+  if (!currentText || currentText === "Funktion") {
+    return name;
+  }
+
+  if (currentText === name || currentText.indexOf(name) === 0 || currentText.indexOf(name + " ") !== -1) {
+    return currentText;
+  }
+
+  return name;
+}
+
 function getChooserPosition(chooserGruppe) {
   let transformState = typeof chooserGruppe.transform === "function" ? chooserGruppe.transform() : null;
   let localMatrix = transformState && transformState.localMatrix ? transformState.localMatrix : null;
@@ -145,7 +233,7 @@ function createFunctionChooser(s, x, y, startText = "Funktion", startFill = "gra
     startFill: startFill,
     menuWidth: 140,
     options: ["Call", "Intro", "Echauffement", "Begleitpattern", "Solo", "Outro", "Leer"],
-    onSelect: function (name) {
+    onSelect: function (name, chooserGruppe, chooserText) {
       if (name !== "Solo" && name !== "Begleitpattern") {
         return name;
       }
@@ -153,12 +241,7 @@ function createFunctionChooser(s, x, y, startText = "Funktion", startFill = "gra
         'Bezeichnung für "' +
         name +
         '" anpassen.\nZum Beispiel: "Solo 1", "1. Solo", "Begleitpattern 2".';
-      let configuredName = prompt(promptText, name);
-      if (configuredName === null) {
-        return null;
-      }
-      configuredName = configuredName.trim();
-      return configuredName === "" ? name : configuredName;
+      return requestChooserLabel(getChooserLabelSeed(name, chooserText), promptText);
     },
   });
 }
@@ -189,13 +272,14 @@ function bindChooserInteraction(chooserGruppe, chooserText, menuGruppe, onSelect
     eintrag.click(function (event) {
       let name = eintrag.attr("text");
       let selectedName = onSelect ? onSelect(name, chooserGruppe, chooserText) : name;
-      if (selectedName === null) {
+      Promise.resolve(selectedName).then(function (resolvedName) {
+        if (resolvedName === null) {
+          menuGruppe.attr({ display: "none" });
+          return;
+        }
+        chooserText.attr({ text: resolvedName, fill: "#333" });
         menuGruppe.attr({ display: "none" });
-        event.stopPropagation();
-        return;
-      }
-      chooserText.attr({ text: selectedName, fill: "#333" });
-      menuGruppe.attr({ display: "none" });
+      });
       event.stopPropagation();
     });
   });
@@ -274,11 +358,6 @@ function rewireFunctionChooser(chooserGruppe) {
       'Bezeichnung für "' +
       name +
       '" anpassen.\nZum Beispiel: "Solo 1", "1. Solo", "Begleitpattern 2".';
-    let configuredName = prompt(promptText, name);
-    if (configuredName === null) {
-      return null;
-    }
-    configuredName = configuredName.trim();
-    return configuredName === "" ? name : configuredName;
+    return requestChooserLabel(getChooserLabelSeed(name, functionText), promptText);
   });
 }

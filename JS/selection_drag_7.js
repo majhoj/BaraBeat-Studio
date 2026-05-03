@@ -13,6 +13,8 @@ var selectionDragState = {
   accumulatedDy: 0,
   dragOffsetDx: 0,
   dragOffsetDy: 0,
+  shadowStartX: 0,
+  shadowStartY: 0,
 };
 
 window.addEventListener("keydown", function (event) {
@@ -175,12 +177,34 @@ function appendUngroupedElement(element) {
   return element;
 }
 
+function getElementTranslate(element) {
+  if (!element || typeof element.transform !== "function") {
+    return { x: 0, y: 0 };
+  }
+
+  var transformState = element.transform();
+  var localMatrix = transformState && transformState.localMatrix ? transformState.localMatrix : null;
+  return {
+    x: localMatrix && typeof localMatrix.e === "number" ? localMatrix.e : 0,
+    y: localMatrix && typeof localMatrix.f === "number" ? localMatrix.f : 0,
+  };
+}
+
 function getSelectedElements(groupElement) {
   return groupElement.selectAll(selectableElementSelector);
 }
 
 function getSelectableCanvasElements() {
   return s.selectAll(selectableElementSelector);
+}
+
+function resetSelectionDragState() {
+  selectionDragState.accumulatedDx = 0;
+  selectionDragState.accumulatedDy = 0;
+  selectionDragState.currentDx = undefined;
+  selectionDragState.currentDy = undefined;
+  selectionDragState.dragOffsetDx = 0;
+  selectionDragState.dragOffsetDy = 0;
 }
 
 function UnGroup() {
@@ -190,65 +214,101 @@ function UnGroup() {
     Elemente wieder zu s hinzugügen. */
 
     const selectedElements = getSelectedElements(selections);
-    if (typeof selectionDragState.currentDx == "undefined") {
+    var selectionWasMoved =
+      typeof selectionDragState.currentDx !== "undefined" &&
+      (selectionDragState.currentDx !== 0 ||
+        selectionDragState.currentDy !== 0 ||
+        selectionDragState.dragOffsetDx !== 0 ||
+        selectionDragState.dragOffsetDy !== 0);
+
+    if (!selectionWasMoved) {
       selectedElements.forEach(function (ele) {
         appendUngroupedElement(ele);
       });
+      selections.remove();
+      selections = null;
+      resetSelectionDragState();
+      return;
     }
-    selectionDragState.accumulatedDx += selectionDragState.dragOffsetDx;
-    selectionDragState.accumulatedDy += selectionDragState.dragOffsetDy;
+    var groupTranslate = getElementTranslate(selections);
     selectedElements.forEach(function (ele) {
-      var transformString = ele.matrix.toTransformString();
-      var nextDx;
-      var nextDy;
-
-      /*Prüfen ob die Auswahl zum ersten Mal verschoben wird.
-      Dann ist trans undefiniert */
-      if (transformString === "") {
-        nextDx = selectionDragState.accumulatedDx;
-        nextDy = selectionDragState.accumulatedDy;
-      } else {
-        transformString = transformString.split(",");
-        nextDx = selectionDragState.accumulatedDx + Number(transformString[0].substr(1));
-        nextDy = selectionDragState.accumulatedDy + Number(transformString[1]);
-      }
+      var childTranslate = getElementTranslate(ele);
+      var nextDx = childTranslate.x + groupTranslate.x;
+      var nextDy = childTranslate.y + groupTranslate.y;
       ele.transform("t" + nextDx + ", " + nextDy);
       appendUngroupedElement(ele);
     });
+    selections.remove();
+    selections = null;
   }
-  selectionDragState.accumulatedDx -= selectionDragState.dragOffsetDx;
-  selectionDragState.accumulatedDy -= selectionDragState.dragOffsetDy;
-  selectionDragState.currentDx = 0;
-  selectionDragState.currentDy = 0;
-  selectionDragState.dragOffsetDx = 0;
-  selectionDragState.dragOffsetDy = 0;
+  resetSelectionDragState();
+}
+
+function getSvgPointerPosition(event, fallbackX, fallbackY) {
+  var svgNode = s && s.node;
+  var sourceEvent = event && (event.touches ? event.touches[0] : (event.changedTouches ? event.changedTouches[0] : event));
+
+  if (!svgNode || !sourceEvent || typeof sourceEvent.clientX !== "number" || typeof sourceEvent.clientY !== "number") {
+    return {
+      x: Number(fallbackX) || 0,
+      y: Number(fallbackY) || 0,
+    };
+  }
+
+  if (typeof svgNode.createSVGPoint === "function" && svgNode.getScreenCTM && svgNode.getScreenCTM()) {
+    var point = svgNode.createSVGPoint();
+    point.x = sourceEvent.clientX;
+    point.y = sourceEvent.clientY;
+    var transformedPoint = point.matrixTransform(svgNode.getScreenCTM().inverse());
+    return {
+      x: transformedPoint.x,
+      y: transformedPoint.y,
+    };
+  }
+
+  var svgBounds = svgNode.getBoundingClientRect();
+  return {
+    x: sourceEvent.clientX - svgBounds.left,
+    y: sourceEvent.clientY - svgBounds.top,
+  };
 }
 
 function shadow_start(x, y, event) {
-  box = s.rect(x - 9, y - 21, 0, 0).attr("stroke", "#3366ff");
+  var pointerPosition = getSvgPointerPosition(event, x, y);
   if (selections) {
     UnGroup();
   }
+  if (box) {
+    box.remove();
+    box = null;
+  }
+  selectionDragState.shadowStartX = pointerPosition.x;
+  selectionDragState.shadowStartY = pointerPosition.y;
+  box = s
+    .rect(pointerPosition.x, pointerPosition.y, 0, 0)
+    .attr({ stroke: "#3366ff", fill: "none", pointerEvents: "none" });
 }
 
 function shadow_move(dx, dy, x, y, event) {
-  var xoffset = 0,
-    yoffset = 0;
-  if (dx < 0) {
-    xoffset = dx;
-    dx = -1 * dx;
+  if (!box) {
+    return;
   }
-  if (dy < 0) {
-    yoffset = dy;
-    dy = -1 * dy;
-  }
-  box.transform("T" + xoffset + "," + yoffset);
-  box.attr("width", dx);
-  box.attr("height", dy);
-  box.attr("fill", "none");
+  var pointerPosition = getSvgPointerPosition(event, x, y);
+  var rectX = Math.min(selectionDragState.shadowStartX, pointerPosition.x);
+  var rectY = Math.min(selectionDragState.shadowStartY, pointerPosition.y);
+  var rectWidth = Math.abs(pointerPosition.x - selectionDragState.shadowStartX);
+  var rectHeight = Math.abs(pointerPosition.y - selectionDragState.shadowStartY);
+
+  box.attr("x", rectX);
+  box.attr("y", rectY);
+  box.attr("width", rectWidth);
+  box.attr("height", rectHeight);
 }
 
 function shadow_end(event) {
+  if (!box) {
+    return;
+  }
   var bounds = box.getBBox();
   box.remove();
   box = null;
@@ -274,34 +334,111 @@ function shadow_end(event) {
 var gridSize = 850 / 26 / 2;
 var gridSize1 = 5;
 var noteGridYOffset = -4;
+// Feste vertikale Snap-Stufen pro System, relativ zu staffStartY:
+// 0: Chooser-Reihe
+// 1: obere Parkposition
+// 2: obere Noten-/Glockenlage
+// 3: untere Notenlage
+// 4: untere Parkposition
+var verticalSnapOffsets = [-32, -2, 15, 31, 42];
+// Eigene vertikale Stufen fuer Notenzeichen:
+// 0: eine Position oberhalb der Grundlinie
+// 1: Grundlinienposition
+// 2: erste Position unterhalb der Grundlinie
+// 3: zweite Position unterhalb der Grundlinie
+var noteSymbolVerticalSnapOffsets = [17, 32, 47, 62];
+//var verticalSnapOffsets = [-32, -12, 15, 36, 70];
 
 function getElementSnapReferenceY(element, bbox) {
   var elementId = element && typeof element.attr === "function" ? element.attr("id") : "";
+  var elementClasses = element && typeof element.attr === "function" ? String(element.attr("class") || "") : "";
   var snapReferenceY = bbox.cy;
 
+  if (elementClasses.indexOf("chooser-node") !== -1 && typeof element.transform === "function") {
+    var chooserTransform = element.transform();
+    var chooserMatrix = chooserTransform && chooserTransform.localMatrix ? chooserTransform.localMatrix : null;
+    if (chooserMatrix && typeof chooserMatrix.f === "number") {
+      return chooserMatrix.f;
+    }
+  }
+
+  if (elementId === "slap" || elementId === "slap_flam") {
+    return bbox.y + bbox.height - 6;
+  }
+  if (elementId === "tone") {
+    return bbox.y + bbox.height - 7;
+  }
+  if (
+    elementId === "bass" ||
+    elementId === "tone_flam" ||
+    elementId === "bass_slap_flam"
+  ) {
+    return bbox.y + bbox.height - 6;
+  }
   if (elementId === "tone_muffled") {
-    return bbox.y + 8;
+    return bbox.y + bbox.height - 9;
   }
   if (elementId === "slap_muffled") {
-    return bbox.y + 6;
+    return bbox.y + bbox.height - 9;
   }
   if (elementId === "in") {
-    return bbox.y + 8;
+    return bbox.y + bbox.height - 22;
   }
   if (elementId === "out") {
-    return bbox.y + 9;
+    return bbox.y + bbox.height - 22;
   }
-  if (elementId === "flam_ton") {
-    return snapReferenceY + 2;
-  }
-  if (elementId === "bass_slap_flam") {
-    return snapReferenceY + 1;
+  if (elementId === "wiederholung") {
+    return bbox.y + bbox.height - 4;
   }
   return snapReferenceY;
 }
 
-function snapDeltaWithYOffset(startY, deltaY) {
-  var snappedY = Snap.snapTo(gridSize1, startY + deltaY - noteGridYOffset, 50) + noteGridYOffset;
+function getVerticalSnapTargets(offsetList) {
+  var lineCount = typeof zeilenAnzahl === "number" && zeilenAnzahl > 0 ? zeilenAnzahl : 10;
+  var baseY = typeof staffStartY === "number" ? staffStartY : 172;
+  var targets = [];
+  var resolvedOffsets = Array.isArray(offsetList) && offsetList.length ? offsetList : verticalSnapOffsets;
+
+  for (var lineIndex = 0; lineIndex <= lineCount; lineIndex++) {
+    resolvedOffsets.forEach(function (offsetY) {
+      targets.push(baseY + offsetY + lineIndex * 120);
+    });
+  }
+
+  return targets;
+}
+
+function snapToVerticalTargets(targetY, element) {
+  var elementId = element && typeof element.attr === "function" ? element.attr("id") : "";
+  var usesNoteSymbolTargets =
+    elementId === "tone" ||
+    elementId === "bass" ||
+    elementId === "slap" ||
+    elementId === "tone_muffled" ||
+    elementId === "slap_muffled" ||
+    elementId === "tone_flam" ||
+    elementId === "slap_flam" ||
+    elementId === "bass_slap_flam";
+  var snapTargets =
+    usesNoteSymbolTargets
+      ? getVerticalSnapTargets(noteSymbolVerticalSnapOffsets)
+      : getVerticalSnapTargets();
+  var nearestTargetY = snapTargets[0];
+  var smallestDistance = Math.abs(targetY - nearestTargetY);
+
+  snapTargets.forEach(function (candidateY) {
+    var candidateDistance = Math.abs(targetY - candidateY);
+    if (candidateDistance < smallestDistance) {
+      smallestDistance = candidateDistance;
+      nearestTargetY = candidateY;
+    }
+  });
+
+  return nearestTargetY;
+}
+
+function snapDeltaWithYOffset(startY, deltaY, element) {
+  var snappedY = snapToVerticalTargets(startY + deltaY, element);
   return snappedY - startY;
 }
 
@@ -322,7 +459,7 @@ function entfernen() {
 
 function sel_move(dx, dy) {
   var dx = Snap.snapTo(gridSize, dx, 50);
-  var dy = snapDeltaWithYOffset(this.data("startSnapY"), dy);
+  var dy = snapDeltaWithYOffset(this.data("startSnapY"), dy, this);
 
   this.selectAll(".instrument-chooser, .function-chooser").forEach(function (chooserElement) {
     suppressChooserClickAfterDrag(chooserElement);
@@ -348,7 +485,7 @@ function sel_move(dx, dy) {
 
 function move(dx, dy) {
   var dx = Snap.snapTo(gridSize, dx, 50);
-  var dy = snapDeltaWithYOffset(this.data("startSnapY"), dy);
+  var dy = snapDeltaWithYOffset(this.data("startSnapY"), dy, this);
   this.attr({
     transform:
       this.data("origTransform") +
@@ -363,6 +500,9 @@ function move(dx, dy) {
 
 function start(event) {
   lastKeyPressed = event.key;
+  if (!this || typeof this.data !== "function" || typeof this.transform !== "function") {
+    return;
+  }
   this.data("origTransform", this.transform().local);
 }
 
@@ -375,11 +515,15 @@ function sel_start(x, y, event) {
   let bbox = this.getBBox();
   this.data("startX", bbox.x);
   this.data("startY", bbox.y);
-  this.data("startSnapY", getElementSnapReferenceY(this, bbox));
+  var startReferenceY = getElementSnapReferenceY(this, bbox);
+  var isSelectionGroup = this === selections;
+  this.data("startSnapY", isSelectionGroup ? snapToVerticalTargets(startReferenceY, this) : startReferenceY);
 }
 
 function stop_m() {
   // Die Verschiebungswerte werden mit jeder Verschiebung der Gruppe addiert, bis die Gruppe aufgelöst wird.
-  selectionDragState.dragOffsetDx += selectionDragState.currentDx;
-  selectionDragState.dragOffsetDy += selectionDragState.currentDy;
+  var currentDx = Number.isFinite(selectionDragState.currentDx) ? selectionDragState.currentDx : 0;
+  var currentDy = Number.isFinite(selectionDragState.currentDy) ? selectionDragState.currentDy : 0;
+  selectionDragState.dragOffsetDx += currentDx;
+  selectionDragState.dragOffsetDy += currentDy;
 }

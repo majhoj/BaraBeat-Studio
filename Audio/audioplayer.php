@@ -1053,9 +1053,9 @@ const orderedBegleitungLoopLength = orderedBegleitungSections.reduce(function (s
   return sum + section.length;
 }, 0);
 const djembeHandStates = {
-  Djembe_1: { nextHand: 'R', lastSectionKey: '' },
-  Djembe_2: { nextHand: 'R', lastSectionKey: '' },
-  Djembe_3: { nextHand: 'R', lastSectionKey: '' }
+  Djembe_1: { nextHand: 'R', leadHand: 'R', lastHand: '', lastSectionKey: '' },
+  Djembe_2: { nextHand: 'R', leadHand: 'R', lastHand: '', lastSectionKey: '' },
+  Djembe_3: { nextHand: 'R', leadHand: 'R', lastHand: '', lastSectionKey: '' }
 };
 
 function warmUpAudioContext(audioCtx) {
@@ -1234,6 +1234,7 @@ function getAccentMultiplier(playbackStep) {
 
 function scheduleNote(kenkeniNote, sangbanNote, doundounNote, dreierbassNote, djembe1Playback, djembe2Playback, djembe3Playback, time, accentMultiplier) {
   const noteGain = Math.max(0, Number(accentMultiplier) || 1);
+  const bassMuffledGain = noteGain * 1.4;
   const klickGain = noteGain * 0.75;
   const sangbanBellGain = noteGain * 0.7;
   const doundounBellGain = noteGain * 0.7;
@@ -1258,7 +1259,7 @@ function scheduleNote(kenkeniNote, sangbanNote, doundounNote, dreierbassNote, dj
         kenkeni.play('Kenkeni_Open', kenkeniTime, noteGain);
         break;
       case "Muffled":
-        kenkeni.play('Kenkeni_Muffled', kenkeniTime, noteGain);
+        kenkeni.play('Kenkeni_Muffled', kenkeniTime, bassMuffledGain);
         break;
       case "Klick":
         kenkeni.play('Kenkeni_Klick', kenkeniTime, klickGain);
@@ -1269,7 +1270,7 @@ function scheduleNote(kenkeniNote, sangbanNote, doundounNote, dreierbassNote, dj
         break;
       case "Bell_Muffled":
         kenkeni.play('Kenkeni_Bell_Open', kenkeniTime, noteGain);
-        kenkeni.play('Kenkeni_Muffled', kenkeniTime, noteGain);
+        kenkeni.play('Kenkeni_Muffled', kenkeniTime, bassMuffledGain);
         break;
       case "Bell_Klick":
         kenkeni.play('Kenkeni_Bell_Open', kenkeniTime, noteGain);
@@ -1291,7 +1292,7 @@ function scheduleNote(kenkeniNote, sangbanNote, doundounNote, dreierbassNote, dj
         sangban.play('Sangban_Open', sangbanTime, noteGain);
         break;
       case "Muffled":
-        sangban.play('Sangban_Muffled', sangbanTime, noteGain);
+        sangban.play('Sangban_Muffled', sangbanTime, bassMuffledGain);
         break;
       case "Klick":
         sangban.play('Sangban_Klick', sangbanTime, klickGain);
@@ -1302,7 +1303,7 @@ function scheduleNote(kenkeniNote, sangbanNote, doundounNote, dreierbassNote, dj
         break;
       case "Bell_Muffled":
         sangban.play('Sangban_Bell_Open', sangbanTime, sangbanBellGain);
-        sangban.play('Sangban_Muffled', sangbanTime, noteGain);
+        sangban.play('Sangban_Muffled', sangbanTime, bassMuffledGain);
         break;
       case "Bell_Klick":
         sangban.play('Sangban_Bell_Open', sangbanTime, sangbanBellGain);
@@ -1324,7 +1325,7 @@ function scheduleNote(kenkeniNote, sangbanNote, doundounNote, dreierbassNote, dj
         doundoun.play('Doundoun_Open', doundounTime, noteGain);
         break;
       case "Muffled":
-        doundoun.play('Doundoun_Muffled', doundounTime, noteGain);
+        doundoun.play('Doundoun_Muffled', doundounTime, bassMuffledGain);
         break;
       case "Klick":
         doundoun.play('Doundoun_Klick', doundounTime, klickGain);
@@ -1335,7 +1336,7 @@ function scheduleNote(kenkeniNote, sangbanNote, doundounNote, dreierbassNote, dj
         break;
       case "Bell_Muffled":
         doundoun.play('Doundoun_Bell_Open', doundounTime, doundounBellGain);
-        doundoun.play('Doundoun_Muffled', doundounTime, noteGain);
+        doundoun.play('Doundoun_Muffled', doundounTime, bassMuffledGain);
         break;
       case "Bell_Klick":
         doundoun.play('Doundoun_Bell_Open', doundounTime, doundounBellGain);
@@ -1416,15 +1417,15 @@ function scheduleNote(kenkeniNote, sangbanNote, doundounNote, dreierbassNote, dj
         playDjembeStroke(djembe_1, 'DjembeOne_Mute', djembe1Time, djembe1Playback, djembeHandStates.Djembe_1, noteGain);
         break;
       case "tone_flam":
-        playDjembeStroke(djembe_1, 'DjembeOne_Open', djembe1Time, djembe1Playback, djembeHandStates.Djembe_1, noteGain);
+        playDjembeStroke(djembe_1, 'DjembeOne_Open', djembe1Time, djembe1Playback, djembeHandStates.Djembe_1, noteGain, { isGrace: true });
         playDjembeStroke(djembe_1, 'DjembeOne_Open', djembe1Time + 5 / tempo, djembe1Playback, djembeHandStates.Djembe_1, noteGain);
         break;
       case "slap_flam":
-        playDjembeStroke(djembe_1, 'DjembeOne_Slap', djembe1Time, djembe1Playback, djembeHandStates.Djembe_1, noteGain);
+        playDjembeStroke(djembe_1, 'DjembeOne_Slap', djembe1Time, djembe1Playback, djembeHandStates.Djembe_1, noteGain, { isGrace: true });
         playDjembeStroke(djembe_1, 'DjembeOne_Slap', djembe1Time + 5 / tempo, djembe1Playback, djembeHandStates.Djembe_1, noteGain);
         break;
       case "bass_slap_flam":
-        playDjembeStroke(djembe_1, 'DjembeOne_Bass', djembe1Time, djembe1Playback, djembeHandStates.Djembe_1, noteGain);
+        playDjembeStroke(djembe_1, 'DjembeOne_Bass', djembe1Time, djembe1Playback, djembeHandStates.Djembe_1, noteGain, { isGrace: true });
         playDjembeStroke(djembe_1, 'DjembeOne_Slap', djembe1Time + 5 / tempo, djembe1Playback, djembeHandStates.Djembe_1, noteGain);
         break;
     }
@@ -1450,15 +1451,15 @@ function scheduleNote(kenkeniNote, sangbanNote, doundounNote, dreierbassNote, dj
         playDjembeStroke(djembe_2, 'DjembeTwo_Mute', djembe2Time, djembe2Playback, djembeHandStates.Djembe_2, noteGain);
         break;
       case "tone_flam":
-        playDjembeStroke(djembe_2, 'DjembeTwo_Open', djembe2Time, djembe2Playback, djembeHandStates.Djembe_2, noteGain);
+        playDjembeStroke(djembe_2, 'DjembeTwo_Open', djembe2Time, djembe2Playback, djembeHandStates.Djembe_2, noteGain, { isGrace: true });
         playDjembeStroke(djembe_2, 'DjembeTwo_Open', djembe2Time + 5 / tempo, djembe2Playback, djembeHandStates.Djembe_2, noteGain);
         break;
       case "slap_flam":
-        playDjembeStroke(djembe_2, 'DjembeTwo_Slap', djembe2Time, djembe2Playback, djembeHandStates.Djembe_2, noteGain);
+        playDjembeStroke(djembe_2, 'DjembeTwo_Slap', djembe2Time, djembe2Playback, djembeHandStates.Djembe_2, noteGain, { isGrace: true });
         playDjembeStroke(djembe_2, 'DjembeTwo_Slap', djembe2Time + 5 / tempo, djembe2Playback, djembeHandStates.Djembe_2, noteGain);
         break;
       case "bass_slap_flam":
-        playDjembeStroke(djembe_2, 'DjembeTwo_Bass', djembe2Time, djembe2Playback, djembeHandStates.Djembe_2, noteGain);
+        playDjembeStroke(djembe_2, 'DjembeTwo_Bass', djembe2Time, djembe2Playback, djembeHandStates.Djembe_2, noteGain, { isGrace: true });
         playDjembeStroke(djembe_2, 'DjembeTwo_Slap', djembe2Time + 5 / tempo, djembe2Playback, djembeHandStates.Djembe_2, noteGain);
         break;
     }
@@ -1484,15 +1485,15 @@ function scheduleNote(kenkeniNote, sangbanNote, doundounNote, dreierbassNote, dj
         playDjembeStroke(djembe_3, 'DjembeThree_Mute', djembe3Time, djembe3Playback, djembeHandStates.Djembe_3, noteGain);
         break;
       case "tone_flam":
-        playDjembeStroke(djembe_3, 'DjembeThree_Open', djembe3Time, djembe3Playback, djembeHandStates.Djembe_3, noteGain);
+        playDjembeStroke(djembe_3, 'DjembeThree_Open', djembe3Time, djembe3Playback, djembeHandStates.Djembe_3, noteGain, { isGrace: true });
         playDjembeStroke(djembe_3, 'DjembeThree_Open', djembe3Time + 5 / tempo, djembe3Playback, djembeHandStates.Djembe_3, noteGain);
         break;
       case "slap_flam":
-        playDjembeStroke(djembe_3, 'DjembeThree_Slap', djembe3Time, djembe3Playback, djembeHandStates.Djembe_3, noteGain);
+        playDjembeStroke(djembe_3, 'DjembeThree_Slap', djembe3Time, djembe3Playback, djembeHandStates.Djembe_3, noteGain, { isGrace: true });
         playDjembeStroke(djembe_3, 'DjembeThree_Slap', djembe3Time + 5 / tempo, djembe3Playback, djembeHandStates.Djembe_3, noteGain);
         break;
       case "bass_slap_flam":
-        playDjembeStroke(djembe_3, 'DjembeThree_Bass', djembe3Time, djembe3Playback, djembeHandStates.Djembe_3, noteGain);
+        playDjembeStroke(djembe_3, 'DjembeThree_Bass', djembe3Time, djembe3Playback, djembeHandStates.Djembe_3, noteGain, { isGrace: true });
         playDjembeStroke(djembe_3, 'DjembeThree_Slap', djembe3Time + 5 / tempo, djembe3Playback, djembeHandStates.Djembe_3, noteGain);
         break;
     }
@@ -1529,7 +1530,8 @@ function getTrackPlaybackAtStep(trackName, trackState, playbackStep) {
       handMode: sectionContext.section.trackHandModes
         ? (sectionContext.section.trackHandModes[trackName] || '')
         : '',
-      sectionKey: sectionContext.section.runtimeKey || ''
+      sectionKey: sectionContext.section.runtimeKey || '',
+      stepIndex: sectionContext.localStep
     };
   }
 
@@ -1537,42 +1539,147 @@ function getTrackPlaybackAtStep(trackName, trackState, playbackStep) {
     return {
       note: null,
       handMode: '',
-      sectionKey: ''
+      sectionKey: '',
+      stepIndex: 0
     };
   }
 
   const begleitungLength = getSectionLength(trackState.begleitungNotes);
   if (begleitungLength > 0) {
     const loopStep = playbackStep - oneShotLength;
+    if (orderedBegleitungSections.length > 0) {
+      const normalizedLoopStep = ((loopStep % orderedBegleitungLoopLength) + orderedBegleitungLoopLength) % orderedBegleitungLoopLength;
+      const loopCycleIndex = Math.floor(loopStep / orderedBegleitungLoopLength);
+      let sectionOffset = 0;
+
+      for (let sectionIndex = 0; sectionIndex < orderedBegleitungSections.length; sectionIndex++) {
+        const section = orderedBegleitungSections[sectionIndex];
+        const sectionLength = section.length || 0;
+        if (sectionLength <= 0) {
+          continue;
+        }
+        if (normalizedLoopStep < sectionOffset + sectionLength) {
+          const localStep = normalizedLoopStep - sectionOffset;
+          return {
+            note: section.trackNotes[trackName][localStep] || null,
+            handMode: section.trackHandModes
+              ? (section.trackHandModes[trackName] || '')
+              : '',
+            sectionKey: (section.runtimeKey || 'begleitung-loop') + ':loop:' + loopCycleIndex,
+            stepIndex: localStep
+          };
+        }
+        sectionOffset += sectionLength;
+      }
+    }
+
     return {
       note: trackState.begleitungNotes[loopStep % begleitungLength],
       handMode: '',
-      sectionKey: 'begleitung-loop'
+      sectionKey: 'begleitung-loop',
+      stepIndex: loopStep % begleitungLength
     };
   }
 
   return {
     note: null,
     handMode: '',
-    sectionKey: ''
+    sectionKey: '',
+    stepIndex: 0
   };
 }
 
-function playDjembeStroke(instrumentInstance, baseSampleName, time, playbackContext, handState, gainMultiplier) {
+function getOppositeHand(handName) {
+  return handName === 'L' ? 'R' : 'L';
+}
+
+function resetHandStateForSection(handState, sectionKey) {
+  if (handState.lastSectionKey !== sectionKey) {
+    handState.lastSectionKey = sectionKey;
+    handState.nextHand = 'R';
+    handState.leadHand = 'R';
+    handState.lastHand = '';
+  }
+}
+
+function isHoHAccentNote(noteValue) {
+  return noteValue === 'slap' ||
+    noteValue === 'slap_flam' ||
+    noteValue === 'slap_muffled' ||
+    noteValue === 'bass_slap_flam';
+}
+
+function getHandPulseStride() {
+  if (rhythmType === 'neunaer') {
+    return 1;
+  }
+  return 2;
+}
+
+function advanceSilentH2HStep(playbackContext, handState) {
   const noteHandMode = playbackContext && playbackContext.handMode ? playbackContext.handMode : '';
-  if (noteHandMode === 'h2h') {
-    const sectionKey = playbackContext.sectionKey || '';
-    if (handState.lastSectionKey !== sectionKey) {
-      handState.lastSectionKey = sectionKey;
-      handState.nextHand = 'R';
-    }
-    const sampleName = handState.nextHand === 'L' ? baseSampleName + 'L' : baseSampleName;
-    instrumentInstance.play(sampleName, time, gainMultiplier);
-    handState.nextHand = handState.nextHand === 'L' ? 'R' : 'L';
+  const noteValue = playbackContext && playbackContext.note ? String(playbackContext.note) : '';
+  if (noteHandMode !== 'h2h' || (noteValue && noteValue !== 'f')) {
     return;
   }
 
-  instrumentInstance.play(baseSampleName, time, gainMultiplier);
+  const stepIndex = playbackContext && Number.isFinite(Number(playbackContext.stepIndex))
+    ? Number(playbackContext.stepIndex)
+    : 0;
+  if (stepIndex % getHandPulseStride() !== 0) {
+    return;
+  }
+
+  const sectionKey = playbackContext && playbackContext.sectionKey ? playbackContext.sectionKey : '';
+  resetHandStateForSection(handState, sectionKey);
+  const consumedHand = handState.nextHand === 'L' ? 'L' : 'R';
+  handState.lastHand = consumedHand;
+  handState.nextHand = getOppositeHand(consumedHand);
+}
+
+function resolveDjembeSampleName(baseSampleName, playbackContext, handState, strokeMeta) {
+  const noteHandMode = playbackContext && playbackContext.handMode ? playbackContext.handMode : '';
+  if (!noteHandMode || noteHandMode === 'auto') {
+    return baseSampleName;
+  }
+
+  const sectionKey = playbackContext && playbackContext.sectionKey ? playbackContext.sectionKey : '';
+  resetHandStateForSection(handState, sectionKey);
+
+  if (noteHandMode === 'h2h') {
+    const sampleName = handState.nextHand === 'L' ? baseSampleName + 'L' : baseSampleName;
+    handState.nextHand = handState.nextHand === 'L' ? 'R' : 'L';
+    handState.lastHand = sampleName.endsWith('L') ? 'L' : 'R';
+    return sampleName;
+  }
+
+  if (noteHandMode === 'hoh') {
+    const noteValue = playbackContext && playbackContext.note ? String(playbackContext.note) : '';
+    const leadHand = handState.leadHand || 'R';
+    const supportHand = getOppositeHand(leadHand);
+    const isGraceStroke = Boolean(strokeMeta && strokeMeta.isGrace);
+    let selectedHand = 'R';
+
+    if (isGraceStroke) {
+      selectedHand = supportHand;
+    } else if (isHoHAccentNote(noteValue)) {
+      selectedHand = leadHand;
+      handState.leadHand = getOppositeHand(leadHand);
+    } else {
+      selectedHand = handState.lastHand === supportHand ? leadHand : supportHand;
+    }
+
+    handState.nextHand = getOppositeHand(selectedHand);
+    handState.lastHand = selectedHand;
+    return selectedHand === 'L' ? baseSampleName + 'L' : baseSampleName;
+  }
+
+  return baseSampleName;
+}
+
+function playDjembeStroke(instrumentInstance, baseSampleName, time, playbackContext, handState, gainMultiplier, strokeMeta) {
+  const sampleName = resolveDjembeSampleName(baseSampleName, playbackContext, handState, strokeMeta);
+  instrumentInstance.play(sampleName, time, gainMultiplier);
 }
 
 function playSampleToDestination(instrumentInstance, sampleName, time, gainMultiplier, audioContext, destinationNode) {
@@ -1588,21 +1695,9 @@ function playSampleToDestination(instrumentInstance, sampleName, time, gainMulti
   sampleSource.start(Math.max(0, time));
 }
 
-function playDjembeStrokeToDestination(instrumentInstance, baseSampleName, time, playbackContext, handState, gainMultiplier, audioContext, destinationNode) {
-  const noteHandMode = playbackContext && playbackContext.handMode ? playbackContext.handMode : '';
-  if (noteHandMode === 'h2h') {
-    const sectionKey = playbackContext.sectionKey || '';
-    if (handState.lastSectionKey !== sectionKey) {
-      handState.lastSectionKey = sectionKey;
-      handState.nextHand = 'R';
-    }
-    const sampleName = handState.nextHand === 'L' ? baseSampleName + 'L' : baseSampleName;
-    playSampleToDestination(instrumentInstance, sampleName, time, gainMultiplier, audioContext, destinationNode);
-    handState.nextHand = handState.nextHand === 'L' ? 'R' : 'L';
-    return;
-  }
-
-  playSampleToDestination(instrumentInstance, baseSampleName, time, gainMultiplier, audioContext, destinationNode);
+function playDjembeStrokeToDestination(instrumentInstance, baseSampleName, time, playbackContext, handState, gainMultiplier, audioContext, destinationNode, strokeMeta) {
+  const sampleName = resolveDjembeSampleName(baseSampleName, playbackContext, handState, strokeMeta);
+  playSampleToDestination(instrumentInstance, sampleName, time, gainMultiplier, audioContext, destinationNode);
 }
 
 function scheduler() {
@@ -1638,6 +1733,10 @@ function scheduleCurrentStep(time) {
   const djembe2Playback = maybeTrackBeat('Djembe_2', trackStates.Djembe_2);
   const djembe3Playback = maybeTrackBeat('Djembe_3', trackStates.Djembe_3);
   const accentMultiplier = getAccentMultiplier(globalPlaybackStep);
+
+  advanceSilentH2HStep(djembe1Playback, djembeHandStates.Djembe_1);
+  advanceSilentH2HStep(djembe2Playback, djembeHandStates.Djembe_2);
+  advanceSilentH2HStep(djembe3Playback, djembeHandStates.Djembe_3);
 
   scheduleNote(
     kenkeniPlayback ? kenkeniPlayback.note : null,
@@ -1709,6 +1808,7 @@ function getExportStepCount() {
 
 function scheduleNoteToDestination(kenkeniNote, sangbanNote, doundounNote, dreierbassNote, djembe1Playback, djembe2Playback, djembe3Playback, time, accentMultiplier, audioContext, destinationNode, exportHandStates, exportTempo) {
   const noteGain = Math.max(0, Number(accentMultiplier) || 1);
+  const bassMuffledGain = noteGain * 1.4;
   const klickGain = noteGain * 0.75;
   const sangbanBellGain = noteGain * 0.7;
   const doundounBellGain = noteGain * 0.7;
@@ -1730,7 +1830,7 @@ function scheduleNoteToDestination(kenkeniNote, sangbanNote, doundounNote, dreie
       playSampleToDestination(kenkeni, 'Kenkeni_Open', kenkeniTime, noteGain, audioContext, destinationNode);
       break;
     case "Muffled":
-      playSampleToDestination(kenkeni, 'Kenkeni_Muffled', kenkeniTime, noteGain, audioContext, destinationNode);
+      playSampleToDestination(kenkeni, 'Kenkeni_Muffled', kenkeniTime, bassMuffledGain, audioContext, destinationNode);
       break;
     case "Klick":
       playSampleToDestination(kenkeni, 'Kenkeni_Klick', kenkeniTime, klickGain, audioContext, destinationNode);
@@ -1741,7 +1841,7 @@ function scheduleNoteToDestination(kenkeniNote, sangbanNote, doundounNote, dreie
       break;
     case "Bell_Muffled":
       playSampleToDestination(kenkeni, 'Kenkeni_Bell_Open', kenkeniTime, noteGain, audioContext, destinationNode);
-      playSampleToDestination(kenkeni, 'Kenkeni_Muffled', kenkeniTime, noteGain, audioContext, destinationNode);
+      playSampleToDestination(kenkeni, 'Kenkeni_Muffled', kenkeniTime, bassMuffledGain, audioContext, destinationNode);
       break;
     case "Bell_Klick":
       playSampleToDestination(kenkeni, 'Kenkeni_Bell_Open', kenkeniTime, noteGain, audioContext, destinationNode);
@@ -1757,7 +1857,7 @@ function scheduleNoteToDestination(kenkeniNote, sangbanNote, doundounNote, dreie
       playSampleToDestination(sangban, 'Sangban_Open', sangbanTime, noteGain, audioContext, destinationNode);
       break;
     case "Muffled":
-      playSampleToDestination(sangban, 'Sangban_Muffled', sangbanTime, noteGain, audioContext, destinationNode);
+      playSampleToDestination(sangban, 'Sangban_Muffled', sangbanTime, bassMuffledGain, audioContext, destinationNode);
       break;
     case "Klick":
       playSampleToDestination(sangban, 'Sangban_Klick', sangbanTime, klickGain, audioContext, destinationNode);
@@ -1768,7 +1868,7 @@ function scheduleNoteToDestination(kenkeniNote, sangbanNote, doundounNote, dreie
       break;
     case "Bell_Muffled":
       playSampleToDestination(sangban, 'Sangban_Bell_Open', sangbanTime, sangbanBellGain, audioContext, destinationNode);
-      playSampleToDestination(sangban, 'Sangban_Muffled', sangbanTime, noteGain, audioContext, destinationNode);
+      playSampleToDestination(sangban, 'Sangban_Muffled', sangbanTime, bassMuffledGain, audioContext, destinationNode);
       break;
     case "Bell_Klick":
       playSampleToDestination(sangban, 'Sangban_Bell_Open', sangbanTime, sangbanBellGain, audioContext, destinationNode);
@@ -1784,7 +1884,7 @@ function scheduleNoteToDestination(kenkeniNote, sangbanNote, doundounNote, dreie
       playSampleToDestination(doundoun, 'Doundoun_Open', doundounTime, noteGain, audioContext, destinationNode);
       break;
     case "Muffled":
-      playSampleToDestination(doundoun, 'Doundoun_Muffled', doundounTime, noteGain, audioContext, destinationNode);
+      playSampleToDestination(doundoun, 'Doundoun_Muffled', doundounTime, bassMuffledGain, audioContext, destinationNode);
       break;
     case "Klick":
       playSampleToDestination(doundoun, 'Doundoun_Klick', doundounTime, klickGain, audioContext, destinationNode);
@@ -1795,7 +1895,7 @@ function scheduleNoteToDestination(kenkeniNote, sangbanNote, doundounNote, dreie
       break;
     case "Bell_Muffled":
       playSampleToDestination(doundoun, 'Doundoun_Bell_Open', doundounTime, doundounBellGain, audioContext, destinationNode);
-      playSampleToDestination(doundoun, 'Doundoun_Muffled', doundounTime, noteGain, audioContext, destinationNode);
+      playSampleToDestination(doundoun, 'Doundoun_Muffled', doundounTime, bassMuffledGain, audioContext, destinationNode);
       break;
     case "Bell_Klick":
       playSampleToDestination(doundoun, 'Doundoun_Bell_Open', doundounTime, doundounBellGain, audioContext, destinationNode);
@@ -1867,15 +1967,15 @@ function scheduleNoteToDestination(kenkeniNote, sangbanNote, doundounNote, dreie
         playDjembeStrokeToDestination(djembeData.instrument, djembeData.baseNames[noteValue], djembeTime, playback, djembeData.handState, noteGain, audioContext, destinationNode);
         break;
       case "tone_flam":
-        playDjembeStrokeToDestination(djembeData.instrument, djembeData.baseNames.tone, djembeTime, playback, djembeData.handState, noteGain, audioContext, destinationNode);
+        playDjembeStrokeToDestination(djembeData.instrument, djembeData.baseNames.tone, djembeTime, playback, djembeData.handState, noteGain, audioContext, destinationNode, { isGrace: true });
         playDjembeStrokeToDestination(djembeData.instrument, djembeData.baseNames.tone, djembeTime + 5 / exportTempo, playback, djembeData.handState, noteGain, audioContext, destinationNode);
         break;
       case "slap_flam":
-        playDjembeStrokeToDestination(djembeData.instrument, djembeData.baseNames.slap, djembeTime, playback, djembeData.handState, noteGain, audioContext, destinationNode);
+        playDjembeStrokeToDestination(djembeData.instrument, djembeData.baseNames.slap, djembeTime, playback, djembeData.handState, noteGain, audioContext, destinationNode, { isGrace: true });
         playDjembeStrokeToDestination(djembeData.instrument, djembeData.baseNames.slap, djembeTime + 5 / exportTempo, playback, djembeData.handState, noteGain, audioContext, destinationNode);
         break;
       case "bass_slap_flam":
-        playDjembeStrokeToDestination(djembeData.instrument, djembeData.baseNames.bass, djembeTime, playback, djembeData.handState, noteGain, audioContext, destinationNode);
+        playDjembeStrokeToDestination(djembeData.instrument, djembeData.baseNames.bass, djembeTime, playback, djembeData.handState, noteGain, audioContext, destinationNode, { isGrace: true });
         playDjembeStrokeToDestination(djembeData.instrument, djembeData.baseNames.slap, djembeTime + 5 / exportTempo, playback, djembeData.handState, noteGain, audioContext, destinationNode);
         break;
     }
@@ -1978,9 +2078,9 @@ async function exportCurrentArrangementAsWav() {
     const sampleRate = 48000;
     const offlineContext = new OfflineAudioContext(2, Math.ceil((renderTime + tailTime) * sampleRate), sampleRate);
     const exportHandStates = {
-      Djembe_1: { nextHand: 'R', lastSectionKey: '' },
-      Djembe_2: { nextHand: 'R', lastSectionKey: '' },
-      Djembe_3: { nextHand: 'R', lastSectionKey: '' }
+      Djembe_1: { nextHand: 'R', leadHand: 'R', lastHand: '', lastSectionKey: '' },
+      Djembe_2: { nextHand: 'R', leadHand: 'R', lastHand: '', lastSectionKey: '' },
+      Djembe_3: { nextHand: 'R', leadHand: 'R', lastHand: '', lastSectionKey: '' }
     };
 
     let currentTime = 0;
@@ -2000,6 +2100,10 @@ async function exportCurrentArrangementAsWav() {
       const djembe2Playback = maybeTrackBeatForExport('Djembe_2', trackStates.Djembe_2);
       const djembe3Playback = maybeTrackBeatForExport('Djembe_3', trackStates.Djembe_3);
       const accentMultiplier = getAccentMultiplier(stepIndex);
+
+      advanceSilentH2HStep(djembe1Playback, exportHandStates.Djembe_1);
+      advanceSilentH2HStep(djembe2Playback, exportHandStates.Djembe_2);
+      advanceSilentH2HStep(djembe3Playback, exportHandStates.Djembe_3);
 
       scheduleNoteToDestination(
         kenkeniPlayback ? kenkeniPlayback.note : null,
@@ -2062,6 +2166,8 @@ playButton.addEventListener('click', async (ev) => {
     globalPlaybackStep = 0;
     Object.keys(djembeHandStates).forEach(function (trackName) {
       djembeHandStates[trackName].nextHand = 'R';
+      djembeHandStates[trackName].leadHand = 'R';
+      djembeHandStates[trackName].lastHand = '';
       djembeHandStates[trackName].lastSectionKey = '';
     });
 
