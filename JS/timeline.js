@@ -1,7 +1,7 @@
 // Abschnittstimeline: Zustand, Bibliothek, Rendering, Drag/Drop und Metadaten
 const timelineDjembeTargets = ['Djembe_1', 'Djembe_2', 'Djembe_3'];
 const timelineBassTargets = ['Kenkeni', 'Sangban', 'Doundoun'];
-const timelineMetadataVersion = 4;
+const timelineMetadataVersion = 7;
 const defaultTimelineSwingProfiles = {
     binaer: [6, -5, 6, 10],
     tenaer: [0, -15, -10],
@@ -26,6 +26,8 @@ const timelineState = {
     sourcePatterns: [],
     sourceLibraryGroups: [],
     entries: [],
+    sheetLoop: false,
+    sheetLoopCount: false,
     tempo: 100,
     swingFactor: 0,
     swingProfile: {
@@ -105,6 +107,26 @@ function normalizeTimelineFeelOffsets(rawOffsets) {
     }, {});
 }
 
+function normalizeTimelineLoopCountValue(rawValue) {
+    if (rawValue === true || rawValue === 'loop' || rawValue === 'continue') {
+        return 'loop';
+    }
+
+    const numericValue = Number(rawValue);
+    if (!Number.isFinite(numericValue) || numericValue < 1) {
+        return false;
+    }
+
+    return Math.max(1, Math.round(numericValue));
+}
+
+function getResolvedTimelineLoopCount() {
+    if (timelineState.sheetLoopCount !== undefined && timelineState.sheetLoopCount !== null && timelineState.sheetLoopCount !== '') {
+        return normalizeTimelineLoopCountValue(timelineState.sheetLoopCount);
+    }
+    return normalizeTimelineLoopCountValue(timelineState.sheetLoop);
+}
+
 function computeTimelineSheetHash(readResult) {
     const bars = Array.isArray(readResult && readResult.rhythmBars) ? readResult.rhythmBars : [];
     const repeatRanges = Array.isArray(readResult && readResult.repeatRanges) ? readResult.repeatRanges : [];
@@ -136,6 +158,178 @@ function computeTimelineSheetHash(readResult) {
     }).join('|');
 
     return barSignature + '////' + repeatSignature + '////' + String(rhythm || '');
+}
+
+function hasTimelineBarContent(bar) {
+    if (!bar) {
+        return false;
+    }
+    if (bar.instrument && bar.instrument !== 'Leer') {
+        return true;
+    }
+    if (bar.label && bar.label !== 'Leer') {
+        return true;
+    }
+    if (Array.isArray(bar.controls) && bar.controls.length > 0) {
+        return true;
+    }
+    return Array.isArray(bar.notes) && bar.notes.some(function (noteValue) {
+        return noteValue && noteValue !== 'f';
+    });
+}
+
+function getLastTimelineActiveBarIndex(rhythmBars) {
+    const bars = Array.isArray(rhythmBars) ? rhythmBars : [];
+    for (let barIndex = bars.length - 1; barIndex >= 0; barIndex--) {
+        if (hasTimelineBarContent(bars[barIndex])) {
+            return barIndex + 1;
+        }
+    }
+    return bars.length;
+}
+
+function isTimelineAccompanimentLabel(labelText) {
+    const normalizedLabel = String(labelText || '').trim();
+    return normalizedLabel.indexOf('Begleitung') === 0 ||
+        normalizedLabel.indexOf('Begleitpattern') === 0;
+}
+
+function isTimelineOutroLabel(labelText) {
+    return String(labelText || '').trim().indexOf('Outro') === 0;
+}
+
+function getFirstTimelineAccompanimentBarIndex(rhythmBars) {
+    const bars = Array.isArray(rhythmBars) ? rhythmBars : [];
+    const firstIndex = bars.findIndex(function (bar) {
+        return isTimelineAccompanimentLabel(bar && (bar.effectiveLabel || bar.label));
+    });
+    return firstIndex === -1 ? 1 : firstIndex + 1;
+}
+
+function getTimelineAccompanimentLoopEndBarIndex(rhythmBars) {
+    const bars = Array.isArray(rhythmBars) ? rhythmBars : [];
+    const firstAccompanimentBarIndex = getFirstTimelineAccompanimentBarIndex(bars);
+    const firstOutroBarIndex = bars.findIndex(function (bar, barIndex) {
+        return barIndex + 1 > firstAccompanimentBarIndex &&
+            isTimelineOutroLabel(bar && (bar.effectiveLabel || bar.label));
+    });
+
+    if (firstOutroBarIndex !== -1) {
+        for (let barIndex = firstOutroBarIndex - 1; barIndex >= firstAccompanimentBarIndex - 1; barIndex--) {
+            if (hasTimelineBarContent(bars[barIndex])) {
+                return barIndex + 1;
+            }
+        }
+    }
+
+    return getLastTimelineActiveBarIndex(bars);
+}
+
+function getTimelineRepeatBoundaryMarkers(repeatBoundaries, boundaryIndex, markerKey) {
+    const boundaries = Array.isArray(repeatBoundaries) ? repeatBoundaries : [];
+    const boundary = boundaries[boundaryIndex];
+    return boundary && Array.isArray(boundary[markerKey]) ? boundary[markerKey] : [];
+}
+
+function getTimelineAccompanimentLoopCountFromPatternLibrary(patternLibrary) {
+    if (!Array.isArray(patternLibrary) || patternLibrary.length === 0) {
+        return false;
+    }
+
+    const accompanimentPatterns = patternLibrary.filter(function (pattern) {
+        return pattern &&
+            pattern.labelType === 'Begleitung' &&
+            Array.isArray(pattern.bars) &&
+            pattern.bars.length > 0;
+    });
+
+    if (accompanimentPatterns.length === 0) {
+        return false;
+    }
+
+    const numericMarkers = [];
+
+    accompanimentPatterns.forEach(function (pattern) {
+        pattern.bars.forEach(function (bar) {
+            const repeatInfo = bar && bar.repeat ? bar.repeat : {};
+            const startMarkers = Array.isArray(repeatInfo.start) ? repeatInfo.start : [];
+            const endMarkers = Array.isArray(repeatInfo.end) ? repeatInfo.end : [];
+
+            startMarkers.concat(endMarkers).forEach(function (marker) {
+                const normalizedMarker = normalizeTimelineLoopCountValue(marker);
+                if (normalizedMarker && normalizedMarker !== 'loop') {
+                    numericMarkers.push(normalizedMarker);
+                }
+            });
+        });
+    });
+
+    if (numericMarkers.length > 0) {
+        return numericMarkers[numericMarkers.length - 1];
+    }
+
+    return false;
+}
+
+function getTimelineOuterRepeatCount(readResult, patternLibrary) {
+    const firstAccompanimentBarIndex = getFirstTimelineAccompanimentBarIndex(readResult && readResult.rhythmBars);
+    const accompanimentLoopEndBarIndex = getTimelineAccompanimentLoopEndBarIndex(readResult && readResult.rhythmBars);
+    const fallbackLoopCount = getTimelineAccompanimentLoopCountFromPatternLibrary(patternLibrary);
+    const matchingRepeatRange = Array.isArray(readResult && readResult.repeatRanges)
+        ? readResult.repeatRanges.find(function (repeatRange) {
+            return repeatRange &&
+                Number(repeatRange.startBar) === firstAccompanimentBarIndex &&
+                Number(repeatRange.endBar) === accompanimentLoopEndBarIndex &&
+                normalizeTimelineLoopCountValue(repeatRange.count);
+        })
+        : null;
+
+    if (matchingRepeatRange) {
+        return normalizeTimelineLoopCountValue(matchingRepeatRange.count);
+    }
+
+    const startMarkers = getTimelineRepeatBoundaryMarkers(
+        readResult && readResult.repeatBoundaries,
+        firstAccompanimentBarIndex - 1,
+        'startMarkers'
+    );
+    const endMarkers = getTimelineRepeatBoundaryMarkers(
+        readResult && readResult.repeatBoundaries,
+        accompanimentLoopEndBarIndex,
+        'endMarkers'
+    );
+    const hasMatchingStartMarker = startMarkers.some(function (marker) {
+        return normalizeTimelineLoopCountValue(marker && marker.count);
+    });
+    if (!hasMatchingStartMarker) {
+        return fallbackLoopCount;
+    }
+
+    const numericEndMarker = endMarkers
+        .map(function (marker) {
+            return normalizeTimelineLoopCountValue(marker && marker.count);
+        })
+        .find(function (markerCount) {
+            return markerCount && markerCount !== 'loop';
+        });
+
+    if (numericEndMarker) {
+        return numericEndMarker;
+    }
+
+    if (fallbackLoopCount && fallbackLoopCount !== 'loop') {
+        return fallbackLoopCount;
+    }
+
+    const loopingEndMarker = endMarkers.some(function (marker) {
+        return normalizeTimelineLoopCountValue(marker && marker.count) === 'loop';
+    });
+
+    if (loopingEndMarker && hasMatchingStartMarker && firstAccompanimentBarIndex === 1) {
+        return 'loop';
+    }
+
+    return false;
 }
 
 function normalizePatternInstrumentName(instrumentName) {
@@ -260,6 +454,10 @@ function cloneTimelineRepeatMarkers(markerValue) {
         return markerValue.slice();
     }
     return markerValue;
+}
+
+function isTimelineContinuationMarker(markerValue) {
+    return markerValue === 'continue';
 }
 
 function getUsedGenericDjembeTargets(patterns) {
@@ -524,7 +722,9 @@ function expandTimelineBarsWithRepeats(rhythmBars, repeatRangesToApply, startBar
     while (currentBarIndex <= endBarIndex) {
         const matchingRanges = repeatRangesToApply
             .filter(function (repeatRange) {
-                return repeatRange.startBar === currentBarIndex && repeatRange.endBar <= endBarIndex;
+                return !isTimelineContinuationMarker(repeatRange.count) &&
+                    repeatRange.startBar === currentBarIndex &&
+                    repeatRange.endBar <= endBarIndex;
             })
             .sort(function (rangeA, rangeB) {
                 return rangeB.endBar - rangeA.endBar;
@@ -566,9 +766,17 @@ function expandTimelineBarsWithRepeats(rhythmBars, repeatRangesToApply, startBar
 
 function buildDefaultTimelineEntriesFromRhythmBars(rhythmBars, repeatRanges, patternLibrary) {
     const patternBySourceKey = {};
+    const sheetLoopRepeatRanges = (Array.isArray(repeatRanges) ? repeatRanges : []).filter(function (repeatRange) {
+        const firstAccompanimentBarIndex = getFirstTimelineAccompanimentBarIndex(rhythmBars);
+        const accompanimentLoopEndBarIndex = getTimelineAccompanimentLoopEndBarIndex(rhythmBars);
+        return !(repeatRange &&
+            Number(repeatRange.startBar) === firstAccompanimentBarIndex &&
+            normalizeTimelineLoopCountValue(repeatRange.count) &&
+            Number(repeatRange.endBar) === accompanimentLoopEndBarIndex);
+    });
     const expandedBars = expandTimelineBarsWithRepeats(
         rhythmBars,
-        Array.isArray(repeatRanges) ? repeatRanges : [],
+        sheetLoopRepeatRanges,
         1,
         rhythmBars.length
     );
@@ -692,10 +900,14 @@ function syncTimelineEntriesWithPatternLibrary(patternLibrary, existingEntries) 
 }
 
 function buildTimelinePlayerPayload(patternLibrary, timelineEntries) {
+    const timelineLoopCount = getResolvedTimelineLoopCount();
+
     return [{
         Name: titel.attr('text'),
         Rhythmus: rhythm,
         TimelineMode: true,
+        TimelineLoop: timelineLoopCount === 'loop',
+        TimelineLoopCount: timelineLoopCount,
         Tempo: normalizeTimelineTempo(timelineState.tempo),
         SwingFactor: normalizeTimelineSwingFactor(timelineState.swingFactor),
         SwingProfile: normalizeAllTimelineSwingProfiles(timelineState.swingProfile),
@@ -761,6 +973,8 @@ function updateTimelineMetadataNode() {
     const metadataPayload = JSON.stringify({
         version: timelineMetadataVersion,
         sourceHash: timelineState.sourceHash,
+        sheetLoop: Boolean(timelineState.sheetLoop),
+        sheetLoopCount: getResolvedTimelineLoopCount(),
         tempo: normalizeTimelineTempo(timelineState.tempo),
         swingFactor: normalizeTimelineSwingFactor(timelineState.swingFactor),
         swingProfile: normalizeAllTimelineSwingProfiles(timelineState.swingProfile),
@@ -827,12 +1041,15 @@ function syncTimelineStateFromReadResult(readResult, options) {
         ? syncOptions.persistedEntries
         : fallbackEntries;
     const syncedEntries = syncTimelineEntriesWithPatternLibrary(patternLibrary, currentEntries);
+    const sheetLoopCount = getTimelineOuterRepeatCount(readResult, patternLibrary);
 
     timelineState.sourcePatterns = patternLibrary;
     timelineState.sourceLibraryGroups = buildPatternLibraryBlocks(fallbackEntries, patternLibrary);
     timelineState.sourceHash = newSourceHash;
     timelineState.sheetHash = computeTimelineSheetHash(readResult);
     timelineState.entries = syncedEntries.length > 0 ? syncedEntries : fallbackEntries;
+    timelineState.sheetLoopCount = sheetLoopCount;
+    timelineState.sheetLoop = sheetLoopCount === 'loop';
     syncTimelineBlockIdSequence(timelineState.entries);
     timelineState.tempo = normalizeTimelineTempo(syncOptions.tempo ?? timelineState.tempo);
     timelineState.swingFactor = normalizeTimelineSwingFactor(syncOptions.swingFactor ?? timelineState.swingFactor);
@@ -921,6 +1138,12 @@ function buildTimelinePatternBarSummary(pattern) {
         const repeatStartMarkers = getTimelineRepeatMarkerList(bar.repeat && bar.repeat.start);
         const repeatEndMarkers = getTimelineRepeatMarkerList(bar.repeat && bar.repeat.end);
         let repeatCount = 1;
+        const continues = repeatEndMarkers.some(isTimelineContinuationMarker);
+
+        if (continues) {
+            summaryParts.push('Takt ' + (barIndex + 1) + ' weiterlaufend');
+            continue;
+        }
 
         if (repeatStartMarkers.length > 0 && repeatEndMarkers.length > 0) {
             const markerCount = repeatEndMarkers[0] === 'loop'
@@ -1271,6 +1494,111 @@ function buildTimelineVisualRows(entryGroups, patternLibrary) {
     return rows;
 }
 
+function doesTimelinePatternContinue(pattern) {
+    if (!pattern || pattern.labelType !== 'Begleitung' || !Array.isArray(pattern.bars)) {
+        return false;
+    }
+    return pattern.bars.some(function (bar) {
+        return getTimelineRepeatMarkerList(bar.repeat && bar.repeat.end).some(isTimelineContinuationMarker);
+    });
+}
+
+function getTimelineGroupTargets(group) {
+    const firstEntry = group && Array.isArray(group.entries) ? group.entries[0] : null;
+    return getTimelineTargetSignature(firstEntry && firstEntry.targetInstruments)
+        .split('|')
+        .filter(Boolean);
+}
+
+function doTimelineTargetListsOverlap(targetsA, targetsB) {
+    return (Array.isArray(targetsA) ? targetsA : []).some(function (targetName) {
+        return (Array.isArray(targetsB) ? targetsB : []).indexOf(targetName) !== -1;
+    });
+}
+
+function getTimelineRowPattern(rowGroups, patternLibrary) {
+    const firstGroup = Array.isArray(rowGroups) && rowGroups.length > 0 ? rowGroups[0] : null;
+    return firstGroup ? getPatternById(patternLibrary, firstGroup.patternId) : null;
+}
+
+function findFirstTimelineAccompanimentRowIndex(visualRows, patternLibrary) {
+    const firstIndex = (visualRows || []).findIndex(function (rowGroups) {
+        return (rowGroups || []).some(function (group) {
+            const pattern = getPatternById(patternLibrary, group.patternId);
+            return pattern && pattern.labelType === 'Begleitung';
+        });
+    });
+    return firstIndex === -1 ? 0 : firstIndex;
+}
+
+function buildTimelineContinuationBlocks(visualRows, patternLibrary) {
+    const blocks = [];
+    const continuingGroupKeys = {};
+    const firstAccompanimentRowIndex = findFirstTimelineAccompanimentRowIndex(visualRows, patternLibrary);
+
+    (visualRows || []).forEach(function (rowGroups, rowIndex) {
+        (rowGroups || []).forEach(function (group) {
+            const pattern = getPatternById(patternLibrary, group.patternId);
+            if (!doesTimelinePatternContinue(pattern)) {
+                return;
+            }
+
+            const targets = getTimelineGroupTargets(group);
+            const hasPreviousAccompanimentTargetOccurrence = visualRows
+                .slice(firstAccompanimentRowIndex, rowIndex)
+                .some(function (previousRowGroups) {
+                    const previousRowPattern = getTimelineRowPattern(previousRowGroups, patternLibrary);
+                    if (!previousRowPattern || previousRowPattern.labelType !== 'Begleitung') {
+                        return false;
+                    }
+                    return (previousRowGroups || []).some(function (previousGroup) {
+                        return doTimelineTargetListsOverlap(targets, getTimelineGroupTargets(previousGroup));
+                    });
+                });
+            const startRowIndex = hasPreviousAccompanimentTargetOccurrence
+                ? rowIndex
+                : firstAccompanimentRowIndex;
+            let endRowIndex = visualRows.length;
+            for (let nextRowIndex = startRowIndex + 1; nextRowIndex < visualRows.length; nextRowIndex++) {
+                const nextRowPattern = getTimelineRowPattern(visualRows[nextRowIndex], patternLibrary);
+                if (!nextRowPattern || nextRowPattern.labelType !== 'Begleitung') {
+                    continue;
+                }
+                const hasReplacement = (visualRows[nextRowIndex] || []).some(function (nextGroup) {
+                    if (nextGroup === group) {
+                        return false;
+                    }
+                    return doTimelineTargetListsOverlap(targets, getTimelineGroupTargets(nextGroup));
+                });
+                if (hasReplacement) {
+                    endRowIndex = nextRowIndex;
+                    break;
+                }
+            }
+
+            const blockKey = String(group.startIndex) + ':' + String(group.endIndex);
+            continuingGroupKeys[blockKey] = true;
+            blocks.push({
+                group: group,
+                pattern: pattern,
+                laneIndex: blocks.length,
+                startRowIndex: startRowIndex,
+                span: Math.max(1, endRowIndex - startRowIndex),
+                targets: targets
+            });
+        });
+    });
+
+    return {
+        blocks: blocks,
+        continuingGroupKeys: continuingGroupKeys
+    };
+}
+
+function getTimelineGroupKey(group) {
+    return String(group && group.startIndex) + ':' + String(group && group.endIndex);
+}
+
 function buildPatternDisplayLabelMap(patternLibrary) {
     const patternGroups = buildPatternLibraryGroups(patternLibrary);
     const displayNameByPatternId = {};
@@ -1577,6 +1905,7 @@ function renderTimelineSequence() {
     const patternDisplayInfo = buildPatternDisplayLabelMap(timelineState.sourcePatterns);
     const entryGroups = buildTimelineDisplayGroups(timelineState.entries, timelineState.sourcePatterns);
     const visualRows = buildTimelineVisualRows(entryGroups, timelineState.sourcePatterns);
+    const continuationInfo = buildTimelineContinuationBlocks(visualRows, timelineState.sourcePatterns);
     sequenceEl.innerHTML = '';
 
     if (visualRows.length === 0) {
@@ -1584,17 +1913,69 @@ function renderTimelineSequence() {
         return;
     }
 
-    visualRows.forEach(function (rowGroups) {
+    const gridEl = document.createElement('div');
+    gridEl.className = 'timeline-continuation-grid';
+    const hasContinuationBlocks = continuationInfo.blocks.length > 0;
+    if (!hasContinuationBlocks) {
+        gridEl.classList.add('is-plain');
+    } else {
+        gridEl.style.gridTemplateColumns =
+            'repeat(' + continuationInfo.blocks.length + ', minmax(150px, 180px)) minmax(0, 1fr)';
+    }
+
+    continuationInfo.blocks.forEach(function (block) {
+        const laneEl = document.createElement('div');
+        laneEl.className = 'timeline-continuation-lane';
+        laneEl.style.gridColumn = String(block.laneIndex + 1);
+        laneEl.style.gridRow = String(block.startRowIndex + 1) + ' / span ' + String(block.span);
+
+        const titleEl = document.createElement('strong');
+        titleEl.textContent = patternDisplayInfo.displayNameByPatternId[block.pattern.id] || block.pattern.name;
+        const targetEl = document.createElement('small');
+        targetEl.textContent = block.targets.join(', ');
+        const statusEl = document.createElement('small');
+        statusEl.textContent = 'läuft weiter';
+        const actionWrap = document.createElement('div');
+        actionWrap.className = 'timeline-entry-actions';
+        const removeButton = document.createElement('button');
+        removeButton.type = 'button';
+        removeButton.textContent = 'Entfernen';
+        removeButton.addEventListener('click', function () {
+            timelineState.entries.splice(block.group.startIndex, block.group.count);
+            updateTimelineMetadataNode();
+            renderTimelinePanel();
+        });
+        actionWrap.appendChild(removeButton);
+
+        laneEl.appendChild(titleEl);
+        laneEl.appendChild(targetEl);
+        laneEl.appendChild(statusEl);
+        laneEl.appendChild(actionWrap);
+        gridEl.appendChild(laneEl);
+    });
+
+    visualRows.forEach(function (rowGroups, rowIndex) {
         if (!rowGroups || rowGroups.length === 0) {
             return;
         }
+        const visibleGroups = rowGroups.filter(function (group) {
+            return !continuationInfo.continuingGroupKeys[getTimelineGroupKey(group)];
+        });
+        if (visibleGroups.length === 0) {
+            return;
+        }
 
-        sequenceEl.appendChild(createTimelineDropzone(rowGroups[0].startIndex));
+        const rowCellEl = document.createElement('div');
+        rowCellEl.className = 'timeline-row-cell';
+        rowCellEl.style.gridColumn = hasContinuationBlocks ? String(continuationInfo.blocks.length + 1) : '1';
+        rowCellEl.style.gridRow = String(rowIndex + 1);
+        rowCellEl.appendChild(createTimelineDropzone(rowGroups[0].startIndex));
+
         const rowEl = document.createElement('div');
         rowEl.className = 'timeline-sequence-row';
         bindParallelDropTarget(rowEl, rowGroups);
 
-        rowGroups.forEach(function (group) {
+        visibleGroups.forEach(function (group) {
             const entry = group.entries[0];
             const pattern = findPatternById(group.patternId);
             if (!pattern) {
@@ -1621,8 +2002,12 @@ function renderTimelineSequence() {
             const groupSummary = buildTimelineGroupSummary(group, timelineState.sourcePatterns);
             const metaEl = document.createElement('small');
             const displayedBarCount = groupSummary.totalBars || (Array.isArray(pattern.bars) ? pattern.bars.length : 0);
-            metaEl.textContent = groupSummary.barText ||
-                ('Takte: ' + displayedBarCount + (!groupSummary.text && group.count > 1 ? ' | Wiederholung x' + group.count : ''));
+            const repeatSuffix = repeatInfo.repeatCount > 1
+                ? ' | Wiederholung x' + repeatInfo.repeatCount
+                : '';
+            metaEl.textContent = groupSummary.barText
+                ? (groupSummary.barText + repeatSuffix)
+                : ('Takte: ' + displayedBarCount + (!groupSummary.text ? repeatSuffix : ''));
             mainWrap.appendChild(titleEl);
             mainWrap.appendChild(metaEl);
             if (groupSummary.text) {
@@ -1781,9 +2166,11 @@ function renderTimelineSequence() {
         });
 
         rowEl.appendChild(createTimelineParallelDropzone(rowGroups));
-        sequenceEl.appendChild(rowEl);
+        rowCellEl.appendChild(rowEl);
+        gridEl.appendChild(rowCellEl);
     });
 
+    sequenceEl.appendChild(gridEl);
     sequenceEl.appendChild(createTimelineDropzone(timelineState.entries.length));
 }
 
@@ -1857,8 +2244,15 @@ function renderTimelinePanel() {
     const sourceLibraryGroupCount = Array.isArray(timelineState.sourceLibraryGroups) && timelineState.sourceLibraryGroups.length > 0
         ? timelineState.sourceLibraryGroups.length
         : patternDisplayInfo.groups.length;
+    const sheetLoopCount = getResolvedTimelineLoopCount();
+    const loopStatusText = sheetLoopCount === 'loop'
+        ? ', Blatt-Loop aktiv.'
+        : (sheetLoopCount
+            ? ', Blatt-Wiederholung x' + sheetLoopCount + ' aktiv.'
+            : '.');
     statusEl.textContent = sourceLibraryGroupCount + ' Pattern aus dem Blatt, ' +
-        timelineVisualRows.length + ' Eintrag/Eintaege in der Timeline.';
+        timelineVisualRows.length + ' Eintrag/Eintaege in der Timeline' +
+        loopStatusText;
 
     if (panelEl.hidden) {
         return;

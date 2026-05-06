@@ -112,13 +112,14 @@ const doundoun_mp3Files = ['snd/Doundoun_Open.mp3','snd/Doundoun_Muffled.mp3','s
 const dreierbass_mp3Files = ['snd/Silence.mp3','snd/Kenkeni_Open.mp3','snd/Kenkeni_Muffled.mp3','snd/Sangban_Open.mp3','snd/Sangban_Muffled.mp3','snd/Doundoun_Open.mp3','snd/Doundoun_Muffled.mp3'];
 
 const djembe_1 = new Instrumente(djembe_1_mp3Files, 1, 1.4);
-const djembe_2 = new Instrumente(djembe_2_mp3Files, 0.5, 1.4);
-const djembe_3 = new Instrumente(djembe_3_mp3Files, 0, 1.4);
+const djembe_2 = new Instrumente(djembe_2_mp3Files, 0.4, 1.4);
+const djembe_3 = new Instrumente(djembe_3_mp3Files, -0.2, 1.4);
 const kenkeni  = new Instrumente(kenkeni_mp3Files, -1, 1.8);
-const sangban  = new Instrumente(sangban_mp3Files, -0.7, 2.5);
-const doundoun = new Instrumente(doundoun_mp3Files, -0.4, 1.5);
+const sangban  = new Instrumente(sangban_mp3Files, -0.8, 2.5);
+const doundoun = new Instrumente(doundoun_mp3Files, -0.6, 1.5);
 const dreierbass = new Instrumente(dreierbass_mp3Files, -1, 1.5);
 const allInstruments = [djembe_1, djembe_2, djembe_3, kenkeni, sangban, doundoun, dreierbass];
+const sangbanStrokeGainMultiplier = 2.2;
 const allInstrumentReadyPromises = allInstruments.map(function (instrumentInstance) {
   return instrumentInstance.readyPromise;
 });
@@ -202,6 +203,19 @@ function normalizeRepeatMarkerList(markerValue) {
   return [markerValue];
 }
 
+function normalizeTimelineLoopCountValue(rawValue) {
+  if (rawValue === true || rawValue === 'loop' || rawValue === 'continue') {
+    return 'loop';
+  }
+
+  const numericValue = Number(rawValue);
+  if (!Number.isFinite(numericValue) || numericValue < 1) {
+    return false;
+  }
+
+  return Math.max(1, Math.round(numericValue));
+}
+
 function buildRepeatRangesFromPatternBars(patternBars) {
   if (!Array.isArray(patternBars) || patternBars.length === 0) {
     return [];
@@ -258,6 +272,11 @@ function expandPatternBars(pattern) {
   if (patternBars.length === 0) {
     return [];
   }
+
+  if (patternStartsContinuingAccompaniment(pattern)) {
+    return patternBars;
+  }
+
   const patternRepeatRanges = buildRepeatRangesFromPatternBars(patternBars);
   if (patternRepeatRanges.length === 0) {
     return patternBars;
@@ -268,6 +287,10 @@ function expandPatternBars(pattern) {
 const playerConfig = Array.isArray(obj) && obj.length > 0 ? obj[0] : {};
 const repeatRanges = sanitizeRepeatRanges(playerConfig.RepeatRanges);
 const isTimelineMode = Boolean(playerConfig.TimelineMode);
+const timelineLoopCount = normalizeTimelineLoopCountValue(
+  playerConfig.TimelineLoopCount !== undefined ? playerConfig.TimelineLoopCount : playerConfig.TimelineLoop
+);
+const timelineLoop = timelineLoopCount === 'loop';
 const initialTempo = Math.max(30, Math.min(180, Number(playerConfig.Tempo) || 100));
 const swingFactor = Math.max(0, Math.min(100, Number(playerConfig.SwingFactor) || 0));
 const rhythmType = String(playerConfig.Rhythmus || '');
@@ -326,25 +349,30 @@ function appendBarToTracks(bar, rowIndex) {
   trackInstrumentNames.forEach(function (instrumentName) {
     const instrumentEntry = ensureSteuerungEntry(instrumentName);
     const segmentStart = instrumentEntry.noten.length;
-    const segmentNotes = targetInstruments.indexOf(instrumentName) !== -1
-      ? bar.notes
-      : new Array(segmentLength).fill('f');
+    const hasTrackNotes = bar.trackNotes &&
+      Array.isArray(bar.trackNotes[instrumentName]) &&
+      bar.trackNotes[instrumentName].length === segmentLength;
+    const segmentNotes = hasTrackNotes
+      ? bar.trackNotes[instrumentName]
+      : (targetInstruments.indexOf(instrumentName) !== -1
+        ? bar.notes
+        : new Array(segmentLength).fill('f'));
     instrumentEntry.noten = instrumentEntry.noten.concat(segmentNotes);
-    if (targetInstruments.indexOf(instrumentName) === -1) {
+    if (targetInstruments.indexOf(instrumentName) === -1 && !hasTrackNotes) {
       return;
     }
 
     if (bar.label === "Call") {
-      instrumentEntry.callNotes = instrumentEntry.callNotes.concat(bar.notes);
+      instrumentEntry.callNotes = instrumentEntry.callNotes.concat(segmentNotes);
     }
     if (bar.label === "Intro") {
-      instrumentEntry.introNotes = instrumentEntry.introNotes.concat(bar.notes);
+      instrumentEntry.introNotes = instrumentEntry.introNotes.concat(segmentNotes);
     }
     if (bar.label === "Echauffement") {
-      instrumentEntry.echauffementNotes = instrumentEntry.echauffementNotes.concat(bar.notes);
+      instrumentEntry.echauffementNotes = instrumentEntry.echauffementNotes.concat(segmentNotes);
     }
     if (bar.label === "Begleitung") {
-      instrumentEntry.begleitungNotes = instrumentEntry.begleitungNotes.concat(bar.notes);
+      instrumentEntry.begleitungNotes = instrumentEntry.begleitungNotes.concat(segmentNotes);
     }
 
     instrument += instrumentName + " von " + rowIndex + " - " + rowIndex + ", ";
@@ -373,6 +401,7 @@ function createOrderedSection(label) {
     runtimeKey: '',
     trackNotes: createEmptyTrackNoteMap(),
     trackHandModes: createEmptyTrackHandModeMap(),
+    continuingAccompaniments: {},
     length: 0,
     startStep: 0,
     endStep: 0
@@ -414,6 +443,15 @@ function appendSectionToSteuerung(section, sectionIndex) {
 
 function flattenPatternNotes(pattern) {
   return expandPatternBars(pattern).reduce(function (allNotes, bar) {
+    if (!bar || !Array.isArray(bar.notes)) {
+      return allNotes;
+    }
+    return allNotes.concat(bar.notes);
+  }, []);
+}
+
+function flattenContinuingAccompanimentNotes(pattern) {
+  return getContinuingAccompanimentPatternBars(pattern).reduce(function (allNotes, bar) {
     if (!bar || !Array.isArray(bar.notes)) {
       return allNotes;
     }
@@ -550,6 +588,21 @@ function loopNotesToLength(sourceNotes, targetLength) {
   return loopedNotes;
 }
 
+function loopNotesFromOffset(sourceNotes, targetLength, startOffset) {
+  const safeSourceNotes = Array.isArray(sourceNotes) ? sourceNotes.slice() : [];
+  const safeTargetLength = Math.max(0, Number(targetLength) || 0);
+  const safeStartOffset = Math.max(0, Number(startOffset) || 0);
+  if (safeSourceNotes.length === 0 || safeTargetLength <= 0) {
+    return [];
+  }
+
+  const loopedNotes = [];
+  for (let noteIndex = 0; noteIndex < safeTargetLength; noteIndex++) {
+    loopedNotes.push(safeSourceNotes[(safeStartOffset + noteIndex) % safeSourceNotes.length]);
+  }
+  return loopedNotes;
+}
+
 function normalizeSectionTrackLoops(section) {
   const trackLengths = trackInstrumentNames
     .map(function (instrumentName) {
@@ -599,7 +652,55 @@ function createSectionFromEntry(label, labelName, entryData) {
   section.entrySignatures = [entryData.entrySignature];
   section.sectionTargets = entryData.targetInstruments.slice();
   appendEntryToSection(section, entryData);
+  if (entryData.startsContinuingAccompaniment) {
+    entryData.targetInstruments.forEach(function (instrumentName) {
+      section.continuingAccompaniments[instrumentName] = entryData.patternNotes.slice();
+    });
+  }
   return section;
+}
+
+function applyContinuingAccompanimentsToSections(sections) {
+  const activeAccompanimentsByInstrument = {};
+
+  sections.forEach(function (section) {
+    const sectionTargets = Array.isArray(section.sectionTargets) ? section.sectionTargets : [];
+
+    sectionTargets.forEach(function (instrumentName) {
+      delete activeAccompanimentsByInstrument[instrumentName];
+    });
+
+    Object.keys(section.continuingAccompaniments || {}).forEach(function (instrumentName) {
+      const sourceNotes = section.continuingAccompaniments[instrumentName];
+      if (Array.isArray(sourceNotes) && sourceNotes.length > 0) {
+        activeAccompanimentsByInstrument[instrumentName] = {
+          notes: sourceNotes.slice(),
+          nextStepIndex: 0
+        };
+      }
+    });
+
+    const sectionLength = Math.max.apply(null, trackInstrumentNames.map(function (instrumentName) {
+      return getSectionLength(section.trackNotes[instrumentName]);
+    }).concat(0));
+
+    Object.keys(activeAccompanimentsByInstrument).forEach(function (instrumentName) {
+      const accompaniment = activeAccompanimentsByInstrument[instrumentName];
+      if (!accompaniment || !Array.isArray(accompaniment.notes) || accompaniment.notes.length === 0) {
+        return;
+      }
+
+      if (sectionTargets.indexOf(instrumentName) === -1 && sectionLength > 0) {
+        section.trackNotes[instrumentName] = mergeNotesIntoTrack(
+          section.trackNotes[instrumentName],
+          loopNotesFromOffset(accompaniment.notes, sectionLength, accompaniment.nextStepIndex),
+          0
+        );
+      }
+
+      accompaniment.nextStepIndex += sectionLength;
+    });
+  });
 }
 
 function finalizeSectionLengths(sections) {
@@ -663,11 +764,78 @@ function normalizeTimelineTargetInstrument(instrumentName) {
   return instrumentMap[instrumentName] || '';
 }
 
+function normalizeTimelineEntryTargets(targetInstruments) {
+  return Array.isArray(targetInstruments)
+    ? targetInstruments
+        .map(normalizeTimelineTargetInstrument)
+        .reduce(function (allTargets, targetName) {
+          if (targetName === 'Bässe') {
+            return allTargets.concat(timelineBassTargets);
+          }
+          if (targetName && allTargets.indexOf(targetName) === -1) {
+            allTargets.push(targetName);
+          }
+          return allTargets;
+        }, [])
+    : [];
+}
+
+function isTimelineContinuationMarker(markerValue) {
+  return markerValue === 'continue';
+}
+
+function patternStartsContinuingAccompaniment(pattern) {
+  if (!pattern || pattern.label !== 'Begleitung' || !Array.isArray(pattern.bars)) {
+    return false;
+  }
+
+  return pattern.bars.some(function (bar) {
+    const repeatInfo = bar && bar.repeat ? bar.repeat : {};
+    return normalizeRepeatMarkerList(repeatInfo.end).some(isTimelineContinuationMarker);
+  });
+}
+
+function barHasPlayableContent(bar) {
+  if (!bar) {
+    return false;
+  }
+
+  const notes = Array.isArray(bar.notes) ? bar.notes : [];
+  return notes.some(function (noteValue) {
+    return noteValue !== 'f' && noteValue !== null && noteValue !== undefined && noteValue !== '';
+  });
+}
+
+function trimTrailingSilentPatternBars(patternBars) {
+  const safeBars = Array.isArray(patternBars) ? patternBars.slice() : [];
+  if (safeBars.length <= 1) {
+    return safeBars;
+  }
+
+  let lastPlayableBarIndex = -1;
+  safeBars.forEach(function (bar, barIndex) {
+    if (barHasPlayableContent(bar)) {
+      lastPlayableBarIndex = barIndex;
+    }
+  });
+
+  if (lastPlayableBarIndex <= 0) {
+    return safeBars.slice(0, 1);
+  }
+
+  return safeBars.slice(0, lastPlayableBarIndex + 1);
+}
+
+function getContinuingAccompanimentPatternBars(pattern) {
+  return trimTrailingSilentPatternBars(expandPatternBars(pattern));
+}
+
 function buildFlatBarsFromTimeline(config) {
   const patternLibrary = Array.isArray(config.PatternLibrary) ? config.PatternLibrary : [];
   const timelineEntries = Array.isArray(config.TimelineEntries) ? config.TimelineEntries : [];
   const patternById = {};
   const flatBars = [];
+  const activeAccompanimentsByInstrument = {};
 
   patternLibrary.forEach(function (pattern) {
     if (pattern && pattern.id) {
@@ -681,21 +849,39 @@ function buildFlatBarsFromTimeline(config) {
       return;
     }
 
-    const targetInstruments = Array.isArray(entry.targetInstruments)
-      ? entry.targetInstruments
-          .map(normalizeTimelineTargetInstrument)
-          .reduce(function (allTargets, targetName) {
-            if (targetName === 'Bässe') {
-              return allTargets.concat(timelineBassTargets);
-            }
-            if (targetName && allTargets.indexOf(targetName) === -1) {
-              allTargets.push(targetName);
-            }
-            return allTargets;
-          }, [])
-      : [];
+    const targetInstruments = normalizeTimelineEntryTargets(entry.targetInstruments);
+    const startsContinuingAccompaniment = patternStartsContinuingAccompaniment(pattern);
+    const expandedPatternBars = startsContinuingAccompaniment
+      ? getContinuingAccompanimentPatternBars(pattern)
+      : expandPatternBars(pattern);
 
-    expandPatternBars(pattern).forEach(function (bar) {
+    targetInstruments.forEach(function (instrumentName) {
+      delete activeAccompanimentsByInstrument[instrumentName];
+    });
+
+    if (startsContinuingAccompaniment && expandedPatternBars.length > 0) {
+      targetInstruments.forEach(function (instrumentName) {
+        activeAccompanimentsByInstrument[instrumentName] = {
+          bars: expandedPatternBars,
+          nextBarIndex: 0
+        };
+      });
+    }
+
+    expandedPatternBars.forEach(function (bar) {
+      const trackNotes = {};
+      Object.keys(activeAccompanimentsByInstrument).forEach(function (instrumentName) {
+        const accompaniment = activeAccompanimentsByInstrument[instrumentName];
+        if (!accompaniment || !Array.isArray(accompaniment.bars) || accompaniment.bars.length === 0) {
+          return;
+        }
+        const accompanimentBar = accompaniment.bars[accompaniment.nextBarIndex % accompaniment.bars.length];
+        if (targetInstruments.indexOf(instrumentName) === -1 && accompanimentBar && Array.isArray(accompanimentBar.notes)) {
+          trackNotes[instrumentName] = accompanimentBar.notes.slice();
+        }
+        accompaniment.nextBarIndex += 1;
+      });
+
       flatBars.push({
         index: flatBars.length + 1,
         instrument: '',
@@ -703,7 +889,8 @@ function buildFlatBarsFromTimeline(config) {
         targetInstruments: targetInstruments.slice(),
         label: bar.label || pattern.label || '',
         labelName: pattern.labelName || pattern.label || bar.label || '',
-        notes: Array.isArray(bar.notes) ? bar.notes.slice() : []
+        notes: Array.isArray(bar.notes) ? bar.notes.slice() : [],
+        trackNotes: trackNotes
       });
     });
   });
@@ -735,24 +922,15 @@ function buildTimelineSections(config) {
       return;
     }
 
-    const targetInstruments = Array.isArray(entry.targetInstruments)
-      ? entry.targetInstruments
-          .map(normalizeTimelineTargetInstrument)
-          .reduce(function (allTargets, targetName) {
-            if (targetName === 'Bässe') {
-              return allTargets.concat(timelineBassTargets);
-            }
-            if (targetName && allTargets.indexOf(targetName) === -1) {
-              allTargets.push(targetName);
-            }
-            return allTargets;
-          }, [])
-      : [];
+    const targetInstruments = normalizeTimelineEntryTargets(entry.targetInstruments);
     const entrySignature = [
       pattern.sourceKey || pattern.id || '',
       targetInstruments.slice().sort().join(',')
     ].join('::');
-    const patternNotes = flattenPatternNotes(pattern);
+    const startsContinuingAccompaniment = patternStartsContinuingAccompaniment(pattern);
+    const patternNotes = startsContinuingAccompaniment
+      ? flattenContinuingAccompanimentNotes(pattern)
+      : flattenPatternNotes(pattern);
     const patternOutStep = getPatternOutStep(pattern);
     expandedEntries.push({
       label: sectionLabel,
@@ -766,30 +944,38 @@ function buildTimelineSections(config) {
       swingFactor: entry.swingFactor === null || entry.swingFactor === undefined
         ? null
         : Math.max(0, Math.min(100, Number(entry.swingFactor) || 0)),
+      startsContinuingAccompaniment: startsContinuingAccompaniment,
       patternNotes: patternNotes,
       patternOutStep: patternOutStep
     });
   });
 
+  const continuingAccompanimentEntries = expandedEntries.filter(function (entryData) {
+    return entryData.startsContinuingAccompaniment;
+  });
+  const playbackEntries = expandedEntries.filter(function (entryData) {
+    return !entryData.startsContinuingAccompaniment;
+  });
+
   let blockStartIndex = 0;
-  while (blockStartIndex < expandedEntries.length) {
-    const blockLabel = expandedEntries[blockStartIndex].label;
-    const blockId = expandedEntries[blockStartIndex].blockId;
-    const parallelGroupId = expandedEntries[blockStartIndex].parallelGroupId;
+  while (blockStartIndex < playbackEntries.length) {
+    const blockLabel = playbackEntries[blockStartIndex].label;
+    const blockId = playbackEntries[blockStartIndex].blockId;
+    const parallelGroupId = playbackEntries[blockStartIndex].parallelGroupId;
     let blockEndIndex = blockStartIndex + 1;
-    while (blockEndIndex < expandedEntries.length &&
+    while (blockEndIndex < playbackEntries.length &&
       (
         parallelGroupId
-          ? expandedEntries[blockEndIndex].parallelGroupId === parallelGroupId
+          ? playbackEntries[blockEndIndex].parallelGroupId === parallelGroupId
           : (
-              expandedEntries[blockEndIndex].label === blockLabel &&
-              expandedEntries[blockEndIndex].blockId === blockId
+              playbackEntries[blockEndIndex].label === blockLabel &&
+              playbackEntries[blockEndIndex].blockId === blockId
             )
       )) {
       blockEndIndex += 1;
     }
 
-    const blockEntries = expandedEntries.slice(blockStartIndex, blockEndIndex);
+    const blockEntries = playbackEntries.slice(blockStartIndex, blockEndIndex);
     const blockLanes = [];
 
     blockEntries.forEach(function (entryData) {
@@ -824,7 +1010,7 @@ function buildTimelineSections(config) {
         });
 
         laneData.entries.forEach(function (laneEntry, laneEntryIndex) {
-          const shouldApplyOut = blockEndIndex < expandedEntries.length &&
+          const shouldApplyOut = blockEndIndex < playbackEntries.length &&
             laneEntry.label === 'Begleitung' &&
             laneEntry.patternOutStep !== null &&
             laneEntryIndex === laneData.entries.length - 1;
@@ -845,6 +1031,11 @@ function buildTimelineSections(config) {
           if (mergedSection.swingFactor === null && laneEntry.swingFactor !== null && laneEntry.swingFactor !== undefined) {
             mergedSection.swingFactor = laneEntry.swingFactor;
           }
+          if (laneEntry.startsContinuingAccompaniment) {
+            laneEntry.targetInstruments.forEach(function (instrumentName) {
+              mergedSection.continuingAccompaniments[instrumentName] = laneEntry.patternNotes.slice();
+            });
+          }
         });
       });
 
@@ -859,7 +1050,7 @@ function buildTimelineSections(config) {
     const maxLaneLength = Math.max.apply(null, blockLanes.map(function (laneData) {
       return laneData.entries.length;
     }).concat(0));
-    const shouldApplyOutInLastCycle = blockLabel === 'Begleitung' && blockEndIndex < expandedEntries.length;
+    const shouldApplyOutInLastCycle = blockLabel === 'Begleitung' && blockEndIndex < playbackEntries.length;
 
     for (let occurrenceIndex = 0; occurrenceIndex < maxLaneLength; occurrenceIndex++) {
       let currentCycleSection = null;
@@ -896,6 +1087,11 @@ function buildTimelineSections(config) {
           })
         );
         appendEntryToSection(currentCycleSection, occurrenceEntry);
+        if (occurrenceEntry.startsContinuingAccompaniment) {
+          occurrenceEntry.targetInstruments.forEach(function (instrumentName) {
+            currentCycleSection.continuingAccompaniments[instrumentName] = occurrenceEntry.patternNotes.slice();
+          });
+        }
       });
 
       if (currentCycleSection) {
@@ -906,6 +1102,21 @@ function buildTimelineSections(config) {
     blockStartIndex = blockEndIndex;
   }
 
+  if (sections.length > 0) {
+    const accompanimentStartSection = sections.find(function (section) {
+      return section && section.label === 'Begleitung';
+    }) || sections[0];
+
+    continuingAccompanimentEntries.forEach(function (entryData) {
+      entryData.targetInstruments.forEach(function (instrumentName) {
+        if (!accompanimentStartSection.continuingAccompaniments[instrumentName]) {
+          accompanimentStartSection.continuingAccompaniments[instrumentName] = entryData.patternNotes.slice();
+        }
+      });
+    });
+  }
+
+  applyContinuingAccompanimentsToSections(sections);
   finalizeSectionLengths(sections);
 
   return sections;
@@ -918,7 +1129,9 @@ function expandBarsWithRepeats(flatBars, repeatRangesToApply, startBarIndex, end
   while (currentBarIndex <= endBarIndex) {
     const matchingRanges = repeatRangesToApply
       .filter(function (repeatRange) {
-        return repeatRange.startBar === currentBarIndex && repeatRange.endBar <= endBarIndex;
+        return !isTimelineContinuationMarker(repeatRange.count) &&
+          repeatRange.startBar === currentBarIndex &&
+          repeatRange.endBar <= endBarIndex;
       })
       .sort(function (rangeA, rangeB) {
         return rangeB.endBar - rangeA.endBar;
@@ -1124,6 +1337,25 @@ const orderedBegleitungSections = orderedSections.filter(function (section) {
 const orderedBegleitungLoopLength = orderedBegleitungSections.reduce(function (sum, section) {
   return sum + section.length;
 }, 0);
+const firstTimelineBegleitungSectionIndex = isTimelineMode
+  ? orderedSections.findIndex(function (section) {
+      return section.label === 'Begleitung' && section.length > 0;
+    })
+  : -1;
+const orderedTimelineFallbackLoopSections = firstTimelineBegleitungSectionIndex === -1
+  ? []
+  : orderedSections.slice(firstTimelineBegleitungSectionIndex).filter(function (section) {
+      return section.length > 0;
+    });
+const orderedFallbackLoopSections = isTimelineMode && orderedTimelineFallbackLoopSections.length > 0
+  ? orderedTimelineFallbackLoopSections
+  : orderedBegleitungSections;
+const orderedFallbackLoopLength = orderedFallbackLoopSections.reduce(function (sum, section) {
+  return sum + section.length;
+}, 0);
+const timelinePlaybackLength = timelineLoopCount && timelineLoopCount !== 'loop' && orderedFallbackLoopLength > 0
+  ? oneShotLength + (orderedFallbackLoopLength * Number(timelineLoopCount))
+  : 0;
 const djembeHandStates = {
   Djembe_1: { nextHand: 'R', leadHand: 'R', lastHand: '', lastSectionKey: '' },
   Djembe_2: { nextHand: 'R', leadHand: 'R', lastHand: '', lastSectionKey: '' },
@@ -1203,22 +1435,25 @@ function getPlaybackSectionContext(playbackStep) {
     if (playbackStep >= section.startStep && playbackStep < section.endStep) {
       return {
         section: section,
-        localStep: playbackStep - section.startStep
+        localStep: playbackStep - section.startStep,
+        loopCycleIndex: 0
       };
     }
   }
 
-  if (!hasOutroSection && orderedBegleitungLoopLength > 0 && playbackStep >= oneShotLength) {
-    let loopStep = (playbackStep - oneShotLength) % orderedBegleitungLoopLength;
-    for (let sectionIndex = 0; sectionIndex < orderedBegleitungSections.length; sectionIndex++) {
-      const begleitungSection = orderedBegleitungSections[sectionIndex];
-      if (loopStep < begleitungSection.length) {
+  if (timelineLoopCount && orderedFallbackLoopLength > 0 && playbackStep >= oneShotLength) {
+    let loopStep = (playbackStep - oneShotLength) % orderedFallbackLoopLength;
+    const loopCycleIndex = Math.floor((playbackStep - oneShotLength) / orderedFallbackLoopLength);
+    for (let sectionIndex = 0; sectionIndex < orderedFallbackLoopSections.length; sectionIndex++) {
+      const loopSection = orderedFallbackLoopSections[sectionIndex];
+      if (loopStep < loopSection.length) {
         return {
-          section: begleitungSection,
-          localStep: loopStep
+          section: loopSection,
+          localStep: loopStep,
+          loopCycleIndex: loopCycleIndex
         };
       }
-      loopStep -= begleitungSection.length;
+      loopStep -= loopSection.length;
     }
   }
 
@@ -1308,6 +1543,9 @@ function scheduleNote(kenkeniNote, sangbanNote, doundounNote, dreierbassNote, dj
   const noteGain = Math.max(0, Number(accentMultiplier) || 1);
   const bassMuffledGain = noteGain * 1.4;
   const klickGain = noteGain * 0.75;
+  const sangbanStrokeGain = noteGain * sangbanStrokeGainMultiplier;
+  const sangbanMuffledGain = bassMuffledGain * sangbanStrokeGainMultiplier;
+  const sangbanKlickGain = klickGain * sangbanStrokeGainMultiplier;
   const sangbanBellGain = noteGain * 0.7;
   const doundounBellGain = noteGain * 0.7;
   const kenkeniTime = Math.max(0, time + getFeelOffsetSeconds('Kenkeni'));
@@ -1361,25 +1599,25 @@ function scheduleNote(kenkeniNote, sangbanNote, doundounNote, dreierbassNote, dj
         sangban.play('Sangban_Bell_Open', sangbanTime, sangbanBellGain);
         break;
       case "Open":
-        sangban.play('Sangban_Open', sangbanTime, noteGain);
+        sangban.play('Sangban_Open', sangbanTime, sangbanStrokeGain);
         break;
       case "Muffled":
-        sangban.play('Sangban_Muffled', sangbanTime, bassMuffledGain);
+        sangban.play('Sangban_Muffled', sangbanTime, sangbanMuffledGain);
         break;
       case "Klick":
-        sangban.play('Sangban_Klick', sangbanTime, klickGain);
+        sangban.play('Sangban_Klick', sangbanTime, sangbanKlickGain);
         break;
       case "Bell_Open":
         sangban.play('Sangban_Bell_Open', sangbanTime, sangbanBellGain);
-        sangban.play('Sangban_Open', sangbanTime, noteGain);
+        sangban.play('Sangban_Open', sangbanTime, sangbanStrokeGain);
         break;
       case "Bell_Muffled":
         sangban.play('Sangban_Bell_Open', sangbanTime, sangbanBellGain);
-        sangban.play('Sangban_Muffled', sangbanTime, bassMuffledGain);
+        sangban.play('Sangban_Muffled', sangbanTime, sangbanMuffledGain);
         break;
       case "Bell_Klick":
         sangban.play('Sangban_Bell_Open', sangbanTime, sangbanBellGain);
-        sangban.play('Sangban_Klick', sangbanTime, klickGain);
+        sangban.play('Sangban_Klick', sangbanTime, sangbanKlickGain);
         break;
     }
   }
@@ -1602,7 +1840,8 @@ function getTrackPlaybackAtStep(trackName, trackState, playbackStep) {
       handMode: sectionContext.section.trackHandModes
         ? (sectionContext.section.trackHandModes[trackName] || '')
         : '',
-      sectionKey: sectionContext.section.runtimeKey || '',
+      sectionKey: (sectionContext.section.runtimeKey || '') +
+        (sectionContext.loopCycleIndex ? ':sheet-loop:' + sectionContext.loopCycleIndex : ''),
       stepIndex: sectionContext.localStep
     };
   }
@@ -1619,13 +1858,13 @@ function getTrackPlaybackAtStep(trackName, trackState, playbackStep) {
   const begleitungLength = getSectionLength(trackState.begleitungNotes);
   if (begleitungLength > 0) {
     const loopStep = playbackStep - oneShotLength;
-    if (orderedBegleitungSections.length > 0) {
-      const normalizedLoopStep = ((loopStep % orderedBegleitungLoopLength) + orderedBegleitungLoopLength) % orderedBegleitungLoopLength;
-      const loopCycleIndex = Math.floor(loopStep / orderedBegleitungLoopLength);
+    if (orderedFallbackLoopSections.length > 0 && orderedFallbackLoopLength > 0) {
+      const normalizedLoopStep = ((loopStep % orderedFallbackLoopLength) + orderedFallbackLoopLength) % orderedFallbackLoopLength;
+      const loopCycleIndex = Math.floor(loopStep / orderedFallbackLoopLength);
       let sectionOffset = 0;
 
-      for (let sectionIndex = 0; sectionIndex < orderedBegleitungSections.length; sectionIndex++) {
-        const section = orderedBegleitungSections[sectionIndex];
+      for (let sectionIndex = 0; sectionIndex < orderedFallbackLoopSections.length; sectionIndex++) {
+        const section = orderedFallbackLoopSections[sectionIndex];
         const sectionLength = section.length || 0;
         if (sectionLength <= 0) {
           continue;
@@ -1776,7 +2015,19 @@ function scheduler() {
   const dTime = instr._audioCtx.currentTime;
 
   while (nextNoteTime < dTime + scheduleAheadTime) {
-    if (hasOutroSection && globalPlaybackStep >= oneShotLength) {
+    if (timelineLoopCount && timelineLoopCount !== 'loop' && timelinePlaybackLength > 0 && globalPlaybackStep >= timelinePlaybackLength) {
+      isPlaying = false;
+      playButton.dataset.playing = 'false';
+      timerID = null;
+      return;
+    }
+    if (!timelineLoopCount && isTimelineMode && globalPlaybackStep >= oneShotLength) {
+      isPlaying = false;
+      playButton.dataset.playing = 'false';
+      timerID = null;
+      return;
+    }
+    if (!timelineLoopCount && !isTimelineMode && hasOutroSection && globalPlaybackStep >= oneShotLength) {
       isPlaying = false;
       playButton.dataset.playing = 'false';
       timerID = null;
@@ -1866,11 +2117,23 @@ function getStepInterval(playbackStep, tempoValue) {
 }
 
 function getExportStepCount() {
+  if (timelineLoopCount && timelineLoopCount !== 'loop' && timelinePlaybackLength > 0) {
+    return timelinePlaybackLength;
+  }
+
+  if (timelineLoop && orderedFallbackLoopLength > 0) {
+    return oneShotLength + orderedFallbackLoopLength;
+  }
+
+  if (isTimelineMode) {
+    return oneShotLength;
+  }
+
   if (hasOutroSection) {
     return oneShotLength;
   }
 
-  const loopLength = orderedBegleitungLoopLength > 0 ? orderedBegleitungLoopLength : globalBegleitungLength;
+  const loopLength = orderedFallbackLoopLength > 0 ? orderedFallbackLoopLength : globalBegleitungLength;
   if (loopLength > 0) {
     return oneShotLength + loopLength;
   }
@@ -1882,6 +2145,9 @@ function scheduleNoteToDestination(kenkeniNote, sangbanNote, doundounNote, dreie
   const noteGain = Math.max(0, Number(accentMultiplier) || 1);
   const bassMuffledGain = noteGain * 1.4;
   const klickGain = noteGain * 0.75;
+  const sangbanStrokeGain = noteGain * sangbanStrokeGainMultiplier;
+  const sangbanMuffledGain = bassMuffledGain * sangbanStrokeGainMultiplier;
+  const sangbanKlickGain = klickGain * sangbanStrokeGainMultiplier;
   const sangbanBellGain = noteGain * 0.7;
   const doundounBellGain = noteGain * 0.7;
   const kenkeniTime = Math.max(0, time + getFeelOffsetSeconds('Kenkeni'));
@@ -1926,25 +2192,25 @@ function scheduleNoteToDestination(kenkeniNote, sangbanNote, doundounNote, dreie
       playSampleToDestination(sangban, 'Sangban_Bell_Open', sangbanTime, sangbanBellGain, audioContext, destinationNode);
       break;
     case "Open":
-      playSampleToDestination(sangban, 'Sangban_Open', sangbanTime, noteGain, audioContext, destinationNode);
+      playSampleToDestination(sangban, 'Sangban_Open', sangbanTime, sangbanStrokeGain, audioContext, destinationNode);
       break;
     case "Muffled":
-      playSampleToDestination(sangban, 'Sangban_Muffled', sangbanTime, bassMuffledGain, audioContext, destinationNode);
+      playSampleToDestination(sangban, 'Sangban_Muffled', sangbanTime, sangbanMuffledGain, audioContext, destinationNode);
       break;
     case "Klick":
-      playSampleToDestination(sangban, 'Sangban_Klick', sangbanTime, klickGain, audioContext, destinationNode);
+      playSampleToDestination(sangban, 'Sangban_Klick', sangbanTime, sangbanKlickGain, audioContext, destinationNode);
       break;
     case "Bell_Open":
       playSampleToDestination(sangban, 'Sangban_Bell_Open', sangbanTime, sangbanBellGain, audioContext, destinationNode);
-      playSampleToDestination(sangban, 'Sangban_Open', sangbanTime, noteGain, audioContext, destinationNode);
+      playSampleToDestination(sangban, 'Sangban_Open', sangbanTime, sangbanStrokeGain, audioContext, destinationNode);
       break;
     case "Bell_Muffled":
       playSampleToDestination(sangban, 'Sangban_Bell_Open', sangbanTime, sangbanBellGain, audioContext, destinationNode);
-      playSampleToDestination(sangban, 'Sangban_Muffled', sangbanTime, bassMuffledGain, audioContext, destinationNode);
+      playSampleToDestination(sangban, 'Sangban_Muffled', sangbanTime, sangbanMuffledGain, audioContext, destinationNode);
       break;
     case "Bell_Klick":
       playSampleToDestination(sangban, 'Sangban_Bell_Open', sangbanTime, sangbanBellGain, audioContext, destinationNode);
-      playSampleToDestination(sangban, 'Sangban_Klick', sangbanTime, klickGain, audioContext, destinationNode);
+      playSampleToDestination(sangban, 'Sangban_Klick', sangbanTime, sangbanKlickGain, audioContext, destinationNode);
       break;
   }
 

@@ -391,6 +391,8 @@ function clear_all() {
     timelineState.entries = [];
     timelineState.sourceHash = '';
     timelineState.sheetHash = '';
+    timelineState.sheetLoop = false;
+    timelineState.sheetLoopCount = false;
     timelineState.tempo = 100;
     timelineState.swingFactor = 0;
     timelineState.swingProfile = normalizeAllTimelineSwingProfiles();
@@ -852,7 +854,7 @@ cycleRepeatCount = function () {
     let zahl = parseInt(wert, 10);
 
     if (isNaN(zahl)) {
-        zahl = 2;
+        zahl = 1;
     } else {
         zahl++;
         if (zahl > 4) {
@@ -1188,7 +1190,7 @@ function getElementLabelText(element) {
 function normalizeRepeatCount(repeatText, repeatSide) {
     const trimmedRepeatText = String(repeatText).trim();
     if (trimmedRepeatText === '') {
-        return repeatSide == 'end' ? 1 : true;
+        return 'continue';
     }
     if (!isNaN(Number(trimmedRepeatText))) {
         return Number(trimmedRepeatText);
@@ -1196,9 +1198,39 @@ function normalizeRepeatCount(repeatText, repeatSide) {
     return trimmedRepeatText;
 }
 
-function buildRepeatRanges(repeatBoundaries) {
+function hasBarContentForRepeatLoop(bar) {
+    if (!bar) {
+        return false;
+    }
+    if (bar.instrument && bar.instrument !== 'Leer') {
+        return true;
+    }
+    if (bar.label && bar.label !== 'Leer') {
+        return true;
+    }
+    if (Array.isArray(bar.controls) && bar.controls.length > 0) {
+        return true;
+    }
+    return Array.isArray(bar.notes) && bar.notes.some(function (noteValue) {
+        return noteValue && noteValue !== 'f';
+    });
+}
+
+function getLastActiveBarIndex(rhythmBars) {
+    for (let barIndex = rhythmBars.length - 1; barIndex >= 0; barIndex--) {
+        if (hasBarContentForRepeatLoop(rhythmBars[barIndex])) {
+            return barIndex + 1;
+        }
+    }
+    return rhythmBars.length;
+}
+
+function buildRepeatRanges(repeatBoundaries, rhythmBars) {
     const repeatRanges = [];
     const repeatStartStack = [];
+    const lastActiveBarIndex = Array.isArray(rhythmBars)
+        ? getLastActiveBarIndex(rhythmBars)
+        : repeatBoundaries.length - 1;
 
     repeatBoundaries.forEach(function (boundary) {
         const sortedStartMarkers = boundary.startMarkers.slice().sort(function (markerA, markerB) {
@@ -1209,7 +1241,25 @@ function buildRepeatRanges(repeatBoundaries) {
         });
 
         sortedEndMarkers.forEach(function (endMarker) {
-            const matchingStartMarker = repeatStartStack.pop();
+            if (endMarker.count === 'continue' && endMarker.boundaryIndex !== lastActiveBarIndex) {
+                return;
+            }
+            let matchingStartMarker = repeatStartStack.pop();
+            if (endMarker.count === 'continue' && endMarker.boundaryIndex === lastActiveBarIndex) {
+                const sheetLoopStartIndex = repeatStartStack.findIndex(function (startMarker) {
+                    return startMarker.boundaryIndex === 0 && startMarker.count === 'continue';
+                });
+                if (sheetLoopStartIndex !== -1) {
+                    repeatRanges.push({
+                        startBoundary: 0,
+                        endBoundary: endMarker.boundaryIndex,
+                        startBar: 1,
+                        endBar: endMarker.boundaryIndex,
+                        count: 'loop'
+                    });
+                    repeatStartStack.splice(sheetLoopStartIndex, 1);
+                }
+            }
             if (!matchingStartMarker) {
                 return;
             }
@@ -1218,7 +1268,11 @@ function buildRepeatRanges(repeatBoundaries) {
                 endBoundary: endMarker.boundaryIndex,
                 startBar: matchingStartMarker.boundaryIndex + 1,
                 endBar: endMarker.boundaryIndex,
-                count: endMarker.count
+                count: matchingStartMarker.boundaryIndex === 0 &&
+                    endMarker.boundaryIndex === lastActiveBarIndex &&
+                    endMarker.count === 'continue'
+                    ? 'loop'
+                    : endMarker.count
             });
         });
 
@@ -1238,17 +1292,31 @@ function buildRepeatRanges(repeatBoundaries) {
 }
 
 function applyRepeatMarkersToBars(rhythmBars, repeatBoundaries) {
+    const lastActiveBarIndex = getLastActiveBarIndex(rhythmBars);
+
     repeatBoundaries.forEach(function (boundary) {
         const startBar = rhythmBars[boundary.index];
         const endBar = rhythmBars[boundary.index - 1];
 
         if (startBar && boundary.startMarkers.length > 0) {
-            startBar.repeat.start = boundary.startMarkers.map(function (marker) {
+            startBar.repeat.start = boundary.startMarkers.filter(function (marker) {
+                return !(boundary.index === 0 && marker.count === 'continue');
+            }).map(function (marker) {
                 return marker.count;
             });
         }
         if (endBar && boundary.endMarkers.length > 0) {
-            endBar.repeat.end = boundary.endMarkers.map(function (marker) {
+            endBar.repeat.end = boundary.endMarkers.filter(function (marker) {
+                const previousBoundary = repeatBoundaries[boundary.index - 1];
+                const hasLocalStartForFinalContinue = boundary.index === lastActiveBarIndex &&
+                    marker.count === 'continue' &&
+                    previousBoundary &&
+                    previousBoundary.startMarkers.some(function (startMarker) {
+                        return startMarker.count === 'continue';
+                    });
+                return hasLocalStartForFinalContinue ||
+                    !(boundary.index === lastActiveBarIndex && marker.count === 'continue');
+            }).map(function (marker) {
                 return marker.count;
             });
         }
@@ -1694,7 +1762,7 @@ function callPHPScript_lesen(anzahl, options) {
     });
 
     applyRepeatMarkersToBars(rhythmBars, repeatBoundaries);
-    const repeatRanges = buildRepeatRanges(repeatBoundaries);
+    const repeatRanges = buildRepeatRanges(repeatBoundaries, rhythmBars);
     window.lastReadRhythmBars = rhythmBars;
     window.lastReadRepeatBoundaries = repeatBoundaries;
     window.lastReadRepeatRanges = repeatRanges;
