@@ -170,6 +170,21 @@ function bringChooserToFront(chooserGruppe, menuGruppe) {
   }
 }
 
+function isChooserMenuVisible(menuGruppe) {
+  return menuGruppe.attr("display") !== "none";
+}
+
+function setChooserMenuVisible(menuGruppe, visible) {
+  menuGruppe.attr({ display: visible ? "block" : "none" });
+}
+
+function isEventInsideChooserMenu(event, menuGruppe) {
+  if (!event || !event.target || !menuGruppe || !menuGruppe.node) {
+    return false;
+  }
+  return menuGruppe.node === event.target || menuGruppe.node.contains(event.target);
+}
+
 function findLinkedFunctionChooser(instrumentChooserGruppe) {
   let instrumentPosition = getChooserPosition(instrumentChooserGruppe);
   let bestFunctionChooser = null;
@@ -253,55 +268,222 @@ function createFunctionChooser(s, x, y, startText = "Funktion", startFill = "gra
  */
 function bindChooserInteraction(chooserGruppe, chooserText, menuGruppe, onSelect) {
   let dragSchwelle = 5;
+  let toggleSuppressDuration = 300;
+  let chooserDragRebindTimer = null;
+  let chooserDragReleaseHandler = null;
 
-  chooserText.click(function (event) {
-    if (chooserGruppe.data("warDrag")) {
-      chooserGruppe.data("warDrag", false);
+  function stopChooserEvent(event) {
+    if (event && typeof event.preventDefault === "function") {
+      event.preventDefault();
+    }
+    if (event && typeof event.stopPropagation === "function") {
       event.stopPropagation();
+    }
+  }
+
+  function stopMenuDragEvent(event) {
+    chooserGruppe.data("suppressChooserDrag", true);
+    stopChooserEvent(event);
+  }
+
+  function rebindChooserDragAfterMenuAction() {
+    chooserGruppe.data("warDrag", false);
+    chooserGruppe.data("chooserDragMoved", false);
+    chooserGruppe.data("suppressChooserDrag", true);
+    chooserGruppe.undrag();
+
+    if (chooserDragRebindTimer) {
+      window.clearTimeout(chooserDragRebindTimer);
+    }
+
+    chooserDragRebindTimer = window.setTimeout(function () {
+      chooserGruppe.data("suppressChooserDrag", false);
+      chooserGruppe.drag(chooser_move, chooser_sel_start, chooser_drag_end);
+    }, 300);
+  }
+
+  function removeChooserDragReleaseFallback() {
+    if (!chooserDragReleaseHandler) {
       return;
     }
-    let sichtbar = menuGruppe.attr("display") !== "none";
+    window.removeEventListener("mouseup", chooserDragReleaseHandler, true);
+    window.removeEventListener("touchend", chooserDragReleaseHandler, true);
+    window.removeEventListener("touchcancel", chooserDragReleaseHandler, true);
+    chooserDragReleaseHandler = null;
+  }
+
+  function rebindChooserDragAfterPointerRelease() {
+    chooserGruppe.undrag();
+
+    if (chooserDragRebindTimer) {
+      window.clearTimeout(chooserDragRebindTimer);
+    }
+
+    chooserDragRebindTimer = window.setTimeout(function () {
+      chooserGruppe.drag(chooser_move, chooser_sel_start, chooser_drag_end);
+    }, 0);
+  }
+
+  function forceChooserDragEnd() {
+    let wasDrag = !!chooserGruppe.data("chooserDragMoved");
+    removeChooserDragReleaseFallback();
+    if (wasDrag) {
+      chooserGruppe.data("suppressChooserToggleUntil", Date.now() + toggleSuppressDuration);
+    }
+    chooserGruppe.data("warDrag", false);
+    chooserGruppe.data("chooserDragMoved", false);
+    chooserGruppe.data("suppressChooserDrag", false);
+    rebindChooserDragAfterPointerRelease();
+  }
+
+  function installChooserDragReleaseFallback() {
+    removeChooserDragReleaseFallback();
+    chooserDragReleaseHandler = function () {
+      forceChooserDragEnd();
+    };
+    window.addEventListener("mouseup", chooserDragReleaseHandler, true);
+    window.addEventListener("touchend", chooserDragReleaseHandler, true);
+    window.addEventListener("touchcancel", chooserDragReleaseHandler, true);
+  }
+
+  if (menuGruppe.node) {
+    if (menuGruppe.node.__chooserMenuDragStopHandler) {
+      menuGruppe.node.removeEventListener("mousedown", menuGruppe.node.__chooserMenuDragStopHandler);
+      menuGruppe.node.removeEventListener("touchstart", menuGruppe.node.__chooserMenuDragStopHandler);
+    }
+    menuGruppe.node.__chooserMenuDragStopHandler = stopMenuDragEvent;
+    menuGruppe.node.addEventListener("mousedown", menuGruppe.node.__chooserMenuDragStopHandler);
+    menuGruppe.node.addEventListener("touchstart", menuGruppe.node.__chooserMenuDragStopHandler, { passive: false });
+  }
+
+  function toggleChooserMenu(event) {
+    let eventType = event && event.type ? event.type : "";
+    let now = Date.now();
+    let suppressToggleUntil = chooserGruppe.data("suppressChooserToggleUntil");
+    if (suppressToggleUntil && now < suppressToggleUntil) {
+      stopChooserEvent(event);
+      return;
+    }
+    if (eventType === "click" && chooserGruppe.data("lastNativeChooserEventAt")) {
+      if (now - chooserGruppe.data("lastNativeChooserEventAt") < 450) {
+        stopChooserEvent(event);
+        return;
+      }
+    }
+    if (eventType === "mouseup" || eventType === "touchend") {
+      chooserGruppe.data("lastNativeChooserEventAt", now);
+    }
+
+    if (chooserGruppe.data("warDrag")) {
+      chooserGruppe.data("warDrag", false);
+      stopChooserEvent(event);
+      return;
+    }
+    let sichtbar = isChooserMenuVisible(menuGruppe);
     if (!sichtbar) {
       bringChooserToFront(chooserGruppe, menuGruppe);
     }
-    menuGruppe.attr({ display: sichtbar ? "none" : "inline" });
-    event.stopPropagation();
-  });
+    setChooserMenuVisible(menuGruppe, !sichtbar);
+    rebindChooserDragAfterMenuAction();
+    stopChooserEvent(event);
+  }
+
+  chooserText.click(toggleChooserMenu);
+
+  if (chooserText.node) {
+    if (chooserText.node.__chooserToggleHandler) {
+      chooserText.node.removeEventListener("mouseup", chooserText.node.__chooserToggleHandler);
+      chooserText.node.removeEventListener("touchend", chooserText.node.__chooserToggleHandler);
+    }
+    chooserText.node.__chooserToggleHandler = toggleChooserMenu;
+    chooserText.node.addEventListener("mouseup", chooserText.node.__chooserToggleHandler);
+    chooserText.node.addEventListener("touchend", chooserText.node.__chooserToggleHandler, { passive: false });
+  }
+
+  function selectChooserEntry(eintrag, event) {
+    let eventType = event && event.type ? event.type : "";
+    let now = Date.now();
+    if (eventType === "click" && eintrag.data && eintrag.data("lastNativeChooserEventAt")) {
+      if (now - eintrag.data("lastNativeChooserEventAt") < 450) {
+        stopChooserEvent(event);
+        return;
+      }
+    }
+    if ((eventType === "mouseup" || eventType === "touchend") && eintrag.data) {
+      eintrag.data("lastNativeChooserEventAt", now);
+    }
+
+    let name = eintrag.attr("text");
+    let selectedName = onSelect ? onSelect(name, chooserGruppe, chooserText) : name;
+    Promise.resolve(selectedName).then(function (resolvedName) {
+      if (resolvedName === null) {
+        setChooserMenuVisible(menuGruppe, false);
+        rebindChooserDragAfterMenuAction();
+        return;
+      }
+      chooserText.attr({ text: resolvedName, fill: "#333" });
+      setChooserMenuVisible(menuGruppe, false);
+      rebindChooserDragAfterMenuAction();
+    });
+    stopChooserEvent(event);
+  }
+
+  function bindChooserEntry(eintrag) {
+    eintrag.click(function (event) {
+      selectChooserEntry(eintrag, event);
+    });
+
+    if (eintrag.node) {
+      if (eintrag.node.__chooserEntryHandler) {
+        eintrag.node.removeEventListener("mouseup", eintrag.node.__chooserEntryHandler);
+        eintrag.node.removeEventListener("touchend", eintrag.node.__chooserEntryHandler);
+      }
+      eintrag.node.__chooserEntryHandler = function (event) {
+        selectChooserEntry(eintrag, event);
+      };
+      eintrag.node.addEventListener("mouseup", eintrag.node.__chooserEntryHandler);
+      eintrag.node.addEventListener("touchend", eintrag.node.__chooserEntryHandler, { passive: false });
+    }
+  }
 
   menuGruppe.selectAll("text").forEach(function (eintrag) {
-    eintrag.click(function (event) {
-      let name = eintrag.attr("text");
-      let selectedName = onSelect ? onSelect(name, chooserGruppe, chooserText) : name;
-      Promise.resolve(selectedName).then(function (resolvedName) {
-        if (resolvedName === null) {
-          menuGruppe.attr({ display: "none" });
-          return;
-        }
-        chooserText.attr({ text: resolvedName, fill: "#333" });
-        menuGruppe.attr({ display: "none" });
-      });
-      event.stopPropagation();
-    });
+    bindChooserEntry(eintrag);
   });
 
   function chooser_sel_start(x, y, event) {
+    if (chooserGruppe.data("suppressChooserDrag") || isChooserMenuVisible(menuGruppe) || isEventInsideChooserMenu(event, menuGruppe)) {
+      stopChooserEvent(event);
+      return;
+    }
     chooserGruppe.data("warDrag", false);
+    chooserGruppe.data("chooserDragMoved", false);
+    chooserGruppe.data("suppressChooserDrag", false);
+    installChooserDragReleaseFallback();
     bringChooserToFront(chooserGruppe, menuGruppe);
     sel_start.call(this, x, y, event);
   }
 
   function chooser_move(dx, dy, px, py, event) {
+    if (chooserGruppe.data("suppressChooserDrag") || isChooserMenuVisible(menuGruppe) || isEventInsideChooserMenu(event, menuGruppe)) {
+      return;
+    }
     if (!chooserGruppe.data("warDrag")) {
       if (Math.abs(dx) < dragSchwelle && Math.abs(dy) < dragSchwelle) {
         return;
       }
       chooserGruppe.data("warDrag", true);
-      menuGruppe.attr({ display: "none" });
+      chooserGruppe.data("chooserDragMoved", true);
+      chooserGruppe.data("suppressChooserToggleUntil", Date.now() + toggleSuppressDuration);
+      setChooserMenuVisible(menuGruppe, false);
     }
     move.call(this, dx, dy, px, py, event);
   }
 
-  chooserGruppe.drag(chooser_move, chooser_sel_start);
+  function chooser_drag_end() {
+    forceChooserDragEnd();
+  }
+
+  chooserGruppe.drag(chooser_move, chooser_sel_start, chooser_drag_end);
 }
 
 function bindInstrumentChooserInteraction(chooserGruppe, instrumentText, menuGruppe) {

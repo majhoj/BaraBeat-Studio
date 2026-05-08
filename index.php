@@ -1,6 +1,8 @@
 <?php
 $jsSnap = @filemtime(__DIR__ . '/JS/snapNEU.svg.js') ?: 1;
 $jsJq = @filemtime(__DIR__ . '/JS/jquery.min.js') ?: 1;
+$jsLocalLibrary = @filemtime(__DIR__ . '/JS/localLibrary.js') ?: 1;
+$jsServerLibrary = @filemtime(__DIR__ . '/JS/serverLibrary.js') ?: 1;
 $jsSel = @filemtime(__DIR__ . '/JS/selection_drag_7.js') ?: 1;
 $jsFn = @filemtime(__DIR__ . '/JS/functions.js') ?: 1;
 $jsTimeline = @filemtime(__DIR__ . '/JS/timeline.js') ?: 1;
@@ -15,6 +17,8 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
     <title><BaraBeat-Studio></title>
     <script src="JS/snapNEU.svg.js?v=<?php echo $jsSnap; ?>"></script>
     <script src="JS/jquery.min.js?v=<?php echo $jsJq; ?>"></script>
+    <script src="JS/localLibrary.js?v=<?php echo $jsLocalLibrary; ?>"></script>
+    <script src="JS/serverLibrary.js?v=<?php echo $jsServerLibrary; ?>"></script>
     <script src="JS/selection_drag_7.js?v=<?php echo $jsSel; ?>"></script>
     <script src="JS/functions.js?v=<?php echo $jsFn; ?>"></script>
     <script src="JS/timeline.js?v=<?php echo $jsTimeline; ?>"></script>
@@ -31,13 +35,9 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
         <details class="app-menu">
             <summary>Datei</summary>
             <div class="app-menu-panel">
-                <div class="menu-file-picker">
-                    <span>Datei laden</span>
-                    <span id="auswahl" name="auswahl"></span>
-                </div>
-                <button type="button" id="button">Datei speichern</button>
-                <button type="button" id="button2">Als SVG speichern</button>
-                <button type="button" id="button12">Als PDF speichern</button>
+                <button type="button" id="openFileDialogButton">Öffnen...</button>
+                <button type="button" id="saveFileDialogButton">Speichern...</button>
+                <button type="button" id="exportFileDialogButton">Exportieren...</button>
             </div>
         </details>
         <details class="app-menu">
@@ -68,6 +68,76 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
             <input type="hidden" size="40" id="iofield" name="iofield" />
         </form>
     </nav>
+
+    <div id="fileDialog" class="file-dialog-backdrop" hidden>
+        <section class="file-dialog" role="dialog" aria-modal="true" aria-labelledby="fileDialogTitle">
+            <header class="file-dialog-titlebar">
+                <div class="file-dialog-window-controls" aria-hidden="true">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+                <h2 id="fileDialogTitle">Datei</h2>
+            </header>
+            <div class="file-dialog-main">
+                <aside class="file-dialog-sidebar" aria-label="Quellen">
+                    <div class="file-dialog-sidebar-section">Quellen</div>
+                    <button type="button" class="file-dialog-source is-active" data-source="local">Lokal</button>
+                    <button type="button" class="file-dialog-source" data-source="server">Server</button>
+                    <div class="file-dialog-sidebar-section">Sammlungen</div>
+                    <button type="button" class="file-dialog-filter is-active" data-filter="all">Alle</button>
+                    <button type="button" class="file-dialog-filter" data-filter="published">Veröffentlicht</button>
+                    <button type="button" class="file-dialog-filter" data-filter="local-only">Nur lokal</button>
+                    <button type="button" class="file-dialog-filter" data-filter="modified">Geändert</button>
+                </aside>
+                <div class="file-dialog-content">
+                    <div class="file-dialog-fields">
+                        <label for="fileDialogName">Name:</label>
+                        <input type="text" id="fileDialogName" autocomplete="off" />
+                        <label for="fileDialogTags">Tags:</label>
+                        <input type="text" id="fileDialogTags" autocomplete="off" />
+                    </div>
+                    <div class="file-dialog-toolbar">
+                        <button type="button" id="fileDialogRefreshButton" title="Aktualisieren">↻</button>
+                        <span id="fileDialogFolderName" class="file-dialog-folder-name">Lokal</span>
+                        <input type="search" id="fileDialogSearch" placeholder="Suchen" />
+                    </div>
+                    <div class="file-dialog-table-wrap">
+                        <table class="file-dialog-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Status</th>
+                                    <th>Geändert</th>
+                                </tr>
+                            </thead>
+                            <tbody id="fileDialogList"></tbody>
+                        </table>
+                        <div id="fileDialogEmpty" class="file-dialog-empty" hidden>Keine Dateien gefunden.</div>
+                    </div>
+                </div>
+            </div>
+            <footer class="file-dialog-footer">
+                <div class="file-dialog-left-actions">
+                    <button type="button" id="fileDialogNewFolderButton">Neuer Ordner</button>
+                    <button type="button" id="fileDialogRenameButton">Umbenennen</button>
+                    <button type="button" id="fileDialogDeleteButton">Löschen</button>
+                    <button type="button" id="fileDialogUnpublishButton">Veröffentlichung löschen</button>
+                </div>
+                <label class="file-dialog-format" for="fileDialogFormat">
+                    Format:
+                    <select id="fileDialogFormat">
+                        <option value="svg">SVG</option>
+                        <option value="pdf">PDF</option>
+                    </select>
+                </label>
+                <div class="file-dialog-actions">
+                    <button type="button" id="fileDialogCancelButton">Abbrechen</button>
+                    <button type="button" id="fileDialogConfirmButton" class="primary">Öffnen</button>
+                </div>
+            </footer>
+        </section>
+    </div>
 
     <div id="timelinePanel" hidden>
         <div class="timeline-panel-header">
@@ -205,9 +275,19 @@ const phpEndpointBase = "PHP/";
 const fileListEndpoint = "auswahlliste.php";
 const loadFileEndpoint = "dateiladen.php";
 const saveTextEndpoint = "dateispeichern.php";
-const saveSvgEndpoint = "dateispeichern_svg.php";
 const checkTextFileEndpoint = "dateivorhanden.php";
-const checkSvgFileEndpoint = "dateivorhanden_svg.php";
+let currentScoreId = null;
+let currentFileSource = "local";
+const fileDialogState = {
+    mode: 'open',
+    source: 'local',
+    filter: 'all',
+    format: 'svg',
+    folderId: localLibrary.rootFolderId,
+    folderName: 'Lokal',
+    entries: [],
+    selectedId: null
+};
 const bodyElement = document.body;
 bodyElement.addEventListener("keydown", shadow_end);
 bodyElement.addEventListener("keydown", start);
@@ -242,6 +322,15 @@ var s = Snap(1050, 1480).attr({ id: "myRect1" });
 var canv = s.rect(0, 0, 1050, 1480).attr({ fill: "white", stroke: "black", strokeWidth: 0.5, opacity: 0.300, id: "myRect2" });
 canv.drag(shadow_move, shadow_start, shadow_end);
 
+if (s.node) {
+    s.node.addEventListener('selectstart', function (event) {
+        event.preventDefault();
+    });
+    s.node.addEventListener('dragstart', function (event) {
+        event.preventDefault();
+    });
+}
+
 function setIoFieldValue(value) {
     $('#iofield').val(value);
 }
@@ -260,15 +349,426 @@ function postPhp(endpoint, payload, onSuccess) {
 }
 
 function updateSelectionMarkup(markup) {
-    document.getElementById('auswahl').innerHTML = markup;
+    const selectionEl = document.getElementById('auswahl');
+    if (selectionEl) {
+        selectionEl.innerHTML = markup;
+    }
 }
 
-function refreshFileList() {
-    postPhp(fileListEndpoint, function (data) {
-        setIoFieldValue(data);
-        const fileListMarkup = getIoFieldValue();
-        updateSelectionMarkup(fileListMarkup);
+function getSelectedFileSource() {
+    const sourceEl = document.querySelector('#fileSource');
+    return sourceEl ? sourceEl.value : fileDialogState.source;
+}
+
+function setSelectedFileSource(source) {
+    const sourceEl = document.querySelector('#fileSource');
+    if (sourceEl) {
+        sourceEl.value = source;
+    }
+    currentFileSource = source;
+    fileDialogState.source = source;
+    document.querySelectorAll('.file-dialog-source').forEach(function (buttonEl) {
+        buttonEl.classList.toggle('is-active', buttonEl.dataset.source === source);
     });
+}
+
+function escapeHtml(value) {
+    return String(value || '').replace(/[&<>"']/g, function (char) {
+        return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[char];
+    });
+}
+
+function buildLocalFileListMarkup(scores) {
+    let markup = '<select id="dateiname" onchange="get_value(this)">';
+    markup += '<option value="">Lokale Datei laden:</option>';
+    scores.forEach(function (score) {
+        const statusLabel = score.syncState === 'modified-local'
+            ? ' *'
+            : score.isPublished
+                ? ' veröffentlicht'
+                : '';
+        markup += '<option value="' + escapeHtml(score.id) + '">' +
+            escapeHtml(score.title + statusLabel) +
+            '</option>';
+    });
+    markup += '</select>';
+    return markup;
+}
+
+function buildServerFileListMarkup(scores) {
+    let markup = '<select id="dateiname" onchange="get_value(this)">';
+    markup += '<option value="">Server-Datei laden:</option>';
+    scores.forEach(function (score) {
+        markup += '<option value="' + escapeHtml(score.serverPath || score.fileName) + '">' +
+            escapeHtml(score.fileName || score.serverPath || score.title) +
+            '</option>';
+    });
+    markup += '</select>';
+    return markup;
+}
+
+function getSelectedLocalScoreId() {
+    if (getSelectedFileSource() !== 'local') {
+        return currentScoreId;
+    }
+
+    const fileSelect = document.querySelector('#dateiname');
+    return fileSelect && fileSelect.value ? fileSelect.value : currentScoreId;
+}
+
+async function refreshFileList() {
+    const source = getSelectedFileSource();
+    currentFileSource = source;
+
+    try {
+        if (source === 'server') {
+            const serverScores = await serverLibrary.listScores();
+            updateSelectionMarkup(buildServerFileListMarkup(serverScores));
+            return;
+        }
+
+        const localScores = await localLibrary.listScores();
+        updateSelectionMarkup(buildLocalFileListMarkup(localScores));
+    } catch (error) {
+        console.error('Dateiliste konnte nicht geladen werden', error);
+        updateSelectionMarkup('<select id="dateiname"><option>Fehler beim Laden</option></select>');
+    }
+}
+
+function getScoreStatusLabel(score) {
+    if (!score) {
+        return '';
+    }
+    if (score.syncState === 'modified-local') {
+        return 'Geändert';
+    }
+    if (score.isPublished) {
+        return 'Veröffentlicht';
+    }
+    return 'Lokal';
+}
+
+function formatFileDialogDate(value) {
+    if (!value) {
+        return '';
+    }
+    const dateValue = new Date(value);
+    if (Number.isNaN(dateValue.getTime())) {
+        return '';
+    }
+    return dateValue.toLocaleDateString('de-DE', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+function getFileDialogTitle(mode) {
+    if (mode === 'save') {
+        return 'Speichern unter';
+    }
+    if (mode === 'export') {
+        return 'Exportieren';
+    }
+    return 'Öffnen';
+}
+
+function getFileDialogConfirmLabel(mode, format) {
+    if (mode === 'save') {
+        return 'Speichern';
+    }
+    if (mode === 'export') {
+        return 'Exportieren';
+    }
+    return 'Öffnen';
+}
+
+function getFileDialogEntryId(entry) {
+    if (!entry) {
+        return '';
+    }
+    return entry.dialogId || entry.id || entry.serverPath || entry.fileName || '';
+}
+
+function isFileDialogFolderEntry(entry) {
+    return entry && (entry.entryType === 'folder' || entry.entryType === 'parent-folder');
+}
+
+function isFileDialogManagementAvailable() {
+    const entry = getSelectedFileDialogEntry();
+    if (!entry || fileDialogState.source !== 'local') {
+        return false;
+    }
+    if (entry.entryType === 'score') {
+        return true;
+    }
+    if (entry.entryType === 'folder') {
+        return Boolean(entry.isEmpty);
+    }
+    return false;
+}
+
+function isFileDialogRenameAvailable() {
+    const entry = getSelectedFileDialogEntry();
+    return fileDialogState.source === 'local' &&
+        entry &&
+        (entry.entryType === 'score' || entry.entryType === 'folder');
+}
+
+function canDeletePublishedFileDialogScore() {
+    const entry = getSelectedFileDialogEntry();
+    return fileDialogState.source === 'local' &&
+        entry &&
+        entry.entryType === 'score' &&
+        entry.serverPath &&
+        entry.publishToken;
+}
+
+function updateFileDialogControls() {
+    const dialogTitle = document.querySelector('#fileDialogTitle');
+    const confirmButton = document.querySelector('#fileDialogConfirmButton');
+    const newFolderButton = document.querySelector('#fileDialogNewFolderButton');
+    const renameButton = document.querySelector('#fileDialogRenameButton');
+    const deleteButton = document.querySelector('#fileDialogDeleteButton');
+    const unpublishButton = document.querySelector('#fileDialogUnpublishButton');
+    const formatEl = document.querySelector('#fileDialogFormat');
+    const formatWrapEl = document.querySelector('.file-dialog-format');
+    const nameEl = document.querySelector('#fileDialogName');
+    const fieldsEl = document.querySelector('.file-dialog-fields');
+    const folderNameEl = document.querySelector('#fileDialogFolderName');
+    const sourceButtons = document.querySelectorAll('.file-dialog-source');
+    const isExportMode = fileDialogState.mode === 'export';
+
+    if (dialogTitle) {
+        dialogTitle.textContent = getFileDialogTitle(fileDialogState.mode);
+    }
+    if (formatWrapEl) {
+        formatWrapEl.hidden = !isExportMode;
+    }
+    if (formatEl) {
+        formatEl.value = fileDialogState.format;
+        formatEl.disabled = !isExportMode;
+    }
+    if (confirmButton) {
+        confirmButton.textContent = getFileDialogConfirmLabel(fileDialogState.mode, fileDialogState.format);
+        confirmButton.disabled = fileDialogState.mode === 'open' && !fileDialogState.selectedId;
+    }
+    if (newFolderButton) {
+        newFolderButton.disabled = fileDialogState.source !== 'local' || isExportMode;
+    }
+    if (renameButton) {
+        renameButton.disabled = !isFileDialogRenameAvailable();
+    }
+    if (deleteButton) {
+        deleteButton.disabled = !isFileDialogManagementAvailable();
+    }
+    if (unpublishButton) {
+        unpublishButton.disabled = !canDeletePublishedFileDialogScore();
+    }
+    if (nameEl) {
+        nameEl.disabled = fileDialogState.mode === 'open';
+    }
+    if (fieldsEl) {
+        fieldsEl.hidden = fileDialogState.mode === 'open';
+    }
+    if (folderNameEl) {
+        folderNameEl.textContent = fileDialogState.source === 'server' ? 'Server' : fileDialogState.folderName;
+    }
+    sourceButtons.forEach(function (buttonEl) {
+        buttonEl.disabled = isExportMode;
+        buttonEl.classList.toggle('is-active', buttonEl.dataset.source === fileDialogState.source);
+    });
+
+    document.querySelectorAll('.file-dialog-filter').forEach(function (buttonEl) {
+        const shouldDisable = fileDialogState.source !== 'local' || isExportMode;
+        buttonEl.disabled = shouldDisable;
+        buttonEl.classList.toggle('is-active', buttonEl.dataset.filter === fileDialogState.filter && !shouldDisable);
+    });
+}
+
+function getFilteredFileDialogEntries() {
+    const searchText = String(document.querySelector('#fileDialogSearch')?.value || '').trim().toLocaleLowerCase('de-DE');
+    return fileDialogState.entries.filter(function (entry) {
+        if (fileDialogState.source === 'local' && entry.entryType === 'score') {
+            if (fileDialogState.filter === 'published' && !entry.isPublished) {
+                return false;
+            }
+            if (fileDialogState.filter === 'local-only' && entry.isPublished) {
+                return false;
+            }
+            if (fileDialogState.filter === 'modified' && entry.syncState !== 'modified-local') {
+                return false;
+            }
+        }
+        if (!searchText) {
+            return true;
+        }
+        return String(entry.title || entry.name || entry.fileName || '').toLocaleLowerCase('de-DE').indexOf(searchText) !== -1;
+    });
+}
+
+async function navigateFileDialogFolder(folderId) {
+    fileDialogState.folderId = folderId || localLibrary.rootFolderId;
+    fileDialogState.selectedId = null;
+    await refreshFileDialogEntries();
+}
+
+function updateFileDialogRowSelection() {
+    document.querySelectorAll('#fileDialogList tr').forEach(function (rowEl) {
+        rowEl.classList.toggle('is-selected', rowEl.dataset.id === fileDialogState.selectedId);
+    });
+}
+
+function renderFileDialogList() {
+    const listEl = document.querySelector('#fileDialogList');
+    const emptyEl = document.querySelector('#fileDialogEmpty');
+    if (!listEl) {
+        return;
+    }
+
+    const entries = getFilteredFileDialogEntries();
+    listEl.innerHTML = '';
+
+    entries.forEach(function (entry) {
+        const rowEl = document.createElement('tr');
+        rowEl.dataset.id = getFileDialogEntryId(entry);
+        rowEl.dataset.entryType = entry.entryType || 'score';
+        rowEl.className = rowEl.dataset.id === fileDialogState.selectedId ? 'is-selected' : '';
+        if (isFileDialogFolderEntry(entry)) {
+            rowEl.classList.add('is-folder');
+        }
+
+        const nameCell = document.createElement('td');
+        nameCell.textContent = entry.title || entry.name || entry.fileName || entry.serverPath || '';
+        const statusCell = document.createElement('td');
+        if (entry.entryType === 'parent-folder') {
+            statusCell.textContent = 'Zurück';
+        } else if (entry.entryType === 'folder') {
+            statusCell.textContent = 'Ordner';
+        } else {
+            statusCell.textContent = fileDialogState.source === 'server' ? 'Server' : getScoreStatusLabel(entry);
+        }
+        const dateCell = document.createElement('td');
+        dateCell.textContent = formatFileDialogDate(entry.updatedAt || entry.localUpdatedAt || entry.publishedAt);
+
+        rowEl.append(nameCell, statusCell, dateCell);
+        rowEl.addEventListener('click', function () {
+            fileDialogState.selectedId = rowEl.dataset.id;
+            if (fileDialogState.mode === 'open' && fileDialogState.source === 'local' && entry.entryType === 'score') {
+                document.querySelector('#fileDialogName').value = entry.title || '';
+            }
+            updateFileDialogRowSelection();
+            updateFileDialogControls();
+        });
+        rowEl.addEventListener('dblclick', function () {
+            if (fileDialogState.source === 'local' && isFileDialogFolderEntry(entry)) {
+                navigateFileDialogFolder(entry.targetFolderId || entry.id);
+                return;
+            }
+            confirmFileDialog();
+        });
+        listEl.appendChild(rowEl);
+    });
+
+    if (emptyEl) {
+        emptyEl.hidden = entries.length > 0;
+    }
+    updateFileDialogControls();
+}
+
+async function refreshFileDialogEntries() {
+    try {
+        if (fileDialogState.source === 'server') {
+            fileDialogState.entries = (await serverLibrary.listScores()).map(function (entry) {
+                return Object.assign({ entryType: 'score' }, entry);
+            });
+            fileDialogState.filter = 'all';
+            fileDialogState.folderName = 'Server';
+        } else {
+            const currentFolder = await localLibrary.getFolder(fileDialogState.folderId);
+            if (!currentFolder) {
+                fileDialogState.folderId = localLibrary.rootFolderId;
+            }
+            fileDialogState.folderName = currentFolder && currentFolder.name ? currentFolder.name : 'Lokal';
+            const foldersInCurrentFolder = await localLibrary.listFolders(fileDialogState.folderId);
+            const folders = await Promise.all(foldersInCurrentFolder.map(async function (folder) {
+                const childFolders = await localLibrary.listFolders(folder.id);
+                const childScores = await localLibrary.listScores(folder.id);
+                return Object.assign({
+                    entryType: 'folder',
+                    title: folder.name,
+                    isEmpty: childFolders.length === 0 && childScores.length === 0
+                }, folder);
+            }));
+            const scores = (await localLibrary.listScores(fileDialogState.folderId)).map(function (score) {
+                return Object.assign({ entryType: 'score' }, score);
+            });
+            fileDialogState.entries = [];
+            if (fileDialogState.folderId !== localLibrary.rootFolderId && currentFolder) {
+                fileDialogState.entries.push({
+                    entryType: 'parent-folder',
+                    dialogId: '__parent__',
+                    targetFolderId: currentFolder.parentId || localLibrary.rootFolderId,
+                    title: '..',
+                    name: '..'
+                });
+            }
+            fileDialogState.entries = fileDialogState.entries.concat(folders, scores);
+        }
+
+        const selectedStillExists = fileDialogState.entries.some(function (entry) {
+            return getFileDialogEntryId(entry) === fileDialogState.selectedId;
+        });
+        if (!selectedStillExists) {
+            fileDialogState.selectedId = null;
+        }
+        renderFileDialogList();
+    } catch (error) {
+        console.error('Dateidialog konnte nicht aktualisiert werden', error);
+        fileDialogState.entries = [];
+        fileDialogState.selectedId = null;
+        renderFileDialogList();
+        alert('Fehler beim Laden der Dateiliste: ' + error.message);
+    }
+}
+
+function openFileDialog(mode) {
+    const dialogEl = document.querySelector('#fileDialog');
+    if (!dialogEl) {
+        return;
+    }
+
+    fileDialogState.mode = mode;
+    fileDialogState.source = 'local';
+    fileDialogState.filter = 'all';
+    fileDialogState.format = mode === 'export' ? 'svg' : 'score';
+    fileDialogState.folderId = localLibrary.rootFolderId;
+    fileDialogState.folderName = 'Lokal';
+    fileDialogState.selectedId = null;
+
+    document.querySelector('#fileDialogName').value = titel ? (titel.attr('text') || '') : '';
+    document.querySelector('#fileDialogTags').value = '';
+    document.querySelector('#fileDialogSearch').value = '';
+    setSelectedFileSource('local');
+    dialogEl.hidden = false;
+    updateFileDialogControls();
+    refreshFileDialogEntries();
+    closeAppMenus();
+}
+
+function closeFileDialog() {
+    const dialogEl = document.querySelector('#fileDialog');
+    if (dialogEl) {
+        dialogEl.hidden = true;
+    }
+}
+
+function getSelectedFileDialogEntry() {
+    return fileDialogState.entries.find(function (entry) {
+        return getFileDialogEntryId(entry) === fileDialogState.selectedId;
+    }) || null;
 }
 
 function saveContentWithCheck(config) {
@@ -296,6 +796,16 @@ function saveContentWithCheck(config) {
             refreshFileList();
         });
     }
+}
+
+function loadRhythmContent(title, content, scoreId) {
+    if (!content) {
+        return;
+    }
+    loadedTitle = title || 'Unbenannt';
+    currentScoreId = scoreId || null;
+    setIoFieldValue(content);
+    Snap.loadStr(content, onSVGLoaded);
 }
 
 function loadRhythmFile(fileName) {
@@ -503,6 +1013,8 @@ function drawRhythmSheet(config) {
     renderLegend(initialChooserX);
 
     if (shouldResetTitle) {
+        currentScoreId = null;
+        setSelectedFileSource('local');
         titel.attr({ text: "Enter the name of the Rhythm" });
     }
 }
@@ -934,83 +1446,208 @@ function buildExportSvgContent() {
         '</svg>';
 }
 
-function callPHPScript2() {
-    const svgContent = buildExportSvgContent();
+function sanitizeDownloadFileName(value, fallback) {
+    return String(value || fallback || 'Notenblatt')
+        .trim()
+        .replace(/[\\/:*?"<>|]+/g, '-')
+        .replace(/\s+/g, ' ')
+        || fallback || 'Notenblatt';
+}
 
-    const name = titel.attr('text');
-    saveContentWithCheck({
-        baseName: name,
-        extension: ".svg",
-        checkEndpoint: checkSvgFileEndpoint,
-        saveEndpoint: saveSvgEndpoint,
-        content: svgContent,
-        onExistingFile: function (existingBaseName, retryCheckName) {
-            const replacementName = prompt('Die Datei "' + existingBaseName + '" existiert schon!\nGib einen anderen Dateinamen ein!', '');
-            if (replacementName == null) {
-                return;
-            }
-            retryCheckName(replacementName);
+function downloadTextFile(content, fileName, mimeType) {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(function () {
+        URL.revokeObjectURL(url);
+    }, 1000);
+}
+
+function callPHPScript2(nameOverride) {
+    const svgContent = buildExportSvgContent();
+    const baseName = sanitizeDownloadFileName(nameOverride || titel.attr('text'), 'Notenblatt');
+    downloadTextFile(svgContent, baseName + '.svg', 'image/svg+xml;charset=utf-8');
+}
+
+function buildSerializedRhythm() {
+    updateTimelineMetadataNode();
+
+    let serializedRhythm;
+    if (rhythm == 'binaer') {
+        serializedRhythm = '<binaer id="rhythmus"/>';
+    } else if (rhythm == 'neunaer') {
+        serializedRhythm = '<neunaer id="rhythmus"/>';
+    } else {
+        serializedRhythm = '<tenaer id="rhythmus"/>';
+    }
+
+    let elementsToSave = s.selectAll(removableCanvasElementSelector);
+    elementsToSave.forEach(function (el) {
+        if (el.attr('id') == 'timeline_metadata') {
+            return;
         }
+        const ax = el.getBBox().cx;
+        const ay = el.getBBox().cy;
+        if (ax < 70 || ax > 1050 || ay < 0 || ay > 1480) {
+            el.remove();
+        }
+    });
+
+    elementsToSave = s.selectAll(removableCanvasElementSelector);
+    elementsToSave.forEach(function (el) {
+        serializedRhythm += el.toString();
+    });
+
+    return serializedRhythm;
+}
+
+function base64ToUint8Array(base64Value) {
+    const binaryString = atob(base64Value);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let index = 0; index < binaryString.length; index += 1) {
+        bytes[index] = binaryString.charCodeAt(index);
+    }
+    return bytes;
+}
+
+function createSingleImagePdf(jpegBytes, imageWidth, imageHeight) {
+    const encoder = new TextEncoder();
+    const pageWidth = 595.28;
+    const pageHeight = 841.89;
+    const margin = 22;
+    const usableWidth = pageWidth - margin * 2;
+    const usableHeight = pageHeight - margin * 2;
+    const imageRatio = imageWidth / imageHeight;
+    const pageRatio = usableWidth / usableHeight;
+    const drawWidth = imageRatio > pageRatio ? usableWidth : usableHeight * imageRatio;
+    const drawHeight = imageRatio > pageRatio ? usableWidth / imageRatio : usableHeight;
+    const drawX = (pageWidth - drawWidth) / 2;
+    const drawY = pageHeight - margin - drawHeight;
+    const chunks = [];
+    const offsets = [0];
+    let byteLength = 0;
+
+    function appendText(text) {
+        const bytes = encoder.encode(text);
+        chunks.push(bytes);
+        byteLength += bytes.length;
+    }
+
+    function appendBytes(bytes) {
+        chunks.push(bytes);
+        byteLength += bytes.length;
+    }
+
+    function addObject(objectNumber, content) {
+        offsets[objectNumber] = byteLength;
+        appendText(objectNumber + ' 0 obj\n');
+        if (content instanceof Uint8Array) {
+            appendBytes(content);
+        } else {
+            appendText(content);
+        }
+        appendText('\nendobj\n');
+    }
+
+    appendText('%PDF-1.4\n');
+    addObject(1, '<< /Type /Catalog /Pages 2 0 R >>');
+    addObject(2, '<< /Type /Pages /Kids [3 0 R] /Count 1 >>');
+    addObject(
+        3,
+        '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + pageWidth + ' ' + pageHeight +
+        '] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>'
+    );
+    offsets[4] = byteLength;
+    appendText(
+        '4 0 obj\n' +
+        '<< /Type /XObject /Subtype /Image /Width ' + imageWidth +
+        ' /Height ' + imageHeight +
+        ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' +
+        jpegBytes.length + ' >>\nstream\n'
+    );
+    appendBytes(jpegBytes);
+    appendText('\nendstream\nendobj\n');
+
+    const contentStream = 'q\n' +
+        drawWidth.toFixed(2) + ' 0 0 ' + drawHeight.toFixed(2) + ' ' +
+        drawX.toFixed(2) + ' ' + drawY.toFixed(2) + ' cm\n' +
+        '/Im0 Do\nQ';
+    addObject(5, '<< /Length ' + encoder.encode(contentStream).length + ' >>\nstream\n' + contentStream + '\nendstream');
+
+    const xrefOffset = byteLength;
+    appendText('xref\n0 6\n0000000000 65535 f \n');
+    for (let objectNumber = 1; objectNumber <= 5; objectNumber += 1) {
+        appendText(String(offsets[objectNumber]).padStart(10, '0') + ' 00000 n \n');
+    }
+    appendText('trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n' + xrefOffset + '\n%%EOF');
+    return new Blob(chunks, { type: 'application/pdf' });
+}
+
+function loadImageFromObjectUrl(url) {
+    return new Promise(function (resolve, reject) {
+        const image = new Image();
+        image.onload = function () {
+            resolve(image);
+        };
+        image.onerror = function () {
+            reject(new Error('Das Notenblatt konnte nicht für den PDF-Export gerendert werden.'));
+        };
+        image.src = url;
     });
 }
 
-function exportCurrentSheetAsPdf() {
+async function exportCurrentSheetAsPdf() {
     const svgContent = buildExportSvgContent();
     const documentTitle = titel.attr('text') || 'Notenblatt';
-    const printWindow = window.open('', '_blank');
+    const svgBlob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8' });
+    const svgUrl = URL.createObjectURL(svgBlob);
 
-    if (!printWindow) {
-        alert('Das PDF-Fenster konnte nicht geöffnet werden. Bitte Pop-up-Blocker prüfen.');
-        return;
-    }
+    try {
+        const image = await loadImageFromObjectUrl(svgUrl);
+        const canvas = document.createElement('canvas');
+        canvas.width = 2480;
+        canvas.height = 3508;
+        const context = canvas.getContext('2d');
+        context.fillStyle = 'white';
+        context.fillRect(0, 0, canvas.width, canvas.height);
 
-    const html = `<!doctype html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <title>${String(documentTitle).replace(/[&<>"]/g, function (char) {
-      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[char];
-  })}</title>
-  <style>
-    @page { size: A4 portrait; margin: 8mm; }
-    html, body {
-      margin: 0;
-      padding: 0;
-      background: white;
-    }
-    body {
-      display: block;
-      padding: 0;
-      box-sizing: border-box;
-    }
-    svg {
-      width: 188mm;
-      max-width: 100%;
-      max-height: 279mm;
-      height: auto;
-      display: block;
-      margin: 0 auto;
-      page-break-inside: avoid;
-      break-inside: avoid;
-    }
-  </style>
-</head>
-<body>
-${svgContent}
-<script>
-  window.addEventListener('load', function () {
-    setTimeout(function () {
-      window.focus();
-      window.print();
-    }, 150);
-  });
-<\/script>
-</body>
-</html>`;
+        const padding = 94;
+        const usableWidth = canvas.width - padding * 2;
+        const usableHeight = canvas.height - padding * 2;
+        const imageRatio = image.naturalWidth / image.naturalHeight;
+        const canvasRatio = usableWidth / usableHeight;
+        const drawWidth = imageRatio > canvasRatio ? usableWidth : usableHeight * imageRatio;
+        const drawHeight = imageRatio > canvasRatio ? usableWidth / imageRatio : usableHeight;
+        const drawX = (canvas.width - drawWidth) / 2;
+        const drawY = padding;
 
-    printWindow.document.open();
-    printWindow.document.write(html);
-    printWindow.document.close();
+        context.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+
+        const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.94);
+        const jpegBytes = base64ToUint8Array(jpegDataUrl.split(',')[1]);
+        const pdfBlob = createSingleImagePdf(jpegBytes, canvas.width, canvas.height);
+        const baseName = sanitizeDownloadFileName(documentTitle, 'Notenblatt');
+        const pdfUrl = URL.createObjectURL(pdfBlob);
+        const link = document.createElement('a');
+        link.href = pdfUrl;
+        link.download = baseName + '.pdf';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.setTimeout(function () {
+            URL.revokeObjectURL(pdfUrl);
+        }, 1000);
+    } catch (error) {
+        console.error('PDF-Export fehlgeschlagen', error);
+        alert('Fehler beim PDF-Export: ' + error.message);
+    } finally {
+        URL.revokeObjectURL(svgUrl);
+    }
 }
 
 
@@ -1669,6 +2306,35 @@ function openAudioTestWindow(playerRows) {
     form.remove();
 }
 
+function timelinePayloadHasPlayableEntries(playerPayload) {
+    const config = Array.isArray(playerPayload) ? playerPayload[0] : null;
+    if (!config || !config.TimelineMode) {
+        return false;
+    }
+
+    const patternLibrary = Array.isArray(config.PatternLibrary) ? config.PatternLibrary : [];
+    const timelineEntries = Array.isArray(config.TimelineEntries) ? config.TimelineEntries : [];
+    if (patternLibrary.length === 0 || timelineEntries.length === 0) {
+        return false;
+    }
+
+    return timelineEntries.some(function (entry) {
+        if (!entry || !entry.patternId) {
+            return false;
+        }
+        const hasTarget = Array.isArray(entry.targetInstruments) && entry.targetInstruments.length > 0;
+        const pattern = patternLibrary.find(function (candidatePattern) {
+            return candidatePattern && candidatePattern.id === entry.patternId;
+        });
+        const hasNotes = pattern && Array.isArray(pattern.bars) && pattern.bars.some(function (bar) {
+            return bar && Array.isArray(bar.notes) && bar.notes.some(function (noteValue) {
+                return noteValue && noteValue !== 'f';
+            });
+        });
+        return hasTarget && hasNotes;
+    });
+}
+
 function callPHPScript_lesen(anzahl, options) {
     const readOptions = options || {};
     const shouldShowAlert = readOptions.showAlert !== false;
@@ -1795,7 +2461,11 @@ function runAudioTest() {
     try {
         const readResult = callPHPScript_lesen(zeilenAnzahl, { showAlert: false });
         syncTimelineStateFromReadResultIfNeeded(readResult, buildCurrentTimelineSyncOptions());
-        const playerPayload = buildTimelinePlayerPayload(timelineState.sourcePatterns, timelineState.entries);
+        let playerPayload = buildTimelinePlayerPayload(timelineState.sourcePatterns, timelineState.entries);
+        if (!timelinePayloadHasPlayableEntries(playerPayload)) {
+            console.warn('Timeline-Payload ist leer oder nicht spielbar, verwende direkten Notenblatt-Payload.');
+            playerPayload = buildPlayerRowsFromRhythmBars(readResult.rhythmBars, readResult.repeatRanges);
+        }
         window.lastPlayerRows = playerPayload;
         console.log('playerRows', playerPayload);
         openAudioTestWindow(playerPayload);
@@ -1807,49 +2477,385 @@ function runAudioTest() {
 
 // Speichern
 
+async function saveCurrentScoreLocal(nameOverride, folderIdOverride) {
+    const serializedRhythm = buildSerializedRhythm();
+    const name = (nameOverride || titel.attr('text') || 'Unbenannt').trim();
+    const existingScore = currentScoreId ? await localLibrary.getScore(currentScoreId) : null;
+    const folderId = folderIdOverride ||
+        (existingScore && existingScore.folderId) ||
+        localLibrary.rootFolderId;
+
+    const savedScore = await localLibrary.saveScore({
+        id: currentScoreId,
+        title: name,
+        folderId: folderId,
+        format: 'txt',
+        content: serializedRhythm
+    });
+
+    currentScoreId = savedScore.id;
+    titel.attr({ text: savedScore.title });
+    setSelectedFileSource('local');
+    await refreshFileList();
+    return savedScore;
+}
+
 function callPHPScript() {
-    updateTimelineMetadataNode();
+    saveCurrentScoreLocal().then(function (savedScore) {
+        alert('"' + savedScore.title + '" wurde lokal gespeichert.');
+    }).catch(function (error) {
+        console.error('Lokales Speichern fehlgeschlagen', error);
+        alert('Fehler beim lokalen Speichern: ' + error.message);
+    });
+}
 
-    if (rhythm == 'binaer') {
-        var serializedRhythm = '<binaer id="rhythmus"/>';
-    } else if (rhythm == 'neunaer') {
-        var serializedRhythm = '<neunaer id="rhythmus"/>';
-    } else {
-        var serializedRhythm = '<tenaer id="rhythmus"/>';
-    }
-
-    let elementsToSave = s.selectAll(removableCanvasElementSelector);
-    // Noten im Abseits löschen
-    elementsToSave.forEach(function (el) {
-        if (el.attr('id') == 'timeline_metadata') {
+async function renameLocalScore() {
+    try {
+        const scoreId = getSelectedLocalScoreId();
+        if (!scoreId) {
+            alert('Bitte zuerst eine lokale Datei auswählen oder speichern.');
             return;
         }
-        const ax = el.getBBox().cx;
-        const ay = el.getBBox().cy;
-        if (ax < 70 || ax > 1050 || ay < 0 || ay > 1480) {
-            el.remove();
+
+        const score = await localLibrary.getScore(scoreId);
+        if (!score) {
+            alert('Die lokale Datei wurde nicht gefunden.');
+            return;
         }
-    });
 
-    elementsToSave = s.selectAll(removableCanvasElementSelector);
-    elementsToSave.forEach(function (el) {
-        serializedRhythm += el.toString();
-    });
+        const nextTitle = prompt('Neuer Name:', score.title || '');
+        if (nextTitle == null) {
+            return;
+        }
 
-    const name = titel.attr('text');
-    saveContentWithCheck({
-        baseName: name,
-        extension: ".txt",
-        checkEndpoint: checkTextFileEndpoint,
-        saveEndpoint: saveTextEndpoint,
-        content: serializedRhythm,
-        onExistingFile: function (existingBaseName, retryCheckName, saveConfirmedName) {
-            const shouldOverwrite = confirm('Die Datei "' + existingBaseName + '" existiert schon!\nSoll die Datei überschrieben werden?', '');
-            if (shouldOverwrite) {
-                saveConfirmedName(existingBaseName);
+        const trimmedTitle = nextTitle.trim();
+        if (!trimmedTitle) {
+            alert('Der Name darf nicht leer sein.');
+            return;
+        }
+
+        const renamedScore = await localLibrary.saveScore(Object.assign({}, score, {
+            title: trimmedTitle
+        }));
+
+        currentScoreId = renamedScore.id;
+        titel.attr({ text: renamedScore.title });
+        setSelectedFileSource('local');
+        await refreshFileList();
+        alert('"' + renamedScore.title + '" wurde lokal umbenannt.');
+    } catch (error) {
+        console.error('Lokales Umbenennen fehlgeschlagen', error);
+        alert('Fehler beim lokalen Umbenennen: ' + error.message);
+    }
+}
+
+async function deleteLocalScore() {
+    try {
+        const scoreId = getSelectedLocalScoreId();
+        if (!scoreId) {
+            alert('Bitte zuerst eine lokale Datei auswählen.');
+            return;
+        }
+
+        const score = await localLibrary.getScore(scoreId);
+        if (!score) {
+            alert('Die lokale Datei wurde nicht gefunden.');
+            return;
+        }
+
+        const shouldDelete = confirm('"' + score.title + '" lokal löschen?\nDer Server bleibt unverändert.');
+        if (!shouldDelete) {
+            return;
+        }
+
+        await localLibrary.deleteScore(score.id);
+
+        setSelectedFileSource('local');
+        viererNoten();
+        await refreshFileList();
+        alert('"' + score.title + '" wurde lokal gelöscht.');
+    } catch (error) {
+        console.error('Lokales Löschen fehlgeschlagen', error);
+        alert('Fehler beim lokalen Löschen: ' + error.message);
+    }
+}
+
+async function publishCurrentScoreToServer(nameOverride) {
+    const savedScore = await saveCurrentScoreLocal(nameOverride);
+    const serverBaseName = String(savedScore.serverPath || '').replace(/\.txt$/i, '');
+    const localBaseName = String(savedScore.title || '').trim();
+    const publishToken = String(savedScore.publishToken || '').trim();
+    const canUpdatePublishedScore = Boolean(
+        savedScore.serverPath &&
+        publishToken &&
+        serverBaseName === localBaseName
+    );
+
+    const scoreForNewPublication = Object.assign({}, savedScore, {
+        serverPath: '',
+        fileName: '',
+        publishToken: ''
+    });
+    let publishResult;
+
+    if (canUpdatePublishedScore) {
+        try {
+            publishResult = await serverLibrary.updatePublishedScore(savedScore);
+        } catch (error) {
+            if (!/Publish-Token|kein Publish/i.test(error.message || '')) {
+                throw error;
             }
+            publishResult = await serverLibrary.publishScore(scoreForNewPublication);
         }
+    } else {
+        publishResult = await serverLibrary.publishScore(scoreForNewPublication);
+    }
+
+    const publishedScore = await localLibrary.markPublished(
+        savedScore.id,
+        publishResult.serverPath,
+        publishResult.publishToken
+    );
+
+    await refreshFileList();
+    return publishedScore;
+}
+
+async function publishCurrentScore() {
+    try {
+        const publishedScore = await publishCurrentScoreToServer();
+        alert('"' + publishedScore.title + '" wurde veröffentlicht.');
+    } catch (error) {
+        console.error('Veröffentlichen fehlgeschlagen', error);
+        alert('Fehler beim Veröffentlichen: ' + error.message);
+    }
+}
+
+function applyDialogNameToTitle() {
+    const nameValue = String(document.querySelector('#fileDialogName')?.value || '').trim();
+    if (nameValue) {
+        titel.attr({ text: nameValue });
+    }
+    return nameValue || titel.attr('text') || 'Unbenannt';
+}
+
+async function openLocalScore(scoreId) {
+    const score = await localLibrary.getScore(scoreId);
+    if (!score) {
+        throw new Error('Die lokale Datei wurde nicht gefunden.');
+    }
+    loadRhythmContent(score.title, score.content || score.data, score.id);
+    return score;
+}
+
+async function importServerScore(serverPath) {
+    const serverScore = await serverLibrary.importScore(serverPath);
+    const savedScore = await localLibrary.findScoreByServerPath(serverScore.serverPath).then(function (existingScore) {
+        if (existingScore) {
+            return existingScore;
+        }
+
+        return localLibrary.saveScore({
+            title: serverScore.title,
+            folderId: localLibrary.rootFolderId,
+            format: serverScore.format,
+            content: serverScore.content,
+            isPublished: true,
+            serverPath: serverScore.serverPath,
+            syncState: 'published'
+        });
     });
+
+    loadRhythmContent(savedScore.title, savedScore.content, savedScore.id);
+    setSelectedFileSource('local');
+    await refreshFileList();
+    return savedScore;
+}
+
+async function confirmFileDialog() {
+    try {
+        if (fileDialogState.mode === 'open') {
+            const entry = getSelectedFileDialogEntry();
+            if (!entry) {
+                return;
+            }
+            if (fileDialogState.source === 'local' && isFileDialogFolderEntry(entry)) {
+                await navigateFileDialogFolder(entry.targetFolderId || entry.id);
+                return;
+            }
+            if (fileDialogState.source === 'server') {
+                await importServerScore(entry.serverPath || entry.fileName);
+            } else {
+                await openLocalScore(entry.id);
+            }
+            closeFileDialog();
+            return;
+        }
+
+        const selectedEntry = getSelectedFileDialogEntry();
+        if (fileDialogState.mode === 'save' &&
+            fileDialogState.source === 'local' &&
+            isFileDialogFolderEntry(selectedEntry)) {
+            await navigateFileDialogFolder(selectedEntry.targetFolderId || selectedEntry.id);
+            return;
+        }
+
+        const chosenName = applyDialogNameToTitle();
+        if (fileDialogState.mode === 'export' && fileDialogState.format === 'pdf') {
+            closeFileDialog();
+            exportCurrentSheetAsPdf();
+            return;
+        }
+        if (fileDialogState.mode === 'export' && fileDialogState.format === 'svg') {
+            closeFileDialog();
+            callPHPScript2(chosenName);
+            return;
+        }
+
+        if (fileDialogState.source === 'server') {
+            const publishedScore = await publishCurrentScoreToServer(chosenName);
+            closeFileDialog();
+            alert('"' + publishedScore.title + '" wurde veröffentlicht.');
+            return;
+        }
+
+        const savedScore = await saveCurrentScoreLocal(chosenName, fileDialogState.folderId);
+        closeFileDialog();
+        alert('"' + savedScore.title + '" wurde lokal gespeichert.');
+    } catch (error) {
+        console.error('Dateidialog-Aktion fehlgeschlagen', error);
+        alert('Fehler: ' + error.message);
+    }
+}
+
+async function createFileDialogFolder() {
+    if (fileDialogState.source !== 'local' || fileDialogState.mode === 'export') {
+        return;
+    }
+
+    const folderName = prompt('Name des neuen Ordners:', 'Neuer Ordner');
+    if (folderName == null) {
+        return;
+    }
+
+    const trimmedName = folderName.trim();
+    if (!trimmedName) {
+        alert('Der Ordnername darf nicht leer sein.');
+        return;
+    }
+
+    try {
+        const folder = await localLibrary.createFolder(trimmedName, fileDialogState.folderId);
+        await navigateFileDialogFolder(folder.id);
+    } catch (error) {
+        console.error('Ordner konnte nicht erstellt werden', error);
+        alert('Fehler beim Erstellen des Ordners: ' + error.message);
+    }
+}
+
+async function renameSelectedFileDialogScore() {
+    const entry = getSelectedFileDialogEntry();
+    if (!entry || fileDialogState.source !== 'local') {
+        return;
+    }
+
+    if (entry.entryType === 'folder') {
+        const nextName = prompt('Neuer Ordnername:', entry.name || entry.title || '');
+        if (nextName == null) {
+            return;
+        }
+
+        const trimmedName = nextName.trim();
+        if (!trimmedName) {
+            alert('Der Ordnername darf nicht leer sein.');
+            return;
+        }
+
+        try {
+            const renamedFolder = await localLibrary.renameFolder(entry.id, trimmedName);
+            fileDialogState.selectedId = renamedFolder.id;
+            await refreshFileDialogEntries();
+        } catch (error) {
+            console.error('Lokaler Ordner konnte nicht umbenannt werden', error);
+            alert('Fehler beim Umbenennen des Ordners: ' + error.message);
+        }
+        return;
+    }
+
+    if (entry.entryType === 'score') {
+        currentScoreId = entry.id;
+        await renameLocalScore();
+        await refreshFileDialogEntries();
+    }
+}
+
+async function deleteSelectedFileDialogScore() {
+    const entry = getSelectedFileDialogEntry();
+    if (!entry || fileDialogState.source !== 'local') {
+        return;
+    }
+
+    if (entry.entryType === 'folder') {
+        if (!entry.isEmpty) {
+            alert('Der Ordner enthält noch Dateien oder Unterordner und kann nicht gelöscht werden.');
+            return;
+        }
+
+        const shouldDeleteFolder = confirm('Den leeren Ordner "' + (entry.name || entry.title) + '" lokal löschen?');
+        if (!shouldDeleteFolder) {
+            return;
+        }
+
+        try {
+            await localLibrary.deleteFolder(entry.id);
+            fileDialogState.selectedId = null;
+            await refreshFileDialogEntries();
+        } catch (error) {
+            console.error('Lokaler Ordner konnte nicht gelöscht werden', error);
+            alert('Fehler beim Löschen des Ordners: ' + error.message);
+        }
+        return;
+    }
+
+    if (entry.entryType === 'score') {
+        currentScoreId = entry.id;
+        await deleteLocalScore();
+        fileDialogState.selectedId = null;
+        await refreshFileDialogEntries();
+    }
+}
+
+async function deletePublishedFileDialogScore() {
+    const entry = getSelectedFileDialogEntry();
+    if (!entry || fileDialogState.source !== 'local') {
+        return;
+    }
+
+    if (!entry.serverPath || !entry.publishToken) {
+        alert('Diese lokale Datei hat kein Publish-Token für eine Serververöffentlichung.');
+        return;
+    }
+
+    const shouldDelete = confirm(
+        '"' + (entry.title || entry.serverPath) + '" vom Server löschen?\n' +
+        'Die lokale Datei bleibt erhalten.'
+    );
+    if (!shouldDelete) {
+        return;
+    }
+
+    try {
+        await serverLibrary.deletePublishedScore(entry);
+        const localScore = await localLibrary.unmarkPublished(entry.id);
+        currentScoreId = localScore.id;
+        setSelectedFileSource('local');
+        await refreshFileList();
+        await refreshFileDialogEntries();
+        alert('Die Veröffentlichung wurde gelöscht. Die lokale Datei bleibt erhalten.');
+    } catch (error) {
+        console.error('Veröffentlichung konnte nicht gelöscht werden', error);
+        alert('Fehler beim Löschen der Veröffentlichung: ' + error.message);
+    }
 }
 
 let scrollOn = false;
@@ -1880,9 +2886,59 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    document.querySelector('#button').addEventListener('click', callPHPScript);
-    document.querySelector('#button2').addEventListener('click', callPHPScript2);
-    document.querySelector('#button12').addEventListener('click', exportCurrentSheetAsPdf);
+    document.querySelector('#openFileDialogButton').addEventListener('click', function () {
+        openFileDialog('open');
+    });
+    document.querySelector('#saveFileDialogButton').addEventListener('click', function () {
+        openFileDialog('save');
+    });
+    document.querySelector('#exportFileDialogButton').addEventListener('click', function () {
+        openFileDialog('export');
+    });
+    document.querySelector('#fileDialogCancelButton').addEventListener('click', closeFileDialog);
+    document.querySelector('#fileDialogConfirmButton').addEventListener('click', confirmFileDialog);
+    document.querySelector('#fileDialogRefreshButton').addEventListener('click', refreshFileDialogEntries);
+    document.querySelector('#fileDialogNewFolderButton').addEventListener('click', createFileDialogFolder);
+    document.querySelector('#fileDialogRenameButton').addEventListener('click', renameSelectedFileDialogScore);
+    document.querySelector('#fileDialogDeleteButton').addEventListener('click', deleteSelectedFileDialogScore);
+    document.querySelector('#fileDialogUnpublishButton').addEventListener('click', deletePublishedFileDialogScore);
+    document.querySelector('#fileDialogSearch').addEventListener('input', renderFileDialogList);
+    document.querySelector('#fileDialogName').addEventListener('keydown', function (event) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            confirmFileDialog();
+        }
+    });
+    document.querySelector('#fileDialogFormat').addEventListener('change', function (event) {
+        fileDialogState.format = event.target.value;
+        updateFileDialogControls();
+    });
+    document.querySelectorAll('.file-dialog-source').forEach(function (sourceButton) {
+        sourceButton.addEventListener('click', function () {
+            setSelectedFileSource(sourceButton.dataset.source);
+            fileDialogState.selectedId = null;
+            refreshFileDialogEntries();
+        });
+    });
+    document.querySelectorAll('.file-dialog-filter').forEach(function (filterButton) {
+        filterButton.addEventListener('click', function () {
+            if (fileDialogState.source !== 'local') {
+                return;
+            }
+            fileDialogState.filter = filterButton.dataset.filter;
+            renderFileDialogList();
+        });
+    });
+    document.querySelector('#fileDialog').addEventListener('click', function (event) {
+        if (event.target === event.currentTarget) {
+            closeFileDialog();
+        }
+    });
+    document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape' && !document.querySelector('#fileDialog').hidden) {
+            closeFileDialog();
+        }
+    });
     document.querySelector('#button3').addEventListener('click', runReadRhythm);
     document.querySelector('#button10').addEventListener('click', runAudioTest);
     document.querySelector('#button4').addEventListener('click', viererNoten);
@@ -1975,9 +3031,9 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     [
-        '#button',
-        '#button2',
-        '#button12',
+        '#openFileDialogButton',
+        '#saveFileDialogButton',
+        '#exportFileDialogButton',
         '#button3',
         '#button4',
         '#button5',
@@ -2103,13 +3159,57 @@ function get_value(e) {
     closeAppMenus();
 
     let selectedFileName;
+    let selectedFromUrl = false;
     if (e) {
-        selectedFileName = e.options[e.selectedIndex].text;
+        selectedFileName = e.value || e.options[e.selectedIndex].text;
     }
     if (datei_name != "") {
         selectedFileName = datei_name;
+        selectedFromUrl = true;
+        datei_name = "";
     }
-    loadRhythmFile(selectedFileName);
+
+    if (!selectedFileName || selectedFileName === '--') {
+        return;
+    }
+
+    if (getSelectedFileSource() === 'server' || selectedFromUrl) {
+        serverLibrary.importScore(selectedFileName).then(function (serverScore) {
+            return localLibrary.findScoreByServerPath(serverScore.serverPath).then(function (existingScore) {
+                if (existingScore) {
+                    return existingScore;
+                }
+
+                return localLibrary.saveScore({
+                    title: serverScore.title,
+                    folderId: localLibrary.rootFolderId,
+                    format: serverScore.format,
+                    content: serverScore.content,
+                    isPublished: true,
+                    serverPath: serverScore.serverPath,
+                    syncState: 'published'
+                });
+            });
+        }).then(function (savedScore) {
+            loadRhythmContent(savedScore.title, savedScore.content, savedScore.id);
+            setSelectedFileSource('local');
+            refreshFileList();
+        }).catch(function (error) {
+            console.error('Serverdatei konnte nicht importiert werden', error);
+            alert('Fehler beim Laden vom Server: ' + error.message);
+        });
+        return;
+    }
+
+    localLibrary.getScore(selectedFileName).then(function (score) {
+        if (!score) {
+            return;
+        }
+        loadRhythmContent(score.title, score.content || score.data, score.id);
+    }).catch(function (error) {
+        console.error('Lokale Datei konnte nicht geladen werden', error);
+        alert('Fehler beim lokalen Laden: ' + error.message);
+    });
 }
 
 get_value();

@@ -17,10 +17,48 @@ class Instrumente {
     this.readyPromise = this.loadSounds();
   }
 
+  createSilentBuffer(duration = 0.08) {
+    const sampleRate = this._audioCtx.sampleRate || 44100;
+    return this._audioCtx.createBuffer(1, Math.max(1, Math.ceil(sampleRate * duration)), sampleRate);
+  }
+
   async getFile(filepath) {
+    if (this.getSoundName(filepath) === 'Silence') {
+      return this.createSilentBuffer();
+    }
+
     const response = await fetch(filepath);
+    const contentType = response.headers.get('content-type') || '';
+
+    if (!response.ok) {
+      throw new Error(
+        'Audiodatei konnte nicht geladen werden: ' + filepath +
+        ' -> ' + response.url +
+        ' (HTTP ' + response.status + ')'
+      );
+    }
+
     const arrayBuffer = await response.arrayBuffer();
-    return this._audioCtx.decodeAudioData(arrayBuffer);
+    const firstBytes = new Uint8Array(arrayBuffer.slice(0, 16));
+    const firstText = String.fromCharCode.apply(null, firstBytes).trim();
+
+    if (/^(text\/html|application\/json|application\/xml|text\/xml)\b/i.test(contentType) || firstText.charAt(0) === '<') {
+      throw new Error(
+        'Audiodatei liefert keine Audiodaten: ' + filepath +
+        ' -> ' + response.url +
+        ' (' + (contentType || 'kein Content-Type') + ')'
+      );
+    }
+
+    try {
+      return await this._audioCtx.decodeAudioData(arrayBuffer);
+    } catch (error) {
+      throw new Error(
+        'Audiodatei konnte nicht dekodiert werden: ' + filepath +
+        ' -> ' + response.url +
+        ' (' + (contentType || 'kein Content-Type') + ') - ' + error.message
+      );
+    }
   }
 
   getSoundName(filepath) {

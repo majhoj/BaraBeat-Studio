@@ -347,7 +347,28 @@ var verticalSnapOffsets = [-32, -2, 15, 31, 42];
 // 2: erste Position unterhalb der Grundlinie
 // 3: zweite Position unterhalb der Grundlinie
 var noteSymbolVerticalSnapOffsets = [17, 32, 47, 62];
+// Eigene vertikale Stufen fuer editierbare Textfelder:
+// -100: Titel-Zeile, -32: Chooser-Zeile, danach die normalen Park-/Notenlinien-Ziele.
+var editableTextVerticalSnapOffsets = [-100, -32, -2, 15, 31, 42];
 //var verticalSnapOffsets = [-32, -12, 15, 36, 70];
+
+function getElementTranslateY(element) {
+  if (!element || typeof element.transform !== "function") {
+    return 0;
+  }
+
+  var transformState = element.transform();
+  var localMatrix = transformState && transformState.localMatrix ? transformState.localMatrix : null;
+  return localMatrix && typeof localMatrix.f === "number" ? localMatrix.f : 0;
+}
+
+function getTextElementBaselineY(element, bbox) {
+  var attrY = element && typeof element.attr === "function" ? Number(element.attr("y")) : NaN;
+  if (Number.isFinite(attrY)) {
+    return attrY + getElementTranslateY(element);
+  }
+  return bbox.cy;
+}
 
 function getElementSnapReferenceY(element, bbox) {
   var elementId = element && typeof element.attr === "function" ? element.attr("id") : "";
@@ -360,6 +381,10 @@ function getElementSnapReferenceY(element, bbox) {
     if (chooserMatrix && typeof chooserMatrix.f === "number") {
       return chooserMatrix.f;
     }
+  }
+
+  if (elementId === "edit_text") {
+    return getTextElementBaselineY(element, bbox);
   }
 
   if (elementId === "slap" || elementId === "slap_flam") {
@@ -419,9 +444,12 @@ function snapToVerticalTargets(targetY, element) {
     elementId === "tone_flam" ||
     elementId === "slap_flam" ||
     elementId === "bass_slap_flam";
+  var usesEditableTextTargets = elementId === "edit_text";
   var snapTargets =
     usesNoteSymbolTargets
       ? getVerticalSnapTargets(noteSymbolVerticalSnapOffsets)
+      : usesEditableTextTargets
+        ? getVerticalSnapTargets(editableTextVerticalSnapOffsets)
       : getVerticalSnapTargets();
   var nearestTargetY = snapTargets[0];
   var smallestDistance = Math.abs(targetY - nearestTargetY);
