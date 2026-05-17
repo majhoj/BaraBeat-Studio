@@ -33,6 +33,12 @@ body {
   color: var(--black);
 }
 
+body.embedded-player {
+  padding: 10px;
+  font-size: 92%;
+  overflow: hidden;
+}
+
 h2 {
   font-size: 1.2em;
 }
@@ -80,6 +86,11 @@ h2 {
 
 }
 
+body.embedded-player #sequencer {
+  width: 100%;
+  max-width: none;
+}
+
 /* ~~~~~~~~~~~~~~~~~~~~~~~ top section */
 .controls-main {
   padding: 2vw;
@@ -96,12 +107,27 @@ h2 {
 
 }
 
+body.embedded-player .controls-main {
+  padding: 10px;
+  gap: 12px;
+  font-size: 18px;
+  border-width: 4px;
+  border-radius: 12px;
+}
+
 .player-title {
   display: flex;
   gap: 12px;
   align-items: center;
   min-width: 180px;
   white-space: nowrap;
+}
+
+body.embedded-player .player-title {
+  min-width: 120px;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .player-controls {
@@ -111,6 +137,10 @@ h2 {
   flex: 1;
   justify-content: flex-end;
   min-width: 0;
+}
+
+body.embedded-player .player-controls {
+  gap: 6px;
 }
 
 .player-controls label {
@@ -128,9 +158,17 @@ h2 {
   font: inherit;
 }
 
+body.embedded-player .player-controls select {
+  min-width: 112px;
+}
+
 .player-controls input[type=range] {
   flex: 1 1 320px;
   max-width: 420px;
+}
+
+body.embedded-player .player-controls input[type=range] {
+  flex-basis: 160px;
 }
 
 .secondary-button {
@@ -142,6 +180,13 @@ h2 {
   background-color: var(--dgrey);
   cursor: pointer;
   font: inherit;
+}
+
+body.embedded-player .secondary-button {
+  min-height: 42px;
+  padding: 0 12px;
+  border-width: 4px;
+  border-radius: 12px;
 }
 
 .secondary-button:disabled {
@@ -158,6 +203,13 @@ h2 {
   border-radius: var(--borderRad);
   background-color: var(--dgrey);
   cursor: pointer;
+}
+
+body.embedded-player [data-playing] {
+  flex-basis: 68px;
+  min-height: 42px;
+  border-width: 4px;
+  border-radius: 12px;
 }
 
 [data-playing="false"] {

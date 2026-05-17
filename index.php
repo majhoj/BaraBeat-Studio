@@ -6,6 +6,7 @@ $jsServerLibrary = @filemtime(__DIR__ . '/JS/serverLibrary.js') ?: 1;
 $jsSel = @filemtime(__DIR__ . '/JS/selection_drag_7.js') ?: 1;
 $jsFn = @filemtime(__DIR__ . '/JS/functions.js') ?: 1;
 $jsTimeline = @filemtime(__DIR__ . '/JS/timeline.js') ?: 1;
+$jsPractice = @filemtime(__DIR__ . '/JS/practice.js') ?: 1;
 $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
 ?>
 <!doctype html>
@@ -22,6 +23,7 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
     <script src="JS/selection_drag_7.js?v=<?php echo $jsSel; ?>"></script>
     <script src="JS/functions.js?v=<?php echo $jsFn; ?>"></script>
     <script src="JS/timeline.js?v=<?php echo $jsTimeline; ?>"></script>
+    <script src="JS/practice.js?v=<?php echo $jsPractice; ?>"></script>
     <link rel="stylesheet" href="CSS/index_style.css?v=<?php echo $cssIndex; ?>">
 </head>
 
@@ -60,6 +62,7 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
             <summary>Werkzeuge</summary>
             <div class="app-menu-panel">
                 <button type="button" id="button10">Audiotest</button>
+                <button type="button" id="practiceButton">Üben</button>
                 <button type="button" id="button11">Abschnittstimeline</button>
                 <button type="button" id="button6">Scroll</button>
             </div>
@@ -187,6 +190,60 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
                 <div id="timelineSequence" class="timeline-sequence-list"></div>
             </section>
         </div>
+    </div>
+
+    <div id="practicePanel" hidden>
+        <div class="timeline-panel-header practice-panel-header">
+            <div>
+                <div class="timeline-panel-title practice-panel-title">Übungsmodus</div>
+                <div id="practiceStatus" class="timeline-status">Pattern werden aus dem Notenblatt gelesen.</div>
+            </div>
+            <div class="timeline-panel-actions">
+                <label class="timeline-tempo-control" for="practiceAccompanimentStart">
+                    Begleitung startet
+                    <select id="practiceAccompanimentStart">
+                        <option value="immediate">Sofort</option>
+                        <option value="afterCall">Nach Call</option>
+                        <option value="afterIntro">Nach Intro</option>
+                        <option value="afterCallIntro">Nach Call + Intro</option>
+                    </select>
+                </label>
+                <label class="timeline-tempo-control" for="practiceWithoutSoloLoops">
+                    Ohne Solo
+                    <input type="number" id="practiceWithoutSoloLoops" min="0" max="32" step="1" value="1" />
+                </label>
+                <label class="timeline-tempo-control" for="practiceWithSoloLoops">
+                    Mit Solo
+                    <input type="number" id="practiceWithSoloLoops" min="1" max="32" step="1" value="1" />
+                </label>
+                <label class="timeline-tempo-control" for="practiceRepeatCount">
+                    Wiederholen
+                    <input type="number" id="practiceRepeatCount" min="1" max="64" step="1" value="4" />
+                </label>
+                <button type="button" id="practiceAudioButton">Player laden</button>
+                <button type="button" id="practiceRefreshButton">Aus Blatt aktualisieren</button>
+                <button type="button" id="practiceCloseButton">Schließen</button>
+            </div>
+        </div>
+        <div class="timeline-panel-body practice-panel-body">
+            <section class="timeline-column practice-column practice-accompaniment-column">
+                <h3>Begleitung auswählen</h3>
+                <p class="timeline-column-note">Diese Pattern laufen parallel als Loop.</p>
+                <div id="practiceAccompanimentList" class="timeline-pattern-list"></div>
+            </section>
+            <section class="timeline-column practice-column practice-solo-column">
+                <h3>Solo-Reihenfolge</h3>
+                <p class="timeline-column-note">Diese Pattern werden in fester Reihenfolge zugeschaltet.</p>
+                <div id="practiceSoloList" class="timeline-pattern-list"></div>
+            </section>
+        </div>
+        <section class="practice-player-panel" hidden>
+            <div class="practice-player-header">
+                <h3>Audioplayer</h3>
+                <button type="button" id="practiceAudioReloadButton">Aktualisieren</button>
+            </div>
+            <iframe id="practiceAudioFrame" name="practiceAudioFrame" title="Audioplayer Übungsmodus"></iframe>
+        </section>
     </div>
 
     <script>
@@ -2294,16 +2351,56 @@ function buildPlayerRowsFromRhythmBars(rhythmBars, repeatRanges) {
     return playerRows;
 }
 
-function openAudioTestWindow(playerRows) {
+function openAudioTestTarget(playerRows, targetName, embedded) {
     const form = document.createElement('form');
     form.action = 'Audio/audioplayer.php';
     form.method = 'POST';
-    form.target = '_blank';
-    form.innerHTML = '<input type="hidden" name="myObj" />';
+    form.target = targetName || '_blank';
+    form.innerHTML = '<input type="hidden" name="myObj" /><input type="hidden" name="embedded" />';
     document.body.appendChild(form);
     form.querySelector('input[name="myObj"]').value = JSON.stringify(playerRows);
+    form.querySelector('input[name="embedded"]').value = embedded ? '1' : '';
     form.submit();
     form.remove();
+}
+
+function openAudioTestWindow(playerRows) {
+    openAudioTestTarget(playerRows, '_blank', false);
+}
+
+function openAudioTestFrame(playerRows, frameName) {
+    openAudioTestTarget(playerRows, frameName, true);
+}
+
+function isPracticeAudioModeActive() {
+    const practicePanelEl = document.getElementById('practicePanel');
+    return practiceState.visible || (practicePanelEl && !practicePanelEl.hidden);
+}
+
+function buildAudioTestPayload(forcePracticeMode) {
+    const readResult = callPHPScript_lesen(zeilenAnzahl, { showAlert: false });
+    syncTimelineStateFromReadResultIfNeeded(readResult, buildCurrentTimelineSyncOptions());
+    const practiceIsActive = forcePracticeMode || isPracticeAudioModeActive();
+    let playerPayload;
+
+    if (practiceIsActive) {
+        syncPracticeSelectionsWithPatternLibrary();
+        playerPayload = buildPracticePlayerPayload();
+    } else {
+        playerPayload = buildTimelinePlayerPayload(timelineState.sourcePatterns, timelineState.entries);
+    }
+
+    if (!practiceIsActive && !timelinePayloadHasPlayableEntries(playerPayload)) {
+        console.warn('Timeline-Payload ist leer oder nicht spielbar, verwende direkten Notenblatt-Payload.');
+        playerPayload = buildPlayerRowsFromRhythmBars(readResult.rhythmBars, readResult.repeatRanges);
+    }
+
+    window.lastPlayerRows = playerPayload;
+    console.log('playerRows', playerPayload);
+    return {
+        playerPayload: playerPayload,
+        practiceIsActive: practiceIsActive
+    };
 }
 
 function timelinePayloadHasPlayableEntries(playerPayload) {
@@ -2459,19 +2556,48 @@ function runReadRhythm() {
 
 function runAudioTest() {
     try {
-        const readResult = callPHPScript_lesen(zeilenAnzahl, { showAlert: false });
-        syncTimelineStateFromReadResultIfNeeded(readResult, buildCurrentTimelineSyncOptions());
-        let playerPayload = buildTimelinePlayerPayload(timelineState.sourcePatterns, timelineState.entries);
-        if (!timelinePayloadHasPlayableEntries(playerPayload)) {
-            console.warn('Timeline-Payload ist leer oder nicht spielbar, verwende direkten Notenblatt-Payload.');
-            playerPayload = buildPlayerRowsFromRhythmBars(readResult.rhythmBars, readResult.repeatRanges);
+        const audioTest = buildAudioTestPayload(false);
+        if (audioTest.practiceIsActive) {
+            openPracticeAudioPlayer(audioTest.playerPayload);
+            return;
         }
-        window.lastPlayerRows = playerPayload;
-        console.log('playerRows', playerPayload);
-        openAudioTestWindow(playerPayload);
+        openAudioTestWindow(audioTest.playerPayload);
     } catch (error) {
         console.error('runAudioTest failed', error);
         alert('Fehler beim Audiotest: ' + error.message);
+    }
+}
+
+function openPracticeAudioPlayer(playerPayload) {
+    const playerPanelEl = document.querySelector('.practice-player-panel');
+    const playerFrameEl = document.getElementById('practiceAudioFrame');
+    if (!playerPanelEl || !playerFrameEl) {
+        openAudioTestWindow(playerPayload);
+        return;
+    }
+
+    playerPanelEl.hidden = false;
+    openAudioTestFrame(playerPayload, playerFrameEl.name || 'practiceAudioFrame');
+}
+
+function clearPracticeAudioPlayer() {
+    const playerPanelEl = document.querySelector('.practice-player-panel');
+    const playerFrameEl = document.getElementById('practiceAudioFrame');
+    if (playerPanelEl) {
+        playerPanelEl.hidden = true;
+    }
+    if (playerFrameEl) {
+        playerFrameEl.src = 'about:blank';
+    }
+}
+
+function runPracticeAudioTest() {
+    try {
+        const audioTest = buildAudioTestPayload(true);
+        openPracticeAudioPlayer(audioTest.playerPayload);
+    } catch (error) {
+        console.error('runPracticeAudioTest failed', error);
+        alert('Fehler beim Übungsplayer: ' + error.message);
     }
 }
 
@@ -2954,12 +3080,66 @@ document.addEventListener('DOMContentLoaded', function () {
         try {
             const readResult = callPHPScript_lesen(zeilenAnzahl, { showAlert: false });
             syncTimelineStateFromReadResultIfNeeded(readResult, buildCurrentTimelineSyncOptions());
+            practiceState.visible = false;
+            clearPracticeAudioPlayer();
             timelineState.visible = !timelineState.visible;
+            renderPracticePanel();
             renderTimelinePanel();
         } catch (error) {
             console.error('Timeline konnte nicht aktualisiert werden', error);
             alert('Fehler beim Aufbau der Timeline: ' + error.message);
         }
+    });
+    document.querySelector('#practiceButton').addEventListener('click', function () {
+        try {
+            refreshPracticeFromSheet(false);
+            timelineState.visible = false;
+            practiceState.visible = !practiceState.visible;
+            if (!practiceState.visible) {
+                clearPracticeAudioPlayer();
+            }
+            renderTimelinePanel();
+            renderPracticePanel();
+        } catch (error) {
+            console.error('Übungsmodus konnte nicht aktualisiert werden', error);
+            alert('Fehler beim Aufbau des Übungsmodus: ' + error.message);
+        }
+    });
+    document.querySelector('#practiceRefreshButton').addEventListener('click', function () {
+        try {
+            refreshPracticeFromSheet(true);
+        } catch (error) {
+            console.error('Übungsmodus-Refresh fehlgeschlagen', error);
+            alert('Fehler beim Aktualisieren des Übungsmodus: ' + error.message);
+        }
+    });
+    document.querySelector('#practiceAudioButton').addEventListener('click', runPracticeAudioTest);
+    document.querySelector('#practiceAudioReloadButton').addEventListener('click', runPracticeAudioTest);
+    document.querySelector('#practiceCloseButton').addEventListener('click', function () {
+        practiceState.visible = false;
+        clearPracticeAudioPlayer();
+        renderPracticePanel();
+    });
+    document.querySelector('#practiceWithoutSoloLoops').addEventListener('input', function (event) {
+        practiceState.loopsWithoutSolo = normalizePracticeCount(event.target.value, 1, 0, 32);
+        event.target.value = practiceState.loopsWithoutSolo;
+    });
+    document.querySelector('#practiceWithSoloLoops').addEventListener('input', function (event) {
+        practiceState.loopsWithSolo = normalizePracticeCount(event.target.value, 1, 1, 32);
+        event.target.value = practiceState.loopsWithSolo;
+    });
+    document.querySelector('#practiceRepeatCount').addEventListener('input', function (event) {
+        practiceState.repeatCount = normalizePracticeCount(event.target.value, 4, 1, 64);
+        event.target.value = practiceState.repeatCount;
+    });
+    document.querySelector('#practiceAccompanimentStart').addEventListener('change', function (event) {
+        const selectedStartMode = event.target.value;
+        practiceState.accompanimentStart = selectedStartMode === 'afterCall' ||
+            selectedStartMode === 'afterIntro' ||
+            selectedStartMode === 'afterCallIntro'
+            ? selectedStartMode
+            : 'immediate';
+        renderPracticePanel();
     });
     document.querySelector('#timelineRefreshButton').addEventListener('click', function () {
         try {

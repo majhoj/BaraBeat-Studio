@@ -514,6 +514,120 @@
     backdrop-filter: blur(8px);
 }
 
+#practicePanel {
+    position: fixed;
+    top: 58px;
+    left: 12px;
+    right: 12px;
+    z-index: 20;
+    background: var(--ui-bg);
+    border: 1px solid var(--ui-border);
+    border-radius: 14px;
+    box-shadow: var(--ui-shadow);
+    padding: 16px;
+    font-family: var(--ui-font);
+    max-height: calc(100vh - 64px);
+    overflow: auto;
+    backdrop-filter: blur(8px);
+    background: #f6fbf8;
+    border-color: #9fcfb2;
+}
+
+#practicePanel[hidden] {
+    display: none;
+}
+
+.practice-panel-header {
+    border-bottom-color: #9fcfb2;
+}
+
+.practice-panel-title {
+    color: #185f3d;
+}
+
+.practice-panel-body {
+    grid-template-columns: 1fr 1fr;
+}
+
+.practice-column {
+    background: #fbfefc;
+    border-color: #b9dbc7;
+}
+
+.practice-accompaniment-column {
+    box-shadow: inset 4px 0 0 #2f9b62, var(--ui-shadow-soft);
+}
+
+.practice-solo-column {
+    box-shadow: inset 4px 0 0 #4c7fd9, var(--ui-shadow-soft);
+}
+
+.practice-pattern-row {
+    display: grid;
+    grid-template-columns: auto minmax(120px, 1fr);
+    gap: 2px 8px;
+    align-items: center;
+    padding: 7px 8px;
+    border-bottom: 1px solid var(--ui-border);
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.practice-pattern-row.is-selected {
+    background: #e7f5ed;
+}
+
+.practice-pattern-row input {
+    grid-row: span 2;
+}
+
+.practice-pattern-title {
+    font-weight: 700;
+    color: var(--ui-text);
+}
+
+.practice-pattern-meta {
+    color: var(--ui-text-soft);
+    font-size: 12px;
+}
+
+.practice-player-panel {
+    margin-top: 14px;
+    border: 1px solid #b9dbc7;
+    border-radius: 12px;
+    background: #fbfefc;
+    box-shadow: var(--ui-shadow-soft);
+    overflow: hidden;
+}
+
+.practice-player-panel[hidden] {
+    display: none;
+}
+
+.practice-player-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    border-bottom: 1px solid #b9dbc7;
+    background: #e7f5ed;
+}
+
+.practice-player-header h3 {
+    margin: 0;
+    font-size: 16px;
+    color: #185f3d;
+}
+
+#practiceAudioFrame {
+    display: block;
+    width: 100%;
+    height: 156px;
+    border: 0;
+    background: white;
+}
+
 #timelinePanel[hidden] {
     display: none;
 }
@@ -555,13 +669,19 @@
 }
 
 .timeline-swing-control input,
-.timeline-tempo-control input {
+.timeline-tempo-control input,
+.timeline-tempo-control select {
     width: 72px;
     padding: 5px 7px;
     font-size: 14px;
     border: 1px solid var(--ui-border);
     border-radius: 6px;
     background: white;
+}
+
+.timeline-tempo-control select {
+    width: auto;
+    min-width: 116px;
 }
 
 .timeline-swing-profile {

@@ -349,23 +349,12 @@ function normalizePatternInstrumentName(instrumentName) {
     return normalizedName;
 }
 
-function isSpecificDjembeName(instrumentName) {
-    return instrumentName === 'Djembe 1' ||
-        instrumentName === 'Djembe 2' ||
-        instrumentName === 'Djembe 3';
-}
-
 function resolvePatternSourceInstrumentName(bar, labelInfo) {
     const explicitInstrumentName = String(bar && bar.instrument || '').trim();
     const effectiveInstrumentName = String(bar && (bar.effectiveInstrument || bar.instrument) || '').trim();
 
     if (explicitInstrumentName && explicitInstrumentName !== 'Leer') {
         return explicitInstrumentName;
-    }
-
-    if ((labelInfo.type === 'Intro' || labelInfo.type === 'Echauffement' || labelInfo.type === 'Outro') &&
-        isSpecificDjembeName(effectiveInstrumentName)) {
-        return 'Djembe';
     }
 
     return effectiveInstrumentName;

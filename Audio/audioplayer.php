@@ -1,10 +1,12 @@
 <?php
 $myObject = $_POST["myObj"] ?? "[]";
+$embedded = ($_POST["embedded"] ?? "") === "1";
 $playerJs = @filemtime(__DIR__ . '/js/instrument_2.js') ?: 1;
 $playerCss = @filemtime(__DIR__ . '/css/audio_style.css') ?: 1;
 ?>
 <script>
   const obj = <?php echo $myObject; ?>;
+  const embeddedPlayer = <?php echo $embedded ? 'true' : 'false'; ?>;
   const myObjectString = JSON.stringify(obj);
 
   function close_window() {
@@ -34,7 +36,7 @@ a:link {
 }
 </style>
 
-<body>
+<body class="<?php echo $embedded ? 'embedded-player' : ''; ?>">
 
 <div class="loading">
   <p>Loading...</p>
@@ -44,7 +46,7 @@ a:link {
   <section class="controls-main">
     <div class="player-title">
       <script>
-        document.write('<a href="javascript:close_window();">X</a>' + obj[0].Name);
+        document.write((embeddedPlayer ? '' : '<a href="javascript:close_window();">X</a>') + obj[0].Name);
       </script>
     </div>
     <div class="player-controls">
@@ -287,6 +289,7 @@ function expandPatternBars(pattern) {
 const playerConfig = Array.isArray(obj) && obj.length > 0 ? obj[0] : {};
 const repeatRanges = sanitizeRepeatRanges(playerConfig.RepeatRanges);
 const isTimelineMode = Boolean(playerConfig.TimelineMode);
+const isPracticeMode = Boolean(playerConfig.PracticeMode);
 const timelineLoopCount = normalizeTimelineLoopCountValue(
   playerConfig.TimelineLoopCount !== undefined ? playerConfig.TimelineLoopCount : playerConfig.TimelineLoop
 );
@@ -785,6 +788,10 @@ function isTimelineContinuationMarker(markerValue) {
 }
 
 function patternStartsContinuingAccompaniment(pattern) {
+  if (isPracticeMode) {
+    return false;
+  }
+
   if (!pattern || pattern.label !== 'Begleitung' || !Array.isArray(pattern.bars)) {
     return false;
   }
@@ -962,16 +969,18 @@ function buildTimelineSections(config) {
     const blockLabel = playbackEntries[blockStartIndex].label;
     const blockId = playbackEntries[blockStartIndex].blockId;
     const parallelGroupId = playbackEntries[blockStartIndex].parallelGroupId;
+    const isPracticeBlock = isPracticeMode && blockId;
     let blockEndIndex = blockStartIndex + 1;
-    while (blockEndIndex < playbackEntries.length &&
-      (
-        parallelGroupId
-          ? playbackEntries[blockEndIndex].parallelGroupId === parallelGroupId
-          : (
-              playbackEntries[blockEndIndex].label === blockLabel &&
-              playbackEntries[blockEndIndex].blockId === blockId
-            )
-      )) {
+    while (blockEndIndex < playbackEntries.length) {
+      const nextEntry = playbackEntries[blockEndIndex];
+      const belongsToCurrentBlock = isPracticeBlock
+        ? nextEntry.blockId === blockId
+        : (parallelGroupId
+            ? nextEntry.parallelGroupId === parallelGroupId
+            : nextEntry.label === blockLabel && nextEntry.blockId === blockId);
+      if (!belongsToCurrentBlock) {
+        break;
+      }
       blockEndIndex += 1;
     }
 
@@ -1000,47 +1009,49 @@ function buildTimelineSections(config) {
       matchingLane.entries.push(entryData);
     });
 
-    if (parallelGroupId) {
+    if (parallelGroupId || isPracticeBlock) {
       const mergedSection = createOrderedSection(blockLabel);
       const sectionLabelNames = [];
 
-      blockLanes.forEach(function (laneData) {
-        const laneHandMode = laneData.entries.find(function (laneEntry) {
-          return String(laneEntry.handMode || '') !== '';
+      blockEntries.forEach(function (entryData) {
+        const shouldApplyOut = !isPracticeMode &&
+          blockEndIndex < playbackEntries.length &&
+          entryData.label === 'Begleitung' &&
+          entryData.patternOutStep !== null;
+        const effectiveNotes = shouldApplyOut
+          ? applyOutToPatternNotes(entryData.patternNotes, entryData.patternOutStep)
+          : entryData.patternNotes;
+
+        entryData.targetInstruments.forEach(function (instrumentName) {
+          mergedSection.trackNotes[instrumentName] = mergeNotesIntoTrack(
+            mergedSection.trackNotes[instrumentName],
+            effectiveNotes,
+            0
+          );
+          if (instrumentName.indexOf('Djembe_') === 0) {
+            mergedSection.trackHandModes[instrumentName] = String(entryData.handMode || '');
+          }
         });
 
-        laneData.entries.forEach(function (laneEntry, laneEntryIndex) {
-          const shouldApplyOut = blockEndIndex < playbackEntries.length &&
-            laneEntry.label === 'Begleitung' &&
-            laneEntry.patternOutStep !== null &&
-            laneEntryIndex === laneData.entries.length - 1;
-          const effectiveNotes = shouldApplyOut
-            ? applyOutToPatternNotes(laneEntry.patternNotes, laneEntry.patternOutStep)
-            : laneEntry.patternNotes;
-
-          laneData.targetInstruments.forEach(function (instrumentName) {
-            appendNotesToSectionTrack(mergedSection, instrumentName, effectiveNotes);
-            if (instrumentName.indexOf('Djembe_') === 0 && laneHandMode) {
-              mergedSection.trackHandModes[instrumentName] = String(laneHandMode.handMode || '');
-            }
+        if (sectionLabelNames.indexOf(entryData.labelName) === -1) {
+          sectionLabelNames.push(entryData.labelName);
+        }
+        if (mergedSection.swingFactor === null && entryData.swingFactor !== null && entryData.swingFactor !== undefined) {
+          mergedSection.swingFactor = entryData.swingFactor;
+        }
+        if (entryData.startsContinuingAccompaniment) {
+          entryData.targetInstruments.forEach(function (instrumentName) {
+            mergedSection.continuingAccompaniments[instrumentName] = entryData.patternNotes.slice();
           });
-
-          if (sectionLabelNames.indexOf(laneEntry.labelName) === -1) {
-            sectionLabelNames.push(laneEntry.labelName);
-          }
-          if (mergedSection.swingFactor === null && laneEntry.swingFactor !== null && laneEntry.swingFactor !== undefined) {
-            mergedSection.swingFactor = laneEntry.swingFactor;
-          }
-          if (laneEntry.startsContinuingAccompaniment) {
-            laneEntry.targetInstruments.forEach(function (instrumentName) {
-              mergedSection.continuingAccompaniments[instrumentName] = laneEntry.patternNotes.slice();
-            });
-          }
-        });
+        }
       });
 
       mergedSection.labelName = sectionLabelNames.join(' + ');
-      mergedSection.runtimeKey = ['parallel', parallelGroupId, mergedSection.labelName].join('::');
+      mergedSection.runtimeKey = [
+        isPracticeBlock ? 'practice' : 'parallel',
+        isPracticeBlock ? blockId : parallelGroupId,
+        mergedSection.labelName
+      ].join('::');
       normalizeSectionTrackLoops(mergedSection);
       sections.push(mergedSection);
       blockStartIndex = blockEndIndex;
@@ -1122,6 +1133,111 @@ function buildTimelineSections(config) {
   return sections;
 }
 
+function buildPracticeSections(config) {
+  const patternLibrary = Array.isArray(config.PatternLibrary) ? config.PatternLibrary : [];
+  const practiceBlocks = Array.isArray(config.PracticeBlocks) ? config.PracticeBlocks : [];
+  const patternById = {};
+  const sections = [];
+
+  patternLibrary.forEach(function (pattern) {
+    if (pattern && pattern.id) {
+      patternById[pattern.id] = pattern;
+    }
+  });
+
+  practiceBlocks.forEach(function (block, blockIndex) {
+    const blockEntries = Array.isArray(block && block.entries) ? block.entries : [];
+    const mergedSection = createOrderedSection('');
+    const sectionLabels = [];
+    const sectionLabelNames = [];
+
+    blockEntries.forEach(function (entry) {
+      const pattern = patternById[entry.patternId];
+      if (!pattern) {
+        return;
+      }
+
+      const targetInstruments = normalizeTimelineEntryTargets(entry.targetInstruments);
+      const patternNotes = flattenPatternNotes(pattern);
+      const patternLabel = pattern.label || '';
+      const patternLabelName = pattern.labelName || pattern.label || '';
+
+      if (patternLabel && sectionLabels.indexOf(patternLabel) === -1) {
+        sectionLabels.push(patternLabel);
+      }
+      if (patternLabelName && sectionLabelNames.indexOf(patternLabelName) === -1) {
+        sectionLabelNames.push(patternLabelName);
+      }
+
+      targetInstruments.forEach(function (instrumentName) {
+        mergedSection.trackNotes[instrumentName] = mergeNotesIntoTrack(
+          mergedSection.trackNotes[instrumentName],
+          patternNotes,
+          0
+        );
+        if (instrumentName.indexOf('Djembe_') === 0) {
+          mergedSection.trackHandModes[instrumentName] = String(entry.handMode || '');
+        }
+      });
+
+      if (mergedSection.swingFactor === null && entry.swingFactor !== null && entry.swingFactor !== undefined) {
+        mergedSection.swingFactor = Math.max(0, Math.min(100, Number(entry.swingFactor) || 0));
+      }
+    });
+
+    mergedSection.label = sectionLabels.indexOf('Begleitung') !== -1
+      ? 'Begleitung'
+      : (sectionLabels[0] || 'Begleitung');
+    mergedSection.labelName = sectionLabelNames.join(' + ') || mergedSection.label;
+    mergedSection.runtimeKey = ['practice', block && block.id ? block.id : blockIndex, mergedSection.labelName].join('::');
+    normalizeSectionTrackLoops(mergedSection);
+
+    if (trackInstrumentNames.some(function (instrumentName) {
+      return getSectionLength(mergedSection.trackNotes[instrumentName]) > 0;
+    })) {
+      sections.push(mergedSection);
+    }
+  });
+
+  finalizeSectionLengths(sections);
+  return sections;
+}
+
+function buildConfiguredPracticeSections(config) {
+  const configuredSections = Array.isArray(config.PracticeSections) ? config.PracticeSections : [];
+  const sections = configuredSections.map(function (configuredSection, sectionIndex) {
+    const section = createOrderedSection(configuredSection && configuredSection.label ? configuredSection.label : 'Begleitung');
+    section.labelName = configuredSection && configuredSection.labelName ? configuredSection.labelName : section.label;
+    section.runtimeKey = configuredSection && configuredSection.runtimeKey
+      ? configuredSection.runtimeKey
+      : ['practice-config', sectionIndex, section.labelName].join('::');
+    section.swingFactor = configuredSection &&
+      configuredSection.swingFactor !== null &&
+      configuredSection.swingFactor !== undefined
+        ? Math.max(0, Math.min(100, Number(configuredSection.swingFactor) || 0))
+        : null;
+
+    const sourceTrackNotes = configuredSection && configuredSection.trackNotes ? configuredSection.trackNotes : {};
+    const sourceTrackHandModes = configuredSection && configuredSection.trackHandModes ? configuredSection.trackHandModes : {};
+    trackInstrumentNames.forEach(function (instrumentName) {
+      section.trackNotes[instrumentName] = Array.isArray(sourceTrackNotes[instrumentName])
+        ? sourceTrackNotes[instrumentName].slice()
+        : [];
+      section.trackHandModes[instrumentName] = String(sourceTrackHandModes[instrumentName] || '');
+    });
+
+    normalizeSectionTrackLoops(section);
+    return section;
+  }).filter(function (section) {
+    return trackInstrumentNames.some(function (instrumentName) {
+      return getSectionLength(section.trackNotes[instrumentName]) > 0;
+    });
+  });
+
+  finalizeSectionLengths(sections);
+  return sections;
+}
+
 function expandBarsWithRepeats(flatBars, repeatRangesToApply, startBarIndex, endBarIndex) {
   const expandedBars = [];
   let currentBarIndex = startBarIndex;
@@ -1187,7 +1303,13 @@ const usedDjembeTrackNames = trackInstrumentNames.filter(function (instrumentNam
 const expandedBars = isTimelineMode
   ? flatBars
   : expandBarsWithRepeats(flatBars, repeatRanges, 1, flatBars.length);
-const orderedSections = isTimelineMode ? buildTimelineSections(playerConfig) : [];
+const orderedSections = isTimelineMode
+  ? (isPracticeMode && Array.isArray(playerConfig.PracticeSections) && playerConfig.PracticeSections.length > 0
+      ? buildConfiguredPracticeSections(playerConfig)
+      : (isPracticeMode && Array.isArray(playerConfig.PracticeBlocks) && playerConfig.PracticeBlocks.length > 0
+          ? buildPracticeSections(playerConfig)
+          : buildTimelineSections(playerConfig)))
+  : [];
 const orderedSectionLabels = ['Call', 'Intro', 'Begleitung', 'Echauffement', 'Outro'];
 let currentOrderedSection = null;
 console.log('repeatRanges', repeatRanges);
