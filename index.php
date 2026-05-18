@@ -220,7 +220,6 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
                     Wiederholen
                     <input type="number" id="practiceRepeatCount" min="1" max="64" step="1" value="4" />
                 </label>
-                <button type="button" id="practiceAudioButton">Player laden</button>
                 <button type="button" id="practiceRefreshButton">Aus Blatt aktualisieren</button>
                 <button type="button" id="practiceCloseButton">Schließen</button>
             </div>
@@ -237,10 +236,9 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
                 <div id="practiceSoloList" class="timeline-pattern-list"></div>
             </section>
         </div>
-        <section class="practice-player-panel" hidden>
+        <section class="practice-player-panel">
             <div class="practice-player-header">
                 <h3>Audioplayer</h3>
-                <button type="button" id="practiceAudioReloadButton">Aktualisieren</button>
             </div>
             <iframe id="practiceAudioFrame" name="practiceAudioFrame" title="Audioplayer Übungsmodus"></iframe>
         </section>
@@ -964,6 +962,13 @@ function clear_all() {
     timelineState.swingFactor = 0;
     timelineState.swingProfile = normalizeAllTimelineSwingProfiles();
     timelineState.feelOffsets = normalizeTimelineFeelOffsets();
+    if (typeof resetPracticeForSource === 'function') {
+        resetPracticeForSource('');
+    }
+    if (typeof clearPracticeAudioPlayer === 'function') {
+        clearPracticeAudioPlayer();
+    }
+    renderPracticePanel();
     renderTimelinePanel();
 }
 
@@ -2372,6 +2377,8 @@ function openAudioTestFrame(playerRows, frameName) {
     openAudioTestTarget(playerRows, frameName, true);
 }
 
+let practiceAudioRefreshTimer = null;
+
 function isPracticeAudioModeActive() {
     const practicePanelEl = document.getElementById('practicePanel');
     return practiceState.visible || (practicePanelEl && !practicePanelEl.hidden);
@@ -2580,24 +2587,64 @@ function openPracticeAudioPlayer(playerPayload) {
     openAudioTestFrame(playerPayload, playerFrameEl.name || 'practiceAudioFrame');
 }
 
-function clearPracticeAudioPlayer() {
-    const playerPanelEl = document.querySelector('.practice-player-panel');
-    const playerFrameEl = document.getElementById('practiceAudioFrame');
-    if (playerPanelEl) {
-        playerPanelEl.hidden = true;
+function refreshPracticeAudioPlayer() {
+    if (!isPracticeAudioModeActive()) {
+        return;
     }
-    if (playerFrameEl) {
-        playerFrameEl.src = 'about:blank';
-    }
-}
 
-function runPracticeAudioTest() {
     try {
         const audioTest = buildAudioTestPayload(true);
         openPracticeAudioPlayer(audioTest.playerPayload);
     } catch (error) {
-        console.error('runPracticeAudioTest failed', error);
-        alert('Fehler beim Übungsplayer: ' + error.message);
+        console.error('refreshPracticeAudioPlayer failed', error);
+    }
+}
+
+function schedulePracticeAudioRefresh(delayMs) {
+    if (!isPracticeAudioModeActive()) {
+        return;
+    }
+
+    window.clearTimeout(practiceAudioRefreshTimer);
+    practiceAudioRefreshTimer = window.setTimeout(refreshPracticeAudioPlayer, Math.max(0, Number(delayMs) || 0));
+}
+
+function notifyPracticeSelectionChanged() {
+    if (typeof updateTimelineMetadataNode === 'function') {
+        updateTimelineMetadataNode();
+    }
+    schedulePracticeAudioRefresh(250);
+}
+
+function handleEmbeddedAudioPlayerMessage(event) {
+    if (event.origin !== window.location.origin) {
+        return;
+    }
+
+    const message = event.data || {};
+    if (!message || message.type !== 'barabeat-audio-tempo-change') {
+        return;
+    }
+
+    const playerFrameEl = document.getElementById('practiceAudioFrame');
+    if (playerFrameEl && event.source !== playerFrameEl.contentWindow) {
+        return;
+    }
+
+    timelineState.tempo = normalizeTimelineTempo(message.tempo);
+    updateTimelineMetadataNode();
+    renderTimelinePanel();
+}
+
+function clearPracticeAudioPlayer() {
+    const playerPanelEl = document.querySelector('.practice-player-panel');
+    const playerFrameEl = document.getElementById('practiceAudioFrame');
+    window.clearTimeout(practiceAudioRefreshTimer);
+    if (playerPanelEl) {
+        playerPanelEl.hidden = false;
+    }
+    if (playerFrameEl) {
+        playerFrameEl.src = 'about:blank';
     }
 }
 
@@ -2993,6 +3040,8 @@ function closeAppMenus() {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
+    window.addEventListener('message', handleEmbeddedAudioPlayerMessage);
+
     document.querySelectorAll('#appMenuBar details.app-menu').forEach(function (menuEl) {
         menuEl.addEventListener('toggle', function () {
             if (!menuEl.open) {
@@ -3100,6 +3149,9 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             renderTimelinePanel();
             renderPracticePanel();
+            if (practiceState.visible) {
+                schedulePracticeAudioRefresh(0);
+            }
         } catch (error) {
             console.error('Übungsmodus konnte nicht aktualisiert werden', error);
             alert('Fehler beim Aufbau des Übungsmodus: ' + error.message);
@@ -3108,13 +3160,12 @@ document.addEventListener('DOMContentLoaded', function () {
     document.querySelector('#practiceRefreshButton').addEventListener('click', function () {
         try {
             refreshPracticeFromSheet(true);
+            schedulePracticeAudioRefresh(0);
         } catch (error) {
             console.error('Übungsmodus-Refresh fehlgeschlagen', error);
             alert('Fehler beim Aktualisieren des Übungsmodus: ' + error.message);
         }
     });
-    document.querySelector('#practiceAudioButton').addEventListener('click', runPracticeAudioTest);
-    document.querySelector('#practiceAudioReloadButton').addEventListener('click', runPracticeAudioTest);
     document.querySelector('#practiceCloseButton').addEventListener('click', function () {
         practiceState.visible = false;
         clearPracticeAudioPlayer();
@@ -3123,14 +3174,17 @@ document.addEventListener('DOMContentLoaded', function () {
     document.querySelector('#practiceWithoutSoloLoops').addEventListener('input', function (event) {
         practiceState.loopsWithoutSolo = normalizePracticeCount(event.target.value, 1, 0, 32);
         event.target.value = practiceState.loopsWithoutSolo;
+        notifyPracticeSelectionChanged();
     });
     document.querySelector('#practiceWithSoloLoops').addEventListener('input', function (event) {
         practiceState.loopsWithSolo = normalizePracticeCount(event.target.value, 1, 1, 32);
         event.target.value = practiceState.loopsWithSolo;
+        notifyPracticeSelectionChanged();
     });
     document.querySelector('#practiceRepeatCount').addEventListener('input', function (event) {
         practiceState.repeatCount = normalizePracticeCount(event.target.value, 4, 1, 64);
         event.target.value = practiceState.repeatCount;
+        notifyPracticeSelectionChanged();
     });
     document.querySelector('#practiceAccompanimentStart').addEventListener('change', function (event) {
         const selectedStartMode = event.target.value;
@@ -3140,6 +3194,7 @@ document.addEventListener('DOMContentLoaded', function () {
             ? selectedStartMode
             : 'immediate';
         renderPracticePanel();
+        notifyPracticeSelectionChanged();
     });
     document.querySelector('#timelineRefreshButton').addEventListener('click', function () {
         try {
@@ -3325,10 +3380,15 @@ function onSVGLoaded(data) {
             swingFactor: timelineState.swingFactor,
             swingProfile: timelineState.swingProfile,
             feelOffsets: timelineState.feelOffsets,
+            persistedPractice: persistedTimelineMetadata ? persistedTimelineMetadata.practice : null,
             persistedEntries: persistedEntries,
             persistedVersion: persistedTimelineMetadata ? persistedTimelineMetadata.version : null,
             persistedSourceHash: persistedTimelineMetadata ? persistedTimelineMetadata.sourceHash : ''
         });
+        renderPracticePanel();
+        if (practiceState.visible) {
+            schedulePracticeAudioRefresh(0);
+        }
     } catch (error) {
         console.warn('Timeline-Zustand konnte nach dem Laden nicht rekonstruiert werden', error);
     }

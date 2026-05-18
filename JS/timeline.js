@@ -968,6 +968,7 @@ function updateTimelineMetadataNode() {
         swingFactor: normalizeTimelineSwingFactor(timelineState.swingFactor),
         swingProfile: normalizeAllTimelineSwingProfiles(timelineState.swingProfile),
         feelOffsets: normalizeTimelineFeelOffsets(timelineState.feelOffsets),
+        practice: typeof buildPracticeMetadata === 'function' ? buildPracticeMetadata() : null,
         entries: timelineState.entries.map(function (entry) {
             return {
                 id: entry.id,
@@ -1045,6 +1046,14 @@ function syncTimelineStateFromReadResult(readResult, options) {
     timelineState.swingProfile = normalizeAllTimelineSwingProfiles(syncOptions.swingProfile);
     timelineState.feelOffsets = normalizeTimelineFeelOffsets(syncOptions.feelOffsets);
 
+    if (typeof applyPracticeMetadata === 'function' && Object.prototype.hasOwnProperty.call(syncOptions, 'persistedPractice')) {
+        applyPracticeMetadata(syncOptions.persistedPractice, patternLibrary, newSourceHash);
+    } else if (typeof resetPracticeForSource === 'function' &&
+            practiceState.defaultSelectionSourceHash &&
+            practiceState.defaultSelectionSourceHash !== newSourceHash) {
+        resetPracticeForSource(newSourceHash);
+    }
+
     updateTimelineMetadataNode();
     renderTimelinePanel();
 }
@@ -1067,6 +1076,7 @@ function buildCurrentTimelineSyncOptions() {
         swingFactor: timelineState.swingFactor,
         swingProfile: normalizeAllTimelineSwingProfiles(timelineState.swingProfile),
         feelOffsets: normalizeTimelineFeelOffsets(timelineState.feelOffsets),
+        persistedPractice: typeof buildPracticeMetadata === 'function' ? buildPracticeMetadata() : null,
         persistedEntries: timelineState.entries.map(function (entry) {
             return {
                 id: entry.id,

@@ -85,6 +85,16 @@ let hasPrimedAudioOutput = false;
 playButton.disabled = true;
 exportWavButton.disabled = true;
 
+function notifyEmbeddedTempoChange(nextTempo) {
+  if (!embeddedPlayer || !window.parent || window.parent === window) {
+    return;
+  }
+  window.parent.postMessage({
+    type: 'barabeat-audio-tempo-change',
+    tempo: nextTempo
+  }, window.location.origin);
+}
+
 function updateLoadingStatus(message) {
   console.log(message);
   if (loadingEl) {
@@ -1382,6 +1392,7 @@ bpmValEl.innerText = String(initialTempo);
 bpmControl.addEventListener('input', ev => {
   tempo = Number(ev.target.value);
   bpmValEl.innerText = tempo;
+  notifyEmbeddedTempoChange(tempo);
 }, false);
 
 soloTrackControl.addEventListener('change', ev => {
