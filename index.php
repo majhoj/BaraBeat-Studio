@@ -220,6 +220,11 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
                     Wiederholen
                     <input type="number" id="practiceRepeatCount" min="1" max="64" step="1" value="4" />
                 </label>
+                <label class="timeline-tempo-control" for="practiceAudioLatency">
+                    Latenz ms
+                    <input type="range" id="practiceAudioLatencyRange" min="0" max="1000" step="10" value="30" />
+                    <input type="number" id="practiceAudioLatency" min="0" max="1000" step="10" value="30" />
+                </label>
                 <button type="button" id="practiceRefreshButton">Aus Blatt aktualisieren</button>
                 <button type="button" id="practiceCloseButton">Schließen</button>
             </div>
@@ -241,6 +246,16 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
                 <h3>Audioplayer</h3>
             </div>
             <iframe id="practiceAudioFrame" name="practiceAudioFrame" title="Audioplayer Übungsmodus"></iframe>
+            <div id="practiceScroller" class="practice-scroller" hidden>
+                <div class="practice-scroller-head">
+                    <strong>Laufende Noten</strong>
+                    <span id="practiceScrollerStatus">Bereit</span>
+                </div>
+                <div class="practice-scroller-stage">
+                    <div class="practice-scroller-playhead" aria-hidden="true"></div>
+                    <div id="practiceScrollerRows" class="practice-scroller-rows"></div>
+                </div>
+            </div>
         </section>
     </div>
 
@@ -2393,6 +2408,9 @@ function buildAudioTestPayload(forcePracticeMode) {
     if (practiceIsActive) {
         syncPracticeSelectionsWithPatternLibrary();
         playerPayload = buildPracticePlayerPayload();
+        if (typeof renderPracticeScrollerFromPayload === 'function') {
+            renderPracticeScrollerFromPayload(playerPayload);
+        }
     } else {
         playerPayload = buildTimelinePlayerPayload(timelineState.sourcePatterns, timelineState.entries);
     }
@@ -2622,7 +2640,7 @@ function handleEmbeddedAudioPlayerMessage(event) {
     }
 
     const message = event.data || {};
-    if (!message || message.type !== 'barabeat-audio-tempo-change') {
+    if (!message || typeof message.type !== 'string') {
         return;
     }
 
@@ -2631,9 +2649,21 @@ function handleEmbeddedAudioPlayerMessage(event) {
         return;
     }
 
-    timelineState.tempo = normalizeTimelineTempo(message.tempo);
-    updateTimelineMetadataNode();
-    renderTimelinePanel();
+    if (message.type === 'barabeat-audio-tempo-change') {
+        timelineState.tempo = normalizeTimelineTempo(message.tempo);
+        updateTimelineMetadataNode();
+        renderTimelinePanel();
+        return;
+    }
+
+    if (message.type === 'barabeat-audio-step' && typeof updatePracticeScrollerPlayback === 'function') {
+        updatePracticeScrollerPlayback(message.playbackStep, message.delayMs);
+        return;
+    }
+
+    if (message.type === 'barabeat-audio-state' && typeof updatePracticeScrollerState === 'function') {
+        updatePracticeScrollerState(message.state, message.leadInMs);
+    }
 }
 
 function clearPracticeAudioPlayer() {
@@ -2645,6 +2675,9 @@ function clearPracticeAudioPlayer() {
     }
     if (playerFrameEl) {
         playerFrameEl.src = 'about:blank';
+    }
+    if (typeof clearPracticeScrollerPlayback === 'function') {
+        clearPracticeScrollerPlayback();
     }
 }
 
@@ -3185,6 +3218,26 @@ document.addEventListener('DOMContentLoaded', function () {
         practiceState.repeatCount = normalizePracticeCount(event.target.value, 4, 1, 64);
         event.target.value = practiceState.repeatCount;
         notifyPracticeSelectionChanged();
+    });
+    function updatePracticeAudioLatencyControl(nextValue) {
+        practiceState.audioLatencyMs = normalizePracticeAudioLatency(nextValue);
+        const audioLatencyEl = document.querySelector('#practiceAudioLatency');
+        const audioLatencyRangeEl = document.querySelector('#practiceAudioLatencyRange');
+        if (audioLatencyEl) {
+            audioLatencyEl.value = practiceState.audioLatencyMs;
+        }
+        if (audioLatencyRangeEl) {
+            audioLatencyRangeEl.value = practiceState.audioLatencyMs;
+        }
+        if (typeof updateTimelineMetadataNode === 'function') {
+            updateTimelineMetadataNode();
+        }
+    }
+    document.querySelector('#practiceAudioLatency').addEventListener('input', function (event) {
+        updatePracticeAudioLatencyControl(event.target.value);
+    });
+    document.querySelector('#practiceAudioLatencyRange').addEventListener('input', function (event) {
+        updatePracticeAudioLatencyControl(event.target.value);
     });
     document.querySelector('#practiceAccompanimentStart').addEventListener('change', function (event) {
         const selectedStartMode = event.target.value;

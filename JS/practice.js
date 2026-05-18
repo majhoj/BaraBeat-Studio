@@ -7,11 +7,52 @@ const practiceState = {
     loopsWithSolo: 1,
     repeatCount: 4,
     accompanimentStart: 'immediate',
+    audioLatencyMs: 30,
     defaultsApplied: false,
     defaultSelectionSourceHash: ''
 };
 
 const practiceTrackInstrumentNames = ['Kenkeni', 'Sangban', 'Doundoun', 'Dreierbass', 'Djembe_1', 'Djembe_2', 'Djembe_3'];
+const practiceScrollerInstrumentLabels = {
+    Kenkeni: 'Kenkeni',
+    Sangban: 'Sangban',
+    Doundoun: 'Doundoun',
+    Dreierbass: 'Dreierbass',
+    Djembe_1: 'Djembe 1',
+    Djembe_2: 'Djembe 2',
+    Djembe_3: 'Djembe 3'
+};
+const practiceScrollerNoteLabels = {
+    tone: 'To',
+    slap: 'Sl',
+    bass: 'Ba',
+    muff: 'Mu',
+    open: 'Op',
+    Flam: 'Fl',
+    'T-Flam': 'TF',
+    'S-Flam': 'SF',
+    Open: 'Op',
+    Muffled: 'Mu',
+    Bell: 'Be',
+    Klick: 'Kl',
+    Bell_Open: 'B+O',
+    Bell_Muffled: 'B+M',
+    Bell_Klick: 'B+K'
+};
+const practiceScrollerState = {
+    totalSteps: 0,
+    currentStep: 0,
+    activeStep: -1,
+    stepsPerBar: 32,
+    stepWidth: 18,
+    playheadRatio: 0.3,
+    leadInSteps: 8,
+    visualLeadInSteps: 8,
+    playbackTimers: [],
+    animationFrameId: null,
+    playbackEvents: [],
+    playbackAnchor: null
+};
 
 function normalizePracticeCount(rawValue, fallback, minValue, maxValue) {
     const numericValue = Number(rawValue);
@@ -27,6 +68,14 @@ function normalizePracticeStartMode(rawValue) {
         rawValue === 'afterCallIntro'
         ? rawValue
         : 'immediate';
+}
+
+function normalizePracticeAudioLatency(rawValue) {
+    const numericValue = Number(rawValue);
+    if (!Number.isFinite(numericValue)) {
+        return 0;
+    }
+    return Math.max(0, Math.min(1000, Math.round(numericValue)));
 }
 
 function getPracticePatternsByIds(patternIds) {
@@ -76,6 +125,7 @@ function buildPracticeMetadata() {
         version: 1,
         sourceHash: timelineState.sourceHash,
         accompanimentStart: practiceState.accompanimentStart,
+        audioLatencyMs: practiceState.audioLatencyMs,
         loopsWithoutSolo: practiceState.loopsWithoutSolo,
         loopsWithSolo: practiceState.loopsWithSolo,
         repeatCount: practiceState.repeatCount,
@@ -100,6 +150,7 @@ function applyPracticeMetadata(metadata, patternLibrary, sourceHash) {
     }
 
     practiceState.accompanimentStart = normalizePracticeStartMode(metadata.accompanimentStart);
+    practiceState.audioLatencyMs = normalizePracticeAudioLatency(metadata.audioLatencyMs);
     practiceState.loopsWithoutSolo = normalizePracticeCount(metadata.loopsWithoutSolo, 1, 0, 32);
     practiceState.loopsWithSolo = normalizePracticeCount(metadata.loopsWithSolo, 1, 1, 32);
     practiceState.repeatCount = normalizePracticeCount(metadata.repeatCount, 4, 1, 64);
@@ -209,6 +260,8 @@ function updatePracticeInputs() {
     const withSoloEl = document.getElementById('practiceWithSoloLoops');
     const repeatEl = document.getElementById('practiceRepeatCount');
     const accompanimentStartEl = document.getElementById('practiceAccompanimentStart');
+    const audioLatencyEl = document.getElementById('practiceAudioLatency');
+    const audioLatencyRangeEl = document.getElementById('practiceAudioLatencyRange');
 
     if (withoutSoloEl) {
         withoutSoloEl.value = practiceState.loopsWithoutSolo;
@@ -221,6 +274,12 @@ function updatePracticeInputs() {
     }
     if (accompanimentStartEl) {
         accompanimentStartEl.value = practiceState.accompanimentStart;
+    }
+    if (audioLatencyEl) {
+        audioLatencyEl.value = practiceState.audioLatencyMs;
+    }
+    if (audioLatencyRangeEl) {
+        audioLatencyRangeEl.value = practiceState.audioLatencyMs;
     }
 }
 
@@ -505,6 +564,339 @@ function buildPracticePlayerPayload() {
         payload[0].TimelineLoopCount = false;
     }
     return payload;
+}
+
+function getPracticeScrollerStepsPerBar() {
+    if (rhythm === 'tenaer') {
+        return 24;
+    }
+    if (rhythm === 'neunaer') {
+        return 9;
+    }
+    return 32;
+}
+
+function getPracticeScrollerBaseStepMs() {
+    const tempo = typeof normalizeTimelineTempo === 'function'
+        ? normalizeTimelineTempo(timelineState.tempo)
+        : 100;
+    const stepSeconds = rhythm === 'neunaer' ? 15 / tempo : 7.5 / tempo;
+    return Math.max(1, stepSeconds * 1000);
+}
+
+function getPracticeScrollerLeadInSteps(leadInMs) {
+    const safeLeadInMs = Math.max(0, Number(leadInMs) || 0);
+    if (safeLeadInMs <= 0) {
+        return practiceScrollerState.leadInSteps;
+    }
+    return Math.max(1, safeLeadInMs / getPracticeScrollerBaseStepMs());
+}
+
+function getPracticeScrollerNoteLabel(noteValue) {
+    if (!noteValue || noteValue === 'f') {
+        return '';
+    }
+    return practiceScrollerNoteLabels[noteValue] || String(noteValue).slice(0, 3);
+}
+
+function getPracticeScrollerNoteClass(noteValue) {
+    if (!noteValue || noteValue === 'f') {
+        return 'is-rest';
+    }
+    return 'is-note note-' + String(noteValue).replace(/[^a-z0-9_-]/gi, '-').toLowerCase();
+}
+
+function flattenPracticeScrollerSections(sections) {
+    const safeSections = Array.isArray(sections) ? sections : [];
+    const trackNotes = createEmptyPracticeTrackNotes();
+    const sectionBoundaries = [];
+    let stepOffset = 0;
+
+    safeSections.forEach(function (section) {
+        const sectionLength = Math.max.apply(null, practiceTrackInstrumentNames.map(function (instrumentName) {
+            const notes = section && section.trackNotes && Array.isArray(section.trackNotes[instrumentName])
+                ? section.trackNotes[instrumentName]
+                : [];
+            return notes.length;
+        }).concat(0));
+
+        if (sectionLength <= 0) {
+            return;
+        }
+
+        sectionBoundaries.push({
+            step: stepOffset,
+            label: section.labelName || section.label || ''
+        });
+
+        practiceTrackInstrumentNames.forEach(function (instrumentName) {
+            const notes = section && section.trackNotes && Array.isArray(section.trackNotes[instrumentName])
+                ? section.trackNotes[instrumentName]
+                : [];
+            for (let stepIndex = 0; stepIndex < sectionLength; stepIndex += 1) {
+                trackNotes[instrumentName].push(notes[stepIndex] || 'f');
+            }
+        });
+
+        stepOffset += sectionLength;
+    });
+
+    return {
+        trackNotes: trackNotes,
+        sectionBoundaries: sectionBoundaries,
+        totalSteps: stepOffset
+    };
+}
+
+function createPracticeScrollerCell(noteValue, stepIndex, stepsPerBar) {
+    const cellEl = document.createElement('span');
+    cellEl.className = 'practice-scroller-cell ' + getPracticeScrollerNoteClass(noteValue);
+    cellEl.textContent = getPracticeScrollerNoteLabel(noteValue);
+    if (stepsPerBar > 0 && stepIndex % stepsPerBar === 0) {
+        cellEl.classList.add('is-bar-start');
+        cellEl.dataset.bar = String(Math.floor(stepIndex / stepsPerBar) + 1);
+    }
+    return cellEl;
+}
+
+function renderPracticeScrollerFromPayload(playerPayload) {
+    const scrollerEl = document.getElementById('practiceScroller');
+    const rowsEl = document.getElementById('practiceScrollerRows');
+    const statusEl = document.getElementById('practiceScrollerStatus');
+    const config = Array.isArray(playerPayload) ? playerPayload[0] : null;
+    const sections = config && Array.isArray(config.PracticeSections) ? config.PracticeSections : [];
+
+    if (!scrollerEl || !rowsEl || !statusEl) {
+        return;
+    }
+
+    practiceScrollerState.playbackTimers.forEach(function (playbackTimer) {
+        window.clearTimeout(playbackTimer);
+    });
+    practiceScrollerState.playbackTimers = [];
+    stopPracticeScrollerAnimation();
+    practiceScrollerState.playbackEvents = [];
+    practiceScrollerState.playbackAnchor = null;
+
+    const flattened = flattenPracticeScrollerSections(sections);
+    const stepsPerBar = getPracticeScrollerStepsPerBar();
+    practiceScrollerState.totalSteps = flattened.totalSteps;
+    practiceScrollerState.stepsPerBar = stepsPerBar;
+    practiceScrollerState.currentStep = 0;
+    practiceScrollerState.activeStep = -1;
+
+    rowsEl.innerHTML = '';
+    scrollerEl.hidden = flattened.totalSteps === 0;
+
+    if (flattened.totalSteps === 0) {
+        statusEl.textContent = 'Keine Noten';
+        return;
+    }
+
+    practiceTrackInstrumentNames.forEach(function (instrumentName) {
+        const notes = flattened.trackNotes[instrumentName];
+        const hasNotes = notes.some(function (noteValue) {
+            return noteValue && noteValue !== 'f';
+        });
+        if (!hasNotes) {
+            return;
+        }
+
+        const rowEl = document.createElement('div');
+        rowEl.className = 'practice-scroller-row';
+
+        const labelEl = document.createElement('div');
+        labelEl.className = 'practice-scroller-label';
+        labelEl.textContent = practiceScrollerInstrumentLabels[instrumentName] || instrumentName;
+
+        const laneWrapEl = document.createElement('div');
+        laneWrapEl.className = 'practice-scroller-lane-wrap';
+
+        const laneEl = document.createElement('div');
+        laneEl.className = 'practice-scroller-lane';
+
+        notes.forEach(function (noteValue, stepIndex) {
+            laneEl.appendChild(createPracticeScrollerCell(noteValue, stepIndex, stepsPerBar));
+        });
+
+        laneWrapEl.appendChild(laneEl);
+        rowEl.append(labelEl, laneWrapEl);
+        rowsEl.appendChild(rowEl);
+    });
+
+    updatePracticeScrollerPosition(-practiceScrollerState.visualLeadInSteps);
+    statusEl.textContent = Math.ceil(flattened.totalSteps / stepsPerBar) + ' Takte';
+}
+
+function updatePracticeScrollerPosition(playbackStep) {
+    const scrollerEl = document.getElementById('practiceScroller');
+    if (!scrollerEl || scrollerEl.hidden || practiceScrollerState.totalSteps <= 0) {
+        return;
+    }
+
+    const stageEl = scrollerEl.querySelector('.practice-scroller-stage');
+    const firstLaneWrapEl = scrollerEl.querySelector('.practice-scroller-lane-wrap');
+    const firstLaneEl = scrollerEl.querySelector('.practice-scroller-lane');
+    const firstCellEl = scrollerEl.querySelector('.practice-scroller-cell');
+    const statusEl = document.getElementById('practiceScrollerStatus');
+    const minVisualStep = -practiceScrollerState.visualLeadInSteps;
+    const safeStep = Math.max(minVisualStep, Math.min(practiceScrollerState.totalSteps - 1, Number(playbackStep) || 0));
+    const activeStep = Math.max(0, Math.min(practiceScrollerState.totalSteps - 1, Math.round(safeStep)));
+    const cellRect = firstCellEl ? firstCellEl.getBoundingClientRect() : null;
+    const stepWidth = cellRect && cellRect.width > 0 ? cellRect.width : practiceScrollerState.stepWidth;
+    const playheadX = stageEl ? stageEl.clientWidth * practiceScrollerState.playheadRatio : 0;
+    const laneStartX = firstLaneWrapEl ? firstLaneWrapEl.offsetLeft : 0;
+    const laneOffset = playheadX - laneStartX - (safeStep * stepWidth) - (stepWidth / 2);
+
+    practiceScrollerState.currentStep = safeStep;
+    practiceScrollerState.stepWidth = stepWidth;
+    scrollerEl.style.setProperty('--practice-scroller-offset', laneOffset + 'px');
+
+    if (practiceScrollerState.activeStep !== activeStep) {
+        scrollerEl.querySelectorAll('.practice-scroller-cell.is-current').forEach(function (cellEl) {
+            cellEl.classList.remove('is-current');
+        });
+        scrollerEl.querySelectorAll('.practice-scroller-lane').forEach(function (laneEl) {
+            if (laneEl.children[activeStep]) {
+                laneEl.children[activeStep].classList.add('is-current');
+            }
+        });
+        practiceScrollerState.activeStep = activeStep;
+
+        if (statusEl) {
+            statusEl.textContent = 'Takt ' + (Math.floor(activeStep / practiceScrollerState.stepsPerBar) + 1) +
+                ', Schritt ' + ((activeStep % practiceScrollerState.stepsPerBar) + 1);
+        }
+    }
+}
+
+function stopPracticeScrollerAnimation() {
+    if (practiceScrollerState.animationFrameId !== null) {
+        window.cancelAnimationFrame(practiceScrollerState.animationFrameId);
+        practiceScrollerState.animationFrameId = null;
+    }
+}
+
+function runPracticeScrollerAnimation() {
+    const now = window.performance.now();
+    const events = practiceScrollerState.playbackEvents;
+
+    while (events.length > 0 && events[0].time <= now) {
+        practiceScrollerState.playbackAnchor = events.shift();
+        updatePracticeScrollerPosition(practiceScrollerState.playbackAnchor.step);
+    }
+
+    const anchor = practiceScrollerState.playbackAnchor;
+    const nextEvent = events[0];
+
+    if (anchor && nextEvent && nextEvent.time > anchor.time) {
+        const progress = Math.max(0, Math.min(1, (now - anchor.time) / (nextEvent.time - anchor.time)));
+        updatePracticeScrollerPosition(anchor.step + ((nextEvent.step - anchor.step) * progress));
+    } else if (anchor) {
+        updatePracticeScrollerPosition(anchor.step);
+    }
+
+    if (events.length > 0) {
+        practiceScrollerState.animationFrameId = window.requestAnimationFrame(runPracticeScrollerAnimation);
+    } else {
+        practiceScrollerState.animationFrameId = null;
+    }
+}
+
+function updatePracticeScrollerPlayback(playbackStep, delayMs) {
+    const stepNumber = Math.max(0, Math.floor(Number(playbackStep) || 0));
+    const eventTime = window.performance.now() + Math.max(0, Number(delayMs) || 0) + practiceState.audioLatencyMs;
+    const matchingEvent = practiceScrollerState.playbackEvents.find(function (playbackEvent) {
+        return playbackEvent.step === stepNumber && Math.abs(playbackEvent.time - eventTime) < 40;
+    });
+
+    if (matchingEvent) {
+        matchingEvent.time = eventTime;
+        return;
+    }
+
+    if (!practiceScrollerState.playbackAnchor) {
+        practiceScrollerState.playbackAnchor = {
+            step: practiceScrollerState.currentStep,
+            time: window.performance.now()
+        };
+    }
+
+    practiceScrollerState.playbackEvents.push({
+        step: stepNumber,
+        time: eventTime
+    });
+    practiceScrollerState.playbackEvents.sort(function (a, b) {
+        return a.time - b.time;
+    });
+
+    if (practiceScrollerState.animationFrameId === null) {
+        practiceScrollerState.animationFrameId = window.requestAnimationFrame(runPracticeScrollerAnimation);
+    }
+}
+
+function startPracticeScrollerLeadIn(leadInMs) {
+    const safeLeadInMs = Math.max(0, Number(leadInMs) || 0) + practiceState.audioLatencyMs;
+    stopPracticeScrollerAnimation();
+    practiceScrollerState.playbackEvents = [];
+    practiceScrollerState.visualLeadInSteps = getPracticeScrollerLeadInSteps(safeLeadInMs);
+    practiceScrollerState.playbackAnchor = {
+        step: -practiceScrollerState.visualLeadInSteps,
+        time: window.performance.now()
+    };
+    updatePracticeScrollerPosition(practiceScrollerState.playbackAnchor.step);
+
+    if (safeLeadInMs <= 0) {
+        return;
+    }
+
+    practiceScrollerState.playbackEvents.push({
+        step: 0,
+        time: practiceScrollerState.playbackAnchor.time + safeLeadInMs
+    });
+    practiceScrollerState.animationFrameId = window.requestAnimationFrame(runPracticeScrollerAnimation);
+}
+
+function updatePracticeScrollerState(nextState, leadInMs) {
+    const scrollerEl = document.getElementById('practiceScroller');
+    if (!scrollerEl) {
+        return;
+    }
+    scrollerEl.dataset.playbackState = nextState || '';
+    if (nextState === 'playing') {
+        startPracticeScrollerLeadIn(leadInMs);
+        return;
+    }
+
+    if (nextState === 'ended') {
+        if (practiceScrollerState.playbackEvents.length > 0 &&
+                practiceScrollerState.animationFrameId === null) {
+            practiceScrollerState.animationFrameId = window.requestAnimationFrame(runPracticeScrollerAnimation);
+        }
+        return;
+    }
+
+    if (nextState === 'stopped') {
+        practiceScrollerState.playbackTimers.forEach(function (playbackTimer) {
+            window.clearTimeout(playbackTimer);
+        });
+        practiceScrollerState.playbackTimers = [];
+        stopPracticeScrollerAnimation();
+        practiceScrollerState.playbackEvents = [];
+        practiceScrollerState.playbackAnchor = null;
+        updatePracticeScrollerPosition(-practiceScrollerState.visualLeadInSteps);
+    }
+}
+
+function clearPracticeScrollerPlayback() {
+    practiceScrollerState.playbackTimers.forEach(function (playbackTimer) {
+        window.clearTimeout(playbackTimer);
+    });
+    practiceScrollerState.playbackTimers = [];
+    stopPracticeScrollerAnimation();
+    practiceScrollerState.playbackEvents = [];
+    practiceScrollerState.playbackAnchor = null;
+    updatePracticeScrollerState('stopped');
 }
 
 function refreshPracticeFromSheet(forceReset) {

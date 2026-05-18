@@ -95,6 +95,27 @@ function notifyEmbeddedTempoChange(nextTempo) {
   }, window.location.origin);
 }
 
+function notifyEmbeddedPlaybackState(nextState, extraData) {
+  if (!embeddedPlayer || !window.parent || window.parent === window) {
+    return;
+  }
+  window.parent.postMessage(Object.assign({
+    type: 'barabeat-audio-state',
+    state: nextState
+  }, extraData || {}), window.location.origin);
+}
+
+function notifyEmbeddedPlaybackStep(playbackStep, scheduledTime) {
+  if (!embeddedPlayer || !window.parent || window.parent === window || !instr || !instr._audioCtx) {
+    return;
+  }
+  window.parent.postMessage({
+    type: 'barabeat-audio-step',
+    playbackStep: playbackStep,
+    delayMs: Math.max(0, (scheduledTime - instr._audioCtx.currentTime) * 1000)
+  }, window.location.origin);
+}
+
 function updateLoadingStatus(message) {
   console.log(message);
   if (loadingEl) {
@@ -1402,6 +1423,7 @@ soloTrackControl.addEventListener('change', ev => {
 const lookahead = 25;          // ms
 const scheduleAheadTime = 0.25; // sec
 const playerStartDelay = 0.18; // sec
+const practiceLeadInDelay = isPracticeMode ? 3.0 : 0; // sec
 
 let nextNoteTime = 0.0;
 let timerID;
@@ -2152,18 +2174,21 @@ function scheduler() {
       isPlaying = false;
       playButton.dataset.playing = 'false';
       timerID = null;
+      notifyEmbeddedPlaybackState('ended');
       return;
     }
     if (!timelineLoopCount && isTimelineMode && globalPlaybackStep >= oneShotLength) {
       isPlaying = false;
       playButton.dataset.playing = 'false';
       timerID = null;
+      notifyEmbeddedPlaybackState('ended');
       return;
     }
     if (!timelineLoopCount && !isTimelineMode && hasOutroSection && globalPlaybackStep >= oneShotLength) {
       isPlaying = false;
       playButton.dataset.playing = 'false';
       timerID = null;
+      notifyEmbeddedPlaybackState('ended');
       return;
     }
     scheduleCurrentStep(nextNoteTime);
@@ -2174,6 +2199,8 @@ function scheduler() {
 }
 
 function scheduleCurrentStep(time) {
+  notifyEmbeddedPlaybackStep(globalPlaybackStep, time);
+
   function maybeTrackBeat(trackName, trackState) {
     if (soloTrackName && soloTrackName !== trackName) {
       return null;
@@ -2643,14 +2670,18 @@ playButton.addEventListener('click', async (ev) => {
     });
 
     const dTime = instr._audioCtx.currentTime;
-    nextNoteTime = dTime + playerStartDelay;
+    nextNoteTime = dTime + playerStartDelay + practiceLeadInDelay;
 
     ev.target.dataset.playing = 'true';
+    notifyEmbeddedPlaybackState('playing', {
+      leadInMs: Math.max(0, (playerStartDelay + practiceLeadInDelay) * 1000)
+    });
     scheduler();
   } else {
     window.clearTimeout(timerID);
     stopAllActiveSources(instr._audioCtx.currentTime);
     ev.target.dataset.playing = 'false';
+    notifyEmbeddedPlaybackState('stopped');
   }
 });
 
