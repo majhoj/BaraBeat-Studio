@@ -8,6 +8,7 @@ const practiceState = {
     repeatCount: 4,
     accompanimentStart: 'immediate',
     audioLatencyMs: 30,
+    patternChooserExpanded: false,
     defaultsApplied: false,
     defaultSelectionSourceHash: ''
 };
@@ -243,6 +244,16 @@ function createPracticePatternRow(pattern, listName) {
     return rowEl;
 }
 
+function isPracticePatternVisibleInList(pattern, listName) {
+    if (!pattern) {
+        return false;
+    }
+    if (listName === 'accompanimentPatternIds') {
+        return pattern.labelType === 'Begleitung';
+    }
+    return true;
+}
+
 function renderPracticePatternList(containerId, listName) {
     const containerEl = document.getElementById(containerId);
     if (!containerEl) {
@@ -250,7 +261,9 @@ function renderPracticePatternList(containerId, listName) {
     }
 
     containerEl.innerHTML = '';
-    timelineState.sourcePatterns.forEach(function (pattern) {
+    timelineState.sourcePatterns.filter(function (pattern) {
+        return isPracticePatternVisibleInList(pattern, listName);
+    }).forEach(function (pattern) {
         containerEl.appendChild(createPracticePatternRow(pattern, listName));
     });
 }
@@ -283,39 +296,54 @@ function updatePracticeInputs() {
     }
 }
 
+function getPracticeRhythmDisplayName() {
+    const rawTitle = typeof titel !== 'undefined' && titel && typeof titel.attr === 'function'
+        ? String(titel.attr('text') || '').trim()
+        : '';
+    if (rawTitle && rawTitle !== 'Enter the name of the Rhythm') {
+        return rawTitle;
+    }
+
+    const rhythmNames = {
+        binaer: 'Binärer Rhythmus',
+        tenaer: 'Tenärer Rhythmus',
+        neunaer: '9/8 Rhythmus'
+    };
+    return rhythmNames[rhythm] || 'Unbenannter Rhythmus';
+}
+
 function renderPracticePanel() {
     const panelEl = document.getElementById('practicePanel');
-    const statusEl = document.getElementById('practiceStatus');
-    if (!panelEl || !statusEl) {
+    const titleEl = document.getElementById('practiceTitle');
+    const chooserEl = document.getElementById('practicePatternChooser');
+    const chooserToggleEl = document.getElementById('practicePatternChooserToggle');
+    if (!panelEl || !titleEl) {
         return;
     }
 
     syncPracticeSelectionsWithPatternLibrary();
     ensurePracticeDefaultSelections();
     panelEl.hidden = !practiceState.visible;
-
-    const accompanimentCount = practiceState.accompanimentPatternIds.length;
-    const soloCount = practiceState.soloPatternIds.length;
-    const startTextByMode = {
-        immediate: 'Start sofort',
-        afterCall: 'Start nach Call',
-        afterIntro: 'Start nach Intro',
-        afterCallIntro: 'Start nach Call + Intro'
-    };
-    const startText = startTextByMode[practiceState.accompanimentStart] || startTextByMode.immediate;
-    statusEl.textContent = timelineState.sourcePatterns.length + ' Pattern aus dem Blatt, ' +
-        accompanimentCount + ' Begleitung(en), ' +
-        soloCount + ' Solo/Soli, ' +
-        startText + '.';
+    titleEl.textContent = 'Übungsmodus: ' + getPracticeRhythmDisplayName();
 
     updatePracticeInputs();
+    if (chooserEl) {
+        chooserEl.hidden = !practiceState.patternChooserExpanded;
+    }
+    if (chooserToggleEl) {
+        chooserToggleEl.textContent = 'Patternauswahl';
+        chooserToggleEl.setAttribute('aria-expanded', practiceState.patternChooserExpanded ? 'true' : 'false');
+        chooserToggleEl.classList.toggle('is-active', practiceState.patternChooserExpanded);
+    }
 
     if (panelEl.hidden) {
         return;
     }
 
-    renderPracticePatternList('practiceAccompanimentList', 'accompanimentPatternIds');
-    renderPracticePatternList('practiceSoloList', 'soloPatternIds');
+    if (practiceState.patternChooserExpanded) {
+        renderPracticePatternList('practiceAccompanimentList', 'accompanimentPatternIds');
+        renderPracticePatternList('practiceSoloList', 'soloPatternIds');
+    }
 }
 
 function createPracticeEntry(pattern, parallelGroupId, blockId) {
@@ -547,7 +575,7 @@ function buildPracticePlayerPayload() {
         throw new Error('Es wurden noch keine Pattern aus dem Notenblatt gelesen.');
     }
     if (practiceState.accompanimentPatternIds.length === 0 && practiceState.soloPatternIds.length === 0) {
-        throw new Error('Bitte mindestens ein Begleit- oder Solo-Pattern für den Übungsmodus auswählen.');
+        throw new Error('Bitte mindestens ein Begleit- oder Übungsteil-Pattern für den Übungsmodus auswählen.');
     }
 
     const entries = buildPracticeEntries();

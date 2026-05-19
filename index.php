@@ -195,10 +195,17 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
     <div id="practicePanel" hidden>
         <div class="timeline-panel-header practice-panel-header">
             <div>
-                <div class="timeline-panel-title practice-panel-title">Übungsmodus</div>
-                <div id="practiceStatus" class="timeline-status">Pattern werden aus dem Notenblatt gelesen.</div>
+                <div id="practiceTitle" class="timeline-panel-title practice-panel-title">Übungsmodus</div>
             </div>
             <div class="timeline-panel-actions">
+                <button type="button" id="practicePatternChooserToggle" aria-expanded="false" aria-controls="practicePatternChooser">
+                    Patternauswahl
+                </button>
+                <button type="button" id="practiceCloseButton">Schließen</button>
+            </div>
+        </div>
+        <div id="practicePatternChooser" class="timeline-panel-body practice-panel-body" hidden>
+            <div class="practice-pattern-options">
                 <label class="timeline-tempo-control" for="practiceAccompanimentStart">
                     Begleitung startet
                     <select id="practiceAccompanimentStart">
@@ -209,11 +216,11 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
                     </select>
                 </label>
                 <label class="timeline-tempo-control" for="practiceWithoutSoloLoops">
-                    Ohne Solo
+                    Ohne Zusatz
                     <input type="number" id="practiceWithoutSoloLoops" min="0" max="32" step="1" value="1" />
                 </label>
                 <label class="timeline-tempo-control" for="practiceWithSoloLoops">
-                    Mit Solo
+                    Mit Übungsteil
                     <input type="number" id="practiceWithSoloLoops" min="1" max="32" step="1" value="1" />
                 </label>
                 <label class="timeline-tempo-control" for="practiceRepeatCount">
@@ -226,25 +233,19 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
                     <input type="number" id="practiceAudioLatency" min="0" max="1000" step="10" value="30" />
                 </label>
                 <button type="button" id="practiceRefreshButton">Aus Blatt aktualisieren</button>
-                <button type="button" id="practiceCloseButton">Schließen</button>
             </div>
-        </div>
-        <div class="timeline-panel-body practice-panel-body">
             <section class="timeline-column practice-column practice-accompaniment-column">
                 <h3>Begleitung auswählen</h3>
                 <p class="timeline-column-note">Diese Pattern laufen parallel als Loop.</p>
                 <div id="practiceAccompanimentList" class="timeline-pattern-list"></div>
             </section>
             <section class="timeline-column practice-column practice-solo-column">
-                <h3>Solo-Reihenfolge</h3>
+                <h3>Übungsteile auswählen</h3>
                 <p class="timeline-column-note">Diese Pattern werden in fester Reihenfolge zugeschaltet.</p>
                 <div id="practiceSoloList" class="timeline-pattern-list"></div>
             </section>
         </div>
         <section class="practice-player-panel">
-            <div class="practice-player-header">
-                <h3>Audioplayer</h3>
-            </div>
             <iframe id="practiceAudioFrame" name="practiceAudioFrame" title="Audioplayer Übungsmodus"></iframe>
             <div id="practiceScroller" class="practice-scroller" hidden>
                 <div class="practice-scroller-head">
@@ -3204,6 +3205,10 @@ document.addEventListener('DOMContentLoaded', function () {
         clearPracticeAudioPlayer();
         renderPracticePanel();
     });
+    document.querySelector('#practicePatternChooserToggle').addEventListener('click', function () {
+        practiceState.patternChooserExpanded = !practiceState.patternChooserExpanded;
+        renderPracticePanel();
+    });
     document.querySelector('#practiceWithoutSoloLoops').addEventListener('input', function (event) {
         practiceState.loopsWithoutSolo = normalizePracticeCount(event.target.value, 1, 0, 32);
         event.target.value = practiceState.loopsWithoutSolo;
@@ -3330,6 +3335,7 @@ document.addEventListener('DOMContentLoaded', function () {
         '#button8',
         '#button9',
         '#button10',
+        '#practiceButton',
         '#button11'
     ].forEach(function (selector) {
         const buttonEl = document.querySelector(selector);

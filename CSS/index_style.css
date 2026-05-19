@@ -549,6 +549,37 @@
     grid-template-columns: 1fr 1fr;
 }
 
+.practice-panel-body[hidden] {
+    display: none;
+}
+
+.practice-pattern-options {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#practicePanel button {
+    border: 1px solid #b9dbc7;
+    border-radius: var(--ui-radius-small);
+    background: #fbfefc;
+    color: #185f3d;
+    padding: 7px 10px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+#practicePanel button:hover {
+    background: #e7f5ed;
+}
+
+#practicePanel button.is-active {
+    background: #e7f5ed;
+    border-color: #6ebf8b;
+}
+
 .practice-column {
     background: #fbfefc;
     border-color: #b9dbc7;

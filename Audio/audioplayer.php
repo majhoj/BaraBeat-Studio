@@ -53,7 +53,7 @@ a:link {
       <label for="bpm">BPM</label>
       <input name="bpm" id="bpm" type="range" min="30" max="180" value="100" step="1" />
       <span id="bpmval">100</span>
-      <label for="soloTrack">Solo</label>
+      <label for="soloTrack">Stimme</label>
       <select id="soloTrack">
         <option value="">Alle</option>
         <option value="Kenkeni">Kenkeni</option>
