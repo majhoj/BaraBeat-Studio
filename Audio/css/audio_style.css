@@ -109,7 +109,7 @@ body.embedded-player #sequencer {
 
 body.embedded-player .controls-main {
   padding: 10px;
-  gap: 12px;
+  gap: 0;
   font-size: 18px;
   border-width: 4px;
   border-radius: 12px;
@@ -140,7 +140,9 @@ body.embedded-player .player-title {
 }
 
 body.embedded-player .player-controls {
-  gap: 6px;
+  width: 100%;
+  gap: 10px;
+  justify-content: space-between;
 }
 
 .player-controls label {
@@ -148,9 +150,20 @@ body.embedded-player .player-controls {
   padding-right: 10px;
 }
 
+body.embedded-player .player-controls label {
+  padding-right: 0;
+}
+
 .player-controls span {
   padding-left: 10px;
 
+}
+
+body.embedded-player .player-controls span {
+  min-width: 38px;
+  margin-right: 14px;
+  padding-left: 0;
+  text-align: right;
 }
 
 .player-controls select {
@@ -168,7 +181,8 @@ body.embedded-player .player-controls select {
 }
 
 body.embedded-player .player-controls input[type=range] {
-  flex-basis: 160px;
+  flex: 1 1 240px;
+  max-width: none;
 }
 
 .secondary-button {

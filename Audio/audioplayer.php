@@ -44,11 +44,13 @@ a:link {
 
 <div id="sequencer">
   <section class="controls-main">
+    <?php if (!$embedded) { ?>
     <div class="player-title">
       <script>
-        document.write((embeddedPlayer ? '' : '<a href="javascript:close_window();">X</a>') + obj[0].Name);
+        document.write('<a href="javascript:close_window();">X</a>' + obj[0].Name);
       </script>
     </div>
+    <?php } ?>
     <div class="player-controls">
       <label for="bpm">BPM</label>
       <input name="bpm" id="bpm" type="range" min="30" max="180" value="100" step="1" />
@@ -64,7 +66,7 @@ a:link {
         <option value="Djembe_2">Djembe 2</option>
         <option value="Djembe_3">Djembe 3</option>
       </select>
-      <button type="button" id="exportWavButton" class="secondary-button">WAV</button>
+      <button type="button" id="exportWavButton" class="secondary-button">Export WAV</button>
       <button data-playing="false">&nbsp;</button>
     </div>
   </section>
