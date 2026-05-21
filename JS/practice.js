@@ -324,6 +324,7 @@ function renderPracticePanel() {
     syncPracticeSelectionsWithPatternLibrary();
     ensurePracticeDefaultSelections();
     panelEl.hidden = !practiceState.visible;
+    document.body.classList.toggle('is-practice-mode-visible', practiceState.visible);
     titleEl.textContent = 'Übungsmodus: ' + getPracticeRhythmDisplayName();
 
     updatePracticeInputs();
@@ -353,6 +354,7 @@ function createPracticeEntry(pattern, parallelGroupId, blockId) {
         parallelGroupId: parallelGroupId,
         patternId: pattern.id,
         patternSourceKey: pattern.sourceKey,
+        isPracticeTarget: practiceState.soloPatternIds.indexOf(pattern.id) !== -1,
         handMode: pattern.instrument === 'Djembe' ? 'auto' : '',
         swingFactor: null,
         targetInstruments: Array.isArray(pattern.defaultTargets) ? pattern.defaultTargets.slice() : []
@@ -440,6 +442,7 @@ function buildPracticeBlocksFromEntries(entries) {
             swingFactor: entry.swingFactor === null || entry.swingFactor === undefined
                 ? null
                 : entry.swingFactor,
+            isPracticeTarget: Boolean(entry.isPracticeTarget),
             targetInstruments: Array.isArray(entry.targetInstruments) ? entry.targetInstruments.slice() : []
         });
     });
@@ -457,6 +460,13 @@ function createEmptyPracticeTrackHandModes() {
     return practiceTrackInstrumentNames.reduce(function (trackHandModes, instrumentName) {
         trackHandModes[instrumentName] = '';
         return trackHandModes;
+    }, {});
+}
+
+function createEmptyPracticeTrackFlags() {
+    return practiceTrackInstrumentNames.reduce(function (trackFlags, instrumentName) {
+        trackFlags[instrumentName] = [];
+        return trackFlags;
     }, {});
 }
 
@@ -522,7 +532,8 @@ function buildPracticeSectionsFromEntries(entries) {
             runtimeKey: 'practice-js::' + block.id + '::' + blockIndex,
             swingFactor: null,
             trackNotes: createEmptyPracticeTrackNotes(),
-            trackHandModes: createEmptyPracticeTrackHandModes()
+            trackHandModes: createEmptyPracticeTrackHandModes(),
+            practiceTargetInstruments: []
         };
         const labels = [];
         const labelNames = [];
@@ -550,6 +561,9 @@ function buildPracticeSectionsFromEntries(entries) {
                     section.trackNotes[instrumentName],
                     patternNotes
                 );
+                if (entry.isPracticeTarget && section.practiceTargetInstruments.indexOf(instrumentName) === -1) {
+                    section.practiceTargetInstruments.push(instrumentName);
+                }
                 if (instrumentName.indexOf('Djembe_') === 0) {
                     section.trackHandModes[instrumentName] = entry.handMode || '';
                 }
@@ -634,9 +648,94 @@ function getPracticeScrollerNoteClass(noteValue) {
     return 'is-note note-' + String(noteValue).replace(/[^a-z0-9_-]/gi, '-').toLowerCase();
 }
 
+function getPracticeScrollerSymbolParts(noteValue) {
+    const symbolMap = {
+        tone: [{ type: 'circle' }],
+        Open: [{ type: 'circle', lane: 'bottom' }],
+        sangban: [{ type: 'circle', lane: 'middle' }],
+        bass: [{ type: 'square' }],
+        doundoun: [{ type: 'square', lane: 'bottom' }],
+        slap: [{ type: 'cross' }],
+        Bell: [{ type: 'cross', lane: 'top' }],
+        kenkeni: [{ type: 'cross', lane: 'top' }],
+        tone_muffled: [{ type: 'circle', muted: true }],
+        Muffled: [{ type: 'circle', muted: true, lane: 'bottom' }],
+        sangban_muffled: [{ type: 'circle', muted: true, lane: 'middle' }],
+        slap_muffled: [{ type: 'cross', muted: true }],
+        Klick: [{ type: 'cross', muted: true, lane: 'bottom' }],
+        kenkeni_muffled: [{ type: 'cross', muted: true, lane: 'top' }],
+        tone_flam: [{ type: 'circle', ghost: true }, { type: 'circle' }],
+        Flam: [{ type: 'circle', ghost: true }, { type: 'circle' }],
+        'T-Flam': [{ type: 'circle', ghost: true }, { type: 'circle' }],
+        slap_flam: [{ type: 'cross' }, { type: 'cross' }],
+        'S-Flam': [{ type: 'cross' }, { type: 'cross' }],
+        bass_slap_flam: [{ type: 'square' }, { type: 'cross' }],
+        Bell_Open: [{ type: 'cross', lane: 'top' }, { type: 'circle', lane: 'bottom' }],
+        Bell_Muffled: [{ type: 'cross', lane: 'top' }, { type: 'circle', muted: true, lane: 'bottom' }],
+        Bell_Klick: [{ type: 'cross', lane: 'top' }, { type: 'cross', muted: true, lane: 'bottom' }],
+        kenkeni_sangban: [{ type: 'cross', lane: 'top' }, { type: 'circle', lane: 'middle' }],
+        kenkeni_doundoun: [{ type: 'cross', lane: 'top' }, { type: 'square', lane: 'bottom' }],
+        sangban_doundoun: [{ type: 'circle', lane: 'middle' }, { type: 'square', lane: 'bottom' }],
+        kenkeni_muffled_sangban: [{ type: 'cross', muted: true, lane: 'top' }, { type: 'circle', lane: 'middle' }],
+        kenkeni_sangban_muffled: [{ type: 'cross', lane: 'top' }, { type: 'circle', muted: true, lane: 'middle' }],
+        sangban_muffled_doundoun: [{ type: 'circle', muted: true, lane: 'middle' }, { type: 'square', lane: 'bottom' }],
+        kenkeni_muffled_doundoun: [{ type: 'cross', muted: true, lane: 'top' }, { type: 'square', lane: 'bottom' }]
+    };
+    return symbolMap[noteValue] || [];
+}
+
+function createPracticeScrollerSymbolPart(partConfig) {
+    const partWrapEl = document.createElement('span');
+    partWrapEl.className = 'practice-symbol-part-wrap';
+    if (partConfig.lane) {
+        partWrapEl.classList.add('is-lane-' + partConfig.lane);
+    }
+
+    const partEl = document.createElement('span');
+    partEl.className = 'practice-symbol-part is-' + partConfig.type;
+    if (partConfig.ghost) {
+        partEl.classList.add('is-ghost');
+    }
+    partWrapEl.appendChild(partEl);
+
+    if (partConfig.muted) {
+        const muteLineEl = document.createElement('span');
+        muteLineEl.className = 'practice-symbol-mute-line';
+        partWrapEl.appendChild(muteLineEl);
+    }
+
+    return partWrapEl;
+}
+
+function createPracticeScrollerNoteSymbol(noteValue) {
+    const parts = getPracticeScrollerSymbolParts(noteValue);
+    if (parts.length === 0) {
+        return null;
+    }
+
+    const symbolEl = document.createElement('span');
+    const usesVerticalLanes = parts.some(function (partConfig) {
+        return Boolean(partConfig.lane);
+    });
+    symbolEl.className = parts.length > 1
+        ? 'practice-note-symbol is-combo'
+        : 'practice-note-symbol';
+    if (usesVerticalLanes) {
+        const usesMiddleLane = parts.some(function (partConfig) {
+            return partConfig.lane === 'middle';
+        });
+        symbolEl.classList.add(usesMiddleLane ? 'is-dreierbass-stack' : 'is-bass-stack');
+    }
+    parts.forEach(function (partConfig) {
+        symbolEl.appendChild(createPracticeScrollerSymbolPart(partConfig));
+    });
+    return symbolEl;
+}
+
 function flattenPracticeScrollerSections(sections) {
     const safeSections = Array.isArray(sections) ? sections : [];
     const trackNotes = createEmptyPracticeTrackNotes();
+    const targetSteps = createEmptyPracticeTrackFlags();
     const sectionBoundaries = [];
     let stepOffset = 0;
 
@@ -661,8 +760,12 @@ function flattenPracticeScrollerSections(sections) {
             const notes = section && section.trackNotes && Array.isArray(section.trackNotes[instrumentName])
                 ? section.trackNotes[instrumentName]
                 : [];
+            const isPracticeTarget = section &&
+                Array.isArray(section.practiceTargetInstruments) &&
+                section.practiceTargetInstruments.indexOf(instrumentName) !== -1;
             for (let stepIndex = 0; stepIndex < sectionLength; stepIndex += 1) {
                 trackNotes[instrumentName].push(notes[stepIndex] || 'f');
+                targetSteps[instrumentName].push(Boolean(isPracticeTarget));
             }
         });
 
@@ -671,18 +774,30 @@ function flattenPracticeScrollerSections(sections) {
 
     return {
         trackNotes: trackNotes,
+        targetSteps: targetSteps,
         sectionBoundaries: sectionBoundaries,
         totalSteps: stepOffset
     };
 }
 
-function createPracticeScrollerCell(noteValue, stepIndex, stepsPerBar) {
+function createPracticeScrollerCell(noteValue, stepIndex, stepsPerBar, isPracticeTarget) {
     const cellEl = document.createElement('span');
     cellEl.className = 'practice-scroller-cell ' + getPracticeScrollerNoteClass(noteValue);
-    cellEl.textContent = getPracticeScrollerNoteLabel(noteValue);
+    if (isPracticeTarget) {
+        cellEl.classList.add('is-practice-target');
+    }
+    const symbolEl = createPracticeScrollerNoteSymbol(noteValue);
+    if (symbolEl) {
+        cellEl.appendChild(symbolEl);
+    } else {
+        cellEl.textContent = getPracticeScrollerNoteLabel(noteValue);
+    }
     if (stepsPerBar > 0 && stepIndex % stepsPerBar === 0) {
         cellEl.classList.add('is-bar-start');
-        cellEl.dataset.bar = String(Math.floor(stepIndex / stepsPerBar) + 1);
+        const barNumberEl = document.createElement('span');
+        barNumberEl.className = 'practice-bar-number';
+        barNumberEl.textContent = String(Math.floor(stepIndex / stepsPerBar) + 1);
+        cellEl.appendChild(barNumberEl);
     }
     return cellEl;
 }
@@ -723,6 +838,7 @@ function renderPracticeScrollerFromPayload(playerPayload) {
 
     practiceTrackInstrumentNames.forEach(function (instrumentName) {
         const notes = flattened.trackNotes[instrumentName];
+        const targetSteps = flattened.targetSteps[instrumentName] || [];
         const hasNotes = notes.some(function (noteValue) {
             return noteValue && noteValue !== 'f';
         });
@@ -732,6 +848,14 @@ function renderPracticeScrollerFromPayload(playerPayload) {
 
         const rowEl = document.createElement('div');
         rowEl.className = 'practice-scroller-row';
+        if (instrumentName === 'Dreierbass') {
+            rowEl.classList.add('is-dreierbass-row');
+        } else if (instrumentName === 'Kenkeni' || instrumentName === 'Sangban' || instrumentName === 'Doundoun') {
+            rowEl.classList.add('is-bass-row');
+        }
+        if (targetSteps.some(Boolean)) {
+            rowEl.classList.add('has-practice-target');
+        }
 
         const labelEl = document.createElement('div');
         labelEl.className = 'practice-scroller-label';
@@ -744,7 +868,7 @@ function renderPracticeScrollerFromPayload(playerPayload) {
         laneEl.className = 'practice-scroller-lane';
 
         notes.forEach(function (noteValue, stepIndex) {
-            laneEl.appendChild(createPracticeScrollerCell(noteValue, stepIndex, stepsPerBar));
+            laneEl.appendChild(createPracticeScrollerCell(noteValue, stepIndex, stepsPerBar, targetSteps[stepIndex]));
         });
 
         laneWrapEl.appendChild(laneEl);

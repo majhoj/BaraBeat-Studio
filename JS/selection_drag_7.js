@@ -6,6 +6,7 @@ var box = null;
 var selections = null;
 var lastKeyPressed = null;
 var altKeyIsDown = false;
+var selectionDragReleaseHandler = null;
 var selectionDragState = {
   currentDx: undefined,
   currentDy: undefined,
@@ -13,6 +14,8 @@ var selectionDragState = {
   accumulatedDy: 0,
   dragOffsetDx: 0,
   dragOffsetDy: 0,
+  selectionWasDragged: false,
+  selectionWasCloned: false,
   shadowStartX: 0,
   shadowStartY: 0,
 };
@@ -32,6 +35,51 @@ window.addEventListener("keyup", function (event) {
 window.addEventListener("blur", function () {
   altKeyIsDown = false;
 });
+
+function removeSelectionDragReleaseFallback() {
+  if (!selectionDragReleaseHandler) {
+    return;
+  }
+  window.removeEventListener("mouseup", selectionDragReleaseHandler, true);
+  window.removeEventListener("touchend", selectionDragReleaseHandler, true);
+  window.removeEventListener("touchcancel", selectionDragReleaseHandler, true);
+  selectionDragReleaseHandler = null;
+}
+
+function selectionShouldUngroupAfterDrag(selectionGroup) {
+  if (!selectionGroup || selectionGroup !== selections) {
+    return false;
+  }
+  var currentDx = Number.isFinite(selectionDragState.currentDx) ? selectionDragState.currentDx : 0;
+  var currentDy = Number.isFinite(selectionDragState.currentDy) ? selectionDragState.currentDy : 0;
+  return currentDx !== 0 ||
+    currentDy !== 0 ||
+    selectionDragState.selectionWasDragged ||
+    selectionDragState.selectionWasCloned ||
+    selectionGroup.data("alreadyCloned");
+}
+
+function scheduleSelectionUngroupAfterDrag(selectionGroup) {
+  if (!selectionShouldUngroupAfterDrag(selectionGroup)) {
+    return;
+  }
+  window.setTimeout(function () {
+    if (selections === selectionGroup) {
+      UnGroup();
+    }
+  }, 0);
+}
+
+function installSelectionDragReleaseFallback(selectionGroup) {
+  removeSelectionDragReleaseFallback();
+  selectionDragReleaseHandler = function () {
+    removeSelectionDragReleaseFallback();
+    scheduleSelectionUngroupAfterDrag(selectionGroup);
+  };
+  window.addEventListener("mouseup", selectionDragReleaseHandler, true);
+  window.addEventListener("touchend", selectionDragReleaseHandler, true);
+  window.addEventListener("touchcancel", selectionDragReleaseHandler, true);
+}
 
 function nextInstrumentChooserId() {
   instrumentChooserIdSeq += 1;
@@ -80,7 +128,9 @@ function suppressChooserClickAfterDrag(chooserElement) {
     return;
   }
 
+  var suppressUntil = Date.now() + 700;
   chooserElement.data("warDrag", true);
+  chooserElement.data("suppressChooserToggleUntil", suppressUntil);
   var chooserChildren = chooserElement.children();
   if (chooserChildren[1] && chooserChildren[1].type === "g") {
     chooserChildren[1].attr({ display: "none" });
@@ -205,6 +255,9 @@ function resetSelectionDragState() {
   selectionDragState.currentDy = undefined;
   selectionDragState.dragOffsetDx = 0;
   selectionDragState.dragOffsetDy = 0;
+  selectionDragState.selectionWasDragged = false;
+  selectionDragState.selectionWasCloned = false;
+  removeSelectionDragReleaseFallback();
 }
 
 function UnGroup() {
@@ -470,6 +523,16 @@ function snapDeltaWithYOffset(startY, deltaY, element) {
   return snappedY - startY;
 }
 
+function captureHistoryForEditorDrag(dragElement) {
+  if (!dragElement || typeof dragElement.data !== "function" || dragElement.data("historyCaptured")) {
+    return;
+  }
+  if (typeof recordHistorySnapshot === "function") {
+    recordHistorySnapshot();
+  }
+  dragElement.data("historyCaptured", true);
+}
+
 function entfernen() {
   let pressedKey = event.key;
 
@@ -479,27 +542,41 @@ function entfernen() {
     //	if(key_ged && key_ged_meta){
     const selectedElements = getSelectedElements(selections);
 
+    if (typeof recordHistorySnapshot === "function") {
+      recordHistorySnapshot();
+    }
     selectedElements.forEach(function (ele) {
       ele.remove();
     });
+    selections.remove();
+    selections = null;
+    resetSelectionDragState();
   }
 }
 
 function sel_move(dx, dy) {
   var dx = Snap.snapTo(gridSize, dx, 50);
   var dy = snapDeltaWithYOffset(this.data("startSnapY"), dy, this);
+  var isSelectionGroup = this === selections;
 
   this.selectAll(".instrument-chooser, .function-chooser").forEach(function (chooserElement) {
     suppressChooserClickAfterDrag(chooserElement);
   });
 
   if (this.data("cloneThisDrag") && !this.data("alreadyCloned")) {
+    captureHistoryForEditorDrag(this);
     this.data("alreadyCloned", true);
+    if (isSelectionGroup) {
+      selectionDragState.selectionWasCloned = true;
+    }
     getSelectedElements(this).forEach(function (ele) {
       appendBoundClone(ele);
     }.bind(this));
   }
 
+  if ((dx !== 0 || dy !== 0)) {
+    captureHistoryForEditorDrag(this);
+  }
   this.attr({
     transform:
       this.data("origTransform") +
@@ -509,11 +586,19 @@ function sel_move(dx, dy) {
   // dx, dy sind die Werte um die die Gruppe verschoben wurde.
   selectionDragState.currentDx = dx;
   selectionDragState.currentDy = dy;
+  if (isSelectionGroup && (dx !== 0 || dy !== 0)) {
+    selectionDragState.selectionWasDragged = true;
+  }
 }
 
 function move(dx, dy) {
   var dx = Snap.snapTo(gridSize, dx, 50);
   var dy = snapDeltaWithYOffset(this.data("startSnapY"), dy, this);
+  if (this.data("cloneThisDrag") && !this.data("alreadyCloned")) {
+    captureHistoryForEditorDrag(this);
+  } else if (dx !== 0 || dy !== 0) {
+    captureHistoryForEditorDrag(this);
+  }
   this.attr({
     transform:
       this.data("origTransform") +
@@ -539,6 +624,14 @@ function sel_start(x, y, event) {
   this.data("cloneThisDrag", !!((ev && ev.altKey) || altKeyIsDown));
   this.data("origTransform", this.transform().local);
   this.data("alreadyCloned", false);
+  this.data("historyCaptured", false);
+  if (this === selections) {
+    selectionDragState.currentDx = undefined;
+    selectionDragState.currentDy = undefined;
+    selectionDragState.selectionWasDragged = false;
+    selectionDragState.selectionWasCloned = false;
+    installSelectionDragReleaseFallback(this);
+  }
 
   let bbox = this.getBBox();
   this.data("startX", bbox.x);
@@ -554,4 +647,9 @@ function stop_m() {
   var currentDy = Number.isFinite(selectionDragState.currentDy) ? selectionDragState.currentDy : 0;
   selectionDragState.dragOffsetDx += currentDx;
   selectionDragState.dragOffsetDy += currentDy;
+
+  if (this === selections) {
+    removeSelectionDragReleaseFallback();
+    scheduleSelectionUngroupAfterDrag(this);
+  }
 }

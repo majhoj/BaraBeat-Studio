@@ -38,7 +38,8 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
             <summary>Datei</summary>
             <div class="app-menu-panel">
                 <button type="button" id="openFileDialogButton">Öffnen...</button>
-                <button type="button" id="saveFileDialogButton">Speichern...</button>
+                <button type="button" id="saveFileDialogButton">Speichern</button>
+                <button type="button" id="saveAsFileDialogButton">Speichern als...</button>
                 <button type="button" id="exportFileDialogButton">Exportieren...</button>
             </div>
         </details>
@@ -341,14 +342,17 @@ const chooserSelector = instrumentChooserSelector + ", " + functionChooserSelect
 const timelineMetadataSelector = "#timeline_metadata";
 const removableCanvasElementSelector = canvasElementSelector + ", " + chooserSelector + ", " + timelineMetadataSelector;
 const exportableElementSelector = "#notenlinien, #basis, " + removableCanvasElementSelector;
-const readableElementSelector = "#edit_text, #wiederholung, " + chooserSelector;
+const readableElementSelector = "#wiederholung, " + chooserSelector;
 const phpEndpointBase = "PHP/";
 const fileListEndpoint = "auswahlliste.php";
 const loadFileEndpoint = "dateiladen.php";
 const saveTextEndpoint = "dateispeichern.php";
 const checkTextFileEndpoint = "dateivorhanden.php";
+const historyLimit = 80;
 let currentScoreId = null;
 let currentFileSource = "local";
+let undoHistory = [];
+let redoHistory = [];
 const fileDialogState = {
     mode: 'open',
     source: 'local',
@@ -376,6 +380,9 @@ edit_title = function () {
     if (text_i == null) {
         return;
     }
+    if (text_i !== text_a) {
+        recordHistorySnapshot();
+    }
     this.attr({ text: text_i });
 };
 
@@ -384,6 +391,9 @@ edit_text = function () {
     const text_i = prompt('Gib hier bitte den gewünschten Text ein!', text_a);
     if (text_i == null) {
         return;
+    }
+    if (text_i !== text_a) {
+        recordHistorySnapshot();
     }
     this.attr({ text: text_i });
 };
@@ -537,6 +547,9 @@ function formatFileDialogDate(value) {
 }
 
 function getFileDialogTitle(mode) {
+    if (mode === 'saveAs') {
+        return 'Speichern als';
+    }
     if (mode === 'save') {
         return 'Speichern unter';
     }
@@ -547,7 +560,7 @@ function getFileDialogTitle(mode) {
 }
 
 function getFileDialogConfirmLabel(mode, format) {
-    if (mode === 'save') {
+    if (mode === 'save' || mode === 'saveAs') {
         return 'Speichern';
     }
     if (mode === 'export') {
@@ -895,6 +908,179 @@ function removeCanvasElements(selector) {
     });
 }
 
+function getCurrentHistorySnapshot() {
+    const elementMarkup = [];
+    s.selectAll(removableCanvasElementSelector).forEach(function (el) {
+        elementMarkup.push(el.toString());
+    });
+    return {
+        rhythm: rhythm || 'tenaer',
+        title: titel ? (titel.attr('text') || '') : '',
+        elementsMarkup: elementMarkup.join('')
+    };
+}
+
+function areHistorySnapshotsEqual(leftSnapshot, rightSnapshot) {
+    return Boolean(leftSnapshot && rightSnapshot) &&
+        leftSnapshot.rhythm === rightSnapshot.rhythm &&
+        leftSnapshot.title === rightSnapshot.title &&
+        leftSnapshot.elementsMarkup === rightSnapshot.elementsMarkup;
+}
+
+function recordHistorySnapshot() {
+    if (!s || !titel) {
+        return;
+    }
+    const snapshot = getCurrentHistorySnapshot();
+    const previousSnapshot = undoHistory.length > 0 ? undoHistory[undoHistory.length - 1] : null;
+    if (areHistorySnapshotsEqual(snapshot, previousSnapshot)) {
+        return;
+    }
+    undoHistory.push(snapshot);
+    if (undoHistory.length > historyLimit) {
+        undoHistory.shift();
+    }
+    redoHistory = [];
+}
+
+function clearHistorySnapshots() {
+    undoHistory = [];
+    redoHistory = [];
+}
+
+function drawHistoryBaseSheet(rhythmName) {
+    if (rhythmName === 'binaer') {
+        viererNotenOhneStartChooser();
+    } else if (rhythmName === 'neunaer') {
+        neunerNotenOhneStartChooser();
+    } else {
+        dreierNotenOhneStartChooser();
+    }
+}
+
+function bindLoadedScoreElements() {
+    const loadedElements = s.selectAll(removableCanvasElementSelector);
+    loadedElements.forEach(function (el) {
+        if (isInstrumentChooserNode(el) || isFunctionChooserNode(el)) {
+            return;
+        }
+        if (el.attr("id") == "timeline_metadata") {
+            return;
+        }
+        if (el.attr("id") == "edit_text") {
+            return;
+        }
+        el.attr({ class: "shp" });
+        el.drag(move, sel_start, stop_m);
+    });
+
+    const loadedTextElements = s.selectAll("#edit_text");
+    loadedTextElements.forEach(function (el) {
+        bindEditableTextElement(el);
+    });
+
+    const loadedRepeatElements = s.selectAll("#wiederholung");
+    loadedRepeatElements.forEach(function (el) {
+        el.dblclick(cycleRepeatCount);
+    });
+
+    const loadedInstrumentChoosers = s.selectAll(instrumentChooserSelector);
+    loadedInstrumentChoosers.forEach(function (el) {
+        el.addClass("shp");
+        el.addClass("instrument-chooser");
+        el.attr({ id: nextInstrumentChooserId() });
+        el.selectAll("g").forEach(function (sub) {
+            sub.attr({ display: "none" });
+        });
+        rewireInstrumentChooser(el);
+    });
+
+    const loadedFunctionChoosers = s.selectAll(functionChooserSelector);
+    loadedFunctionChoosers.forEach(function (el) {
+        el.addClass("shp");
+        el.addClass("function-chooser");
+        el.attr({ id: nextFunctionChooserId() });
+        el.selectAll("g").forEach(function (sub) {
+            sub.attr({ display: "none" });
+        });
+        rewireFunctionChooser(el);
+    });
+}
+
+function syncStateAfterHistoryRestore(syncOptions) {
+    try {
+        const readResult = callPHPScript_lesen(zeilenAnzahl, { showAlert: false });
+        syncTimelineStateFromReadResult(readResult, syncOptions || buildCurrentTimelineSyncOptions());
+        renderPracticePanel();
+        if (practiceState.visible) {
+            schedulePracticeAudioRefresh(0);
+        }
+    } catch (error) {
+        console.warn('Timeline-Zustand konnte nach Undo/Redo nicht rekonstruiert werden', error);
+    }
+}
+
+function restoreHistorySnapshot(snapshot) {
+    if (!snapshot) {
+        return;
+    }
+    resetSelectionArtifacts();
+    const syncOptions = buildCurrentTimelineSyncOptions();
+    drawHistoryBaseSheet(snapshot.rhythm);
+    removeCanvasElements(removableCanvasElementSelector);
+    if (snapshot.elementsMarkup) {
+        s.append(Snap.parse(snapshot.elementsMarkup));
+    }
+    bindLoadedScoreElements();
+    titel.attr({ text: snapshot.title || 'Unbenannt' });
+    syncStateAfterHistoryRestore(syncOptions);
+}
+
+function undoLastEditorAction() {
+    if (undoHistory.length === 0) {
+        return;
+    }
+    const currentSnapshot = getCurrentHistorySnapshot();
+    const previousSnapshot = undoHistory.pop();
+    if (!areHistorySnapshotsEqual(currentSnapshot, previousSnapshot)) {
+        redoHistory.push(currentSnapshot);
+    }
+    restoreHistorySnapshot(previousSnapshot);
+}
+
+function redoLastEditorAction() {
+    if (redoHistory.length === 0) {
+        return;
+    }
+    const currentSnapshot = getCurrentHistorySnapshot();
+    const nextSnapshot = redoHistory.pop();
+    if (!areHistorySnapshotsEqual(currentSnapshot, nextSnapshot)) {
+        undoHistory.push(currentSnapshot);
+    }
+    restoreHistorySnapshot(nextSnapshot);
+}
+
+function isUndoRedoKeyEvent(event) {
+    if (!event || !event.altKey || String(event.key || '').toLowerCase() !== 'z') {
+        return false;
+    }
+    const targetName = event.target && event.target.tagName ? event.target.tagName.toLowerCase() : '';
+    return targetName !== 'input' && targetName !== 'textarea' && targetName !== 'select';
+}
+
+document.addEventListener('keydown', function (event) {
+    if (!isUndoRedoKeyEvent(event)) {
+        return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.shiftKey) {
+        redoLastEditorAction();
+    } else {
+        undoLastEditorAction();
+    }
+}, true);
+
 function resetSelectionArtifacts() {
     if (typeof box !== 'undefined' && box) {
         box.remove();
@@ -934,6 +1120,7 @@ function bindPaletteInsert(sourceElement, templateElement, elementId, offsetX, o
         if (!resolvedTemplateElement) {
             return;
         }
+        recordHistorySnapshot();
         insertedElement = createPaletteClone(resolvedTemplateElement, elementId, offsetX, offsetY);
         if (afterCreate) {
             afterCreate(insertedElement);
@@ -1425,6 +1612,9 @@ handleTextTouchEnd = function () {
         if (text_i == null) {
             return;
         }
+        if (text_i !== text_a) {
+            recordHistorySnapshot();
+        }
         this.attr({ text: text_i });
     }
 };
@@ -1433,6 +1623,10 @@ insertTextField = function () {
     const elx = this.getBBox().cx + paletteOffsetX + 19;
     const ely = this.getBBox().y + paletteOffsetY + 12;
     const text_i = prompt('Gib hier bitte den gewünschten Text ein!', '');
+    if (text_i == null) {
+        return;
+    }
+    recordHistorySnapshot();
     createEditableTextElement(elx + 3.5, ely, text_i);
 };
 text_z_g.click(insertTextField);
@@ -1451,6 +1645,7 @@ cycleRepeatCount = function () {
             zahl = 0;
         }
     }
+    recordHistorySnapshot();
     textEl.attr({ text: zahl === 0 ? '' : String(zahl) });
 };
 
@@ -2682,18 +2877,39 @@ function clearPracticeAudioPlayer() {
     }
 }
 
+function showAutoDismissMessage(message, durationMs) {
+    const existingEl = document.querySelector('.auto-dismiss-message');
+    if (existingEl) {
+        existingEl.remove();
+    }
+
+    const messageEl = document.createElement('div');
+    messageEl.className = 'auto-dismiss-message';
+    messageEl.textContent = message;
+    document.body.appendChild(messageEl);
+
+    window.setTimeout(function () {
+        messageEl.classList.add('is-hiding');
+        window.setTimeout(function () {
+            messageEl.remove();
+        }, 180);
+    }, Math.max(500, Number(durationMs) || 900));
+}
+
 // Speichern
 
-async function saveCurrentScoreLocal(nameOverride, folderIdOverride) {
+async function saveCurrentScoreLocal(nameOverride, folderIdOverride, options) {
+    const saveOptions = options || {};
     const serializedRhythm = buildSerializedRhythm();
     const name = (nameOverride || titel.attr('text') || 'Unbenannt').trim();
-    const existingScore = currentScoreId ? await localLibrary.getScore(currentScoreId) : null;
+    const scoreId = saveOptions.asCopy ? null : currentScoreId;
+    const existingScore = scoreId ? await localLibrary.getScore(scoreId) : null;
     const folderId = folderIdOverride ||
         (existingScore && existingScore.folderId) ||
         localLibrary.rootFolderId;
 
     const savedScore = await localLibrary.saveScore({
-        id: currentScoreId,
+        id: scoreId,
         title: name,
         folderId: folderId,
         format: 'txt',
@@ -2707,13 +2923,44 @@ async function saveCurrentScoreLocal(nameOverride, folderIdOverride) {
     return savedScore;
 }
 
-function callPHPScript() {
-    saveCurrentScoreLocal().then(function (savedScore) {
-        alert('"' + savedScore.title + '" wurde lokal gespeichert.');
-    }).catch(function (error) {
+function getCurrentRhythmTitle() {
+    return String(titel && typeof titel.attr === 'function' ? titel.attr('text') || '' : '').trim();
+}
+
+function isDefaultRhythmTitle(titleValue) {
+    return !titleValue || titleValue === 'Enter the name of the Rhythm';
+}
+
+async function getSaveDialogModeForDirectSave() {
+    const currentTitle = getCurrentRhythmTitle();
+    if (isDefaultRhythmTitle(currentTitle)) {
+        return 'save';
+    }
+    if (!currentScoreId) {
+        return '';
+    }
+    const existingScore = await localLibrary.getScore(currentScoreId);
+    return existingScore && String(existingScore.title || '').trim() !== currentTitle ? 'saveAs' : '';
+}
+
+async function saveCurrentScoreFromMenu() {
+    try {
+        const saveDialogMode = await getSaveDialogModeForDirectSave();
+        if (saveDialogMode) {
+            openFileDialog(saveDialogMode);
+            return;
+        }
+        const savedScore = await saveCurrentScoreLocal();
+        showAutoDismissMessage('"' + savedScore.title + '" wurde lokal gespeichert.');
+        closeAppMenus();
+    } catch (error) {
         console.error('Lokales Speichern fehlgeschlagen', error);
         alert('Fehler beim lokalen Speichern: ' + error.message);
-    });
+    }
+}
+
+function callPHPScript() {
+    saveCurrentScoreFromMenu();
 }
 
 async function renameLocalScore() {
@@ -2900,7 +3147,7 @@ async function confirmFileDialog() {
         }
 
         const selectedEntry = getSelectedFileDialogEntry();
-        if (fileDialogState.mode === 'save' &&
+        if ((fileDialogState.mode === 'save' || fileDialogState.mode === 'saveAs') &&
             fileDialogState.source === 'local' &&
             isFileDialogFolderEntry(selectedEntry)) {
             await navigateFileDialogFolder(selectedEntry.targetFolderId || selectedEntry.id);
@@ -2926,9 +3173,11 @@ async function confirmFileDialog() {
             return;
         }
 
-        const savedScore = await saveCurrentScoreLocal(chosenName, fileDialogState.folderId);
+        const savedScore = await saveCurrentScoreLocal(chosenName, fileDialogState.folderId, {
+            asCopy: fileDialogState.mode === 'saveAs'
+        });
         closeFileDialog();
-        alert('"' + savedScore.title + '" wurde lokal gespeichert.');
+        showAutoDismissMessage('"' + savedScore.title + '" wurde lokal gespeichert.');
     } catch (error) {
         console.error('Dateidialog-Aktion fehlgeschlagen', error);
         alert('Fehler: ' + error.message);
@@ -3099,7 +3348,10 @@ document.addEventListener('DOMContentLoaded', function () {
         openFileDialog('open');
     });
     document.querySelector('#saveFileDialogButton').addEventListener('click', function () {
-        openFileDialog('save');
+        saveCurrentScoreFromMenu();
+    });
+    document.querySelector('#saveAsFileDialogButton').addEventListener('click', function () {
+        openFileDialog('saveAs');
     });
     document.querySelector('#exportFileDialogButton').addEventListener('click', function () {
         openFileDialog('export');
@@ -3150,13 +3402,24 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     document.querySelector('#button3').addEventListener('click', runReadRhythm);
     document.querySelector('#button10').addEventListener('click', runAudioTest);
-    document.querySelector('#button4').addEventListener('click', viererNoten);
-    document.querySelector('#button5').addEventListener('click', dreierNoten);
-    document.querySelector('#button8').addEventListener('click', neunerNoten);
+    document.querySelector('#button4').addEventListener('click', function () {
+        recordHistorySnapshot();
+        viererNoten();
+    });
+    document.querySelector('#button5').addEventListener('click', function () {
+        recordHistorySnapshot();
+        dreierNoten();
+    });
+    document.querySelector('#button8').addEventListener('click', function () {
+        recordHistorySnapshot();
+        neunerNoten();
+    });
     document.querySelector('#button7').addEventListener('click', function () {
+        recordHistorySnapshot();
         addInitialInstrumentChooser(125, 140);
     });
     document.querySelector('#button9').addEventListener('click', function () {
+        recordHistorySnapshot();
         addInitialFunctionChooser(260, 140);
     });
     document.querySelector('#button11').addEventListener('click', function () {
@@ -3369,51 +3632,7 @@ function onSVGLoaded(data) {
 
     let loadedElements = data.selectAll(removableCanvasElementSelector);
     s.append(loadedElements);
-    loadedElements.forEach(function (el) {
-        if (isInstrumentChooserNode(el) || isFunctionChooserNode(el)) {
-            return;
-        }
-        if (el.attr("id") == "timeline_metadata") {
-            return;
-        }
-        if (el.attr("id") == "edit_text") {
-            return;
-        }
-        el.attr({ class: "shp" });
-        el.drag(move, sel_start);
-    });
-
-    const loadedTextElements = s.selectAll("#edit_text");
-    loadedTextElements.forEach(function (el) {
-        bindEditableTextElement(el);
-    });
-
-    const loadedRepeatElements = s.selectAll("#wiederholung");
-    loadedRepeatElements.forEach(function (el) {
-        el.dblclick(cycleRepeatCount);
-    });
-
-    const loadedInstrumentChoosers = s.selectAll(instrumentChooserSelector);
-    loadedInstrumentChoosers.forEach(function (el) {
-        el.addClass("shp");
-        el.addClass("instrument-chooser");
-        el.attr({ id: nextInstrumentChooserId() });
-        el.selectAll("g").forEach(function (sub) {
-            sub.attr({ display: "none" });
-        });
-        rewireInstrumentChooser(el);
-    });
-
-    const loadedFunctionChoosers = s.selectAll(functionChooserSelector);
-    loadedFunctionChoosers.forEach(function (el) {
-        el.addClass("shp");
-        el.addClass("function-chooser");
-        el.attr({ id: nextFunctionChooserId() });
-        el.selectAll("g").forEach(function (sub) {
-            sub.attr({ display: "none" });
-        });
-        rewireFunctionChooser(el);
-    });
+    bindLoadedScoreElements();
 
     titel.attr({ text: loadedTitle });
 
@@ -3451,6 +3670,7 @@ function onSVGLoaded(data) {
     } catch (error) {
         console.warn('Timeline-Zustand konnte nach dem Laden nicht rekonstruiert werden', error);
     }
+    clearHistorySnapshots();
 }
 
 function get_value(e) {

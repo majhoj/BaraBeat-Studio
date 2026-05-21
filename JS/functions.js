@@ -272,6 +272,18 @@ function bindChooserInteraction(chooserGruppe, chooserText, menuGruppe, onSelect
   let chooserDragRebindTimer = null;
   let chooserDragReleaseHandler = null;
 
+  function ungroupSelectionBeforeChooserAction() {
+    if (typeof selections === "undefined" || !selections || !selections.node || !chooserGruppe.node) {
+      return;
+    }
+    if (selections.node.contains(chooserGruppe.node)) {
+      UnGroup();
+      chooserGruppe.data("warDrag", false);
+      chooserGruppe.data("chooserDragMoved", false);
+      chooserGruppe.data("suppressChooserDrag", false);
+    }
+  }
+
   function stopChooserEvent(event) {
     if (event && typeof event.preventDefault === "function") {
       event.preventDefault();
@@ -357,6 +369,8 @@ function bindChooserInteraction(chooserGruppe, chooserText, menuGruppe, onSelect
   }
 
   function toggleChooserMenu(event) {
+    ungroupSelectionBeforeChooserAction();
+
     let eventType = event && event.type ? event.type : "";
     let now = Date.now();
     let suppressToggleUntil = chooserGruppe.data("suppressChooserToggleUntil");
@@ -413,6 +427,9 @@ function bindChooserInteraction(chooserGruppe, chooserText, menuGruppe, onSelect
       eintrag.data("lastNativeChooserEventAt", now);
     }
 
+    if (typeof recordHistorySnapshot === "function") {
+      recordHistorySnapshot();
+    }
     let name = eintrag.attr("text");
     let selectedName = onSelect ? onSelect(name, chooserGruppe, chooserText) : name;
     Promise.resolve(selectedName).then(function (resolvedName) {
