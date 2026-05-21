@@ -1029,7 +1029,7 @@ function restoreHistorySnapshot(snapshot) {
     drawHistoryBaseSheet(snapshot.rhythm);
     removeCanvasElements(removableCanvasElementSelector);
     if (snapshot.elementsMarkup) {
-        s.append(Snap.parse(snapshot.elementsMarkup));
+        s.append(Snap.parseStr(snapshot.elementsMarkup));
     }
     bindLoadedScoreElements();
     titel.attr({ text: snapshot.title || 'Unbenannt' });
@@ -1061,7 +1061,9 @@ function redoLastEditorAction() {
 }
 
 function isUndoRedoKeyEvent(event) {
-    if (!event || !event.altKey || String(event.key || '').toLowerCase() !== 'z') {
+    const isZKey = event &&
+        (String(event.key || '').toLowerCase() === 'z' || event.code === 'KeyZ');
+    if (!event || !event.altKey || !isZKey) {
         return false;
     }
     const targetName = event.target && event.target.tagName ? event.target.tagName.toLowerCase() : '';

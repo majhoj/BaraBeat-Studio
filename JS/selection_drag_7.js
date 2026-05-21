@@ -533,11 +533,11 @@ function captureHistoryForEditorDrag(dragElement) {
   dragElement.data("historyCaptured", true);
 }
 
-function entfernen() {
-  let pressedKey = event.key;
+function entfernen(event) {
+  let pressedKey = event && event.key;
 
   //(event.key + " " + event.metaKey)
-  let pressedMetaKey = event.metaKey;
+  let pressedMetaKey = event && event.metaKey;
   if (pressedKey == "x" && pressedMetaKey && selections) {
     //	if(key_ged && key_ged_meta){
     const selectedElements = getSelectedElements(selections);
