@@ -427,9 +427,9 @@ function bindChooserInteraction(chooserGruppe, chooserText, menuGruppe, onSelect
       eintrag.data("lastNativeChooserEventAt", now);
     }
 
-    if (typeof recordHistorySnapshot === "function") {
-      recordHistorySnapshot();
-    }
+    let beforeSelectionSnapshot = typeof getCurrentHistorySnapshot === "function"
+      ? getCurrentHistorySnapshot()
+      : null;
     let name = eintrag.attr("text");
     let selectedName = onSelect ? onSelect(name, chooserGruppe, chooserText) : name;
     Promise.resolve(selectedName).then(function (resolvedName) {
@@ -441,6 +441,12 @@ function bindChooserInteraction(chooserGruppe, chooserText, menuGruppe, onSelect
       chooserText.attr({ text: resolvedName, fill: "#333" });
       setChooserMenuVisible(menuGruppe, false);
       rebindChooserDragAfterMenuAction();
+      if (beforeSelectionSnapshot &&
+          typeof getCurrentHistorySnapshot === "function" &&
+          typeof pushHistorySnapshot === "function" &&
+          !areHistorySnapshotsEqual(beforeSelectionSnapshot, getCurrentHistorySnapshot())) {
+        pushHistorySnapshot(beforeSelectionSnapshot);
+      }
     });
     stopChooserEvent(event);
   }

@@ -931,7 +931,13 @@ function recordHistorySnapshot() {
     if (!s || !titel) {
         return;
     }
-    const snapshot = getCurrentHistorySnapshot();
+    pushHistorySnapshot(getCurrentHistorySnapshot());
+}
+
+function pushHistorySnapshot(snapshot) {
+    if (!snapshot) {
+        return;
+    }
     const previousSnapshot = undoHistory.length > 0 ? undoHistory[undoHistory.length - 1] : null;
     if (areHistorySnapshotsEqual(snapshot, previousSnapshot)) {
         return;
@@ -1063,7 +1069,7 @@ function redoLastEditorAction() {
 function isUndoRedoKeyEvent(event) {
     const isZKey = event &&
         (String(event.key || '').toLowerCase() === 'z' || event.code === 'KeyZ');
-    if (!event || !event.altKey || !isZKey) {
+    if (!event || !event.metaKey || !isZKey) {
         return false;
     }
     const targetName = event.target && event.target.tagName ? event.target.tagName.toLowerCase() : '';
