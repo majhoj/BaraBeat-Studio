@@ -1097,7 +1097,9 @@ function resetSelectionArtifacts() {
 
     if (typeof selections !== 'undefined' && selections) {
         UnGroup();
-        selections.remove();
+        if (selections) {
+            selections.remove();
+        }
         selections = null;
     }
 }
