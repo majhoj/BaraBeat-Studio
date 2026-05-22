@@ -142,8 +142,11 @@ function suppressChooserClickAfterDrag(chooserElement) {
 
 function createChooserClone(sourceElement) {
   var chooserBounds = sourceElement.getBBox();
-  var startX = chooserBounds.x;
-  var startY = chooserBounds.y + 13;
+  var chooserPosition = typeof getChooserPosition === "function"
+    ? getChooserPosition(sourceElement)
+    : getElementTranslate(sourceElement);
+  var startX = Number.isFinite(chooserPosition.x) ? chooserPosition.x : chooserBounds.x;
+  var startY = Number.isFinite(chooserPosition.y) ? chooserPosition.y : chooserBounds.y + 13;
   var textElement = sourceElement.select("text");
   var chooserText = textElement.attr("text");
   var chooserColor = textElement.attr("fill");
