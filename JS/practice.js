@@ -8,6 +8,8 @@ const practiceState = {
     repeatCount: 4,
     accompanimentStart: 'immediate',
     audioLatencyMs: 30,
+    h2hRestMute: false,
+    patternHandModes: {},
     patternChooserExpanded: false,
     defaultsApplied: false,
     defaultSelectionSourceHash: ''
@@ -79,6 +81,10 @@ function normalizePracticeAudioLatency(rawValue) {
     return Math.max(0, Math.min(1000, Math.round(numericValue)));
 }
 
+function normalizePracticeHandMode(rawValue) {
+    return rawValue === 'h2h' || rawValue === 'hoh' ? rawValue : 'auto';
+}
+
 function getPracticePatternsByIds(patternIds) {
     const ids = Array.isArray(patternIds) ? patternIds : [];
     return ids
@@ -92,6 +98,36 @@ function getPracticePatternSourceKeys(patternIds) {
     return getPracticePatternsByIds(patternIds).map(function (pattern) {
         return pattern.sourceKey;
     }).filter(Boolean);
+}
+
+function getPracticePatternHandModesBySourceKey(patternHandModes) {
+    return Object.keys(patternHandModes || {}).reduce(function (modeBySourceKey, patternId) {
+        const pattern = findPatternById(patternId);
+        if (pattern && pattern.sourceKey) {
+            modeBySourceKey[pattern.sourceKey] = normalizePracticeHandMode(patternHandModes[patternId]);
+        }
+        return modeBySourceKey;
+    }, {});
+}
+
+function getPracticePatternHandModesFromMetadata(patternHandModes, patternHandModesBySourceKey, patternLibrary) {
+    const patterns = Array.isArray(patternLibrary) ? patternLibrary : timelineState.sourcePatterns;
+    const modeById = patternHandModes && typeof patternHandModes === 'object' ? patternHandModes : {};
+    const modeBySourceKey = patternHandModesBySourceKey && typeof patternHandModesBySourceKey === 'object'
+        ? patternHandModesBySourceKey
+        : {};
+
+    return patterns.reduce(function (resolvedModes, pattern) {
+        if (!pattern || !pattern.id || pattern.instrument !== 'Djembe') {
+            return resolvedModes;
+        }
+        const rawMode = modeBySourceKey[pattern.sourceKey] || modeById[pattern.id];
+        const normalizedMode = normalizePracticeHandMode(rawMode);
+        if (normalizedMode !== 'auto') {
+            resolvedModes[pattern.id] = normalizedMode;
+        }
+        return resolvedModes;
+    }, {});
 }
 
 function getPracticePatternIdsFromMetadata(sourceKeys, patternIds, patternLibrary) {
@@ -127,13 +163,16 @@ function buildPracticeMetadata() {
         sourceHash: timelineState.sourceHash,
         accompanimentStart: practiceState.accompanimentStart,
         audioLatencyMs: practiceState.audioLatencyMs,
+        h2hRestMute: practiceState.h2hRestMute,
         loopsWithoutSolo: practiceState.loopsWithoutSolo,
         loopsWithSolo: practiceState.loopsWithSolo,
         repeatCount: practiceState.repeatCount,
         accompanimentPatternIds: practiceState.accompanimentPatternIds.slice(),
         soloPatternIds: practiceState.soloPatternIds.slice(),
         accompanimentPatternSourceKeys: getPracticePatternSourceKeys(practiceState.accompanimentPatternIds),
-        soloPatternSourceKeys: getPracticePatternSourceKeys(practiceState.soloPatternIds)
+        soloPatternSourceKeys: getPracticePatternSourceKeys(practiceState.soloPatternIds),
+        patternHandModes: Object.assign({}, practiceState.patternHandModes),
+        patternHandModesBySourceKey: getPracticePatternHandModesBySourceKey(practiceState.patternHandModes)
     };
 }
 
@@ -152,6 +191,7 @@ function applyPracticeMetadata(metadata, patternLibrary, sourceHash) {
 
     practiceState.accompanimentStart = normalizePracticeStartMode(metadata.accompanimentStart);
     practiceState.audioLatencyMs = normalizePracticeAudioLatency(metadata.audioLatencyMs);
+    practiceState.h2hRestMute = Boolean(metadata.h2hRestMute);
     practiceState.loopsWithoutSolo = normalizePracticeCount(metadata.loopsWithoutSolo, 1, 0, 32);
     practiceState.loopsWithSolo = normalizePracticeCount(metadata.loopsWithSolo, 1, 1, 32);
     practiceState.repeatCount = normalizePracticeCount(metadata.repeatCount, 4, 1, 64);
@@ -163,6 +203,11 @@ function applyPracticeMetadata(metadata, patternLibrary, sourceHash) {
     practiceState.soloPatternIds = getPracticePatternIdsFromMetadata(
         metadata.soloPatternSourceKeys,
         metadata.soloPatternIds,
+        patternLibrary
+    );
+    practiceState.patternHandModes = getPracticePatternHandModesFromMetadata(
+        metadata.patternHandModes,
+        metadata.patternHandModesBySourceKey,
         patternLibrary
     );
     const hasPersistedPatternSelection =
@@ -186,6 +231,11 @@ function syncPracticeSelectionsWithPatternLibrary() {
     });
     practiceState.soloPatternIds = practiceState.soloPatternIds.filter(function (patternId) {
         return availableIds.indexOf(patternId) !== -1;
+    });
+    Object.keys(practiceState.patternHandModes).forEach(function (patternId) {
+        if (availableIds.indexOf(patternId) === -1) {
+            delete practiceState.patternHandModes[patternId];
+        }
     });
 }
 
@@ -256,6 +306,37 @@ function createPracticePatternRow(pattern, listName) {
     metaEl.textContent = (pattern.sourceInstrument || pattern.instrument || '') + ' · ' + (pattern.labelName || pattern.labelType || '');
 
     rowEl.append(inputEl, titleEl, metaEl);
+
+    if (listName === 'soloPatternIds' && pattern.instrument === 'Djembe') {
+        const handModeEl = document.createElement('select');
+        handModeEl.className = 'practice-pattern-hand-mode';
+        [
+            { value: 'auto', label: 'Auto' },
+            { value: 'h2h', label: 'H2H' },
+            { value: 'hoh', label: 'HOH' }
+        ].forEach(function (optionData) {
+            const optionEl = document.createElement('option');
+            optionEl.value = optionData.value;
+            optionEl.textContent = optionData.label;
+            handModeEl.appendChild(optionEl);
+        });
+        handModeEl.value = normalizePracticeHandMode(practiceState.patternHandModes[pattern.id]);
+        handModeEl.addEventListener('click', function (event) {
+            event.stopPropagation();
+        });
+        handModeEl.addEventListener('change', function () {
+            const selectedMode = normalizePracticeHandMode(handModeEl.value);
+            if (selectedMode === 'auto') {
+                delete practiceState.patternHandModes[pattern.id];
+            } else {
+                practiceState.patternHandModes[pattern.id] = selectedMode;
+            }
+            if (typeof notifyPracticeSelectionChanged === 'function') {
+                notifyPracticeSelectionChanged();
+            }
+        });
+        rowEl.appendChild(handModeEl);
+    }
     return rowEl;
 }
 
@@ -290,6 +371,7 @@ function updatePracticeInputs() {
     const accompanimentStartEl = document.getElementById('practiceAccompanimentStart');
     const audioLatencyEl = document.getElementById('practiceAudioLatency');
     const audioLatencyRangeEl = document.getElementById('practiceAudioLatencyRange');
+    const h2hRestMuteEl = document.getElementById('practiceH2HRestMute');
 
     if (withoutSoloEl) {
         withoutSoloEl.value = practiceState.loopsWithoutSolo;
@@ -308,6 +390,9 @@ function updatePracticeInputs() {
     }
     if (audioLatencyRangeEl) {
         audioLatencyRangeEl.value = practiceState.audioLatencyMs;
+    }
+    if (h2hRestMuteEl) {
+        h2hRestMuteEl.checked = Boolean(practiceState.h2hRestMute);
     }
 }
 
@@ -370,7 +455,9 @@ function createPracticeEntry(pattern, parallelGroupId, blockId) {
         patternId: pattern.id,
         patternSourceKey: pattern.sourceKey,
         isPracticeTarget: practiceState.soloPatternIds.indexOf(pattern.id) !== -1,
-        handMode: pattern.instrument === 'Djembe' ? 'auto' : '',
+        handMode: pattern.instrument === 'Djembe'
+            ? normalizePracticeHandMode(practiceState.patternHandModes[pattern.id])
+            : '',
         swingFactor: null,
         targetInstruments: Array.isArray(pattern.defaultTargets) ? pattern.defaultTargets.slice() : []
     };
@@ -617,6 +704,7 @@ function buildPracticePlayerPayload() {
         payload[0].PracticeMode = true;
         payload[0].PracticeBlocks = buildPracticeBlocksFromEntries(entries);
         payload[0].PracticeSections = buildPracticeSectionsFromEntries(entries);
+        payload[0].PracticeH2HRestMute = Boolean(practiceState.h2hRestMute);
         payload[0].TimelineLoop = false;
         payload[0].TimelineLoopCount = false;
     }

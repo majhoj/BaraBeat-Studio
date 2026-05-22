@@ -624,7 +624,7 @@
 
 .practice-pattern-row {
     display: grid;
-    grid-template-columns: auto minmax(120px, 1fr);
+    grid-template-columns: auto minmax(120px, 1fr) auto;
     gap: 2px 8px;
     align-items: center;
     padding: 7px 8px;
@@ -639,6 +639,17 @@
 
 .practice-pattern-row input {
     grid-row: span 2;
+}
+
+.practice-pattern-hand-mode {
+    grid-column: 3;
+    grid-row: span 2;
+    padding: 5px 6px;
+    border: 1px solid var(--ui-border);
+    border-radius: 6px;
+    background: white;
+    color: var(--ui-text);
+    font-size: 13px;
 }
 
 .practice-pattern-title {

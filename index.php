@@ -233,6 +233,10 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
                     <input type="range" id="practiceAudioLatencyRange" min="0" max="1000" step="10" value="30" />
                     <input type="number" id="practiceAudioLatency" min="0" max="1000" step="10" value="30" />
                 </label>
+                <label class="timeline-tempo-control" for="practiceH2HRestMute">
+                    H2H Leer = Mute
+                    <input type="checkbox" id="practiceH2HRestMute" />
+                </label>
                 <button type="button" id="practiceRefreshButton">Aus Blatt aktualisieren</button>
             </div>
             <section class="timeline-column practice-column practice-accompaniment-column">
@@ -3516,6 +3520,13 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     document.querySelector('#practiceAudioLatencyRange').addEventListener('input', function (event) {
         updatePracticeAudioLatencyControl(event.target.value);
+    });
+    document.querySelector('#practiceH2HRestMute').addEventListener('change', function (event) {
+        practiceState.h2hRestMute = Boolean(event.target.checked);
+        if (typeof updateTimelineMetadataNode === 'function') {
+            updateTimelineMetadataNode();
+        }
+        notifyPracticeSelectionChanged();
     });
     document.querySelector('#practiceAccompanimentStart').addEventListener('change', function (event) {
         const selectedStartMode = event.target.value;

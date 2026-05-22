@@ -332,6 +332,7 @@ const swingFactor = Math.max(0, Math.min(100, Number(playerConfig.SwingFactor) |
 const rhythmType = String(playerConfig.Rhythmus || '');
 const swingProfile = playerConfig.SwingProfile || {};
 const feelOffsets = playerConfig.FeelOffsets || {};
+const practiceH2HRestMute = Boolean(playerConfig.PracticeH2HRestMute);
 const timelineBassTargets = ['Kenkeni', 'Sangban', 'Doundoun'];
 
 function getFeelOffsetSeconds(trackName) {
@@ -2096,7 +2097,45 @@ function isSingleHandDjembeSample(baseSampleName) {
     baseSampleName === 'DjembeThree_Muffled_Slap';
 }
 
-function advanceSilentH2HStep(playbackContext, handState) {
+function getH2HRestMuteSampleName(trackName) {
+  if (trackName === 'Djembe_1') {
+    return 'DjembeOne_Mute';
+  }
+  if (trackName === 'Djembe_2') {
+    return 'DjembeTwo_Mute';
+  }
+  if (trackName === 'Djembe_3') {
+    return 'DjembeThree_Mute';
+  }
+  return '';
+}
+
+function playH2HRestMuteSample(restConfig, selectedHand) {
+  if (!restConfig || !restConfig.baseSampleName) {
+    return;
+  }
+  const sampleName = selectedHand === 'L' && !isSingleHandDjembeSample(restConfig.baseSampleName)
+    ? restConfig.baseSampleName + 'L'
+    : restConfig.baseSampleName;
+
+  if (restConfig.audioContext && restConfig.destinationNode) {
+    playSampleToDestination(
+      restConfig.instrumentInstance,
+      sampleName,
+      restConfig.time,
+      restConfig.gainMultiplier,
+      restConfig.audioContext,
+      restConfig.destinationNode
+    );
+    return;
+  }
+
+  if (restConfig.instrumentInstance && typeof restConfig.instrumentInstance.play === 'function') {
+    restConfig.instrumentInstance.play(sampleName, restConfig.time, restConfig.gainMultiplier);
+  }
+}
+
+function advanceSilentH2HStep(playbackContext, handState, restConfig) {
   const noteHandMode = playbackContext && playbackContext.handMode ? playbackContext.handMode : '';
   const noteValue = playbackContext && playbackContext.note ? String(playbackContext.note) : '';
   if (noteHandMode !== 'h2h' || (noteValue && noteValue !== 'f')) {
@@ -2115,6 +2154,9 @@ function advanceSilentH2HStep(playbackContext, handState) {
   const consumedHand = handState.nextHand === 'L' ? 'L' : 'R';
   handState.lastHand = consumedHand;
   handState.nextHand = getOppositeHand(consumedHand);
+  if (practiceH2HRestMute) {
+    playH2HRestMuteSample(restConfig, consumedHand);
+  }
 }
 
 function resolveDjembeSampleName(baseSampleName, playbackContext, handState, strokeMeta) {
@@ -2235,9 +2277,24 @@ function scheduleCurrentStep(time) {
   const djembe3Playback = maybeTrackBeat('Djembe_3', trackStates.Djembe_3);
   const accentMultiplier = getAccentMultiplier(globalPlaybackStep);
 
-  advanceSilentH2HStep(djembe1Playback, djembeHandStates.Djembe_1);
-  advanceSilentH2HStep(djembe2Playback, djembeHandStates.Djembe_2);
-  advanceSilentH2HStep(djembe3Playback, djembeHandStates.Djembe_3);
+  advanceSilentH2HStep(djembe1Playback, djembeHandStates.Djembe_1, {
+    instrumentInstance: djembe_1,
+    baseSampleName: getH2HRestMuteSampleName('Djembe_1'),
+    time: Math.max(0, time + getFeelOffsetSeconds('Djembe_1')),
+    gainMultiplier: accentMultiplier * 0.1
+  });
+  advanceSilentH2HStep(djembe2Playback, djembeHandStates.Djembe_2, {
+    instrumentInstance: djembe_2,
+    baseSampleName: getH2HRestMuteSampleName('Djembe_2'),
+    time: Math.max(0, time + getFeelOffsetSeconds('Djembe_2')),
+    gainMultiplier: accentMultiplier * 0.1
+  });
+  advanceSilentH2HStep(djembe3Playback, djembeHandStates.Djembe_3, {
+    instrumentInstance: djembe_3,
+    baseSampleName: getH2HRestMuteSampleName('Djembe_3'),
+    time: Math.max(0, time + getFeelOffsetSeconds('Djembe_3')),
+    gainMultiplier: accentMultiplier * 0.1
+  });
 
   scheduleNote(
     kenkeniPlayback ? kenkeniPlayback.note : null,
@@ -2620,9 +2677,30 @@ async function exportCurrentArrangementAsWav() {
       const djembe3Playback = maybeTrackBeatForExport('Djembe_3', trackStates.Djembe_3);
       const accentMultiplier = getAccentMultiplier(stepIndex);
 
-      advanceSilentH2HStep(djembe1Playback, exportHandStates.Djembe_1);
-      advanceSilentH2HStep(djembe2Playback, exportHandStates.Djembe_2);
-      advanceSilentH2HStep(djembe3Playback, exportHandStates.Djembe_3);
+      advanceSilentH2HStep(djembe1Playback, exportHandStates.Djembe_1, {
+        instrumentInstance: djembe_1,
+        baseSampleName: getH2HRestMuteSampleName('Djembe_1'),
+        time: Math.max(0, currentTime + getFeelOffsetSeconds('Djembe_1')),
+        gainMultiplier: accentMultiplier * 0.1,
+        audioContext: offlineContext,
+        destinationNode: offlineContext.destination
+      });
+      advanceSilentH2HStep(djembe2Playback, exportHandStates.Djembe_2, {
+        instrumentInstance: djembe_2,
+        baseSampleName: getH2HRestMuteSampleName('Djembe_2'),
+        time: Math.max(0, currentTime + getFeelOffsetSeconds('Djembe_2')),
+        gainMultiplier: accentMultiplier * 0.1,
+        audioContext: offlineContext,
+        destinationNode: offlineContext.destination
+      });
+      advanceSilentH2HStep(djembe3Playback, exportHandStates.Djembe_3, {
+        instrumentInstance: djembe_3,
+        baseSampleName: getH2HRestMuteSampleName('Djembe_3'),
+        time: Math.max(0, currentTime + getFeelOffsetSeconds('Djembe_3')),
+        gainMultiplier: accentMultiplier * 0.1,
+        audioContext: offlineContext,
+        destinationNode: offlineContext.destination
+      });
 
       scheduleNoteToDestination(
         kenkeniPlayback ? kenkeniPlayback.note : null,
