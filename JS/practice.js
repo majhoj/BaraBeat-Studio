@@ -196,13 +196,25 @@ function ensurePracticeDefaultSelections() {
         return;
     }
 
-    practiceState.accompanimentPatternIds = timelineState.sourcePatterns
+    const accompanimentPatternIds = timelineState.sourcePatterns
         .filter(function (pattern) {
             return pattern && pattern.labelType === 'Begleitung';
         })
         .map(function (pattern) {
             return pattern.id;
         });
+
+    if (accompanimentPatternIds.length > 0) {
+        practiceState.accompanimentPatternIds = accompanimentPatternIds;
+    } else {
+        practiceState.soloPatternIds = timelineState.sourcePatterns
+            .filter(function (pattern) {
+                return pattern && pattern.id;
+            })
+            .map(function (pattern) {
+                return pattern.id;
+            });
+    }
     practiceState.defaultsApplied = true;
 }
 
