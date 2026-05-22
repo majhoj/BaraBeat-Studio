@@ -165,7 +165,10 @@ function applyPracticeMetadata(metadata, patternLibrary, sourceHash) {
         metadata.soloPatternIds,
         patternLibrary
     );
-    practiceState.defaultsApplied = true;
+    const hasPersistedPatternSelection =
+        practiceState.accompanimentPatternIds.length > 0 ||
+        practiceState.soloPatternIds.length > 0;
+    practiceState.defaultsApplied = hasPersistedPatternSelection;
     practiceState.defaultSelectionSourceHash = sourceHash || timelineState.sourceHash || '';
 }
 
@@ -473,9 +476,11 @@ function createEmptyPracticeTrackFlags() {
 function normalizePracticeTargetInstrument(instrumentName) {
     const instrumentMap = {
         Djembe_1: ['Djembe_1'],
+        Djembe_One: ['Djembe_1'],
         Djembe_2: ['Djembe_2'],
         Djembe_3: ['Djembe_3'],
         'Djembe 1': ['Djembe_1'],
+        'Djembe One': ['Djembe_1'],
         'Djembe 2': ['Djembe_2'],
         'Djembe 3': ['Djembe_3'],
         Kenkeni: ['Kenkeni'],

@@ -2435,6 +2435,8 @@ function buildRepeatRangeSummary(repeatRanges) {
 function mapInstrumentNameForPlayer(instrumentName) {
     const instrumentMap = {
         'Djembe 1': 'Djembe_1',
+        'Djembe One': 'Djembe_1',
+        'Djembe_One': 'Djembe_1',
         'Djembe 2': 'Djembe_2',
         'Djembe 3': 'Djembe_3',
         'Dununba': 'Doundoun'
