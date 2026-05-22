@@ -497,8 +497,6 @@ function collectUsedSheetDjembeTargets(rhythmBars) {
     const usedTargets = [];
     const targetMap = {
         'Djembe 1': 'Djembe_1',
-        'Djembe One': 'Djembe_1',
-        'Djembe_One': 'Djembe_1',
         'Djembe 2': 'Djembe_2',
         'Djembe 3': 'Djembe_3'
     };
@@ -524,8 +522,6 @@ function hasExplicitSingleDjembePattern(rhythmBars, labelType) {
         const labelInfo = getPlayerLabelInfo(bar.effectiveLabel || bar.label);
         return labelInfo.type === labelType &&
             (sourceInstrumentName === 'Djembe 1' ||
-             sourceInstrumentName === 'Djembe One' ||
-             sourceInstrumentName === 'Djembe_One' ||
              sourceInstrumentName === 'Djembe 2' ||
              sourceInstrumentName === 'Djembe 3');
     });
@@ -541,9 +537,6 @@ function getDefaultTargetsForPattern(pattern, originalInstrumentName, timelineCo
 
     if (pattern.instrument === 'Djembe') {
         if (originalName === 'Djembe 1') {
-            return ['Djembe_1'];
-        }
-        if (originalName === 'Djembe One' || originalName === 'Djembe_One') {
             return ['Djembe_1'];
         }
         if (originalName === 'Djembe 2') {

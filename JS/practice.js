@@ -476,11 +476,9 @@ function createEmptyPracticeTrackFlags() {
 function normalizePracticeTargetInstrument(instrumentName) {
     const instrumentMap = {
         Djembe_1: ['Djembe_1'],
-        Djembe_One: ['Djembe_1'],
         Djembe_2: ['Djembe_2'],
         Djembe_3: ['Djembe_3'],
         'Djembe 1': ['Djembe_1'],
-        'Djembe One': ['Djembe_1'],
         'Djembe 2': ['Djembe_2'],
         'Djembe 3': ['Djembe_3'],
         Kenkeni: ['Kenkeni'],
