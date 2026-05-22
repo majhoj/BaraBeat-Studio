@@ -138,7 +138,7 @@ window.addEventListener('unhandledrejection', function (event) {
 
 updateLoadingStatus('Player startet...');
 
-const djembe_1_mp3Files = ['snd/Silence.mp3','snd/DjembeOne_Open.mp3','snd/DjembeOne_OpenL.mp3','snd/DjembeOne_Bass.mp3','snd/DjembeOne_BassL.mp3','snd/DjembeOne_Slap.mp3','snd/DjembeOne_SlapL.mp3','snd/DjembeOne_Mute.mp3','snd/DjembeOne_MuteL.mp3'];
+const djembe_1_mp3Files = ['snd/Silence.mp3','snd/DjembeOne_Open.mp3','snd/DjembeOne_OpenL.mp3','snd/DjembeOne_Bass.mp3','snd/DjembeOne_BassL.mp3','snd/DjembeOne_Slap.mp3','snd/DjembeOne_SlapL.mp3','snd/DjembeOne_Mute.mp3','snd/DjembeOne_MuteL.mp3','snd/DjembeOne_Muffled_Open.mp3','snd/DjembeOne_Muffled_Slap.mp3'];
 const djembe_2_mp3Files = ['snd/Silence.mp3','snd/DjembeTwo_Open.mp3','snd/DjembeTwo_OpenL.mp3','snd/DjembeTwo_Bass.mp3','snd/DjembeTwo_BassL.mp3','snd/DjembeTwo_Slap.mp3','snd/DjembeTwo_SlapL.mp3','snd/DjembeTwo_Mute.mp3','snd/DjembeTwo_MuteL.mp3'];
 const djembe_3_mp3Files = ['snd/Silence.mp3','snd/DjembeThree_Open.mp3','snd/DjembeThree_OpenL.mp3','snd/DjembeThree_Bass.mp3','snd/DjembeThree_BassL.mp3','snd/DjembeThree_Slap.mp3','snd/DjembeThree_SlapL.mp3','snd/DjembeThree_Mute.mp3','snd/DjembeThree_MuteL.mp3'];
 const kenkeni_mp3Files  = ['snd/Kenkeni_Open.mp3','snd/Kenkeni_Muffled.mp3','snd/Kenkeni_Bell_Open.mp3','snd/Kenkeni_Klick.mp3'];
@@ -1880,8 +1880,11 @@ function scheduleNote(kenkeniNote, sangbanNote, doundounNote, dreierbassNote, dj
       case "slap":
         playDjembeStroke(djembe_1, 'DjembeOne_Slap', djembe1Time, djembe1Playback, djembeHandStates.Djembe_1, noteGain);
         break;
+      case "tone_muffled":
+        playDjembeStroke(djembe_1, 'DjembeOne_Muffled_Open', djembe1Time, djembe1Playback, djembeHandStates.Djembe_1, noteGain);
+        break;
       case "slap_muffled":
-        playDjembeStroke(djembe_1, 'DjembeOne_Mute', djembe1Time, djembe1Playback, djembeHandStates.Djembe_1, noteGain);
+        playDjembeStroke(djembe_1, 'DjembeOne_Muffled_Slap', djembe1Time, djembe1Playback, djembeHandStates.Djembe_1, noteGain);
         break;
       case "tone_flam":
         playDjembeStroke(djembe_1, 'DjembeOne_Open', djembe1Time, djembe1Playback, djembeHandStates.Djembe_1, noteGain, { isGrace: true });
@@ -2084,6 +2087,15 @@ function getHandPulseStride() {
   return 2;
 }
 
+function isSingleHandDjembeSample(baseSampleName) {
+  return baseSampleName === 'DjembeOne_Muffled_Open' ||
+    baseSampleName === 'DjembeOne_Muffled_Slap' ||
+    baseSampleName === 'DjembeTwo_Muffled_Open' ||
+    baseSampleName === 'DjembeTwo_Muffled_Slap' ||
+    baseSampleName === 'DjembeThree_Muffled_Open' ||
+    baseSampleName === 'DjembeThree_Muffled_Slap';
+}
+
 function advanceSilentH2HStep(playbackContext, handState) {
   const noteHandMode = playbackContext && playbackContext.handMode ? playbackContext.handMode : '';
   const noteValue = playbackContext && playbackContext.note ? String(playbackContext.note) : '';
@@ -2115,10 +2127,12 @@ function resolveDjembeSampleName(baseSampleName, playbackContext, handState, str
   resetHandStateForSection(handState, sectionKey);
 
   if (noteHandMode === 'h2h') {
-    const sampleName = handState.nextHand === 'L' ? baseSampleName + 'L' : baseSampleName;
-    handState.nextHand = handState.nextHand === 'L' ? 'R' : 'L';
-    handState.lastHand = sampleName.endsWith('L') ? 'L' : 'R';
-    return sampleName;
+    const selectedHand = handState.nextHand === 'L' ? 'L' : 'R';
+    handState.nextHand = getOppositeHand(selectedHand);
+    handState.lastHand = selectedHand;
+    return selectedHand === 'L' && !isSingleHandDjembeSample(baseSampleName)
+      ? baseSampleName + 'L'
+      : baseSampleName;
   }
 
   if (noteHandMode === 'hoh') {
@@ -2139,7 +2153,9 @@ function resolveDjembeSampleName(baseSampleName, playbackContext, handState, str
 
     handState.nextHand = getOppositeHand(selectedHand);
     handState.lastHand = selectedHand;
-    return selectedHand === 'L' ? baseSampleName + 'L' : baseSampleName;
+    return selectedHand === 'L' && !isSingleHandDjembeSample(baseSampleName)
+      ? baseSampleName + 'L'
+      : baseSampleName;
   }
 
   return baseSampleName;
@@ -2450,7 +2466,7 @@ function scheduleNoteToDestination(kenkeniNote, sangbanNote, doundounNote, dreie
   }
 
   const djembeNotes = [
-    { trackName: 'Djembe_1', playback: djembe1Playback, instrument: djembe_1, baseNames: { tone: 'DjembeOne_Open', bass: 'DjembeOne_Bass', slap: 'DjembeOne_Slap', slap_muffled: 'DjembeOne_Mute' }, handState: exportHandStates.Djembe_1 },
+    { trackName: 'Djembe_1', playback: djembe1Playback, instrument: djembe_1, baseNames: { tone: 'DjembeOne_Open', bass: 'DjembeOne_Bass', slap: 'DjembeOne_Slap', tone_muffled: 'DjembeOne_Muffled_Open', slap_muffled: 'DjembeOne_Muffled_Slap' }, handState: exportHandStates.Djembe_1 },
     { trackName: 'Djembe_2', playback: djembe2Playback, instrument: djembe_2, baseNames: { tone: 'DjembeTwo_Open', bass: 'DjembeTwo_Bass', slap: 'DjembeTwo_Slap', slap_muffled: 'DjembeTwo_Mute' }, handState: exportHandStates.Djembe_2 },
     { trackName: 'Djembe_3', playback: djembe3Playback, instrument: djembe_3, baseNames: { tone: 'DjembeThree_Open', bass: 'DjembeThree_Bass', slap: 'DjembeThree_Slap', slap_muffled: 'DjembeThree_Mute' }, handState: exportHandStates.Djembe_3 }
   ];
@@ -2463,8 +2479,11 @@ function scheduleNoteToDestination(kenkeniNote, sangbanNote, doundounNote, dreie
       case "tone":
       case "bass":
       case "slap":
+      case "tone_muffled":
       case "slap_muffled":
-        playDjembeStrokeToDestination(djembeData.instrument, djembeData.baseNames[noteValue], djembeTime, playback, djembeData.handState, noteGain, audioContext, destinationNode);
+        if (djembeData.baseNames[noteValue]) {
+          playDjembeStrokeToDestination(djembeData.instrument, djembeData.baseNames[noteValue], djembeTime, playback, djembeData.handState, noteGain, audioContext, destinationNode);
+        }
         break;
       case "tone_flam":
         playDjembeStrokeToDestination(djembeData.instrument, djembeData.baseNames.tone, djembeTime, playback, djembeData.handState, noteGain, audioContext, destinationNode, { isGrace: true });
