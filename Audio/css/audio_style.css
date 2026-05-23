@@ -241,6 +241,70 @@ body.embedded-player [data-playing] {
   background-size: 60% 60%;
 }
 
+@media (max-width: 560px) {
+  body.embedded-player {
+    padding: 6px;
+    font-size: 84%;
+  }
+
+  body.embedded-player .controls-main {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px;
+    border-width: 3px;
+  }
+
+  body.embedded-player .player-title {
+    display: none;
+  }
+
+  body.embedded-player .player-controls {
+    display: grid;
+    grid-template-columns: auto minmax(96px, 1fr) auto;
+    gap: 7px;
+    align-items: center;
+  }
+
+  body.embedded-player .player-controls label {
+    justify-self: start;
+    font-size: 13px;
+  }
+
+  body.embedded-player .player-controls span {
+    min-width: 34px;
+    margin-right: 0;
+    font-size: 13px;
+  }
+
+  body.embedded-player .player-controls input[type=range] {
+    width: 100%;
+    min-width: 0;
+  }
+
+  body.embedded-player .player-controls select {
+    width: 100%;
+    min-width: 0;
+  }
+
+  body.embedded-player .secondary-button,
+  body.embedded-player [data-playing] {
+    min-height: 40px;
+    border-width: 3px;
+    border-radius: 10px;
+  }
+
+  body.embedded-player .secondary-button {
+    grid-column: 1 / 3;
+  }
+
+  body.embedded-player [data-playing] {
+    grid-column: 3;
+    grid-row: 3;
+    flex-basis: auto;
+  }
+}
+
 /* ~~~~~~~~~~~~~~~~~~~~~~~ main body */
 [class^="track"] {
   display: grid;

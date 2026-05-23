@@ -7,6 +7,7 @@ const practiceState = {
     loopsWithSolo: 1,
     repeatCount: 4,
     accompanimentStart: 'immediate',
+    accompanimentBetweenPatterns: false,
     audioLatencyMs: 30,
     h2hRestMute: false,
     patternHandModes: {},
@@ -162,6 +163,7 @@ function buildPracticeMetadata() {
         version: 1,
         sourceHash: timelineState.sourceHash,
         accompanimentStart: practiceState.accompanimentStart,
+        accompanimentBetweenPatterns: practiceState.accompanimentBetweenPatterns,
         audioLatencyMs: practiceState.audioLatencyMs,
         h2hRestMute: practiceState.h2hRestMute,
         loopsWithoutSolo: practiceState.loopsWithoutSolo,
@@ -190,6 +192,7 @@ function applyPracticeMetadata(metadata, patternLibrary, sourceHash) {
     }
 
     practiceState.accompanimentStart = normalizePracticeStartMode(metadata.accompanimentStart);
+    practiceState.accompanimentBetweenPatterns = Boolean(metadata.accompanimentBetweenPatterns);
     practiceState.audioLatencyMs = normalizePracticeAudioLatency(metadata.audioLatencyMs);
     practiceState.h2hRestMute = Boolean(metadata.h2hRestMute);
     practiceState.loopsWithoutSolo = normalizePracticeCount(metadata.loopsWithoutSolo, 1, 0, 32);
@@ -331,9 +334,7 @@ function createPracticePatternRow(pattern, listName) {
             } else {
                 practiceState.patternHandModes[pattern.id] = selectedMode;
             }
-            if (typeof notifyPracticeSelectionChanged === 'function') {
-                notifyPracticeSelectionChanged();
-            }
+            notifyPracticeHandModeChanged();
         });
         rowEl.appendChild(handModeEl);
     }
@@ -369,6 +370,7 @@ function updatePracticeInputs() {
     const withSoloEl = document.getElementById('practiceWithSoloLoops');
     const repeatEl = document.getElementById('practiceRepeatCount');
     const accompanimentStartEl = document.getElementById('practiceAccompanimentStart');
+    const accompanimentBetweenPatternsEl = document.getElementById('practiceAccompanimentBetweenPatterns');
     const audioLatencyEl = document.getElementById('practiceAudioLatency');
     const audioLatencyRangeEl = document.getElementById('practiceAudioLatencyRange');
     const h2hRestMuteEl = document.getElementById('practiceH2HRestMute');
@@ -384,6 +386,9 @@ function updatePracticeInputs() {
     }
     if (accompanimentStartEl) {
         accompanimentStartEl.value = practiceState.accompanimentStart;
+    }
+    if (accompanimentBetweenPatternsEl) {
+        accompanimentBetweenPatternsEl.checked = Boolean(practiceState.accompanimentBetweenPatterns);
     }
     if (audioLatencyEl) {
         audioLatencyEl.value = practiceState.audioLatencyMs;
@@ -432,7 +437,9 @@ function renderPracticePanel() {
         chooserEl.hidden = !practiceState.patternChooserExpanded;
     }
     if (chooserToggleEl) {
-        chooserToggleEl.textContent = 'Patternauswahl';
+        chooserToggleEl.textContent = practiceState.patternChooserExpanded
+            ? 'Patternauswahl schließen'
+            : 'Patternauswahl öffnen';
         chooserToggleEl.setAttribute('aria-expanded', practiceState.patternChooserExpanded ? 'true' : 'false');
         chooserToggleEl.classList.toggle('is-active', practiceState.patternChooserExpanded);
     }
@@ -511,10 +518,16 @@ function buildPracticeEntries() {
             continue;
         }
 
-        soloPatterns.forEach(function (soloPattern) {
+        soloPatterns.forEach(function (soloPattern, soloPatternIndex) {
             for (let loopIndex = 0; loopIndex < practiceState.loopsWithSolo; loopIndex += 1) {
                 addPracticeParallelGroup(entries, accompanimentPatterns.concat([soloPattern]), blockIndex);
                 blockIndex += 1;
+            }
+            if (practiceState.accompanimentBetweenPatterns && soloPatternIndex < soloPatterns.length - 1) {
+                for (let loopIndex = 0; loopIndex < practiceState.loopsWithoutSolo; loopIndex += 1) {
+                    addPracticeParallelGroup(entries, accompanimentPatterns, blockIndex);
+                    blockIndex += 1;
+                }
             }
         });
     }
@@ -684,6 +697,26 @@ function buildPracticeSectionsFromEntries(entries) {
             return Array.isArray(section.trackNotes[instrumentName]) && section.trackNotes[instrumentName].length > 0;
         });
     });
+}
+
+function notifyPracticeHandModeChanged() {
+    if (typeof updateTimelineMetadataNode === 'function') {
+        updateTimelineMetadataNode();
+    }
+
+    if (typeof sendPracticeAudioMessage !== 'function') {
+        return;
+    }
+
+    try {
+        const entries = buildPracticeEntries();
+        sendPracticeAudioMessage({
+            type: 'barabeat-practice-hand-modes-update',
+            sections: buildPracticeSectionsFromEntries(entries)
+        });
+    } catch (error) {
+        console.warn('Handsatz konnte nicht live aktualisiert werden', error);
+    }
 }
 
 function buildPracticePlayerPayload() {

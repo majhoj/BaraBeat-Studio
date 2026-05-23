@@ -114,6 +114,11 @@
     border-color: var(--ui-border-strong);
 }
 
+.app-menu-panel button:disabled {
+    opacity: 0.48;
+    cursor: not-allowed;
+}
+
 .menu-file-picker {
     display: flex;
     flex-direction: column;
@@ -1394,4 +1399,198 @@
 #timelinePanel button:hover {
     background: var(--ui-soft-bg-2);
     border-color: var(--ui-border-strong);
+}
+
+@media (max-width: 760px) {
+    .app-body {
+        margin: 0;
+        padding: 0;
+        overflow-x: hidden;
+        background: #f6fbf8;
+    }
+
+    #appMenuBar {
+        position: sticky;
+        top: 0;
+        z-index: 80;
+        gap: 4px;
+        padding: calc(6px + env(safe-area-inset-top)) 8px 6px;
+        overflow-x: auto;
+        box-shadow: none;
+    }
+
+    .app-menu:nth-of-type(2),
+    .app-menu:nth-of-type(3) {
+        display: none;
+    }
+
+    #button6,
+    #button11 {
+        display: none;
+    }
+
+    .app-menu summary {
+        padding: 8px 10px;
+        font-size: 13px;
+    }
+
+    .app-menu-panel {
+        position: fixed;
+        top: calc(44px + env(safe-area-inset-top));
+        left: 8px;
+        right: 8px;
+        min-width: 0;
+        max-height: calc(100vh - 58px - env(safe-area-inset-top));
+        overflow: auto;
+    }
+
+    #myRect1 {
+        position: absolute;
+        left: -10000px;
+        top: 0;
+        width: 1px !important;
+        height: 1px !important;
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    #timelinePanel {
+        display: none !important;
+    }
+
+    #practicePanel {
+        position: fixed;
+        inset: calc(45px + env(safe-area-inset-top)) 0 0 0;
+        z-index: 70;
+        max-height: none;
+        overflow: auto;
+        padding: 10px;
+        border: 0;
+        border-radius: 0;
+        box-shadow: none;
+    }
+
+    #practicePanel[hidden] {
+        display: none;
+    }
+
+    .timeline-panel-header,
+    .practice-panel-header {
+        align-items: flex-start;
+        gap: 10px;
+        margin-bottom: 10px;
+        padding-bottom: 10px;
+    }
+
+    .timeline-panel-title {
+        font-size: 17px;
+    }
+
+    .timeline-panel-actions {
+        justify-content: flex-end;
+        gap: 6px;
+    }
+
+    #practicePanel button {
+        min-height: 38px;
+        padding: 8px 10px;
+        font-size: 13px;
+    }
+
+    .practice-panel-body,
+    .timeline-panel-body {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+
+    .practice-pattern-options {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
+    .timeline-swing-control,
+    .timeline-tempo-control {
+        justify-content: space-between;
+        width: 100%;
+        min-height: 40px;
+        box-sizing: border-box;
+    }
+
+    .timeline-tempo-control input[type="range"] {
+        width: min(42vw, 150px);
+    }
+
+    .timeline-tempo-control input,
+    .timeline-tempo-control select {
+        max-width: 54vw;
+    }
+
+    .practice-column,
+    .timeline-column {
+        min-height: 0;
+        max-height: 34vh;
+        padding: 10px;
+        border-radius: 9px;
+    }
+
+    .timeline-pattern-list,
+    .timeline-sequence-list {
+        gap: 8px;
+    }
+
+    .practice-pattern-row,
+    .timeline-card {
+        min-width: 0;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .practice-pattern-row {
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        padding: 9px 8px;
+    }
+
+    .practice-player-panel {
+        margin-top: 10px;
+        border-radius: 10px;
+    }
+
+    #practiceAudioFrame {
+        height: 214px;
+    }
+
+    .practice-scroller-head {
+        padding: 7px 9px;
+    }
+
+    .practice-scroller-stage {
+        min-height: 220px;
+        padding-top: 12px;
+    }
+
+    .practice-scroller-playhead {
+        left: 34%;
+    }
+
+    .practice-scroller {
+        --practice-step-width: 22px;
+    }
+
+    .practice-scroller-row {
+        grid-template-columns: 72px minmax(0, 1fr);
+        min-height: 30px;
+    }
+
+    .practice-scroller-label {
+        padding: 0 7px 0 8px;
+        font-size: 11px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .practice-scroller-cell {
+        height: 30px;
+    }
 }

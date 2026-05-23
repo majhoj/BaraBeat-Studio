@@ -13,8 +13,7 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
 <html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width">
-    <meta name="viewport" content="initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title><BaraBeat-Studio></title>
     <script src="JS/snapNEU.svg.js?v=<?php echo $jsSnap; ?>"></script>
     <script src="JS/jquery.min.js?v=<?php echo $jsJq; ?>"></script>
@@ -200,7 +199,7 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
             </div>
             <div class="timeline-panel-actions">
                 <button type="button" id="practicePatternChooserToggle" aria-expanded="false" aria-controls="practicePatternChooser">
-                    Patternauswahl
+                    Patternauswahl öffnen
                 </button>
                 <button type="button" id="practiceCloseButton">Schließen</button>
             </div>
@@ -223,6 +222,10 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
                 <label class="timeline-tempo-control" for="practiceWithSoloLoops">
                     Mit Übungsteil
                     <input type="number" id="practiceWithSoloLoops" min="1" max="32" step="1" value="1" />
+                </label>
+                <label class="timeline-tempo-control" for="practiceAccompanimentBetweenPatterns">
+                    Zwischen Übungsteilen
+                    <input type="checkbox" id="practiceAccompanimentBetweenPatterns" />
                 </label>
                 <label class="timeline-tempo-control" for="practiceRepeatCount">
                     Wiederholen
@@ -2603,6 +2606,42 @@ function openAudioTestFrame(playerRows, frameName) {
 }
 
 let practiceAudioRefreshTimer = null;
+let practiceAudioPlaybackState = 'stopped';
+
+function isMobilePracticeViewport() {
+    return window.matchMedia('(max-width: 760px)').matches;
+}
+
+function updateMobilePracticeModeAvailability() {
+    const mobilePracticeViewport = isMobilePracticeViewport();
+    document.body.classList.toggle('is-mobile-practice-viewport', mobilePracticeViewport);
+
+    [
+        'button4',
+        'button5',
+        'button8',
+        'button7',
+        'button9',
+        'button11',
+        'button6'
+    ].forEach(function (buttonId) {
+        const buttonEl = document.getElementById(buttonId);
+        if (!buttonEl) {
+            return;
+        }
+        buttonEl.disabled = mobilePracticeViewport;
+        if (mobilePracticeViewport) {
+            buttonEl.title = 'Auf Smartphones ist nur Üben/Abspielen aktiv.';
+        } else {
+            buttonEl.removeAttribute('title');
+        }
+    });
+
+    if (mobilePracticeViewport && timelineState.visible) {
+        timelineState.visible = false;
+        renderTimelinePanel();
+    }
+}
 
 function isPracticeAudioModeActive() {
     const practicePanelEl = document.getElementById('practicePanel');
@@ -2841,7 +2880,32 @@ function notifyPracticeSelectionChanged() {
     if (typeof updateTimelineMetadataNode === 'function') {
         updateTimelineMetadataNode();
     }
+
+    if (isPracticeAudioModeActive() && practiceAudioPlaybackState === 'playing') {
+        try {
+            const audioTest = buildAudioTestPayload(true);
+            const playerConfig = Array.isArray(audioTest.playerPayload) ? audioTest.playerPayload[0] : null;
+            if (playerConfig && Array.isArray(playerConfig.PracticeSections) && sendPracticeAudioMessage({
+                type: 'barabeat-practice-sections-update',
+                sections: playerConfig.PracticeSections
+            })) {
+                return;
+            }
+        } catch (error) {
+            console.error('notifyPracticeSelectionChanged live update failed', error);
+        }
+    }
+
     schedulePracticeAudioRefresh(250);
+}
+
+function sendPracticeAudioMessage(message) {
+    const playerFrameEl = document.getElementById('practiceAudioFrame');
+    if (!playerFrameEl || !playerFrameEl.contentWindow) {
+        return false;
+    }
+    playerFrameEl.contentWindow.postMessage(message, window.location.origin);
+    return true;
 }
 
 function handleEmbeddedAudioPlayerMessage(event) {
@@ -2871,8 +2935,11 @@ function handleEmbeddedAudioPlayerMessage(event) {
         return;
     }
 
-    if (message.type === 'barabeat-audio-state' && typeof updatePracticeScrollerState === 'function') {
-        updatePracticeScrollerState(message.state, message.leadInMs);
+    if (message.type === 'barabeat-audio-state') {
+        practiceAudioPlaybackState = message.state || 'stopped';
+        if (typeof updatePracticeScrollerState === 'function') {
+            updatePracticeScrollerState(message.state, message.leadInMs);
+        }
     }
 }
 
@@ -2880,6 +2947,7 @@ function clearPracticeAudioPlayer() {
     const playerPanelEl = document.querySelector('.practice-player-panel');
     const playerFrameEl = document.getElementById('practiceAudioFrame');
     window.clearTimeout(practiceAudioRefreshTimer);
+    practiceAudioPlaybackState = 'stopped';
     if (playerPanelEl) {
         playerPanelEl.hidden = false;
     }
@@ -3337,6 +3405,8 @@ function closeAppMenus() {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
+    updateMobilePracticeModeAvailability();
+    window.addEventListener('resize', updateMobilePracticeModeAvailability);
     window.addEventListener('message', handleEmbeddedAudioPlayerMessage);
 
     document.querySelectorAll('#appMenuBar details.app-menu').forEach(function (menuEl) {
@@ -3437,6 +3507,9 @@ document.addEventListener('DOMContentLoaded', function () {
         addInitialFunctionChooser(260, 140);
     });
     document.querySelector('#button11').addEventListener('click', function () {
+        if (isMobilePracticeViewport()) {
+            return;
+        }
         try {
             const readResult = callPHPScript_lesen(zeilenAnzahl, { showAlert: false });
             syncTimelineStateFromReadResultIfNeeded(readResult, buildCurrentTimelineSyncOptions());
@@ -3496,6 +3569,10 @@ document.addEventListener('DOMContentLoaded', function () {
         event.target.value = practiceState.loopsWithSolo;
         notifyPracticeSelectionChanged();
     });
+    document.querySelector('#practiceAccompanimentBetweenPatterns').addEventListener('change', function (event) {
+        practiceState.accompanimentBetweenPatterns = Boolean(event.target.checked);
+        notifyPracticeSelectionChanged();
+    });
     document.querySelector('#practiceRepeatCount').addEventListener('input', function (event) {
         practiceState.repeatCount = normalizePracticeCount(event.target.value, 4, 1, 64);
         event.target.value = practiceState.repeatCount;
@@ -3526,7 +3603,10 @@ document.addEventListener('DOMContentLoaded', function () {
         if (typeof updateTimelineMetadataNode === 'function') {
             updateTimelineMetadataNode();
         }
-        notifyPracticeSelectionChanged();
+        sendPracticeAudioMessage({
+            type: 'barabeat-practice-h2h-rest-mute',
+            enabled: practiceState.h2hRestMute
+        });
     });
     document.querySelector('#practiceAccompanimentStart').addEventListener('change', function (event) {
         const selectedStartMode = event.target.value;

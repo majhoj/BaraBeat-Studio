@@ -139,7 +139,7 @@ window.addEventListener('unhandledrejection', function (event) {
 updateLoadingStatus('Player startet...');
 
 const djembe_1_mp3Files = ['snd/Silence.mp3','snd/DjembeOne_Open.mp3','snd/DjembeOne_OpenL.mp3','snd/DjembeOne_Bass.mp3','snd/DjembeOne_BassL.mp3','snd/DjembeOne_Slap.mp3','snd/DjembeOne_SlapL.mp3','snd/DjembeOne_Mute.mp3','snd/DjembeOne_MuteL.mp3','snd/DjembeOne_Muffled_Open.mp3','snd/DjembeOne_Muffled_Slap.mp3'];
-const djembe_2_mp3Files = ['snd/Silence.mp3','snd/DjembeTwo_Open.mp3','snd/DjembeTwo_OpenL.mp3','snd/DjembeTwo_Bass.mp3','snd/DjembeTwo_BassL.mp3','snd/DjembeTwo_Slap.mp3','snd/DjembeTwo_SlapL.mp3','snd/DjembeTwo_Mute.mp3','snd/DjembeTwo_MuteL.mp3'];
+const djembe_2_mp3Files = ['snd/Silence.mp3','snd/DjembeTwo_Open.mp3','snd/DjembeTwo_OpenL.mp3','snd/DjembeTwo_Bass.mp3','snd/DjembeTwo_BassL.mp3','snd/DjembeTwo_Slap.mp3','snd/DjembeTwo_SlapL.mp3','snd/DjembeTwo_Mute.mp3','snd/DjembeTwo_MuteL.mp3','snd/DjembeTwo_Muffled_Open.mp3','snd/DjembeTwo_Muffled_Slap.mp3'];
 const djembe_3_mp3Files = ['snd/Silence.mp3','snd/DjembeThree_Open.mp3','snd/DjembeThree_OpenL.mp3','snd/DjembeThree_Bass.mp3','snd/DjembeThree_BassL.mp3','snd/DjembeThree_Slap.mp3','snd/DjembeThree_SlapL.mp3','snd/DjembeThree_Mute.mp3','snd/DjembeThree_MuteL.mp3'];
 const kenkeni_mp3Files  = ['snd/Kenkeni_Open.mp3','snd/Kenkeni_Muffled.mp3','snd/Kenkeni_Bell_Open.mp3','snd/Kenkeni_Klick.mp3'];
 const sangban_mp3Files  = ['snd/Sangban_Open.mp3','snd/Sangban_Muffled.mp3','snd/Sangban_Bell_Open.mp3','snd/Sangban_Klick.mp3'];
@@ -155,6 +155,11 @@ const doundoun = new Instrumente(doundoun_mp3Files, -0.6, 1.5);
 const dreierbass = new Instrumente(dreierbass_mp3Files, -1, 1.5);
 const allInstruments = [djembe_1, djembe_2, djembe_3, kenkeni, sangban, doundoun, dreierbass];
 const sangbanStrokeGainMultiplier = 2.2;
+const h2hRestMuteGainMultipliers = {
+  Djembe_1: 0.8,
+  Djembe_2: 1,
+  Djembe_3: 0.8
+};
 const allInstrumentReadyPromises = allInstruments.map(function (instrumentInstance) {
   return instrumentInstance.readyPromise;
 });
@@ -332,8 +337,28 @@ const swingFactor = Math.max(0, Math.min(100, Number(playerConfig.SwingFactor) |
 const rhythmType = String(playerConfig.Rhythmus || '');
 const swingProfile = playerConfig.SwingProfile || {};
 const feelOffsets = playerConfig.FeelOffsets || {};
-const practiceH2HRestMute = Boolean(playerConfig.PracticeH2HRestMute);
+let practiceH2HRestMute = Boolean(playerConfig.PracticeH2HRestMute);
+let pendingPracticeSections = null;
+let pendingPracticeSectionsApplyStep = null;
 const timelineBassTargets = ['Kenkeni', 'Sangban', 'Doundoun'];
+
+window.addEventListener('message', function (event) {
+  if (event.origin !== window.location.origin) {
+    return;
+  }
+  const message = event.data || {};
+  if (message.type === 'barabeat-practice-h2h-rest-mute') {
+    practiceH2HRestMute = Boolean(message.enabled);
+    return;
+  }
+  if (message.type === 'barabeat-practice-hand-modes-update') {
+    updateOrderedSectionHandModes(message.sections);
+    return;
+  }
+  if (message.type === 'barabeat-practice-sections-update') {
+    queuePracticeSectionsUpdate(message.sections);
+  }
+});
 
 function getFeelOffsetSeconds(trackName) {
   const offsetMilliseconds = Number(feelOffsets && feelOffsets[trackName]) || 0;
@@ -1337,7 +1362,7 @@ const usedDjembeTrackNames = trackInstrumentNames.filter(function (instrumentNam
 const expandedBars = isTimelineMode
   ? flatBars
   : expandBarsWithRepeats(flatBars, repeatRanges, 1, flatBars.length);
-const orderedSections = isTimelineMode
+let orderedSections = isTimelineMode
   ? (isPracticeMode && Array.isArray(playerConfig.PracticeSections) && playerConfig.PracticeSections.length > 0
       ? buildConfiguredPracticeSections(playerConfig)
       : (isPracticeMode && Array.isArray(playerConfig.PracticeBlocks) && playerConfig.PracticeBlocks.length > 0
@@ -1379,6 +1404,104 @@ if (isTimelineMode) {
 
     appendBarToOrderedSection(currentOrderedSection, bar);
   }
+}
+
+function updateOrderedSectionHandModes(configuredSections) {
+  if (!Array.isArray(configuredSections) || !Array.isArray(orderedSections)) {
+    return;
+  }
+
+  configuredSections.forEach(function (configuredSection, sectionIndex) {
+    if (!configuredSection || !configuredSection.trackHandModes) {
+      return;
+    }
+
+    const runtimeKey = String(configuredSection.runtimeKey || '');
+    const targetSection = runtimeKey
+      ? orderedSections.find(function (section) {
+          return section && section.runtimeKey === runtimeKey;
+        })
+      : orderedSections[sectionIndex];
+
+    if (!targetSection || !targetSection.trackHandModes) {
+      return;
+    }
+
+    trackInstrumentNames.forEach(function (instrumentName) {
+      targetSection.trackHandModes[instrumentName] = String(configuredSection.trackHandModes[instrumentName] || '');
+    });
+  });
+}
+
+function resetDjembeHandStates() {
+  Object.keys(djembeHandStates).forEach(function (trackName) {
+    djembeHandStates[trackName].nextHand = 'R';
+    djembeHandStates[trackName].leadHand = 'R';
+    djembeHandStates[trackName].lastHand = '';
+    djembeHandStates[trackName].lastSectionKey = '';
+  });
+}
+
+function replaceOrderedSectionsWithConfigured(configuredSections) {
+  if (!Array.isArray(configuredSections) || configuredSections.length === 0) {
+    return false;
+  }
+
+  const nextSections = buildConfiguredPracticeSections({
+    PracticeSections: configuredSections
+  });
+
+  if (nextSections.length === 0) {
+    return false;
+  }
+
+  orderedSections = nextSections;
+  recalculateOrderedSectionTiming();
+  resetDjembeHandStates();
+  return true;
+}
+
+function getNextPracticeSectionBoundaryStep(playbackStep) {
+  const sectionContext = getPlaybackSectionContext(playbackStep);
+  if (!sectionContext || !sectionContext.section || !sectionContext.section.length) {
+    return playbackStep;
+  }
+
+  return playbackStep + Math.max(1, sectionContext.section.length - sectionContext.localStep);
+}
+
+function queuePracticeSectionsUpdate(configuredSections) {
+  if (!isPracticeMode || !Array.isArray(configuredSections) || configuredSections.length === 0) {
+    return;
+  }
+
+  if (!isPlaying) {
+    replaceOrderedSectionsWithConfigured(configuredSections);
+    globalPlaybackStep = 0;
+    notifyEmbeddedPlaybackStep(globalPlaybackStep, nextNoteTime);
+    return;
+  }
+
+  pendingPracticeSections = configuredSections;
+  pendingPracticeSectionsApplyStep = getNextPracticeSectionBoundaryStep(globalPlaybackStep);
+}
+
+function applyPendingPracticeSectionsIfReady() {
+  if (!pendingPracticeSections || pendingPracticeSectionsApplyStep === null) {
+    return;
+  }
+
+  if (globalPlaybackStep < pendingPracticeSectionsApplyStep) {
+    return;
+  }
+
+  if (replaceOrderedSectionsWithConfigured(pendingPracticeSections)) {
+    globalPlaybackStep = 0;
+    notifyEmbeddedPlaybackStep(globalPlaybackStep, nextNoteTime);
+  }
+
+  pendingPracticeSections = null;
+  pendingPracticeSectionsApplyStep = null;
 }
 
 console.log(instrument);
@@ -1475,45 +1598,59 @@ const globalBegleitungLength = Math.max(
   getSectionLength(trackStates.Djembe_3.begleitungNotes)
 );
 
-orderedSections.forEach(function (section, sectionIndex) {
-  section.length = Math.max.apply(null, trackInstrumentNames.map(function (instrumentName) {
-    return getSectionLength(section.trackNotes[instrumentName]);
-  }).concat(0));
-  section.startStep = sectionIndex === 0 ? 0 : orderedSections[sectionIndex - 1].endStep;
-  section.endStep = section.startStep + section.length;
-});
+let oneShotLength = 0;
+let hasOutroSection = false;
+let orderedBegleitungSections = [];
+let orderedBegleitungLoopLength = 0;
+let firstTimelineBegleitungSectionIndex = -1;
+let orderedTimelineFallbackLoopSections = [];
+let orderedFallbackLoopSections = [];
+let orderedFallbackLoopLength = 0;
+let timelinePlaybackLength = 0;
 
-const oneShotLength = orderedSections.length > 0
-  ? orderedSections[orderedSections.length - 1].endStep
-  : 0;
-const hasOutroSection = orderedSections.some(function (section) {
-  return section.label === 'Outro';
-});
-const orderedBegleitungSections = orderedSections.filter(function (section) {
-  return section.label === 'Begleitung' && section.length > 0;
-});
-const orderedBegleitungLoopLength = orderedBegleitungSections.reduce(function (sum, section) {
-  return sum + section.length;
-}, 0);
-const firstTimelineBegleitungSectionIndex = isTimelineMode
-  ? orderedSections.findIndex(function (section) {
-      return section.label === 'Begleitung' && section.length > 0;
-    })
-  : -1;
-const orderedTimelineFallbackLoopSections = firstTimelineBegleitungSectionIndex === -1
-  ? []
-  : orderedSections.slice(firstTimelineBegleitungSectionIndex).filter(function (section) {
-      return section.length > 0;
-    });
-const orderedFallbackLoopSections = isTimelineMode && orderedTimelineFallbackLoopSections.length > 0
-  ? orderedTimelineFallbackLoopSections
-  : orderedBegleitungSections;
-const orderedFallbackLoopLength = orderedFallbackLoopSections.reduce(function (sum, section) {
-  return sum + section.length;
-}, 0);
-const timelinePlaybackLength = timelineLoopCount && timelineLoopCount !== 'loop' && orderedFallbackLoopLength > 0
-  ? oneShotLength + (orderedFallbackLoopLength * Number(timelineLoopCount))
-  : 0;
+function recalculateOrderedSectionTiming() {
+  orderedSections.forEach(function (section, sectionIndex) {
+    section.length = Math.max.apply(null, trackInstrumentNames.map(function (instrumentName) {
+      return getSectionLength(section.trackNotes[instrumentName]);
+    }).concat(0));
+    section.startStep = sectionIndex === 0 ? 0 : orderedSections[sectionIndex - 1].endStep;
+    section.endStep = section.startStep + section.length;
+  });
+
+  oneShotLength = orderedSections.length > 0
+    ? orderedSections[orderedSections.length - 1].endStep
+    : 0;
+  hasOutroSection = orderedSections.some(function (section) {
+    return section.label === 'Outro';
+  });
+  orderedBegleitungSections = orderedSections.filter(function (section) {
+    return section.label === 'Begleitung' && section.length > 0;
+  });
+  orderedBegleitungLoopLength = orderedBegleitungSections.reduce(function (sum, section) {
+    return sum + section.length;
+  }, 0);
+  firstTimelineBegleitungSectionIndex = isTimelineMode
+    ? orderedSections.findIndex(function (section) {
+        return section.label === 'Begleitung' && section.length > 0;
+      })
+    : -1;
+  orderedTimelineFallbackLoopSections = firstTimelineBegleitungSectionIndex === -1
+    ? []
+    : orderedSections.slice(firstTimelineBegleitungSectionIndex).filter(function (section) {
+        return section.length > 0;
+      });
+  orderedFallbackLoopSections = isTimelineMode && orderedTimelineFallbackLoopSections.length > 0
+    ? orderedTimelineFallbackLoopSections
+    : orderedBegleitungSections;
+  orderedFallbackLoopLength = orderedFallbackLoopSections.reduce(function (sum, section) {
+    return sum + section.length;
+  }, 0);
+  timelinePlaybackLength = timelineLoopCount && timelineLoopCount !== 'loop' && orderedFallbackLoopLength > 0
+    ? oneShotLength + (orderedFallbackLoopLength * Number(timelineLoopCount))
+    : 0;
+}
+
+recalculateOrderedSectionTiming();
 const djembeHandStates = {
   Djembe_1: { nextHand: 'R', leadHand: 'R', lastHand: '', lastSectionKey: '' },
   Djembe_2: { nextHand: 'R', leadHand: 'R', lastHand: '', lastSectionKey: '' },
@@ -1912,6 +2049,9 @@ function scheduleNote(kenkeniNote, sangbanNote, doundounNote, dreierbassNote, dj
       case "tone":
         playDjembeStroke(djembe_2, 'DjembeTwo_Open', djembe2Time, djembe2Playback, djembeHandStates.Djembe_2, noteGain);
         break;
+      case "tone_muffled":
+        playDjembeStroke(djembe_2, 'DjembeTwo_Muffled_Open', djembe2Time, djembe2Playback, djembeHandStates.Djembe_2, noteGain);
+        break;
       case "bass":
         playDjembeStroke(djembe_2, 'DjembeTwo_Bass', djembe2Time, djembe2Playback, djembeHandStates.Djembe_2, noteGain);
         break;
@@ -1919,7 +2059,7 @@ function scheduleNote(kenkeniNote, sangbanNote, doundounNote, dreierbassNote, dj
         playDjembeStroke(djembe_2, 'DjembeTwo_Slap', djembe2Time, djembe2Playback, djembeHandStates.Djembe_2, noteGain);
         break;
       case "slap_muffled":
-        playDjembeStroke(djembe_2, 'DjembeTwo_Mute', djembe2Time, djembe2Playback, djembeHandStates.Djembe_2, noteGain);
+        playDjembeStroke(djembe_2, 'DjembeTwo_Muffled_Slap', djembe2Time, djembe2Playback, djembeHandStates.Djembe_2, noteGain);
         break;
       case "tone_flam":
         playDjembeStroke(djembe_2, 'DjembeTwo_Open', djembe2Time, djembe2Playback, djembeHandStates.Djembe_2, noteGain, { isGrace: true });
@@ -2230,6 +2370,8 @@ function scheduler() {
   const dTime = instr._audioCtx.currentTime;
 
   while (nextNoteTime < dTime + scheduleAheadTime) {
+    applyPendingPracticeSectionsIfReady();
+
     if (timelineLoopCount && timelineLoopCount !== 'loop' && timelinePlaybackLength > 0 && globalPlaybackStep >= timelinePlaybackLength) {
       isPlaying = false;
       playButton.dataset.playing = 'false';
@@ -2281,19 +2423,19 @@ function scheduleCurrentStep(time) {
     instrumentInstance: djembe_1,
     baseSampleName: getH2HRestMuteSampleName('Djembe_1'),
     time: Math.max(0, time + getFeelOffsetSeconds('Djembe_1')),
-    gainMultiplier: accentMultiplier * 0.1
+    gainMultiplier: accentMultiplier * h2hRestMuteGainMultipliers.Djembe_1
   });
   advanceSilentH2HStep(djembe2Playback, djembeHandStates.Djembe_2, {
     instrumentInstance: djembe_2,
     baseSampleName: getH2HRestMuteSampleName('Djembe_2'),
     time: Math.max(0, time + getFeelOffsetSeconds('Djembe_2')),
-    gainMultiplier: accentMultiplier * 0.1
+    gainMultiplier: accentMultiplier * h2hRestMuteGainMultipliers.Djembe_2
   });
   advanceSilentH2HStep(djembe3Playback, djembeHandStates.Djembe_3, {
     instrumentInstance: djembe_3,
     baseSampleName: getH2HRestMuteSampleName('Djembe_3'),
     time: Math.max(0, time + getFeelOffsetSeconds('Djembe_3')),
-    gainMultiplier: accentMultiplier * 0.1
+    gainMultiplier: accentMultiplier * h2hRestMuteGainMultipliers.Djembe_3
   });
 
   scheduleNote(
@@ -2524,7 +2666,7 @@ function scheduleNoteToDestination(kenkeniNote, sangbanNote, doundounNote, dreie
 
   const djembeNotes = [
     { trackName: 'Djembe_1', playback: djembe1Playback, instrument: djembe_1, baseNames: { tone: 'DjembeOne_Open', bass: 'DjembeOne_Bass', slap: 'DjembeOne_Slap', tone_muffled: 'DjembeOne_Muffled_Open', slap_muffled: 'DjembeOne_Muffled_Slap' }, handState: exportHandStates.Djembe_1 },
-    { trackName: 'Djembe_2', playback: djembe2Playback, instrument: djembe_2, baseNames: { tone: 'DjembeTwo_Open', bass: 'DjembeTwo_Bass', slap: 'DjembeTwo_Slap', slap_muffled: 'DjembeTwo_Mute' }, handState: exportHandStates.Djembe_2 },
+    { trackName: 'Djembe_2', playback: djembe2Playback, instrument: djembe_2, baseNames: { tone: 'DjembeTwo_Open', bass: 'DjembeTwo_Bass', slap: 'DjembeTwo_Slap', tone_muffled: 'DjembeTwo_Muffled_Open', slap_muffled: 'DjembeTwo_Muffled_Slap' }, handState: exportHandStates.Djembe_2 },
     { trackName: 'Djembe_3', playback: djembe3Playback, instrument: djembe_3, baseNames: { tone: 'DjembeThree_Open', bass: 'DjembeThree_Bass', slap: 'DjembeThree_Slap', slap_muffled: 'DjembeThree_Mute' }, handState: exportHandStates.Djembe_3 }
   ];
 
@@ -2681,7 +2823,7 @@ async function exportCurrentArrangementAsWav() {
         instrumentInstance: djembe_1,
         baseSampleName: getH2HRestMuteSampleName('Djembe_1'),
         time: Math.max(0, currentTime + getFeelOffsetSeconds('Djembe_1')),
-        gainMultiplier: accentMultiplier * 0.1,
+        gainMultiplier: accentMultiplier * h2hRestMuteGainMultipliers.Djembe_1,
         audioContext: offlineContext,
         destinationNode: offlineContext.destination
       });
@@ -2689,7 +2831,7 @@ async function exportCurrentArrangementAsWav() {
         instrumentInstance: djembe_2,
         baseSampleName: getH2HRestMuteSampleName('Djembe_2'),
         time: Math.max(0, currentTime + getFeelOffsetSeconds('Djembe_2')),
-        gainMultiplier: accentMultiplier * 0.1,
+        gainMultiplier: accentMultiplier * h2hRestMuteGainMultipliers.Djembe_2,
         audioContext: offlineContext,
         destinationNode: offlineContext.destination
       });
@@ -2697,7 +2839,7 @@ async function exportCurrentArrangementAsWav() {
         instrumentInstance: djembe_3,
         baseSampleName: getH2HRestMuteSampleName('Djembe_3'),
         time: Math.max(0, currentTime + getFeelOffsetSeconds('Djembe_3')),
-        gainMultiplier: accentMultiplier * 0.1,
+        gainMultiplier: accentMultiplier * h2hRestMuteGainMultipliers.Djembe_3,
         audioContext: offlineContext,
         destinationNode: offlineContext.destination
       });
@@ -2761,12 +2903,7 @@ playButton.addEventListener('click', async (ev) => {
     }
 
     globalPlaybackStep = 0;
-    Object.keys(djembeHandStates).forEach(function (trackName) {
-      djembeHandStates[trackName].nextHand = 'R';
-      djembeHandStates[trackName].leadHand = 'R';
-      djembeHandStates[trackName].lastHand = '';
-      djembeHandStates[trackName].lastSectionKey = '';
-    });
+    resetDjembeHandStates();
 
     const dTime = instr._audioCtx.currentTime;
     nextNoteTime = dTime + playerStartDelay + practiceLeadInDelay;
