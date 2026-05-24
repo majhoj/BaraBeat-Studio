@@ -58,19 +58,25 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
                 <button type="button" id="button9">Funktions-Chooser</button>
             </div>
         </details>
-        <details class="app-menu">
-            <summary>Werkzeuge</summary>
+        <details class="app-menu" data-mobile-practice-menu="true">
+            <summary><span class="desktop-menu-label">Werkzeuge</span><span class="mobile-menu-label">Üben</span></summary>
             <div class="app-menu-panel">
-                <button type="button" id="button10">Audiotest</button>
+                <button type="button" id="button10" hidden>Audiotest</button>
                 <button type="button" id="practiceButton">Üben</button>
                 <button type="button" id="button11">Abschnittstimeline</button>
                 <button type="button" id="button6">Scroll</button>
             </div>
         </details>
+        <button type="button" id="mobilePatternChooserButton" class="mobile-menu-action" hidden>Patternauswahl öffnen</button>
         <form action="" name="uploadForm" class="hidden-upload-form">
             <input type="hidden" size="40" id="iofield" name="iofield" />
         </form>
     </nav>
+
+    <section id="mobileStartInfo" class="mobile-start-info" aria-live="polite">
+        <h1>BaraBeat Studio</h1>
+        <p>Öffne ein Notenblatt und starte den Übungsmodus. Auf Smartphones ist die Ansicht zum Üben und Abspielen vorbereitet.</p>
+    </section>
 
     <div id="fileDialog" class="file-dialog-backdrop" hidden>
         <section class="file-dialog" role="dialog" aria-modal="true" aria-labelledby="fileDialogTitle">
@@ -217,19 +223,39 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
                 </label>
                 <label class="timeline-tempo-control" for="practiceWithoutSoloLoops">
                     Ohne Zusatz
-                    <input type="number" id="practiceWithoutSoloLoops" min="0" max="32" step="1" value="1" />
+                    <span class="practice-stepper">
+                        <button type="button" class="practice-stepper-button" data-practice-step-target="practiceWithoutSoloLoops" data-practice-step-delta="-1" aria-label="Ohne Zusatz verringern">-</button>
+                        <input type="number" id="practiceWithoutSoloLoops" min="0" max="32" step="1" value="1" />
+                        <button type="button" class="practice-stepper-button" data-practice-step-target="practiceWithoutSoloLoops" data-practice-step-delta="1" aria-label="Ohne Zusatz erhöhen">+</button>
+                    </span>
                 </label>
                 <label class="timeline-tempo-control" for="practiceWithSoloLoops">
                     Mit Übungsteil
-                    <input type="number" id="practiceWithSoloLoops" min="1" max="32" step="1" value="1" />
+                    <span class="practice-stepper">
+                        <button type="button" class="practice-stepper-button" data-practice-step-target="practiceWithSoloLoops" data-practice-step-delta="-1" aria-label="Mit Übungsteil verringern">-</button>
+                        <input type="number" id="practiceWithSoloLoops" min="1" max="32" step="1" value="1" />
+                        <button type="button" class="practice-stepper-button" data-practice-step-target="practiceWithSoloLoops" data-practice-step-delta="1" aria-label="Mit Übungsteil erhöhen">+</button>
+                    </span>
                 </label>
                 <label class="timeline-tempo-control" for="practiceAccompanimentBetweenPatterns">
                     Zwischen Übungsteilen
                     <input type="checkbox" id="practiceAccompanimentBetweenPatterns" />
                 </label>
-                <label class="timeline-tempo-control" for="practiceRepeatCount">
+                <label class="timeline-tempo-control" for="practiceRepeatCount" id="practiceRepeatCountControl">
                     Wiederholen
-                    <input type="number" id="practiceRepeatCount" min="1" max="64" step="1" value="4" />
+                    <span class="practice-stepper">
+                        <button type="button" class="practice-stepper-button" data-practice-step-target="practiceRepeatCount" data-practice-step-delta="-1" aria-label="Wiederholungen verringern">-</button>
+                        <input type="number" id="practiceRepeatCount" min="1" max="999" step="1" value="4" />
+                        <button type="button" class="practice-stepper-button" data-practice-step-target="practiceRepeatCount" data-practice-step-delta="1" aria-label="Wiederholungen erhöhen">+</button>
+                    </span>
+                </label>
+                <label class="timeline-tempo-control" for="practiceTimerMinutes">
+                    Timer min
+                    <span class="practice-stepper">
+                        <button type="button" class="practice-stepper-button" data-practice-step-target="practiceTimerMinutes" data-practice-step-delta="-1" aria-label="Timer verringern">-</button>
+                        <input type="number" id="practiceTimerMinutes" min="0" max="240" step="1" value="0" />
+                        <button type="button" class="practice-stepper-button" data-practice-step-target="practiceTimerMinutes" data-practice-step-delta="1" aria-label="Timer erhöhen">+</button>
+                    </span>
                 </label>
                 <label class="timeline-tempo-control" for="practiceAudioLatency">
                     Latenz ms
@@ -407,6 +433,10 @@ edit_text = function () {
 
 // Zeichenfläche und Titel festlegen
 var s = Snap(1050, 1480).attr({ id: "myRect1" });
+if (s.node) {
+    s.node.setAttribute('viewBox', '0 0 1050 1480');
+    s.node.setAttribute('preserveAspectRatio', 'xMinYMin meet');
+}
 var canv = s.rect(0, 0, 1050, 1480).attr({ fill: "white", stroke: "black", strokeWidth: 0.5, opacity: 0.300, id: "myRect2" });
 canv.drag(shadow_move, shadow_start, shadow_end);
 
@@ -2887,7 +2917,9 @@ function notifyPracticeSelectionChanged() {
             const playerConfig = Array.isArray(audioTest.playerPayload) ? audioTest.playerPayload[0] : null;
             if (playerConfig && Array.isArray(playerConfig.PracticeSections) && sendPracticeAudioMessage({
                 type: 'barabeat-practice-sections-update',
-                sections: playerConfig.PracticeSections
+                sections: playerConfig.PracticeSections,
+                timelineLoopCount: playerConfig.TimelineLoopCount,
+                practiceDurationSeconds: playerConfig.PracticeDurationSeconds
             })) {
                 return;
             }
@@ -3410,6 +3442,20 @@ document.addEventListener('DOMContentLoaded', function () {
     window.addEventListener('message', handleEmbeddedAudioPlayerMessage);
 
     document.querySelectorAll('#appMenuBar details.app-menu').forEach(function (menuEl) {
+        const summaryEl = menuEl.querySelector('summary');
+        if (summaryEl && menuEl.dataset.mobilePracticeMenu === 'true') {
+            summaryEl.addEventListener('click', function (event) {
+                if (!isMobilePracticeViewport()) {
+                    return;
+                }
+                event.preventDefault();
+                menuEl.open = false;
+                const practiceButtonEl = document.getElementById('practiceButton');
+                if (practiceButtonEl) {
+                    practiceButtonEl.click();
+                }
+            });
+        }
         menuEl.addEventListener('toggle', function () {
             if (!menuEl.open) {
                 return;
@@ -3559,6 +3605,10 @@ document.addEventListener('DOMContentLoaded', function () {
         practiceState.patternChooserExpanded = !practiceState.patternChooserExpanded;
         renderPracticePanel();
     });
+    document.querySelector('#mobilePatternChooserButton').addEventListener('click', function () {
+        practiceState.patternChooserExpanded = !practiceState.patternChooserExpanded;
+        renderPracticePanel();
+    });
     document.querySelector('#practiceWithoutSoloLoops').addEventListener('input', function (event) {
         practiceState.loopsWithoutSolo = normalizePracticeCount(event.target.value, 1, 0, 32);
         event.target.value = practiceState.loopsWithoutSolo;
@@ -3574,9 +3624,37 @@ document.addEventListener('DOMContentLoaded', function () {
         notifyPracticeSelectionChanged();
     });
     document.querySelector('#practiceRepeatCount').addEventListener('input', function (event) {
-        practiceState.repeatCount = normalizePracticeCount(event.target.value, 4, 1, 64);
+        if (practiceState.timerMinutes > 0) {
+            event.target.value = practiceState.repeatCount;
+            return;
+        }
+        practiceState.repeatCount = normalizePracticeCount(event.target.value, 4, 1, practiceRepeatCountMax);
         event.target.value = practiceState.repeatCount;
         notifyPracticeSelectionChanged();
+    });
+    document.querySelector('#practiceTimerMinutes').addEventListener('input', function (event) {
+        practiceState.timerMinutes = normalizePracticeTimerMinutes(event.target.value);
+        event.target.value = practiceState.timerMinutes;
+        updatePracticeInputs();
+        notifyPracticeSelectionChanged();
+    });
+    document.querySelectorAll('.practice-stepper-button').forEach(function (buttonEl) {
+        buttonEl.addEventListener('click', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            const inputEl = document.getElementById(buttonEl.dataset.practiceStepTarget || '');
+            if (!inputEl) {
+                return;
+            }
+            const stepValue = Math.max(1, Number(inputEl.step) || 1);
+            const delta = (Number(buttonEl.dataset.practiceStepDelta) || 0) * stepValue;
+            const minValue = Number.isFinite(Number(inputEl.min)) ? Number(inputEl.min) : -Infinity;
+            const maxValue = Number.isFinite(Number(inputEl.max)) ? Number(inputEl.max) : Infinity;
+            const fallbackValue = Number.isFinite(Number(inputEl.value)) ? Number(inputEl.value) : minValue;
+            const nextValue = Math.max(minValue, Math.min(maxValue, fallbackValue + delta));
+            inputEl.value = nextValue;
+            inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+        });
     });
     function updatePracticeAudioLatencyControl(nextValue) {
         practiceState.audioLatencyMs = normalizePracticeAudioLatency(nextValue);
@@ -3721,6 +3799,7 @@ function callPHPScript1() {
 }
 
 function onSVGLoaded(data) {
+    document.body.classList.add('has-loaded-score');
     const persistedTimelineMetadata = readTimelineMetadata(data);
 
     if (data.select("#rhythmus") == '<binaer id="rhythmus"/>') {

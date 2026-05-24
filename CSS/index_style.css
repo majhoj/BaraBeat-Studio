@@ -22,6 +22,10 @@
     display: none;
 }
 
+.mobile-start-info {
+    display: none;
+}
+
 #myRect1,
 #myRect1 text {
     -webkit-user-select: none;
@@ -71,6 +75,10 @@
     display: none;
 }
 
+.mobile-menu-label {
+    display: none;
+}
+
 .app-menu[open] summary,
 .app-menu summary:hover {
     background: var(--ui-soft-bg-2);
@@ -117,6 +125,10 @@
 .app-menu-panel button:disabled {
     opacity: 0.48;
     cursor: not-allowed;
+}
+
+.mobile-menu-action {
+    display: none;
 }
 
 .menu-file-picker {
@@ -1126,6 +1138,34 @@
     min-width: 116px;
 }
 
+.practice-stepper {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.timeline-tempo-control .practice-stepper input {
+    width: 58px;
+    text-align: center;
+}
+
+#practicePanel .practice-stepper-button {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    font-size: 18px;
+    line-height: 1;
+}
+
+.timeline-tempo-control.is-disabled {
+    opacity: 0.45;
+}
+
+.timeline-tempo-control.is-disabled input,
+.timeline-tempo-control.is-disabled button {
+    cursor: not-allowed;
+}
+
 .timeline-swing-profile {
     display: inline-flex;
     align-items: center;
@@ -1415,7 +1455,7 @@
         z-index: 80;
         gap: 4px;
         padding: calc(6px + env(safe-area-inset-top)) 8px 6px;
-        overflow-x: auto;
+        overflow: visible;
         box-shadow: none;
     }
 
@@ -1429,9 +1469,47 @@
         display: none;
     }
 
+    #saveAsFileDialogButton,
+    #exportFileDialogButton {
+        display: none;
+    }
+
+    #saveFileDialogButton {
+        display: block;
+    }
+
     .app-menu summary {
         padding: 8px 10px;
         font-size: 13px;
+    }
+
+    .desktop-menu-label {
+        display: none;
+    }
+
+    .mobile-menu-label {
+        display: inline;
+    }
+
+    .mobile-menu-action {
+        display: inline-flex;
+        align-items: center;
+        min-height: 35px;
+        padding: 8px 10px;
+        border: 1px solid transparent;
+        border-radius: var(--ui-radius-small);
+        background: transparent;
+        color: var(--ui-text);
+        font: 600 13px var(--ui-font);
+    }
+
+    .mobile-menu-action[hidden] {
+        display: none;
+    }
+
+    .mobile-menu-action.is-active {
+        background: var(--ui-soft-bg-2);
+        border-color: var(--ui-border);
     }
 
     .app-menu-panel {
@@ -1439,19 +1517,191 @@
         top: calc(44px + env(safe-area-inset-top));
         left: 8px;
         right: 8px;
+        z-index: 90;
         min-width: 0;
         max-height: calc(100vh - 58px - env(safe-area-inset-top));
         overflow: auto;
     }
 
+    .file-dialog-backdrop {
+        align-items: stretch;
+        justify-content: stretch;
+        padding: 0;
+    }
+
+    .file-dialog {
+        width: 100vw;
+        height: 100vh;
+        height: 100dvh;
+        border: 0;
+        border-radius: 0;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+    }
+
+    .file-dialog-main {
+        display: grid;
+        grid-template-columns: 1fr;
+        grid-template-rows: auto minmax(0, 1fr);
+    }
+
+    .file-dialog-sidebar {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 6px;
+        padding: 8px;
+        border-right: 0;
+        border-bottom: 1px solid #dddddd;
+    }
+
+    .file-dialog-sidebar-section {
+        display: none;
+    }
+
+    .file-dialog-filter {
+        display: none;
+    }
+
+    .file-dialog-source,
+    .file-dialog-filter {
+        padding: 8px 9px;
+        text-align: center;
+        font-size: 13px;
+        background: rgba(255, 255, 255, 0.64);
+    }
+
+    .file-dialog-content {
+        min-height: 0;
+    }
+
+    .file-dialog-fields {
+        grid-template-columns: 64px minmax(0, 1fr);
+        width: auto;
+        margin: 8px;
+    }
+
+    .file-dialog-toolbar {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 8px;
+        padding: 0 8px 8px;
+    }
+
+    .file-dialog-folder-name {
+        max-width: none;
+        min-width: 0;
+    }
+
+    .file-dialog-toolbar input {
+        grid-column: 1 / -1;
+        width: 100%;
+        margin-left: 0;
+    }
+
+    .file-dialog-table-wrap {
+        overflow-x: hidden;
+    }
+
+    .file-dialog-table {
+        table-layout: fixed;
+        font-size: 13px;
+    }
+
+    .file-dialog-table th,
+    .file-dialog-table td {
+        padding: 7px 8px;
+    }
+
+    .file-dialog-table th:first-child,
+    .file-dialog-table td:first-child {
+        width: auto;
+    }
+
+    .file-dialog-table th:nth-child(2),
+    .file-dialog-table td:nth-child(2) {
+        width: 82px;
+        text-align: right;
+    }
+
+    .file-dialog-table th:nth-child(3),
+    .file-dialog-table td:nth-child(3) {
+        display: none;
+    }
+
+    .file-dialog-table tbody tr {
+        height: 34px;
+    }
+
+    .file-dialog-footer {
+        grid-template-columns: 1fr;
+        gap: 8px;
+        padding: 8px;
+    }
+
+    .file-dialog-left-actions {
+        display: flex;
+    }
+
+    .file-dialog-format,
+    .file-dialog-actions {
+        justify-content: stretch;
+        width: 100%;
+    }
+
+    #fileDialogNewFolderButton,
+    #fileDialogRenameButton,
+    #fileDialogUnpublishButton {
+        display: none;
+    }
+
+    .file-dialog-actions button,
+    .file-dialog-footer button.primary,
+    #fileDialogDeleteButton {
+        flex: 1;
+        min-height: 40px;
+    }
+
+    .mobile-start-info {
+        display: block;
+        margin: 18px 14px;
+        padding: 14px;
+        border: 1px solid #b9dbc7;
+        border-radius: 10px;
+        background: #fbfefc;
+        color: #185f3d;
+        font-family: var(--ui-font);
+        box-shadow: var(--ui-shadow-soft);
+    }
+
+    .mobile-start-info h1 {
+        margin: 0 0 8px;
+        font-size: 20px;
+    }
+
+    .mobile-start-info p {
+        margin: 0;
+        font-size: 14px;
+        line-height: 1.4;
+        color: #315a42;
+    }
+
+    .has-loaded-score .mobile-start-info {
+        display: none;
+    }
+
+    body:not(.has-loaded-score) #myRect1 {
+        display: none;
+    }
+
     #myRect1 {
-        position: absolute;
-        left: -10000px;
-        top: 0;
-        width: 1px !important;
-        height: 1px !important;
-        opacity: 0;
+        display: block;
+        width: auto !important;
+        height: calc(100vh - 54px - env(safe-area-inset-top)) !important;
+        height: calc(100dvh - 54px - env(safe-area-inset-top)) !important;
+        max-width: none;
+        margin: 4px 0 0 -24px;
+        opacity: 0.72;
         pointer-events: none;
+        touch-action: pan-y;
     }
 
     #timelinePanel {
@@ -1484,6 +1734,15 @@
 
     .timeline-panel-title {
         font-size: 17px;
+    }
+
+    .practice-panel-title .practice-title-label,
+    .practice-panel-title .practice-title-rhythm {
+        display: block;
+    }
+
+    #practicePatternChooserToggle {
+        display: none;
     }
 
     .timeline-panel-actions {
@@ -1527,6 +1786,21 @@
         max-width: 54vw;
     }
 
+    .practice-stepper {
+        flex-shrink: 0;
+    }
+
+    .timeline-tempo-control .practice-stepper input {
+        width: 64px;
+        max-width: 22vw;
+    }
+
+    #practicePanel .practice-stepper-button {
+        width: 34px;
+        height: 34px;
+        font-size: 20px;
+    }
+
     .practice-column,
     .timeline-column {
         min-height: 0;
@@ -1558,7 +1832,7 @@
     }
 
     #practiceAudioFrame {
-        height: 214px;
+        height: 82px;
     }
 
     .practice-scroller-head {
@@ -1571,7 +1845,7 @@
     }
 
     .practice-scroller-playhead {
-        left: 34%;
+        left: 24%;
     }
 
     .practice-scroller {
@@ -1579,15 +1853,21 @@
     }
 
     .practice-scroller-row {
-        grid-template-columns: 72px minmax(0, 1fr);
+        grid-template-columns: minmax(0, 1fr);
+        align-items: stretch;
         min-height: 30px;
     }
 
     .practice-scroller-label {
-        padding: 0 7px 0 8px;
+        padding: 0 9px 3px;
         font-size: 11px;
+        text-align: left;
         overflow: hidden;
         text-overflow: ellipsis;
+    }
+
+    .practice-scroller-lane-wrap {
+        width: 100%;
     }
 
     .practice-scroller-cell {

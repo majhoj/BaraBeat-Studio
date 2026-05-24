@@ -55,6 +55,7 @@ a:link {
       <label for="bpm">BPM</label>
       <input name="bpm" id="bpm" type="range" min="30" max="180" value="100" step="1" />
       <span id="bpmval">100</span>
+      <?php if (!$embedded) { ?>
       <label for="soloTrack">Stimme</label>
       <select id="soloTrack">
         <option value="">Alle</option>
@@ -66,6 +67,7 @@ a:link {
         <option value="Djembe_2">Djembe 2</option>
         <option value="Djembe_3">Djembe 3</option>
       </select>
+      <?php } ?>
       <button type="button" id="exportWavButton" class="secondary-button">Export WAV</button>
       <button data-playing="false">&nbsp;</button>
     </div>
@@ -328,17 +330,20 @@ const playerConfig = Array.isArray(obj) && obj.length > 0 ? obj[0] : {};
 const repeatRanges = sanitizeRepeatRanges(playerConfig.RepeatRanges);
 const isTimelineMode = Boolean(playerConfig.TimelineMode);
 const isPracticeMode = Boolean(playerConfig.PracticeMode);
-const timelineLoopCount = normalizeTimelineLoopCountValue(
+let timelineLoopCount = normalizeTimelineLoopCountValue(
   playerConfig.TimelineLoopCount !== undefined ? playerConfig.TimelineLoopCount : playerConfig.TimelineLoop
 );
-const timelineLoop = timelineLoopCount === 'loop';
+let timelineLoop = timelineLoopCount === 'loop';
 const initialTempo = Math.max(30, Math.min(180, Number(playerConfig.Tempo) || 100));
 const swingFactor = Math.max(0, Math.min(100, Number(playerConfig.SwingFactor) || 0));
 const rhythmType = String(playerConfig.Rhythmus || '');
 const swingProfile = playerConfig.SwingProfile || {};
 const feelOffsets = playerConfig.FeelOffsets || {};
 let practiceH2HRestMute = Boolean(playerConfig.PracticeH2HRestMute);
+let practiceDurationSeconds = Math.max(0, Number(playerConfig.PracticeDurationSeconds) || 0);
 let pendingPracticeSections = null;
+let pendingPracticeLoopCount = false;
+let pendingPracticeDurationSeconds = undefined;
 let pendingPracticeSectionsApplyStep = null;
 const timelineBassTargets = ['Kenkeni', 'Sangban', 'Doundoun'];
 
@@ -356,7 +361,7 @@ window.addEventListener('message', function (event) {
     return;
   }
   if (message.type === 'barabeat-practice-sections-update') {
-    queuePracticeSectionsUpdate(message.sections);
+    queuePracticeSectionsUpdate(message.sections, message.timelineLoopCount, message.practiceDurationSeconds);
   }
 });
 
@@ -455,6 +460,13 @@ function createEmptyTrackHandModeMap() {
   }, {});
 }
 
+function createEmptyTrackStepMap() {
+  return trackInstrumentNames.reduce(function (trackMap, instrumentName) {
+    trackMap[instrumentName] = null;
+    return trackMap;
+  }, {});
+}
+
 function createOrderedSection(label) {
   return {
     label: label,
@@ -463,7 +475,11 @@ function createOrderedSection(label) {
     runtimeKey: '',
     trackNotes: createEmptyTrackNoteMap(),
     trackHandModes: createEmptyTrackHandModeMap(),
+    finalRepeatOutSteps: createEmptyTrackStepMap(),
     continuingAccompaniments: {},
+    isLeadIn: false,
+    repeatCount: 1,
+    playbackLength: 0,
     length: 0,
     startStep: 0,
     endStep: 0
@@ -696,6 +712,32 @@ function normalizeSectionTrackLoops(section) {
   });
 }
 
+function normalizeSectionRepeatCount(rawValue) {
+  const numericValue = Number(rawValue);
+  if (!Number.isFinite(numericValue) || numericValue < 1) {
+    return 1;
+  }
+  return Math.max(1, Math.min(32, Math.round(numericValue)));
+}
+
+function normalizeSectionOutStep(rawValue) {
+  if (rawValue === null || rawValue === undefined || rawValue === '') {
+    return null;
+  }
+  const numericValue = Number(rawValue);
+  if (!Number.isFinite(numericValue) || numericValue < 0) {
+    return null;
+  }
+  return Math.round(numericValue);
+}
+
+function isSectionLoopEligible(section) {
+  if (!section || section.playbackLength <= 0) {
+    return false;
+  }
+  return isPracticeMode ? !section.isLeadIn : section.label === 'Begleitung';
+}
+
 function appendNotesToSectionTrack(section, instrumentName, sourceNotes) {
   const safeSourceNotes = Array.isArray(sourceNotes) ? sourceNotes : [];
   if (!Array.isArray(section.trackNotes[instrumentName])) {
@@ -770,6 +812,8 @@ function finalizeSectionLengths(sections) {
     section.length = Math.max.apply(null, trackInstrumentNames.map(function (instrumentName) {
       return getSectionLength(section.trackNotes[instrumentName]);
     }).concat(0));
+    section.repeatCount = normalizeSectionRepeatCount(section.repeatCount);
+    section.playbackLength = section.length * section.repeatCount;
   });
 }
 
@@ -1207,6 +1251,8 @@ function buildPracticeSections(config) {
   practiceBlocks.forEach(function (block, blockIndex) {
     const blockEntries = Array.isArray(block && block.entries) ? block.entries : [];
     const mergedSection = createOrderedSection('');
+    mergedSection.repeatCount = normalizeSectionRepeatCount(block && block.repeatCount);
+    mergedSection.isLeadIn = Boolean(block && block.isLeadIn);
     const sectionLabels = [];
     const sectionLabelNames = [];
 
@@ -1266,6 +1312,8 @@ function buildConfiguredPracticeSections(config) {
   const configuredSections = Array.isArray(config.PracticeSections) ? config.PracticeSections : [];
   const sections = configuredSections.map(function (configuredSection, sectionIndex) {
     const section = createOrderedSection(configuredSection && configuredSection.label ? configuredSection.label : 'Begleitung');
+    section.repeatCount = normalizeSectionRepeatCount(configuredSection && configuredSection.repeatCount);
+    section.isLeadIn = Boolean(configuredSection && configuredSection.isLeadIn);
     section.labelName = configuredSection && configuredSection.labelName ? configuredSection.labelName : section.label;
     section.runtimeKey = configuredSection && configuredSection.runtimeKey
       ? configuredSection.runtimeKey
@@ -1278,11 +1326,15 @@ function buildConfiguredPracticeSections(config) {
 
     const sourceTrackNotes = configuredSection && configuredSection.trackNotes ? configuredSection.trackNotes : {};
     const sourceTrackHandModes = configuredSection && configuredSection.trackHandModes ? configuredSection.trackHandModes : {};
+    const sourceFinalRepeatOutSteps = configuredSection && configuredSection.finalRepeatOutSteps
+      ? configuredSection.finalRepeatOutSteps
+      : {};
     trackInstrumentNames.forEach(function (instrumentName) {
       section.trackNotes[instrumentName] = Array.isArray(sourceTrackNotes[instrumentName])
         ? sourceTrackNotes[instrumentName].slice()
         : [];
       section.trackHandModes[instrumentName] = String(sourceTrackHandModes[instrumentName] || '');
+      section.finalRepeatOutSteps[instrumentName] = normalizeSectionOutStep(sourceFinalRepeatOutSteps[instrumentName]);
     });
 
     normalizeSectionTrackLoops(section);
@@ -1442,7 +1494,25 @@ function resetDjembeHandStates() {
   });
 }
 
-function replaceOrderedSectionsWithConfigured(configuredSections) {
+function updatePracticeDurationSeconds(nextDurationSeconds) {
+  if (nextDurationSeconds === undefined) {
+    return;
+  }
+
+  const normalizedDurationSeconds = Math.max(0, Number(nextDurationSeconds) || 0);
+  if (practiceDurationSeconds === normalizedDurationSeconds) {
+    return;
+  }
+
+  practiceDurationSeconds = normalizedDurationSeconds;
+  if (isPlaying && practiceDurationSeconds > 0 && instr && instr._audioCtx) {
+    practiceStopAudioTime = instr._audioCtx.currentTime + practiceDurationSeconds;
+  } else if (practiceDurationSeconds <= 0) {
+    practiceStopAudioTime = 0;
+  }
+}
+
+function replaceOrderedSectionsWithConfigured(configuredSections, nextLoopCount, nextDurationSeconds) {
   if (!Array.isArray(configuredSections) || configuredSections.length === 0) {
     return false;
   }
@@ -1456,6 +1526,11 @@ function replaceOrderedSectionsWithConfigured(configuredSections) {
   }
 
   orderedSections = nextSections;
+  if (nextLoopCount !== undefined) {
+    timelineLoopCount = normalizeTimelineLoopCountValue(nextLoopCount);
+    timelineLoop = timelineLoopCount === 'loop';
+  }
+  updatePracticeDurationSeconds(nextDurationSeconds);
   recalculateOrderedSectionTiming();
   resetDjembeHandStates();
   return true;
@@ -1463,26 +1538,28 @@ function replaceOrderedSectionsWithConfigured(configuredSections) {
 
 function getNextPracticeSectionBoundaryStep(playbackStep) {
   const sectionContext = getPlaybackSectionContext(playbackStep);
-  if (!sectionContext || !sectionContext.section || !sectionContext.section.length) {
+  if (!sectionContext || !sectionContext.section || !sectionContext.section.playbackLength) {
     return playbackStep;
   }
 
-  return playbackStep + Math.max(1, sectionContext.section.length - sectionContext.localStep);
+  return playbackStep + Math.max(1, sectionContext.section.playbackLength - sectionContext.sectionStep);
 }
 
-function queuePracticeSectionsUpdate(configuredSections) {
+function queuePracticeSectionsUpdate(configuredSections, nextLoopCount, nextDurationSeconds) {
   if (!isPracticeMode || !Array.isArray(configuredSections) || configuredSections.length === 0) {
     return;
   }
 
   if (!isPlaying) {
-    replaceOrderedSectionsWithConfigured(configuredSections);
+    replaceOrderedSectionsWithConfigured(configuredSections, nextLoopCount, nextDurationSeconds);
     globalPlaybackStep = 0;
     notifyEmbeddedPlaybackStep(globalPlaybackStep, nextNoteTime);
     return;
   }
 
   pendingPracticeSections = configuredSections;
+  pendingPracticeLoopCount = nextLoopCount;
+  pendingPracticeDurationSeconds = nextDurationSeconds;
   pendingPracticeSectionsApplyStep = getNextPracticeSectionBoundaryStep(globalPlaybackStep);
 }
 
@@ -1495,12 +1572,14 @@ function applyPendingPracticeSectionsIfReady() {
     return;
   }
 
-  if (replaceOrderedSectionsWithConfigured(pendingPracticeSections)) {
+  if (replaceOrderedSectionsWithConfigured(pendingPracticeSections, pendingPracticeLoopCount, pendingPracticeDurationSeconds)) {
     globalPlaybackStep = 0;
     notifyEmbeddedPlaybackStep(globalPlaybackStep, nextNoteTime);
   }
 
   pendingPracticeSections = null;
+  pendingPracticeLoopCount = false;
+  pendingPracticeDurationSeconds = undefined;
   pendingPracticeSectionsApplyStep = null;
 }
 
@@ -1530,7 +1609,6 @@ for (const key in steuerung) {
 let tempo = initialTempo;
 const bpmControl = document.querySelector('#bpm');
 const bpmValEl = document.querySelector('#bpmval');
-const soloTrackControl = document.querySelector('#soloTrack');
 let soloTrackName = '';
 
 bpmControl.value = String(initialTempo);
@@ -1542,9 +1620,12 @@ bpmControl.addEventListener('input', ev => {
   notifyEmbeddedTempoChange(tempo);
 }, false);
 
-soloTrackControl.addEventListener('change', ev => {
-  soloTrackName = ev.target.value;
-}, false);
+const soloTrackControl = document.querySelector('#soloTrack');
+if (soloTrackControl) {
+  soloTrackControl.addEventListener('change', ev => {
+    soloTrackName = ev.target.value;
+  }, false);
+}
 
 const lookahead = 25;          // ms
 const scheduleAheadTime = 0.25; // sec
@@ -1555,6 +1636,7 @@ let nextNoteTime = 0.0;
 let timerID;
 let instr;
 let globalPlaybackStep = 0;
+let practiceStopAudioTime = 0;
 
 function getSectionLength(sectionNotes) {
   return Array.isArray(sectionNotes) ? sectionNotes.length : 0;
@@ -1613,8 +1695,10 @@ function recalculateOrderedSectionTiming() {
     section.length = Math.max.apply(null, trackInstrumentNames.map(function (instrumentName) {
       return getSectionLength(section.trackNotes[instrumentName]);
     }).concat(0));
+    section.repeatCount = normalizeSectionRepeatCount(section.repeatCount);
+    section.playbackLength = section.length * section.repeatCount;
     section.startStep = sectionIndex === 0 ? 0 : orderedSections[sectionIndex - 1].endStep;
-    section.endStep = section.startStep + section.length;
+    section.endStep = section.startStep + section.playbackLength;
   });
 
   oneShotLength = orderedSections.length > 0
@@ -1623,27 +1707,21 @@ function recalculateOrderedSectionTiming() {
   hasOutroSection = orderedSections.some(function (section) {
     return section.label === 'Outro';
   });
-  orderedBegleitungSections = orderedSections.filter(function (section) {
-    return section.label === 'Begleitung' && section.length > 0;
-  });
+  orderedBegleitungSections = orderedSections.filter(isSectionLoopEligible);
   orderedBegleitungLoopLength = orderedBegleitungSections.reduce(function (sum, section) {
-    return sum + section.length;
+    return sum + section.playbackLength;
   }, 0);
   firstTimelineBegleitungSectionIndex = isTimelineMode
-    ? orderedSections.findIndex(function (section) {
-        return section.label === 'Begleitung' && section.length > 0;
-      })
+    ? orderedSections.findIndex(isSectionLoopEligible)
     : -1;
   orderedTimelineFallbackLoopSections = firstTimelineBegleitungSectionIndex === -1
     ? []
-    : orderedSections.slice(firstTimelineBegleitungSectionIndex).filter(function (section) {
-        return section.length > 0;
-      });
+    : orderedSections.slice(firstTimelineBegleitungSectionIndex).filter(isSectionLoopEligible);
   orderedFallbackLoopSections = isTimelineMode && orderedTimelineFallbackLoopSections.length > 0
     ? orderedTimelineFallbackLoopSections
     : orderedBegleitungSections;
   orderedFallbackLoopLength = orderedFallbackLoopSections.reduce(function (sum, section) {
-    return sum + section.length;
+    return sum + section.playbackLength;
   }, 0);
   timelinePlaybackLength = timelineLoopCount && timelineLoopCount !== 'loop' && orderedFallbackLoopLength > 0
     ? oneShotLength + (orderedFallbackLoopLength * Number(timelineLoopCount))
@@ -1728,10 +1806,12 @@ function getPlaybackSectionContext(playbackStep) {
   for (let sectionIndex = 0; sectionIndex < orderedSections.length; sectionIndex++) {
     const section = orderedSections[sectionIndex];
     if (playbackStep >= section.startStep && playbackStep < section.endStep) {
+      const sectionStep = playbackStep - section.startStep;
       return {
         section: section,
-        localStep: playbackStep - section.startStep,
-        loopCycleIndex: 0
+        localStep: section.length > 0 ? sectionStep % section.length : 0,
+        sectionStep: sectionStep,
+        loopCycleIndex: section.length > 0 ? Math.floor(sectionStep / section.length) : 0
       };
     }
   }
@@ -1741,14 +1821,18 @@ function getPlaybackSectionContext(playbackStep) {
     const loopCycleIndex = Math.floor((playbackStep - oneShotLength) / orderedFallbackLoopLength);
     for (let sectionIndex = 0; sectionIndex < orderedFallbackLoopSections.length; sectionIndex++) {
       const loopSection = orderedFallbackLoopSections[sectionIndex];
-      if (loopStep < loopSection.length) {
+      const loopSectionLength = loopSection.playbackLength || loopSection.length || 0;
+      if (loopStep < loopSectionLength) {
+        const repeatedLocalStep = loopSection.length > 0 ? loopStep % loopSection.length : 0;
+        const repeatedCycleIndex = loopSection.length > 0 ? Math.floor(loopStep / loopSection.length) : 0;
         return {
           section: loopSection,
-          localStep: loopStep,
-          loopCycleIndex: loopCycleIndex
+          localStep: repeatedLocalStep,
+          sectionStep: loopStep,
+          loopCycleIndex: loopCycleIndex + repeatedCycleIndex
         };
       }
-      loopStep -= loopSection.length;
+      loopStep -= loopSectionLength;
     }
   }
 
@@ -2136,8 +2220,17 @@ window.masterAudioContext = instr._audioCtx;
 function getTrackPlaybackAtStep(trackName, trackState, playbackStep) {
   const sectionContext = getPlaybackSectionContext(playbackStep);
   if (sectionContext) {
+    const finalRepeatOutStep = sectionContext.section.finalRepeatOutSteps
+      ? normalizeSectionOutStep(sectionContext.section.finalRepeatOutSteps[trackName])
+      : null;
+    const isFinalSectionRepeat = sectionContext.loopCycleIndex === sectionContext.section.repeatCount - 1;
+    const shouldMuteForOut = isFinalSectionRepeat &&
+      finalRepeatOutStep !== null &&
+      sectionContext.localStep > finalRepeatOutStep;
     return {
-      note: sectionContext.section.trackNotes[trackName][sectionContext.localStep] || null,
+      note: shouldMuteForOut
+        ? null
+        : (sectionContext.section.trackNotes[trackName][sectionContext.localStep] || null),
       handMode: sectionContext.section.trackHandModes
         ? (sectionContext.section.trackHandModes[trackName] || '')
         : '',
@@ -2166,22 +2259,24 @@ function getTrackPlaybackAtStep(trackName, trackState, playbackStep) {
 
       for (let sectionIndex = 0; sectionIndex < orderedFallbackLoopSections.length; sectionIndex++) {
         const section = orderedFallbackLoopSections[sectionIndex];
-        const sectionLength = section.length || 0;
-        if (sectionLength <= 0) {
+        const sectionPlaybackLength = section.playbackLength || section.length || 0;
+        if (sectionPlaybackLength <= 0) {
           continue;
         }
-        if (normalizedLoopStep < sectionOffset + sectionLength) {
-          const localStep = normalizedLoopStep - sectionOffset;
+        if (normalizedLoopStep < sectionOffset + sectionPlaybackLength) {
+          const sectionStep = normalizedLoopStep - sectionOffset;
+          const localStep = section.length > 0 ? sectionStep % section.length : 0;
+          const repeatedCycleIndex = section.length > 0 ? Math.floor(sectionStep / section.length) : 0;
           return {
             note: section.trackNotes[trackName][localStep] || null,
             handMode: section.trackHandModes
               ? (section.trackHandModes[trackName] || '')
               : '',
-            sectionKey: (section.runtimeKey || 'begleitung-loop') + ':loop:' + loopCycleIndex,
+            sectionKey: (section.runtimeKey || 'begleitung-loop') + ':loop:' + (loopCycleIndex + repeatedCycleIndex),
             stepIndex: localStep
           };
         }
-        sectionOffset += sectionLength;
+        sectionOffset += sectionPlaybackLength;
       }
     }
 
@@ -2372,10 +2467,19 @@ function scheduler() {
   while (nextNoteTime < dTime + scheduleAheadTime) {
     applyPendingPracticeSectionsIfReady();
 
+    if (practiceStopAudioTime > 0 && nextNoteTime >= practiceStopAudioTime) {
+      isPlaying = false;
+      playButton.dataset.playing = 'false';
+      timerID = null;
+      practiceStopAudioTime = 0;
+      notifyEmbeddedPlaybackState('ended');
+      return;
+    }
     if (timelineLoopCount && timelineLoopCount !== 'loop' && timelinePlaybackLength > 0 && globalPlaybackStep >= timelinePlaybackLength) {
       isPlaying = false;
       playButton.dataset.playing = 'false';
       timerID = null;
+      practiceStopAudioTime = 0;
       notifyEmbeddedPlaybackState('ended');
       return;
     }
@@ -2383,6 +2487,7 @@ function scheduler() {
       isPlaying = false;
       playButton.dataset.playing = 'false';
       timerID = null;
+      practiceStopAudioTime = 0;
       notifyEmbeddedPlaybackState('ended');
       return;
     }
@@ -2390,6 +2495,7 @@ function scheduler() {
       isPlaying = false;
       playButton.dataset.playing = 'false';
       timerID = null;
+      practiceStopAudioTime = 0;
       notifyEmbeddedPlaybackState('ended');
       return;
     }
@@ -2494,6 +2600,17 @@ function getStepInterval(playbackStep, tempoValue) {
 }
 
 function getExportStepCount() {
+  if (practiceDurationSeconds > 0) {
+    let exportDuration = 0;
+    let exportStep = 0;
+    const maxExportSteps = 200000;
+    while (exportDuration < practiceDurationSeconds && exportStep < maxExportSteps) {
+      exportDuration += getStepInterval(exportStep, tempo);
+      exportStep += 1;
+    }
+    return Math.max(1, exportStep);
+  }
+
   if (timelineLoopCount && timelineLoopCount !== 'loop' && timelinePlaybackLength > 0) {
     return timelinePlaybackLength;
   }
@@ -2907,6 +3024,9 @@ playButton.addEventListener('click', async (ev) => {
 
     const dTime = instr._audioCtx.currentTime;
     nextNoteTime = dTime + playerStartDelay + practiceLeadInDelay;
+    practiceStopAudioTime = practiceDurationSeconds > 0
+      ? nextNoteTime + practiceDurationSeconds
+      : 0;
 
     ev.target.dataset.playing = 'true';
     notifyEmbeddedPlaybackState('playing', {
@@ -2916,6 +3036,7 @@ playButton.addEventListener('click', async (ev) => {
   } else {
     window.clearTimeout(timerID);
     stopAllActiveSources(instr._audioCtx.currentTime);
+    practiceStopAudioTime = 0;
     ev.target.dataset.playing = 'false';
     notifyEmbeddedPlaybackState('stopped');
   }
