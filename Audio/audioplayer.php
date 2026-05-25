@@ -140,6 +140,43 @@ window.addEventListener('unhandledrejection', function (event) {
 
 updateLoadingStatus('Player startet...');
 
+const playerConfig = Array.isArray(obj) && obj.length > 0 ? obj[0] : {};
+const isPracticeMode = Boolean(playerConfig.PracticeMode);
+const allPracticeTrackNames = ['Kenkeni', 'Sangban', 'Doundoun', 'Dreierbass', 'Djembe_1', 'Djembe_2', 'Djembe_3'];
+
+function hasPlayablePracticeNotes(notes) {
+  return Array.isArray(notes) && notes.some(function (noteValue) {
+    return noteValue !== 'f' && noteValue !== null && noteValue !== undefined && noteValue !== '';
+  });
+}
+
+function getActivePracticeTrackNames(config) {
+  if (!isPracticeMode || !Array.isArray(config.PracticeSections)) {
+    return allPracticeTrackNames.slice();
+  }
+
+  const activeTracks = [];
+  config.PracticeSections.forEach(function (section) {
+    const trackNotes = section && section.trackNotes ? section.trackNotes : {};
+    allPracticeTrackNames.forEach(function (trackName) {
+      if (activeTracks.indexOf(trackName) === -1 && hasPlayablePracticeNotes(trackNotes[trackName])) {
+        activeTracks.push(trackName);
+      }
+    });
+  });
+
+  return activeTracks.length > 0 ? activeTracks : allPracticeTrackNames.slice();
+}
+
+const activePracticeTrackNames = getActivePracticeTrackNames(playerConfig);
+
+function getPracticeInstrumentFiles(trackName, files) {
+  if (!isPracticeMode || activePracticeTrackNames.indexOf(trackName) !== -1) {
+    return files;
+  }
+  return [];
+}
+
 const djembe_1_mp3Files = ['snd/Silence.mp3','snd/DjembeOne_Open.mp3','snd/DjembeOne_OpenL.mp3','snd/DjembeOne_Bass.mp3','snd/DjembeOne_BassL.mp3','snd/DjembeOne_Slap.mp3','snd/DjembeOne_SlapL.mp3','snd/DjembeOne_Mute.mp3','snd/DjembeOne_MuteL.mp3','snd/DjembeOne_Muffled_Open.mp3','snd/DjembeOne_Muffled_Slap.mp3'];
 const djembe_2_mp3Files = ['snd/Silence.mp3','snd/DjembeTwo_Open.mp3','snd/DjembeTwo_OpenL.mp3','snd/DjembeTwo_Bass.mp3','snd/DjembeTwo_BassL.mp3','snd/DjembeTwo_Slap.mp3','snd/DjembeTwo_SlapL.mp3','snd/DjembeTwo_Mute.mp3','snd/DjembeTwo_MuteL.mp3','snd/DjembeTwo_Muffled_Open.mp3','snd/DjembeTwo_Muffled_Slap.mp3'];
 const djembe_3_mp3Files = ['snd/Silence.mp3','snd/DjembeThree_Open.mp3','snd/DjembeThree_OpenL.mp3','snd/DjembeThree_Bass.mp3','snd/DjembeThree_BassL.mp3','snd/DjembeThree_Slap.mp3','snd/DjembeThree_SlapL.mp3','snd/DjembeThree_Mute.mp3','snd/DjembeThree_MuteL.mp3'];
@@ -148,13 +185,13 @@ const sangban_mp3Files  = ['snd/Sangban_Open.mp3','snd/Sangban_Muffled.mp3','snd
 const doundoun_mp3Files = ['snd/Doundoun_Open.mp3','snd/Doundoun_Muffled.mp3','snd/Doundoun_Bell_Open.mp3','snd/Doundoun_Klick.mp3'];
 const dreierbass_mp3Files = ['snd/Silence.mp3','snd/Kenkeni_Open.mp3','snd/Kenkeni_Muffled.mp3','snd/Sangban_Open.mp3','snd/Sangban_Muffled.mp3','snd/Doundoun_Open.mp3','snd/Doundoun_Muffled.mp3'];
 
-const djembe_1 = new Instrumente(djembe_1_mp3Files, 1, 1.4);
-const djembe_2 = new Instrumente(djembe_2_mp3Files, 0.4, 1.4);
-const djembe_3 = new Instrumente(djembe_3_mp3Files, -0.2, 1.4);
-const kenkeni  = new Instrumente(kenkeni_mp3Files, -1, 1.8);
-const sangban  = new Instrumente(sangban_mp3Files, -0.8, 2.5);
-const doundoun = new Instrumente(doundoun_mp3Files, -0.6, 1.5);
-const dreierbass = new Instrumente(dreierbass_mp3Files, -1, 1.5);
+const djembe_1 = new Instrumente(getPracticeInstrumentFiles('Djembe_1', djembe_1_mp3Files), 1, 1.4);
+const djembe_2 = new Instrumente(getPracticeInstrumentFiles('Djembe_2', djembe_2_mp3Files), 0.4, 1.4);
+const djembe_3 = new Instrumente(getPracticeInstrumentFiles('Djembe_3', djembe_3_mp3Files), -0.2, 1.4);
+const kenkeni  = new Instrumente(getPracticeInstrumentFiles('Kenkeni', kenkeni_mp3Files), -1, 1.8);
+const sangban  = new Instrumente(getPracticeInstrumentFiles('Sangban', sangban_mp3Files), -0.8, 2.5);
+const doundoun = new Instrumente(getPracticeInstrumentFiles('Doundoun', doundoun_mp3Files), -0.6, 1.5);
+const dreierbass = new Instrumente(getPracticeInstrumentFiles('Dreierbass', dreierbass_mp3Files), -1, 1.5);
 const allInstruments = [djembe_1, djembe_2, djembe_3, kenkeni, sangban, doundoun, dreierbass];
 const sangbanStrokeGainMultiplier = 2.2;
 const h2hRestMuteGainMultipliers = {
@@ -326,10 +363,8 @@ function expandPatternBars(pattern) {
   return expandBarsWithRepeats(patternBars, patternRepeatRanges, 1, patternBars.length);
 }
 
-const playerConfig = Array.isArray(obj) && obj.length > 0 ? obj[0] : {};
 const repeatRanges = sanitizeRepeatRanges(playerConfig.RepeatRanges);
 const isTimelineMode = Boolean(playerConfig.TimelineMode);
-const isPracticeMode = Boolean(playerConfig.PracticeMode);
 let timelineLoopCount = normalizeTimelineLoopCountValue(
   playerConfig.TimelineLoopCount !== undefined ? playerConfig.TimelineLoopCount : playerConfig.TimelineLoop
 );
@@ -544,6 +579,7 @@ function getPatternOutStep(pattern) {
   }
 
   let stepOffset = 0;
+  let matchedOutStep = null;
 
   for (let barIndex = 0; barIndex < patternBars.length; barIndex++) {
     const bar = patternBars[barIndex];
@@ -559,13 +595,13 @@ function getPatternOutStep(pattern) {
 
     if (outControl) {
       const controlStep = Math.max(0, Number(outControl.stepIndex) || 0);
-      return stepOffset + Math.min(controlStep, barNotes.length);
+      matchedOutStep = stepOffset + Math.min(controlStep, barNotes.length);
     }
 
     stepOffset += barNotes.length;
   }
 
-  return null;
+  return matchedOutStep;
 }
 
 function applyOutToPatternNotes(patternNotes, outStep) {
@@ -1829,7 +1865,8 @@ function getPlaybackSectionContext(playbackStep) {
           section: loopSection,
           localStep: repeatedLocalStep,
           sectionStep: loopStep,
-          loopCycleIndex: loopCycleIndex + repeatedCycleIndex
+          loopCycleIndex: repeatedCycleIndex,
+          outerLoopIndex: loopCycleIndex
         };
       }
       loopStep -= loopSectionLength;
@@ -1839,8 +1876,23 @@ function getPlaybackSectionContext(playbackStep) {
   return null;
 }
 
+function getStepsPerBeatForRhythm() {
+  if (rhythmType === 'tenaer') {
+    return 6;
+  }
+  if (rhythmType === 'neunaer') {
+    return 3;
+  }
+  return 8;
+}
+
+function getBaseStepDuration(tempoValue) {
+  const safeTempo = Math.max(1, Number(tempoValue) || initialTempo || 100);
+  return 60 / safeTempo / getStepsPerBeatForRhythm();
+}
+
 function nextNote() {
-  const stepDuration = rhythmType === 'neunaer' ? 15 / tempo : 7.5 / tempo;
+  const stepDuration = getBaseStepDuration(tempo);
   let intervalToNextStep = stepDuration;
   let activeSwingFactor = swingFactor;
   const sectionContext = getPlaybackSectionContext(globalPlaybackStep);
@@ -2227,6 +2279,10 @@ function getTrackPlaybackAtStep(trackName, trackState, playbackStep) {
     const shouldMuteForOut = isFinalSectionRepeat &&
       finalRepeatOutStep !== null &&
       sectionContext.localStep > finalRepeatOutStep;
+    const outerLoopIndex = Number(sectionContext.outerLoopIndex) || 0;
+    const sectionKeySuffix = outerLoopIndex
+      ? ':timeline-loop:' + outerLoopIndex + ':section-repeat:' + sectionContext.loopCycleIndex
+      : (sectionContext.loopCycleIndex ? ':section-repeat:' + sectionContext.loopCycleIndex : '');
     return {
       note: shouldMuteForOut
         ? null
@@ -2234,8 +2290,7 @@ function getTrackPlaybackAtStep(trackName, trackState, playbackStep) {
       handMode: sectionContext.section.trackHandModes
         ? (sectionContext.section.trackHandModes[trackName] || '')
         : '',
-      sectionKey: (sectionContext.section.runtimeKey || '') +
-        (sectionContext.loopCycleIndex ? ':sheet-loop:' + sectionContext.loopCycleIndex : ''),
+      sectionKey: (sectionContext.section.runtimeKey || '') + sectionKeySuffix,
       stepIndex: sectionContext.localStep
     };
   }
@@ -2452,7 +2507,13 @@ function playSampleToDestination(instrumentInstance, sampleName, time, gainMulti
   const gainNode = audioContext.createGain();
   sampleSource.buffer = instrumentInstance._snd[sampleName];
   gainNode.gain.value = instrumentInstance._vol * Math.max(0, Number(gainMultiplier) || 1);
-  sampleSource.connect(gainNode).connect(destinationNode);
+  if (typeof audioContext.createStereoPanner === 'function') {
+    const panNode = audioContext.createStereoPanner();
+    panNode.pan.value = Math.max(-1, Math.min(1, Number(instrumentInstance._pan) || 0));
+    sampleSource.connect(gainNode).connect(panNode).connect(destinationNode);
+  } else {
+    sampleSource.connect(gainNode).connect(destinationNode);
+  }
   sampleSource.start(Math.max(0, time));
 }
 
@@ -2558,7 +2619,7 @@ function scheduleCurrentStep(time) {
 }
 
 function getStepInterval(playbackStep, tempoValue) {
-  const stepDuration = rhythmType === 'neunaer' ? 15 / tempoValue : 7.5 / tempoValue;
+  const stepDuration = getBaseStepDuration(tempoValue);
   let intervalToNextStep = stepDuration;
   let activeSwingFactor = swingFactor;
   const sectionContext = getPlaybackSectionContext(playbackStep);

@@ -13,6 +13,13 @@ class Instrumente {
     this._snd = {};
     this._activeSources = [];
     this._outputNode = this._audioCtx.createGain();
+    this._panNode = typeof this._audioCtx.createStereoPanner === 'function'
+      ? this._audioCtx.createStereoPanner()
+      : null;
+    if (this._panNode) {
+      this._panNode.pan.value = Math.max(-1, Math.min(1, this._pan));
+      this._panNode.connect(this._outputNode);
+    }
     this._outputNode.connect(this._audioCtx.destination);
     this.readyPromise = this.loadSounds();
   }
@@ -23,6 +30,24 @@ class Instrumente {
   }
 
   async getFile(filepath) {
+    if (!Instrumente.audioBufferCache) {
+      Instrumente.audioBufferCache = new Map();
+    }
+    if (Instrumente.audioBufferCache.has(filepath)) {
+      return await Instrumente.audioBufferCache.get(filepath);
+    }
+
+    const loadPromise = this.loadAudioBuffer(filepath);
+    Instrumente.audioBufferCache.set(filepath, loadPromise);
+    try {
+      return await loadPromise;
+    } catch (error) {
+      Instrumente.audioBufferCache.delete(filepath);
+      throw error;
+    }
+  }
+
+  async loadAudioBuffer(filepath) {
     if (this.getSoundName(filepath) === 'Silence') {
       return this.createSilentBuffer();
     }
@@ -65,26 +90,6 @@ class Instrumente {
     return filepath.substring(filepath.lastIndexOf('/') + 1, filepath.lastIndexOf('.'));
   }
 
-  createPannedBuffer(audioBuffer) {
-    const pannedBuffer = this._audioCtx.createBuffer(2, audioBuffer.length, audioBuffer.sampleRate);
-    const leftOutput = pannedBuffer.getChannelData(0);
-    const rightOutput = pannedBuffer.getChannelData(1);
-    const leftGain = Math.max(0, 1 - this._pan) / 2;
-    const rightGain = Math.max(0, 1 + this._pan) / 2;
-    const channelScale = audioBuffer.numberOfChannels > 1 ? 1 / audioBuffer.numberOfChannels : 1;
-
-    for (let channelIndex = 0; channelIndex < audioBuffer.numberOfChannels; channelIndex++) {
-      const input = audioBuffer.getChannelData(channelIndex);
-      for (let sampleIndex = 0; sampleIndex < audioBuffer.length; sampleIndex++) {
-        const monoSample = input[sampleIndex] * channelScale;
-        leftOutput[sampleIndex] += monoSample * leftGain;
-        rightOutput[sampleIndex] += monoSample * rightGain;
-      }
-    }
-
-    return pannedBuffer;
-  }
-
   async loadSounds() {
     const loadingIndicator = window.loadingEl;
 
@@ -93,7 +98,7 @@ class Instrumente {
         const filepath = this._sounds[i];
         const name = this.getSoundName(filepath);
         const audioBuffer = await this.getFile(filepath);
-        this._snd[name] = this.createPannedBuffer(audioBuffer);
+        this._snd[name] = audioBuffer;
       }
     } catch (error) {
       console.error('Fehler beim Laden der Audiodateien:', error);
@@ -116,7 +121,11 @@ class Instrumente {
       sampleSource.buffer = this._snd[name];
       vol_tone.gain.value = this._vol * Math.max(0, Number(gainMultiplier) || 1);
 
-      sampleSource.connect(vol_tone).connect(this._outputNode);
+      if (this._panNode) {
+        sampleSource.connect(vol_tone).connect(this._panNode);
+      } else {
+        sampleSource.connect(vol_tone).connect(this._outputNode);
+      }
 
       sampleSource.onended = () => {
         this._activeSources = this._activeSources.filter((source) => source !== sampleSource);

@@ -12,6 +12,7 @@ const practiceState = {
     audioLatencyMs: 30,
     h2hRestMute: false,
     patternHandModes: {},
+    patternTargetInstruments: {},
     patternChooserExpanded: false,
     defaultsApplied: false,
     defaultSelectionSourceHash: ''
@@ -71,8 +72,22 @@ const practiceScrollerState = {
     playbackTimers: [],
     animationFrameId: null,
     playbackEvents: [],
-    playbackAnchor: null
+    playbackAnchor: null,
+    activeCells: []
 };
+
+function isPracticeScrollerCompactViewport() {
+    return typeof window !== 'undefined' &&
+        window.matchMedia &&
+        window.matchMedia('(max-width: 760px), (hover: none) and (pointer: coarse)').matches;
+}
+
+function getPracticeScrollerVisualLoopCopies() {
+    if (isPracticeScrollerCompactViewport()) {
+        return 1;
+    }
+    return practiceScrollerState.visualLoopCopies;
+}
 
 function normalizePracticeCount(rawValue, fallback, minValue, maxValue) {
     const numericValue = Number(rawValue);
@@ -131,6 +146,27 @@ function getPracticePatternHandModesBySourceKey(patternHandModes) {
     }, {});
 }
 
+function getPracticePatternTargetsBySourceKey(patternTargets) {
+    return Object.keys(patternTargets || {}).reduce(function (targetBySourceKey, patternId) {
+        const pattern = findPatternById(patternId);
+        if (pattern && pattern.sourceKey) {
+            targetBySourceKey[pattern.sourceKey] = patternTargets[patternId];
+        }
+        return targetBySourceKey;
+    }, {});
+}
+
+function getPersistedPracticePatternTargets() {
+    const persistedTargets = Object.assign({}, practiceState.patternTargetInstruments);
+    practiceState.accompanimentPatternIds.concat(practiceState.soloPatternIds).forEach(function (patternId) {
+        const pattern = findPatternById(patternId);
+        if (pattern && getPracticeTargetOptionsForPattern(pattern).length > 0) {
+            persistedTargets[patternId] = getPracticeTargetForPattern(pattern);
+        }
+    });
+    return persistedTargets;
+}
+
 function getPracticePatternHandModesFromMetadata(patternHandModes, patternHandModesBySourceKey, patternLibrary) {
     const patterns = Array.isArray(patternLibrary) ? patternLibrary : timelineState.sourcePatterns;
     const modeById = patternHandModes && typeof patternHandModes === 'object' ? patternHandModes : {};
@@ -148,6 +184,28 @@ function getPracticePatternHandModesFromMetadata(patternHandModes, patternHandMo
             resolvedModes[pattern.id] = normalizedMode;
         }
         return resolvedModes;
+    }, {});
+}
+
+function getPracticePatternTargetsFromMetadata(patternTargets, patternTargetsBySourceKey, patternLibrary) {
+    const patterns = Array.isArray(patternLibrary) ? patternLibrary : timelineState.sourcePatterns;
+    const targetById = patternTargets && typeof patternTargets === 'object' ? patternTargets : {};
+    const targetBySourceKey = patternTargetsBySourceKey && typeof patternTargetsBySourceKey === 'object'
+        ? patternTargetsBySourceKey
+        : {};
+
+    return patterns.reduce(function (resolvedTargets, pattern) {
+        if (!pattern || !pattern.id) {
+            return resolvedTargets;
+        }
+        const allowedTargets = getPracticeTargetOptionsForPattern(pattern).map(function (optionData) {
+            return optionData.value;
+        });
+        const rawTarget = targetBySourceKey[pattern.sourceKey] || targetById[pattern.id];
+        if (allowedTargets.indexOf(rawTarget) !== -1) {
+            resolvedTargets[pattern.id] = rawTarget;
+        }
+        return resolvedTargets;
     }, {});
 }
 
@@ -179,6 +237,7 @@ function getPracticePatternIdsFromMetadata(sourceKeys, patternIds, patternLibrar
 }
 
 function buildPracticeMetadata() {
+    const persistedPatternTargets = getPersistedPracticePatternTargets();
     return {
         version: 1,
         sourceHash: timelineState.sourceHash,
@@ -195,13 +254,16 @@ function buildPracticeMetadata() {
         accompanimentPatternSourceKeys: getPracticePatternSourceKeys(practiceState.accompanimentPatternIds),
         soloPatternSourceKeys: getPracticePatternSourceKeys(practiceState.soloPatternIds),
         patternHandModes: Object.assign({}, practiceState.patternHandModes),
-        patternHandModesBySourceKey: getPracticePatternHandModesBySourceKey(practiceState.patternHandModes)
+        patternHandModesBySourceKey: getPracticePatternHandModesBySourceKey(practiceState.patternHandModes),
+        patternTargetInstruments: persistedPatternTargets,
+        patternTargetInstrumentsBySourceKey: getPracticePatternTargetsBySourceKey(persistedPatternTargets)
     };
 }
 
 function resetPracticeForSource(sourceHash) {
     practiceState.accompanimentPatternIds = [];
     practiceState.soloPatternIds = [];
+    practiceState.patternTargetInstruments = {};
     practiceState.defaultsApplied = false;
     practiceState.defaultSelectionSourceHash = sourceHash || timelineState.sourceHash || '';
 }
@@ -235,6 +297,11 @@ function applyPracticeMetadata(metadata, patternLibrary, sourceHash) {
         metadata.patternHandModesBySourceKey,
         patternLibrary
     );
+    practiceState.patternTargetInstruments = getPracticePatternTargetsFromMetadata(
+        metadata.patternTargetInstruments,
+        metadata.patternTargetInstrumentsBySourceKey,
+        patternLibrary
+    );
     const hasPersistedPatternSelection =
         practiceState.accompanimentPatternIds.length > 0 ||
         practiceState.soloPatternIds.length > 0;
@@ -260,6 +327,18 @@ function syncPracticeSelectionsWithPatternLibrary() {
     Object.keys(practiceState.patternHandModes).forEach(function (patternId) {
         if (availableIds.indexOf(patternId) === -1) {
             delete practiceState.patternHandModes[patternId];
+        }
+    });
+    Object.keys(practiceState.patternTargetInstruments).forEach(function (patternId) {
+        const pattern = findPatternById(patternId);
+        const allowedTargets = pattern
+            ? getPracticeTargetOptionsForPattern(pattern).map(function (optionData) {
+                return optionData.value;
+            })
+            : [];
+        if (availableIds.indexOf(patternId) === -1 ||
+                allowedTargets.indexOf(practiceState.patternTargetInstruments[patternId]) === -1) {
+            delete practiceState.patternTargetInstruments[patternId];
         }
     });
 }
@@ -304,9 +383,93 @@ function togglePracticePatternSelection(listName, patternId, selected) {
     }
 }
 
+function movePracticePatternSelection(listName, patternId, direction) {
+    const selectedIds = practiceState[listName];
+    const currentIndex = selectedIds.indexOf(patternId);
+    const targetIndex = currentIndex + direction;
+    if (currentIndex === -1 || targetIndex < 0 || targetIndex >= selectedIds.length) {
+        return false;
+    }
+
+    selectedIds.splice(currentIndex, 1);
+    selectedIds.splice(targetIndex, 0, patternId);
+    return true;
+}
+
+function reorderPracticePatternSelection(listName, draggedPatternId, targetPatternId) {
+    const selectedIds = practiceState[listName];
+    const currentIndex = selectedIds.indexOf(draggedPatternId);
+    const targetIndex = selectedIds.indexOf(targetPatternId);
+    if (currentIndex === -1 || targetIndex === -1 || currentIndex === targetIndex) {
+        return false;
+    }
+
+    selectedIds.splice(currentIndex, 1);
+    selectedIds.splice(targetIndex, 0, draggedPatternId);
+    return true;
+}
+
+function notifyPracticePatternOrderChanged() {
+    renderPracticePanel();
+    if (typeof notifyPracticeSelectionChanged === 'function') {
+        notifyPracticeSelectionChanged();
+    }
+}
+
+function getPracticeTargetOptionsForPattern(pattern) {
+    const sourceInstrument = String(pattern && (pattern.sourceInstrument || pattern.instrument) || '').trim();
+    const defaultTargets = Array.isArray(pattern && pattern.defaultTargets) ? pattern.defaultTargets : [];
+    const normalizedDefaultTargets = normalizePracticeTargetInstruments(defaultTargets);
+    const isGenericDjembe = sourceInstrument === 'Djembe' ||
+        (pattern && pattern.instrument === 'Djembe' && normalizedDefaultTargets.length > 1);
+    const isGenericBass = sourceInstrument === 'Bässe' || sourceInstrument === 'Baesse';
+
+    if (isGenericDjembe) {
+        return [
+            { value: 'Djembe_1', label: 'Djembe 1' },
+            { value: 'Djembe_2', label: 'Djembe 2' },
+            { value: 'Djembe_3', label: 'Djembe 3' }
+        ];
+    }
+
+    if (isGenericBass) {
+        return [
+            { value: 'Kenkeni', label: 'Kenkeni' },
+            { value: 'Sangban', label: 'Sangban' },
+            { value: 'Doundoun', label: 'Doundoun' },
+            { value: 'Dreierbass', label: 'Dreierbass' }
+        ];
+    }
+
+    return [];
+}
+
+function getPracticeTargetForPattern(pattern) {
+    const targetOptions = getPracticeTargetOptionsForPattern(pattern);
+    if (targetOptions.length === 0) {
+        return '';
+    }
+    const selectedTarget = practiceState.patternTargetInstruments[pattern.id];
+    if (targetOptions.some(function (optionData) {
+        return optionData.value === selectedTarget;
+    })) {
+        return selectedTarget;
+    }
+    return targetOptions[0].value;
+}
+
+function getPracticePatternPlaybackTargets(pattern) {
+    const selectedTarget = getPracticeTargetForPattern(pattern);
+    if (selectedTarget) {
+        return [selectedTarget];
+    }
+    return Array.isArray(pattern.defaultTargets) ? pattern.defaultTargets.slice() : [];
+}
+
 function createPracticePatternRow(pattern, listName) {
     const rowEl = document.createElement('label');
     rowEl.className = 'practice-pattern-row';
+    rowEl.dataset.patternId = pattern.id;
 
     const inputEl = document.createElement('input');
     inputEl.type = 'checkbox';
@@ -331,6 +494,70 @@ function createPracticePatternRow(pattern, listName) {
     metaEl.textContent = (pattern.sourceInstrument || pattern.instrument || '') + ' · ' + (pattern.labelName || pattern.labelType || '');
 
     rowEl.append(inputEl, titleEl, metaEl);
+
+    if (listName === 'soloPatternIds' && inputEl.checked) {
+        rowEl.classList.add('has-order-controls');
+        const orderControlsEl = document.createElement('span');
+        orderControlsEl.className = 'practice-pattern-order-controls';
+
+        const dragHandleEl = document.createElement('span');
+        dragHandleEl.className = 'practice-pattern-drag-handle';
+        dragHandleEl.textContent = '↕';
+        dragHandleEl.setAttribute('aria-hidden', 'true');
+
+        const upButtonEl = document.createElement('button');
+        upButtonEl.type = 'button';
+        upButtonEl.className = 'practice-pattern-order-button';
+        upButtonEl.textContent = '↑';
+        upButtonEl.setAttribute('aria-label', 'Übungsteil nach oben verschieben');
+        upButtonEl.disabled = practiceState[listName].indexOf(pattern.id) === 0;
+
+        const downButtonEl = document.createElement('button');
+        downButtonEl.type = 'button';
+        downButtonEl.className = 'practice-pattern-order-button';
+        downButtonEl.textContent = '↓';
+        downButtonEl.setAttribute('aria-label', 'Übungsteil nach unten verschieben');
+        downButtonEl.disabled = practiceState[listName].indexOf(pattern.id) === practiceState[listName].length - 1;
+
+        [upButtonEl, downButtonEl].forEach(function (buttonEl) {
+            buttonEl.addEventListener('click', function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                const direction = buttonEl === upButtonEl ? -1 : 1;
+                if (movePracticePatternSelection(listName, pattern.id, direction)) {
+                    notifyPracticePatternOrderChanged();
+                }
+            });
+        });
+
+        orderControlsEl.append(dragHandleEl, upButtonEl, downButtonEl);
+        rowEl.appendChild(orderControlsEl);
+        rowEl.draggable = true;
+        rowEl.addEventListener('dragstart', function (event) {
+            rowEl.classList.add('is-dragging');
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('text/plain', pattern.id);
+        });
+        rowEl.addEventListener('dragend', function () {
+            rowEl.classList.remove('is-dragging');
+        });
+        rowEl.addEventListener('dragover', function (event) {
+            event.preventDefault();
+            rowEl.classList.add('is-drop-target');
+            event.dataTransfer.dropEffect = 'move';
+        });
+        rowEl.addEventListener('dragleave', function () {
+            rowEl.classList.remove('is-drop-target');
+        });
+        rowEl.addEventListener('drop', function (event) {
+            event.preventDefault();
+            rowEl.classList.remove('is-drop-target');
+            const draggedPatternId = event.dataTransfer.getData('text/plain');
+            if (reorderPracticePatternSelection(listName, draggedPatternId, pattern.id)) {
+                notifyPracticePatternOrderChanged();
+            }
+        });
+    }
 
     if (listName === 'soloPatternIds' && pattern.instrument === 'Djembe') {
         const handModeEl = document.createElement('select');
@@ -360,6 +587,28 @@ function createPracticePatternRow(pattern, listName) {
         });
         rowEl.appendChild(handModeEl);
     }
+    if (inputEl.checked) {
+        const targetOptions = getPracticeTargetOptionsForPattern(pattern);
+        if (targetOptions.length > 0) {
+            const targetEl = document.createElement('select');
+            targetEl.className = 'practice-pattern-target';
+            targetOptions.forEach(function (optionData) {
+                const optionEl = document.createElement('option');
+                optionEl.value = optionData.value;
+                optionEl.textContent = optionData.label;
+                targetEl.appendChild(optionEl);
+            });
+            targetEl.value = getPracticeTargetForPattern(pattern);
+            targetEl.addEventListener('click', function (event) {
+                event.stopPropagation();
+            });
+            targetEl.addEventListener('change', function () {
+                practiceState.patternTargetInstruments[pattern.id] = targetEl.value;
+                notifyPracticePatternOrderChanged();
+            });
+            rowEl.appendChild(targetEl);
+        }
+    }
     return rowEl;
 }
 
@@ -380,9 +629,25 @@ function renderPracticePatternList(containerId, listName) {
     }
 
     containerEl.innerHTML = '';
-    timelineState.sourcePatterns.filter(function (pattern) {
+    let visiblePatterns = timelineState.sourcePatterns.filter(function (pattern) {
         return isPracticePatternVisibleInList(pattern, listName);
-    }).forEach(function (pattern) {
+    });
+    if (listName === 'soloPatternIds') {
+        const selectedPatternIds = practiceState.soloPatternIds;
+        const selectedPatterns = selectedPatternIds
+            .map(function (patternId) {
+                return visiblePatterns.find(function (pattern) {
+                    return pattern && pattern.id === patternId;
+                });
+            })
+            .filter(Boolean);
+        const unselectedPatterns = visiblePatterns.filter(function (pattern) {
+            return selectedPatternIds.indexOf(pattern.id) === -1;
+        });
+        visiblePatterns = selectedPatterns.concat(unselectedPatterns);
+    }
+
+    visiblePatterns.forEach(function (pattern) {
         containerEl.appendChild(createPracticePatternRow(pattern, listName));
     });
 }
@@ -516,7 +781,7 @@ function createPracticeEntry(pattern, parallelGroupId, blockId, repeatCount, isL
             ? normalizePracticeHandMode(practiceState.patternHandModes[pattern.id])
             : '',
         swingFactor: null,
-        targetInstruments: Array.isArray(pattern.defaultTargets) ? pattern.defaultTargets.slice() : []
+        targetInstruments: getPracticePatternPlaybackTargets(pattern)
     };
 }
 
@@ -661,6 +926,46 @@ function createEmptyPracticeTrackFlags() {
     }, {});
 }
 
+function mergePracticeFlagsIntoTrackAtOffset(targetFlags, sourceFlags, offset) {
+    const mergedFlags = Array.isArray(targetFlags) ? targetFlags.slice() : [];
+    const safeSourceFlags = Array.isArray(sourceFlags) ? sourceFlags : [];
+    const safeOffset = Math.max(0, Number(offset) || 0);
+    safeSourceFlags.forEach(function (flagValue, flagIndex) {
+        const targetIndex = safeOffset + flagIndex;
+        while (mergedFlags.length <= targetIndex) {
+            mergedFlags.push(false);
+        }
+        if (flagValue) {
+            mergedFlags[targetIndex] = true;
+        }
+    });
+    return mergedFlags;
+}
+
+function expandPracticeTargetFlags(targetFlags, paddingSteps) {
+    const safeTargetFlags = Array.isArray(targetFlags) ? targetFlags : [];
+    const safePaddingSteps = Math.max(0, Number(paddingSteps) || 0);
+    if (safePaddingSteps === 0 || safeTargetFlags.length === 0) {
+        return safeTargetFlags.slice();
+    }
+
+    const expandedFlags = safeTargetFlags.slice();
+    safeTargetFlags.forEach(function (isTarget, stepIndex) {
+        if (!isTarget) {
+            return;
+        }
+        for (let offset = 1; offset <= safePaddingSteps; offset += 1) {
+            if (stepIndex - offset >= 0) {
+                expandedFlags[stepIndex - offset] = true;
+            }
+            if (stepIndex + offset < expandedFlags.length) {
+                expandedFlags[stepIndex + offset] = true;
+            }
+        }
+    });
+    return expandedFlags;
+}
+
 function normalizePracticeTargetInstrument(instrumentName) {
     const instrumentMap = {
         Djembe_1: ['Djembe_1'],
@@ -692,7 +997,7 @@ function normalizePracticeTargetInstruments(targetInstruments) {
 }
 
 function flattenPracticePatternNotes(pattern) {
-    return (pattern && Array.isArray(pattern.bars) ? pattern.bars : []).reduce(function (allNotes, bar) {
+    return expandPracticePatternBars(pattern).reduce(function (allNotes, bar) {
         if (bar && Array.isArray(bar.notes)) {
             return allNotes.concat(bar.notes);
         }
@@ -700,9 +1005,139 @@ function flattenPracticePatternNotes(pattern) {
     }, []);
 }
 
-function getPracticePatternControlStep(pattern, controlType) {
+function getPracticeRepeatMarkerList(markerValue) {
+    if (Array.isArray(markerValue)) {
+        return markerValue.filter(function (marker) {
+            return marker !== false && marker !== null && marker !== undefined && marker !== '';
+        });
+    }
+    if (markerValue === false || markerValue === null || markerValue === undefined || markerValue === '') {
+        return [];
+    }
+    return [markerValue];
+}
+
+function isPracticeContinuationMarker(markerValue) {
+    return markerValue === 'continue' || markerValue === 'loop';
+}
+
+function buildPracticeRepeatRangesFromBars(bars) {
+    const safeBars = Array.isArray(bars) ? bars : [];
+    const repeatBoundaries = new Array(safeBars.length + 1).fill(null).map(function (_, boundaryIndex) {
+        return {
+            startMarkers: [],
+            endMarkers: [],
+            index: boundaryIndex
+        };
+    });
+
+    safeBars.forEach(function (bar, barIndex) {
+        const repeatInfo = bar && bar.repeat ? bar.repeat : {};
+        getPracticeRepeatMarkerList(repeatInfo.start).forEach(function (marker) {
+            repeatBoundaries[barIndex].startMarkers.push({
+                boundaryIndex: barIndex,
+                count: marker
+            });
+        });
+        getPracticeRepeatMarkerList(repeatInfo.end).forEach(function (marker) {
+            repeatBoundaries[barIndex + 1].endMarkers.push({
+                boundaryIndex: barIndex + 1,
+                count: marker
+            });
+        });
+    });
+
+    const repeatRanges = [];
+    const repeatStartStack = [];
+    repeatBoundaries.forEach(function (boundary) {
+        boundary.endMarkers.forEach(function (endMarker) {
+            const matchingStartMarker = repeatStartStack.pop();
+            if (!matchingStartMarker) {
+                return;
+            }
+            repeatRanges.push({
+                startBar: matchingStartMarker.boundaryIndex + 1,
+                endBar: endMarker.boundaryIndex,
+                count: endMarker.count
+            });
+        });
+        boundary.startMarkers.forEach(function (startMarker) {
+            repeatStartStack.push(startMarker);
+        });
+    });
+
+    return repeatRanges.filter(function (repeatRange) {
+        const startBar = Number(repeatRange.startBar);
+        const endBar = Number(repeatRange.endBar);
+        if (!Number.isFinite(startBar) || !Number.isFinite(endBar) || startBar < 1 || endBar < startBar) {
+            return false;
+        }
+        return repeatRange.count === 'loop' || Number.isFinite(Number(repeatRange.count));
+    }).map(function (repeatRange) {
+        return {
+            startBar: Number(repeatRange.startBar),
+            endBar: Number(repeatRange.endBar),
+            count: repeatRange.count === 'loop' ? 'loop' : Number(repeatRange.count)
+        };
+    });
+}
+
+function expandPracticeBarsWithRepeats(bars, repeatRangesToApply, startBarIndex, endBarIndex) {
+    const expandedBars = [];
+    let currentBarIndex = startBarIndex;
+    while (currentBarIndex <= endBarIndex) {
+        const matchingRange = repeatRangesToApply
+            .filter(function (repeatRange) {
+                return !isPracticeContinuationMarker(repeatRange.count) &&
+                    repeatRange.startBar === currentBarIndex &&
+                    repeatRange.endBar <= endBarIndex;
+            })
+            .sort(function (rangeA, rangeB) {
+                return rangeB.endBar - rangeA.endBar;
+            })[0];
+
+        if (!matchingRange) {
+            expandedBars.push(bars[currentBarIndex - 1]);
+            currentBarIndex += 1;
+            continue;
+        }
+
+        const repeatedSegment = expandPracticeBarsWithRepeats(
+            bars,
+            repeatRangesToApply.filter(function (repeatRange) {
+                return repeatRange.startBar >= matchingRange.startBar &&
+                    repeatRange.endBar <= matchingRange.endBar &&
+                    !(repeatRange.startBar === matchingRange.startBar && repeatRange.endBar === matchingRange.endBar);
+            }),
+            matchingRange.startBar,
+            matchingRange.endBar
+        );
+        expandedBars.push.apply(expandedBars, repeatedSegment);
+        const repeatCount = Number(matchingRange.count) || 0;
+        for (let repeatIndex = 0; repeatIndex < repeatCount; repeatIndex += 1) {
+            expandedBars.push.apply(expandedBars, repeatedSegment);
+        }
+        currentBarIndex = matchingRange.endBar + 1;
+    }
+    return expandedBars;
+}
+
+function expandPracticePatternBars(pattern) {
     const bars = pattern && Array.isArray(pattern.bars) ? pattern.bars : [];
+    if (bars.length === 0) {
+        return [];
+    }
+    const repeatRanges = buildPracticeRepeatRangesFromBars(bars);
+    if (repeatRanges.length === 0) {
+        return bars;
+    }
+    return expandPracticeBarsWithRepeats(bars, repeatRanges, 1, bars.length);
+}
+
+function getPracticePatternControlStep(pattern, controlType) {
+    const bars = expandPracticePatternBars(pattern);
     let stepOffset = 0;
+    let matchedControlStep = null;
 
     for (let barIndex = 0; barIndex < bars.length; barIndex += 1) {
         const bar = bars[barIndex];
@@ -718,13 +1153,16 @@ function getPracticePatternControlStep(pattern, controlType) {
 
         if (matchingControl) {
             const controlStep = Math.max(0, Number(matchingControl.stepIndex) || 0);
-            return stepOffset + Math.min(controlStep, notes.length);
+            matchedControlStep = stepOffset + Math.min(controlStep, notes.length);
+            if (controlType !== 'out') {
+                return matchedControlStep;
+            }
         }
 
         stepOffset += notes.length;
     }
 
-    return null;
+    return matchedControlStep;
 }
 
 function getPracticePatternInStep(pattern) {
@@ -799,6 +1237,7 @@ function createPracticeSection(block, blockIndex, sectionSuffix) {
             swingFactor: null,
             trackNotes: createEmptyPracticeTrackNotes(),
             trackHandModes: createEmptyPracticeTrackHandModes(),
+            trackTargetFlags: createEmptyPracticeTrackFlags(),
             finalRepeatOutSteps: createEmptyPracticeTrackStepMap(),
             practiceTargetInstruments: []
     };
@@ -814,6 +1253,7 @@ function clonePracticeSection(section, sectionSuffix) {
         swingFactor: section.swingFactor,
         trackNotes: createEmptyPracticeTrackNotes(),
         trackHandModes: createEmptyPracticeTrackHandModes(),
+        trackTargetFlags: createEmptyPracticeTrackFlags(),
         finalRepeatOutSteps: createEmptyPracticeTrackStepMap(),
         practiceTargetInstruments: Array.isArray(section.practiceTargetInstruments)
             ? section.practiceTargetInstruments.slice()
@@ -826,6 +1266,10 @@ function clonePracticeSection(section, sectionSuffix) {
             ? section.trackNotes[instrumentName].slice()
             : [];
         clonedSection.trackHandModes[instrumentName] = section.trackHandModes[instrumentName] || '';
+        clonedSection.trackTargetFlags[instrumentName] = section.trackTargetFlags &&
+            Array.isArray(section.trackTargetFlags[instrumentName])
+            ? section.trackTargetFlags[instrumentName].slice()
+            : [];
         clonedSection.finalRepeatOutSteps[instrumentName] = section.finalRepeatOutSteps[instrumentName];
     });
     return clonedSection;
@@ -864,6 +1308,13 @@ function mergePracticePickupIntoHostSection(hostSection, pickupSection) {
         if (pickupSection.trackHandModes[instrumentName]) {
             hostSection.trackHandModes[instrumentName] = pickupSection.trackHandModes[instrumentName];
         }
+        if (pickupSection.trackTargetFlags && Array.isArray(pickupSection.trackTargetFlags[instrumentName])) {
+            hostSection.trackTargetFlags[instrumentName] = mergePracticeFlagsIntoTrackAtOffset(
+                hostSection.trackTargetFlags[instrumentName],
+                pickupSection.trackTargetFlags[instrumentName],
+                pickupOffset
+            );
+        }
     });
 }
 
@@ -873,9 +1324,115 @@ function clearPracticeSectionOutSteps(section) {
     });
 }
 
+function getPracticeSectionFinalOutEndStep(section) {
+    const outSteps = section && section.finalRepeatOutSteps ? section.finalRepeatOutSteps : {};
+    const sectionLength = getPracticeSectionLength(section);
+    const safeOutSteps = practiceTrackInstrumentNames
+        .map(function (instrumentName) {
+            const rawOutStep = outSteps[instrumentName];
+            if (rawOutStep === null || rawOutStep === undefined || rawOutStep === '') {
+                return null;
+            }
+            const numericOutStep = Number(rawOutStep);
+            return Number.isFinite(numericOutStep) && numericOutStep >= 0
+                ? Math.round(numericOutStep)
+                : null;
+        })
+        .filter(function (outStep) {
+            return outStep !== null;
+        });
+
+    if (safeOutSteps.length === 0 || sectionLength <= 0) {
+        return null;
+    }
+    const outEndStep = Math.max.apply(null, safeOutSteps) + 1;
+    const stepsPerBar = getPracticeStepsPerBar();
+    const sectionEndStep = stepsPerBar > 0
+        ? Math.ceil(outEndStep / stepsPerBar) * stepsPerBar
+        : outEndStep;
+    return Math.max(1, Math.min(sectionLength, sectionEndStep));
+}
+
+function trimPracticeSectionToFinalOut(section) {
+    const endStep = getPracticeSectionFinalOutEndStep(section);
+    if (endStep === null) {
+        return;
+    }
+
+    practiceTrackInstrumentNames.forEach(function (instrumentName) {
+        if (Array.isArray(section.trackNotes[instrumentName])) {
+            section.trackNotes[instrumentName] = section.trackNotes[instrumentName].slice(0, endStep);
+        }
+        if (section.trackTargetFlags && Array.isArray(section.trackTargetFlags[instrumentName])) {
+            section.trackTargetFlags[instrumentName] = section.trackTargetFlags[instrumentName].slice(0, endStep);
+        }
+    });
+}
+
+function normalizePracticeSectionTrackLoops(section) {
+    const sectionLength = getPracticeSectionLength(section);
+    if (sectionLength <= 0) {
+        return;
+    }
+
+    practiceTrackInstrumentNames.forEach(function (instrumentName) {
+        const notes = section.trackNotes[instrumentName];
+        if (!Array.isArray(notes) || notes.length === 0 || notes.length >= sectionLength) {
+            return;
+        }
+
+        const loopedNotes = [];
+        for (let stepIndex = 0; stepIndex < sectionLength; stepIndex += 1) {
+            loopedNotes.push(notes[stepIndex % notes.length] || 'f');
+        }
+        section.trackNotes[instrumentName] = loopedNotes;
+
+        if (section.trackTargetFlags && Array.isArray(section.trackTargetFlags[instrumentName])) {
+            const flags = section.trackTargetFlags[instrumentName];
+            const loopedFlags = [];
+            for (let stepIndex = 0; stepIndex < sectionLength; stepIndex += 1) {
+                loopedFlags.push(Boolean(flags[stepIndex % Math.max(1, flags.length)]));
+            }
+            section.trackTargetFlags[instrumentName] = loopedFlags;
+        }
+    });
+}
+
+function loopPracticeArrayToLength(values, targetLength, fallbackValue) {
+    const safeValues = Array.isArray(values) ? values : [];
+    const safeTargetLength = Math.max(0, Number(targetLength) || 0);
+    if (safeTargetLength <= 0 || safeValues.length === 0) {
+        return [];
+    }
+    if (safeValues.length >= safeTargetLength) {
+        return safeValues.slice(0, safeTargetLength);
+    }
+
+    const loopedValues = [];
+    for (let stepIndex = 0; stepIndex < safeTargetLength; stepIndex += 1) {
+        const sourceValue = safeValues[stepIndex % safeValues.length];
+        loopedValues.push(sourceValue === undefined ? fallbackValue : sourceValue);
+    }
+    return loopedValues;
+}
+
+function appendPracticeSectionWithFinalOut(sections, section) {
+    if (getPracticeSectionFinalOutEndStep(section) !== null && section.repeatCount > 1) {
+        const repeatedSection = clonePracticeSection(section, '::before-final-out');
+        repeatedSection.repeatCount = section.repeatCount - 1;
+        clearPracticeSectionOutSteps(repeatedSection);
+        normalizePracticeSectionTrackLoops(repeatedSection);
+        sections.push(repeatedSection);
+        section.repeatCount = 1;
+    }
+    trimPracticeSectionToFinalOut(section);
+    normalizePracticeSectionTrackLoops(section);
+    sections.push(section);
+}
+
 function appendPracticeSectionWithPickup(sections, section, pickupSection, hasPickup) {
     if (!hasPickup || !sectionHasPracticeNotes(pickupSection)) {
-        sections.push(section);
+        appendPracticeSectionWithFinalOut(sections, section);
         return null;
     }
 
@@ -892,7 +1449,7 @@ function appendPracticeSectionWithPickup(sections, section, pickupSection, hasPi
 
     if (hostIndex === -1) {
         sections.push(pickupSection);
-        sections.push(section);
+        appendPracticeSectionWithFinalOut(sections, section);
         return pickupSection;
     }
 
@@ -912,9 +1469,12 @@ function appendPracticeSectionWithPickup(sections, section, pickupSection, hasPi
         repeatedSection.repeatCount = section.repeatCount - 1;
         clearPracticeSectionOutSteps(repeatedSection);
         mergePracticePickupIntoHostSection(repeatedSection, pickupSection);
+        normalizePracticeSectionTrackLoops(repeatedSection);
         section.repeatCount = 1;
         sections.push(repeatedSection);
     }
+    trimPracticeSectionToFinalOut(section);
+    normalizePracticeSectionTrackLoops(section);
     sections.push(section);
     return pickupWasPlacedInLeadIn ? pickupSection : null;
 }
@@ -965,6 +1525,15 @@ function buildPracticeSectionsFromEntries(entries) {
                         pickupSection.trackNotes[instrumentName],
                         pickupNotes
                     );
+                    if (entry.isPracticeTarget) {
+                        pickupSection.trackTargetFlags[instrumentName] = mergePracticeFlagsIntoTrackAtOffset(
+                            pickupSection.trackTargetFlags[instrumentName],
+                            pickupNotes.map(function (noteValue) {
+                                return noteValue !== 'f' && noteValue !== null && noteValue !== undefined && noteValue !== '';
+                            }),
+                            0
+                        );
+                    }
                     if (instrumentName.indexOf('Djembe_') === 0) {
                         pickupSection.trackHandModes[instrumentName] = entry.handMode || '';
                     }
@@ -1079,11 +1648,22 @@ function getPracticeScrollerStepsPerBar() {
     return 32;
 }
 
+function getPracticeScrollerStepsPerBeat() {
+    if (rhythm === 'tenaer') {
+        return 6;
+    }
+    if (rhythm === 'neunaer') {
+        return 3;
+    }
+    return 8;
+}
+
 function getPracticeScrollerBaseStepMs() {
     const tempo = typeof normalizeTimelineTempo === 'function'
         ? normalizeTimelineTempo(timelineState.tempo)
         : 100;
-    const stepSeconds = rhythm === 'neunaer' ? 15 / tempo : 7.5 / tempo;
+    const safeTempo = Math.max(1, Number(tempo) || 100);
+    const stepSeconds = 60 / safeTempo / getPracticeScrollerStepsPerBeat();
     return Math.max(1, stepSeconds * 1000);
 }
 
@@ -1195,6 +1775,7 @@ function createPracticeScrollerNoteSymbol(noteValue) {
 
 function flattenPracticeScrollerSections(sections) {
     const safeSections = Array.isArray(sections) ? sections : [];
+    const visualLoopCopies = getPracticeScrollerVisualLoopCopies();
     const trackNotes = createEmptyPracticeTrackNotes();
     const targetSteps = createEmptyPracticeTrackFlags();
     const sectionBoundaries = [];
@@ -1217,7 +1798,7 @@ function flattenPracticeScrollerSections(sections) {
             return;
         }
         const repeatCount = normalizePracticeCount(section.repeatCount, 1, 1, 32);
-        const renderRepeatCount = Math.min(repeatCount, practiceScrollerState.visualLoopCopies);
+        const renderRepeatCount = Math.min(repeatCount, visualLoopCopies);
         const isLeadIn = Boolean(section.isLeadIn);
         const finalRepeatOutSteps = section && section.finalRepeatOutSteps ? section.finalRepeatOutSteps : {};
         if (!isLeadIn && loopStartStep === null) {
@@ -1243,12 +1824,18 @@ function flattenPracticeScrollerSections(sections) {
         });
 
         practiceTrackInstrumentNames.forEach(function (instrumentName) {
-            const notes = section && section.trackNotes && Array.isArray(section.trackNotes[instrumentName])
+            const rawNotes = section && section.trackNotes && Array.isArray(section.trackNotes[instrumentName])
                 ? section.trackNotes[instrumentName]
                 : [];
+            const notes = loopPracticeArrayToLength(rawNotes, sectionLength, 'f');
             const isPracticeTarget = section &&
                 Array.isArray(section.practiceTargetInstruments) &&
                 section.practiceTargetInstruments.indexOf(instrumentName) !== -1;
+            const rawStepTargetFlags = section && section.trackTargetFlags &&
+                Array.isArray(section.trackTargetFlags[instrumentName])
+                ? section.trackTargetFlags[instrumentName]
+                : [];
+            const stepTargetFlags = loopPracticeArrayToLength(rawStepTargetFlags, sectionLength, false);
             const outStep = finalRepeatOutSteps[instrumentName];
             const safeOutStep = outStep === null || outStep === undefined
                 ? null
@@ -1259,13 +1846,18 @@ function flattenPracticeScrollerSections(sections) {
                         repeatIndex === repeatCount - 1 &&
                         stepIndex > safeOutStep;
                     trackNotes[instrumentName].push(shouldMuteForOut ? 'f' : (notes[stepIndex] || 'f'));
-                    targetSteps[instrumentName].push(Boolean(isPracticeTarget));
+                    const isStepTarget = Boolean(isPracticeTarget) || Boolean(stepTargetFlags[stepIndex]);
+                    targetSteps[instrumentName].push(isStepTarget && !shouldMuteForOut);
                 }
             }
         });
 
         stepOffset += sectionLength * renderRepeatCount;
         playbackOffset += sectionLength * repeatCount;
+    });
+
+    practiceTrackInstrumentNames.forEach(function (instrumentName) {
+        targetSteps[instrumentName] = expandPracticeTargetFlags(targetSteps[instrumentName], 1);
     });
 
     const visualCycleSteps = stepOffset;
@@ -1280,7 +1872,7 @@ function flattenPracticeScrollerSections(sections) {
         baseTargetSteps[instrumentName] = targetSteps[instrumentName].slice(safeLoopStartStep);
     });
 
-    for (let copyIndex = 0; copyIndex < practiceScrollerState.visualLoopCopies; copyIndex += 1) {
+    for (let copyIndex = 0; copyIndex < visualLoopCopies; copyIndex += 1) {
         practiceTrackInstrumentNames.forEach(function (instrumentName) {
             trackNotes[instrumentName] = trackNotes[instrumentName].concat(baseTrackNotes[instrumentName]);
             targetSteps[instrumentName] = targetSteps[instrumentName].concat(baseTargetSteps[instrumentName]);
@@ -1302,7 +1894,8 @@ function flattenPracticeScrollerSections(sections) {
         playbackLoopStart: safePlaybackLoopStart,
         playbackLoopLength: playbackLoopLength,
         visualCycleSteps: visualCycleSteps,
-        totalSteps: visualCycleSteps + (visualLoopLength * practiceScrollerState.visualLoopCopies)
+        visualLoopCopies: visualLoopCopies,
+        totalSteps: visualCycleSteps + (visualLoopLength * visualLoopCopies)
     };
 }
 
@@ -1345,6 +1938,43 @@ function appendPracticeScrollerCells(laneEl, notes, targetSteps, visualStepOffse
     });
 }
 
+function arePracticeArraysEqual(firstArray, secondArray) {
+    const safeFirstArray = Array.isArray(firstArray) ? firstArray : [];
+    const safeSecondArray = Array.isArray(secondArray) ? secondArray : [];
+    if (safeFirstArray.length !== safeSecondArray.length) {
+        return false;
+    }
+    return safeFirstArray.every(function (entry, entryIndex) {
+        return entry === safeSecondArray[entryIndex];
+    });
+}
+
+function getCollapsedPracticeDjembeRows(flattened) {
+    const djembeRows = ['Djembe_1', 'Djembe_2', 'Djembe_3'];
+    const firstInstrument = djembeRows[0];
+    const firstNotes = flattened.trackNotes[firstInstrument] || [];
+    const firstTargets = flattened.targetSteps[firstInstrument] || [];
+    const hasTarget = firstTargets.some(Boolean);
+    const canCollapse = hasTarget && djembeRows.every(function (instrumentName) {
+        return arePracticeArraysEqual(flattened.trackNotes[instrumentName], firstNotes) &&
+            arePracticeArraysEqual(flattened.targetSteps[instrumentName], firstTargets);
+    });
+
+    if (!canCollapse) {
+        return {
+            hiddenRows: [],
+            labels: {}
+        };
+    }
+
+    return {
+        hiddenRows: ['Djembe_2', 'Djembe_3'],
+        labels: {
+            Djembe_1: 'Djembe'
+        }
+    };
+}
+
 function renderPracticeScrollerFromPayload(playerPayload) {
     const scrollerEl = document.getElementById('practiceScroller');
     const rowsEl = document.getElementById('practiceScrollerRows');
@@ -1363,6 +1993,7 @@ function renderPracticeScrollerFromPayload(playerPayload) {
     stopPracticeScrollerAnimation();
     practiceScrollerState.playbackEvents = [];
     practiceScrollerState.playbackAnchor = null;
+    practiceScrollerState.activeCells = [];
 
     const flattened = flattenPracticeScrollerSections(sections);
     const stepsPerBar = getPracticeScrollerStepsPerBar();
@@ -1371,6 +2002,7 @@ function renderPracticeScrollerFromPayload(playerPayload) {
     practiceScrollerState.loopLength = flattened.loopLength;
     practiceScrollerState.loopStartStep = flattened.loopStartStep;
     practiceScrollerState.visualLoopLength = flattened.visualLoopLength;
+    practiceScrollerState.activeVisualLoopCopies = flattened.visualLoopCopies;
     practiceScrollerState.playbackSegments = flattened.playbackSegments;
     practiceScrollerState.playbackTotalSteps = flattened.playbackTotalSteps;
     practiceScrollerState.playbackLoopStart = flattened.playbackLoopStart;
@@ -1389,7 +2021,11 @@ function renderPracticeScrollerFromPayload(playerPayload) {
         return;
     }
 
+    const collapsedDjembeRows = getCollapsedPracticeDjembeRows(flattened);
     practiceTrackInstrumentNames.forEach(function (instrumentName) {
+        if (collapsedDjembeRows.hiddenRows.indexOf(instrumentName) !== -1) {
+            return;
+        }
         const notes = flattened.trackNotes[instrumentName];
         const targetSteps = flattened.targetSteps[instrumentName] || [];
         const hasNotes = notes.some(function (noteValue) {
@@ -1412,7 +2048,9 @@ function renderPracticeScrollerFromPayload(playerPayload) {
 
         const labelEl = document.createElement('div');
         labelEl.className = 'practice-scroller-label';
-        labelEl.textContent = practiceScrollerInstrumentLabels[instrumentName] || instrumentName;
+        labelEl.textContent = collapsedDjembeRows.labels[instrumentName] ||
+            practiceScrollerInstrumentLabels[instrumentName] ||
+            instrumentName;
 
         const laneWrapEl = document.createElement('div');
         laneWrapEl.className = 'practice-scroller-lane-wrap';
@@ -1460,7 +2098,7 @@ function normalizePracticeScrollerPlaybackStep(playbackStep) {
 
     const localPlaybackStep = normalizedPlaybackStep - matchedSegment.playbackStart;
     const cycleIndex = rawStep >= playbackTotalSteps && playbackLoopLength > 0 && visualLoopLength > 0
-        ? Math.floor((rawStep - playbackTotalSteps) / playbackLoopLength) % practiceScrollerState.visualLoopCopies
+        ? Math.floor((rawStep - playbackTotalSteps) / playbackLoopLength)
         : 0;
     const baseVisualStart = rawStep >= playbackTotalSteps && visualLoopLength > 0
         ? visualLoopStart + (cycleIndex * visualLoopLength)
@@ -1469,6 +2107,18 @@ function normalizePracticeScrollerPlaybackStep(playbackStep) {
         ? Math.max(0, matchedSegment.visualStart - practiceScrollerState.loopStartStep)
         : matchedSegment.visualStart;
     return baseVisualStart + segmentVisualStart + (localPlaybackStep % matchedSegment.visualLength);
+}
+
+function getRenderedPracticeScrollerStep(visualStep) {
+    const rawStep = Number(visualStep) || 0;
+    const visualLoopLength = practiceScrollerState.visualLoopLength || 0;
+    const visualCycleSteps = practiceScrollerState.visualCycleSteps || 0;
+
+    if (visualLoopLength <= 0 || rawStep < visualCycleSteps) {
+        return rawStep;
+    }
+
+    return visualCycleSteps + ((rawStep - visualCycleSteps) % visualLoopLength);
 }
 
 function updatePracticeScrollerPosition(playbackStep) {
@@ -1484,7 +2134,9 @@ function updatePracticeScrollerPosition(playbackStep) {
     const statusEl = document.getElementById('practiceScrollerStatus');
     const minVisualStep = -practiceScrollerState.visualLeadInSteps;
     const maxVisualStep = Math.max(0, practiceScrollerState.visualTotalSteps - 1);
-    const safeStep = Math.max(minVisualStep, Math.min(maxVisualStep, Number(playbackStep) || 0));
+    const rawStep = Math.max(minVisualStep, Number(playbackStep) || 0);
+    const renderedStep = getRenderedPracticeScrollerStep(rawStep);
+    const safeStep = Math.max(minVisualStep, Math.min(maxVisualStep, renderedStep));
     const activeStep = Math.max(0, Math.min(maxVisualStep, Math.round(safeStep)));
     const cellRect = firstCellEl ? firstCellEl.getBoundingClientRect() : null;
     const stepWidth = cellRect && cellRect.width > 0 ? cellRect.width : practiceScrollerState.stepWidth;
@@ -1496,23 +2148,33 @@ function updatePracticeScrollerPosition(playbackStep) {
     const visualStep = safeStep + getPracticeScrollerPreRollLineSteps();
     const laneOffset = playheadX - laneStartX - (visualStep * stepWidth) - (stepWidth / 2);
 
-    practiceScrollerState.currentStep = safeStep;
+    practiceScrollerState.currentStep = rawStep;
     practiceScrollerState.stepWidth = stepWidth;
     scrollerEl.style.setProperty('--practice-scroller-offset', laneOffset + 'px');
 
     if (practiceScrollerState.activeStep !== activeStep) {
-        scrollerEl.querySelectorAll('.practice-scroller-cell.is-current').forEach(function (cellEl) {
-            cellEl.classList.remove('is-current');
-        });
-        scrollerEl.querySelectorAll('.practice-scroller-lane').forEach(function (laneEl) {
-            const activeChildIndex = activeStep + getPracticeScrollerPreRollLineSteps();
-            if (laneEl.children[activeChildIndex]) {
-                laneEl.children[activeChildIndex].classList.add('is-current');
-            }
-        });
+        if (isPracticeScrollerCompactViewport()) {
+            practiceScrollerState.activeCells.forEach(function (cellEl) {
+                cellEl.classList.remove('is-current');
+            });
+            practiceScrollerState.activeCells = [];
+        } else {
+            practiceScrollerState.activeCells.forEach(function (cellEl) {
+                cellEl.classList.remove('is-current');
+            });
+            practiceScrollerState.activeCells = [];
+            scrollerEl.querySelectorAll('.practice-scroller-lane').forEach(function (laneEl) {
+                const activeChildIndex = activeStep + getPracticeScrollerPreRollLineSteps();
+                if (laneEl.children[activeChildIndex]) {
+                    const activeCellEl = laneEl.children[activeChildIndex];
+                    activeCellEl.classList.add('is-current');
+                    practiceScrollerState.activeCells.push(activeCellEl);
+                }
+            });
+        }
         practiceScrollerState.activeStep = activeStep;
 
-        if (statusEl) {
+        if (statusEl && (!isPracticeScrollerCompactViewport() || activeStep % practiceScrollerState.stepsPerBar === 0)) {
             const displayBase = practiceScrollerState.visualCycleSteps || practiceScrollerState.totalSteps;
             const displayStep = displayBase > 0
                 ? activeStep % displayBase
@@ -1563,14 +2225,18 @@ function recyclePracticeScrollerVisualLoop(nextStep) {
     }
 
     function recycleStep(referenceStep) {
-        if (!Number.isFinite(referenceStep) || referenceStep <= nextStep) {
+        if (!Number.isFinite(referenceStep)) {
             return referenceStep;
         }
-        const loopDistance = referenceStep - nextStep;
-        if (loopDistance < visualLoopLength) {
-            return referenceStep;
+        if (referenceStep > nextStep) {
+            const loopDistance = referenceStep - nextStep;
+            return referenceStep - (Math.ceil(loopDistance / visualLoopLength) * visualLoopLength);
         }
-        return referenceStep - (Math.floor(loopDistance / visualLoopLength) * visualLoopLength);
+        const loopDistance = nextStep - referenceStep;
+        if (loopDistance >= visualLoopLength) {
+            return referenceStep + (Math.floor(loopDistance / visualLoopLength) * visualLoopLength);
+        }
+        return referenceStep;
     }
 
     if (practiceScrollerState.playbackAnchor) {
@@ -1584,7 +2250,6 @@ function recyclePracticeScrollerVisualLoop(nextStep) {
 function updatePracticeScrollerPlayback(playbackStep, delayMs) {
     const stepNumber = normalizePracticeScrollerPlaybackStep(playbackStep);
     const eventTime = window.performance.now() + Math.max(0, Number(delayMs) || 0) + practiceState.audioLatencyMs;
-    recyclePracticeScrollerVisualLoop(stepNumber);
     const matchingEvent = practiceScrollerState.playbackEvents.find(function (playbackEvent) {
         return playbackEvent.step === stepNumber && Math.abs(playbackEvent.time - eventTime) < 40;
     });

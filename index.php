@@ -78,6 +78,13 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
         <p>Öffne ein Notenblatt und starte den Übungsmodus. Auf Smartphones ist die Ansicht zum Üben und Abspielen vorbereitet.</p>
     </section>
 
+    <section id="mobileOrientationNotice" class="mobile-orientation-notice" aria-live="polite" aria-hidden="true">
+        <div>
+            <h1>Bitte hochkant drehen</h1>
+            <p>Die Smartphone-Ansicht ist für den Portrait-Modus vorbereitet.</p>
+        </div>
+    </section>
+
     <div id="fileDialog" class="file-dialog-backdrop" hidden>
         <section class="file-dialog" role="dialog" aria-modal="true" aria-labelledby="fileDialogTitle">
             <header class="file-dialog-titlebar">
@@ -2639,12 +2646,26 @@ let practiceAudioRefreshTimer = null;
 let practiceAudioPlaybackState = 'stopped';
 
 function isMobilePracticeViewport() {
-    return window.matchMedia('(max-width: 760px)').matches;
+    return window.matchMedia('(max-width: 760px)').matches ||
+        (window.matchMedia('(hover: none) and (pointer: coarse)').matches &&
+            Math.min(window.innerWidth || 0, window.innerHeight || 0) <= 760);
+}
+
+function isMobileLandscapeViewport() {
+    return window.matchMedia('(hover: none) and (pointer: coarse) and (orientation: landscape)').matches &&
+        Math.min(window.innerWidth || 0, window.innerHeight || 0) <= 760;
 }
 
 function updateMobilePracticeModeAvailability() {
     const mobilePracticeViewport = isMobilePracticeViewport();
+    const mobileLandscapeViewport = isMobileLandscapeViewport();
+    const orientationNoticeEl = document.getElementById('mobileOrientationNotice');
     document.body.classList.toggle('is-mobile-practice-viewport', mobilePracticeViewport);
+    document.body.classList.toggle('is-mobile-landscape-blocked', mobileLandscapeViewport);
+    if (orientationNoticeEl) {
+        orientationNoticeEl.hidden = !mobileLandscapeViewport;
+        orientationNoticeEl.setAttribute('aria-hidden', mobileLandscapeViewport ? 'false' : 'true');
+    }
 
     [
         'button4',
@@ -3439,6 +3460,10 @@ function closeAppMenus() {
 document.addEventListener('DOMContentLoaded', function () {
     updateMobilePracticeModeAvailability();
     window.addEventListener('resize', updateMobilePracticeModeAvailability);
+    window.addEventListener('orientationchange', function () {
+        updateMobilePracticeModeAvailability();
+        window.setTimeout(updateMobilePracticeModeAvailability, 250);
+    });
     window.addEventListener('message', handleEmbeddedAudioPlayerMessage);
 
     document.querySelectorAll('#appMenuBar details.app-menu').forEach(function (menuEl) {
