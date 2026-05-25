@@ -62,6 +62,7 @@ const practiceScrollerState = {
     playbackLoopLength: 0,
     visualCycleSteps: 0,
     visualTotalSteps: 0,
+    visualTailSteps: 0,
     visualLoopCopies: 4,
     stepsPerBar: 32,
     stepWidth: 18,
@@ -87,6 +88,17 @@ function getPracticeScrollerVisualLoopCopies() {
         return 1;
     }
     return practiceScrollerState.visualLoopCopies;
+}
+
+function getPracticeScrollerTailSteps(visualLoopLength) {
+    if (!isPracticeScrollerCompactViewport()) {
+        return 0;
+    }
+    const loopLength = Math.max(0, Number(visualLoopLength) || 0);
+    if (loopLength <= 0) {
+        return 0;
+    }
+    return Math.min(loopLength, getPracticeScrollerStepsPerBar() * 3);
 }
 
 function normalizePracticeCount(rawValue, fallback, minValue, maxValue) {
@@ -1878,6 +1890,17 @@ function flattenPracticeScrollerSections(sections) {
             targetSteps[instrumentName] = targetSteps[instrumentName].concat(baseTargetSteps[instrumentName]);
         });
     }
+    const visualTailSteps = getPracticeScrollerTailSteps(visualLoopLength);
+    if (visualTailSteps > 0) {
+        practiceTrackInstrumentNames.forEach(function (instrumentName) {
+            trackNotes[instrumentName] = trackNotes[instrumentName].concat(
+                baseTrackNotes[instrumentName].slice(0, visualTailSteps)
+            );
+            targetSteps[instrumentName] = targetSteps[instrumentName].concat(
+                baseTargetSteps[instrumentName].slice(0, visualTailSteps)
+            );
+        });
+    }
 
     return {
         trackNotes: trackNotes,
@@ -1895,7 +1918,8 @@ function flattenPracticeScrollerSections(sections) {
         playbackLoopLength: playbackLoopLength,
         visualCycleSteps: visualCycleSteps,
         visualLoopCopies: visualLoopCopies,
-        totalSteps: visualCycleSteps + (visualLoopLength * visualLoopCopies)
+        visualTailSteps: visualTailSteps,
+        totalSteps: visualCycleSteps + (visualLoopLength * visualLoopCopies) + visualTailSteps
     };
 }
 
@@ -2009,6 +2033,7 @@ function renderPracticeScrollerFromPayload(playerPayload) {
     practiceScrollerState.playbackLoopLength = flattened.playbackLoopLength;
     practiceScrollerState.visualCycleSteps = flattened.visualCycleSteps;
     practiceScrollerState.visualTotalSteps = flattened.totalSteps;
+    practiceScrollerState.visualTailSteps = flattened.visualTailSteps;
     practiceScrollerState.stepsPerBar = stepsPerBar;
     practiceScrollerState.currentStep = 0;
     practiceScrollerState.activeStep = -1;

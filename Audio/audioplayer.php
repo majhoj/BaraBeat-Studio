@@ -2522,13 +2522,29 @@ function playDjembeStrokeToDestination(instrumentInstance, baseSampleName, time,
   playSampleToDestination(instrumentInstance, sampleName, time, gainMultiplier, audioContext, destinationNode);
 }
 
+function shouldStopForPracticeTimer(scheduledTime) {
+  if (practiceStopAudioTime <= 0 || scheduledTime < practiceStopAudioTime) {
+    return false;
+  }
+
+  if (orderedFallbackLoopLength <= 0) {
+    return true;
+  }
+
+  if (globalPlaybackStep < oneShotLength) {
+    return globalPlaybackStep >= oneShotLength;
+  }
+
+  return (globalPlaybackStep - oneShotLength) % orderedFallbackLoopLength === 0;
+}
+
 function scheduler() {
   const dTime = instr._audioCtx.currentTime;
 
   while (nextNoteTime < dTime + scheduleAheadTime) {
     applyPendingPracticeSectionsIfReady();
 
-    if (practiceStopAudioTime > 0 && nextNoteTime >= practiceStopAudioTime) {
+    if (shouldStopForPracticeTimer(nextNoteTime)) {
       isPlaying = false;
       playButton.dataset.playing = 'false';
       timerID = null;
