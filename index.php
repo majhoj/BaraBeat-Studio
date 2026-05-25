@@ -2663,8 +2663,8 @@ function updateMobilePracticeModeAvailability() {
     document.body.classList.toggle('is-mobile-practice-viewport', mobilePracticeViewport);
     document.body.classList.toggle('is-mobile-landscape-blocked', mobileLandscapeViewport);
     if (orientationNoticeEl) {
-        orientationNoticeEl.hidden = !mobileLandscapeViewport;
-        orientationNoticeEl.setAttribute('aria-hidden', mobileLandscapeViewport ? 'false' : 'true');
+        orientationNoticeEl.hidden = true;
+        orientationNoticeEl.setAttribute('aria-hidden', 'true');
     }
 
     [

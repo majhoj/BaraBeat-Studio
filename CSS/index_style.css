@@ -1969,41 +1969,28 @@ html {
 }
 
 .is-mobile-landscape-blocked {
-    overflow: hidden;
-}
-
-.is-mobile-landscape-blocked .mobile-orientation-notice {
-    position: fixed;
-    inset: 0;
-    z-index: 1000;
-    display: grid;
-    place-items: center;
-    padding: max(18px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right))
-        max(18px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
-    box-sizing: border-box;
-    background: #f6fbf8;
-    color: #185f3d;
-    font-family: var(--ui-font);
-    text-align: center;
-}
-
-.is-mobile-landscape-blocked .mobile-orientation-notice > div {
-    max-width: 420px;
-    padding: 18px;
-    border: 1px solid #b9dbc7;
-    border-radius: 10px;
-    background: #fbfefc;
-    box-shadow: var(--ui-shadow-soft);
-}
-
-.is-mobile-landscape-blocked .mobile-orientation-notice h1 {
-    margin: 0 0 8px;
-    font-size: 21px;
-}
-
-.is-mobile-landscape-blocked .mobile-orientation-notice p {
     margin: 0;
-    font-size: 15px;
-    line-height: 1.4;
-    color: #315a42;
+    padding: 0;
+    overflow: auto;
+    background: #f6fbf8;
+}
+
+.is-mobile-landscape-blocked #appMenuBar,
+.is-mobile-landscape-blocked #practicePanel,
+.is-mobile-landscape-blocked #timelinePanel,
+.is-mobile-landscape-blocked .mobile-start-info,
+.is-mobile-landscape-blocked .mobile-orientation-notice {
+    display: none !important;
+}
+
+.is-mobile-landscape-blocked.has-loaded-score #myRect1 {
+    display: block !important;
+    width: 100vw !important;
+    height: auto !important;
+    max-width: none !important;
+    margin: 0 !important;
+    opacity: 1 !important;
+    filter: none !important;
+    pointer-events: none;
+    transform: none !important;
 }
