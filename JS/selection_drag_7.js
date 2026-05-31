@@ -409,6 +409,8 @@ var noteSymbolVerticalSnapOffsets = [17, 32, 47, 62];
 // Eigene vertikale Stufen fuer editierbare Textfelder:
 // -100: Titel-Zeile, -32: Chooser-Zeile, danach die normalen Park-/Notenlinien-Ziele.
 var editableTextVerticalSnapOffsets = [-100, -32, -2, 15, 31, 42];
+// ShortBar ist eine Taktsteuerung und soll nicht auf jede Notenebene springen.
+var shortBarVerticalSnapOffsets = [18];
 //var verticalSnapOffsets = [-32, -12, 15, 36, 70];
 
 function getElementTranslateY(element) {
@@ -427,6 +429,23 @@ function getTextElementBaselineY(element, bbox) {
     return attrY + getElementTranslateY(element);
   }
   return bbox.cy;
+}
+
+function getShortBarMarkerAnchorY(element) {
+  var markerLine = element && element.select ? element.select(".shortbar-marker-line") : null;
+  if (!markerLine || typeof markerLine.attr !== "function") {
+    return null;
+  }
+  var explicitAnchorY = Number(element.attr("data-shortbar-anchor-y"));
+  if (Number.isFinite(explicitAnchorY)) {
+    return explicitAnchorY + getElementTranslateY(element);
+  }
+  var y1 = Number(markerLine.attr("y1"));
+  var y2 = Number(markerLine.attr("y2"));
+  if (!Number.isFinite(y1) || !Number.isFinite(y2)) {
+    return null;
+  }
+  return ((y1 + y2) / 2) + getElementTranslateY(element);
 }
 
 function getElementSnapReferenceY(element, bbox) {
@@ -471,6 +490,12 @@ function getElementSnapReferenceY(element, bbox) {
   if (elementId === "out") {
     return bbox.y + bbox.height - 22;
   }
+  if (elementId === "shortbar") {
+    var shortBarAnchorY = getShortBarMarkerAnchorY(element);
+    if (Number.isFinite(shortBarAnchorY)) {
+      return shortBarAnchorY;
+    }
+  }
   if (elementId === "wiederholung") {
     return bbox.y + bbox.height - 4;
   }
@@ -504,9 +529,12 @@ function snapToVerticalTargets(targetY, element) {
     elementId === "slap_flam" ||
     elementId === "bass_slap_flam";
   var usesEditableTextTargets = elementId === "edit_text";
+  var usesShortBarTargets = elementId === "shortbar";
   var snapTargets =
     usesNoteSymbolTargets
       ? getVerticalSnapTargets(noteSymbolVerticalSnapOffsets)
+      : usesShortBarTargets
+        ? getVerticalSnapTargets(shortBarVerticalSnapOffsets)
       : usesEditableTextTargets
         ? getVerticalSnapTargets(editableTextVerticalSnapOffsets)
       : getVerticalSnapTargets();

@@ -218,6 +218,7 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
             </div>
         </div>
         <div id="practicePatternChooser" class="timeline-panel-body practice-panel-body" hidden>
+            <h3 class="practice-options-title">Einstellungen</h3>
             <div class="practice-pattern-options">
                 <label class="timeline-tempo-control" for="practiceAccompanimentStart">
                     Begleitung startet
@@ -229,11 +230,11 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
                     </select>
                 </label>
                 <label class="timeline-tempo-control" for="practiceWithoutSoloLoops">
-                    Ohne Zusatz
+                    Ohne Übungsteil
                     <span class="practice-stepper">
-                        <button type="button" class="practice-stepper-button" data-practice-step-target="practiceWithoutSoloLoops" data-practice-step-delta="-1" aria-label="Ohne Zusatz verringern">-</button>
+                        <button type="button" class="practice-stepper-button" data-practice-step-target="practiceWithoutSoloLoops" data-practice-step-delta="-1" aria-label="Ohne Übungsteil verringern">-</button>
                         <input type="number" id="practiceWithoutSoloLoops" min="0" max="32" step="1" value="1" />
-                        <button type="button" class="practice-stepper-button" data-practice-step-target="practiceWithoutSoloLoops" data-practice-step-delta="1" aria-label="Ohne Zusatz erhöhen">+</button>
+                        <button type="button" class="practice-stepper-button" data-practice-step-target="practiceWithoutSoloLoops" data-practice-step-delta="1" aria-label="Ohne Übungsteil erhöhen">+</button>
                     </span>
                 </label>
                 <label class="timeline-tempo-control" for="practiceWithSoloLoops">
@@ -247,6 +248,10 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
                 <label class="timeline-tempo-control" for="practiceAccompanimentBetweenPatterns">
                     Zwischen Übungsteilen
                     <input type="checkbox" id="practiceAccompanimentBetweenPatterns" />
+                </label>
+                <label class="timeline-tempo-control" for="practicePauseAccompanimentForLeadInPatterns">
+                    Begleitung stoppt bei Call/Intro
+                    <input type="checkbox" id="practicePauseAccompanimentForLeadInPatterns" />
                 </label>
                 <label class="timeline-tempo-control" for="practiceRepeatCount" id="practiceRepeatCountControl">
                     Wiederholen
@@ -326,10 +331,10 @@ var paletteOriginX,
     paletteOffsetY = 0;
 
 // Paletten-Elemente
-var ton, bass, slap, flam_ton, flam_slap, flam_bass_slap, ton_g, slap_g, In, Out, text_z_g, repeatMarkerGroup;
+var ton, bass, slap, flam_ton, flam_slap, flam_bass_slap, ton_g, slap_g, In, Out, ShortBar, text_z_g, repeatMarkerGroup;
 
 // Geklonte Paletten-Elemente
-var ton_c, bass_c, slap_c, flam_ton_c, flam_slap_c, flam_bass_slap_c, ton_g_c, slap_g_c, In_c, Out_c, repeatMarkerLegendClone;
+var ton_c, bass_c, slap_c, flam_ton_c, flam_slap_c, flam_bass_slap_c, ton_g_c, slap_g_c, In_c, Out_c, ShortBar_c, repeatMarkerLegendClone;
 
 // Touch-Status und geladener Titel
 var textTouchStartX,
@@ -347,6 +352,7 @@ var x, insertedElement,
     slap_a5, slap_a6, slap_g_b,
     in_c, in_a, in_b,
     out_c, out_a, out_b,
+    shortbar_c, shortbar_a, shortbar_b, shortbar_v1, shortbar_v2,
     textPaletteBox, textPaletteHorizontalLine, textPaletteVerticalLine;
 
 // Wiederholungszeichen und Paletten-Positionen
@@ -369,13 +375,14 @@ var insertTone,
     insertFlamBassSlap,
     insertInMarker,
     insertOutMarker,
+    insertShortBarMarker,
     captureTextTouchStart,
     handleTextTouchEnd,
     insertTextField,
     cycleRepeatCount,
     insertRepeatMarker;
 
-const canvasElementSelector = "#edit, #tone, #bass, #slap, #tone_muffled, #slap_muffled, #tone_flam, #slap_flam, #bass_slap_flam, #in, #out, #edit_text, #wiederholung";
+const canvasElementSelector = "#edit, #tone, #bass, #slap, #tone_muffled, #slap_muffled, #tone_flam, #slap_flam, #bass_slap_flam, #in, #out, #shortbar, #edit_text, #wiederholung";
 const instrumentChooserSelector = ".instrument-chooser, #instrumentChooser";
 const functionChooserSelector = ".function-chooser, #functionChooser";
 const chooserSelector = instrumentChooserSelector + ", " + functionChooserSelector;
@@ -937,8 +944,7 @@ function loadRhythmContent(title, content, scoreId) {
 }
 
 function loadRhythmFile(fileName) {
-    const fileNameLengthWithoutExtension = fileName.length - 4;
-    loadedTitle = fileName.substr(0, fileNameLengthWithoutExtension);
+    loadedTitle = String(fileName || '').replace(/\.(bbs|txt)$/i, '');
     postPhp(loadFileEndpoint, { b: fileName }, function (data) {
         setIoFieldValue(data);
         const loadedSvgMarkup = getIoFieldValue();
@@ -1019,6 +1025,9 @@ function bindLoadedScoreElements() {
         }
         if (el.attr("id") == "edit_text") {
             return;
+        }
+        if (el.attr("id") == "shortbar") {
+            updateShortBarMarkerVisual(el);
         }
         el.attr({ class: "shp" });
         el.drag(move, sel_start, stop_m);
@@ -1193,6 +1202,42 @@ function bindEditableTextElement(textElement) {
     return textElement;
 }
 
+function updateShortBarMarkerVisual(shortBarElement) {
+    if (!shortBarElement || typeof shortBarElement.select !== 'function') {
+        return shortBarElement;
+    }
+    const tailWidth = Math.max(34, Math.round((Number(gridSizeX) || 34) * 3) - 12);
+    const tail = shortBarElement.select('.shortbar-tail');
+    const markerLine = shortBarElement.select('.shortbar-marker-line');
+    const firstTailLine = shortBarElement.select('.shortbar-tail-line-1');
+    const secondTailLine = shortBarElement.select('.shortbar-tail-line-2');
+    const hitbox = shortBarElement.select('.shortbar-hitbox');
+    const baseX = markerLine ? Number(markerLine.attr('x1')) || 0 : 0;
+    const baseY1 = markerLine ? Number(markerLine.attr('y1')) || 0 : 0;
+    const baseY2 = markerLine ? Number(markerLine.attr('y2')) || 0 : 0;
+    const explicitAnchorY = Number(shortBarElement.attr('data-shortbar-anchor-y'));
+    const centerY = Number.isFinite(explicitAnchorY)
+        ? explicitAnchorY
+        : (baseY1 + baseY2) / 2;
+    const tailTop = centerY - 19;
+    const tailBottom = centerY + 21;
+    const tailX = baseX + 4;
+
+    if (tail) {
+        tail.attr({ display: null, x: tailX, y: tailTop, width: tailWidth, height: tailBottom - tailTop });
+    }
+    if (firstTailLine) {
+        firstTailLine.attr({ display: null, x1: tailX + tailWidth / 3, x2: tailX + tailWidth / 3, y1: tailTop, y2: tailBottom });
+    }
+    if (secondTailLine) {
+        secondTailLine.attr({ display: null, x1: tailX + tailWidth * 2 / 3, x2: tailX + tailWidth * 2 / 3, y1: tailTop, y2: tailBottom });
+    }
+    if (hitbox) {
+        hitbox.attr({ x: baseX - 7, y: tailTop - 4, width: tailWidth + 18, height: tailBottom - tailTop + 8 });
+    }
+    return shortBarElement;
+}
+
 function createEditableTextElement(x, y, textContent) {
     const textElement = s.text(x, y, textContent).attr({
         class: 'shp',
@@ -1239,7 +1284,7 @@ function snapElementToVerticalTarget(element) {
         ? getElementSnapReferenceY(element, bbox)
         : bbox.cy;
     const snappedY = typeof snapToVerticalTargets === 'function'
-        ? snapToVerticalTargets(referenceY)
+        ? snapToVerticalTargets(referenceY, element)
         : referenceY;
     const deltaY = snappedY - referenceY;
 
@@ -1472,7 +1517,7 @@ paletteOriginX = 33;
 paletteOriginY = paletteBaseY - 30;
 
 // Kartusche
-paletteFrame = s.rect(paletteOriginX - 12, paletteOriginY - 14, 26, 262, 3, 3).attr({ fill: "lightgrey", stroke: "black", strokeWidth: 0.5 });
+paletteFrame = s.rect(paletteOriginX - 12, paletteOriginY - 14, 26, 300, 3, 3).attr({ fill: "lightgrey", stroke: "black", strokeWidth: 0.5 });
 
 // Tone
 ton = s.circle(paletteOriginX + 1, paletteOriginY + 1, 7);
@@ -1579,6 +1624,40 @@ repeatMarkerDotBottom = s.circle(paletteOriginX + 1, paletteOriginY + 236, 2.5);
 repeatMarkerCountText = s.text(paletteOriginX + 1, paletteOriginY + 252, " ").attr({ 'font-size': 12, 'font-family': 'sans-serif', 'font-weight': 'bold', 'text-anchor': 'middle' });
 repeatMarkerGroup = s.g(repeatMarkerHitbox, repeatMarkerDotTop, repeatMarkerDotBottom, repeatMarkerCountText);
 
+// ShortBar
+x = paletteOriginX + 1;
+y = paletteOriginY + 257;
+shortbar_c = s.rect(x - 7, y - 14, 14, 28).attr({ opacity: 0.001 }).addClass('shortbar-hitbox');
+shortbar_a = s.rect(x, y - 14, 44, 38).attr({
+    display: "none",
+    fill: "#f4f4f4",
+    opacity: 0.55,
+    stroke: "#777",
+    strokeWidth: 1,
+    strokeDasharray: "4 4"
+}).addClass('shortbar-tail');
+shortbar_b = s.line(x, y - 4, x, y + 22).attr({
+    stroke: "#222",
+    strokeWidth: 4,
+    strokeDasharray: "1 5",
+    strokeLinecap: "round"
+}).addClass('shortbar-marker-line');
+shortbar_v1 = s.line(x + 15, y - 14, x + 15, y + 24).attr({
+    display: "none",
+    stroke: "#aaa",
+    strokeWidth: 1,
+    strokeDasharray: "4 4"
+}).addClass('shortbar-tail-line-1');
+shortbar_v2 = s.line(x + 30, y - 14, x + 30, y + 24).attr({
+    display: "none",
+    stroke: "#aaa",
+    strokeWidth: 1,
+    strokeDasharray: "4 4"
+}).addClass('shortbar-tail-line-2');
+ShortBar = s.g(shortbar_a, shortbar_b, shortbar_v1, shortbar_v2, shortbar_c).attr({
+    'data-shortbar-anchor-y': y + 7
+});
+
 // Legende schreiben
 function addLegendEntry(symbol, label, symbolX, symbolY, labelOffsetX, labelOffsetY, legendOffsetX) {
     const shiftedSymbolX = symbolX + legendOffsetX;
@@ -1612,7 +1691,8 @@ function renderLegend(initialChooserX) {
     slap_g_c = addLegendEntry(slap_g, "gedämpfter Slap / Klick", 240, 1058, 48, 319, legendOffsetX);
     In_c = addLegendEntry(In, "In", 428, 1034, 44, 343, legendOffsetX);
     Out_c = addLegendEntry(Out, "Out", 470, 1011, 44, 366, legendOffsetX);
-    repeatMarkerLegendClone = addLegendEntry(repeatMarkerGroup, "Wiederholung", 521, 968, 44, 409, legendOffsetX);
+    ShortBar_c = addLegendEntry(ShortBar, "ShortBar", 521, 943, 44, 434, legendOffsetX);
+    repeatMarkerLegendClone = addLegendEntry(repeatMarkerGroup, "Wiederholung", 605, 968, 44, 409, legendOffsetX);
 }
 
 renderLegend(125);
@@ -1637,7 +1717,7 @@ var stop1 = function() {
 };
 
 // Kartusche zeichnen
-paletteGroup = s.g(paletteFrame, ton, bass, slap, ton_g, slap_g, flam_ton, flam_slap, flam_bass_slap, In, Out, text_z_g, repeatMarkerGroup);
+paletteGroup = s.g(paletteFrame, ton, bass, slap, ton_g, slap_g, flam_ton, flam_slap, flam_bass_slap, In, Out, ShortBar, text_z_g, repeatMarkerGroup);
 paletteGroup.drag(move1, sel_start, stop1);
 
 // Duplicate der Noten erzeugen
@@ -1651,6 +1731,10 @@ paletteGroup.drag(move1, sel_start, stop1);
 	insertFlamBassSlap = bindPaletteInsert(flam_bass_slap, function () { return flam_bass_slap_c; }, "bass_slap_flam", function () { return gridSizeX; }, 0);
 	insertInMarker = bindPaletteInsert(In, function () { return In_c; }, "in", function () { return gridSizeX; }, -2);
 insertOutMarker = bindPaletteInsert(Out, function () { return Out_c; }, "out", function () { return gridSizeX; }, 0);
+insertShortBarMarker = bindPaletteInsert(ShortBar, function () { return ShortBar_c; }, "shortbar", function () { return gridSizeX; }, 0, function (shortBarElement) {
+    updateShortBarMarkerVisual(shortBarElement);
+    snapElementToVerticalTarget(shortBarElement);
+});
 
 captureTextTouchStart = function () {
     textTouchStartX = this.getBBox().x;
@@ -1982,7 +2066,7 @@ async function exportCurrentSheetAsPdf() {
 
 
 const noteElementIds = ['tone', 'bass', 'slap', 'tone_muffled', 'slap_muffled', 'slap_muffled', 'tone_flam', 'slap_flam', 'bass_slap_flam'];
-const controlElementIds = ['in', 'out', 'wiederholung'];
+const controlElementIds = ['in', 'out', 'shortbar', 'wiederholung'];
 
 let notenText = "eee";
 
@@ -2011,11 +2095,11 @@ function getReadRhythmConfig() {
     }
     return {
         rhythmLabel: "tenär 9/8",
-        stepsPerBar: 9,
-        totalStepsPerLine: 18,
-        gapSlotCount: 1,
+        stepsPerBar: 18,
+        totalStepsPerLine: 36,
+        gapSlotCount: 2,
         getLineSlotIndex: function (centerX) {
-            return Math.round(((centerX - 58.25) / 42.5) - 1);
+            return Math.round((centerX - 121.25) / 21.25);
         }
     };
 }
@@ -2055,10 +2139,52 @@ function getElementReadPosition(element) {
             y: localMatrix ? localMatrix.f : chooserBounds.cy
         };
     }
+    if (element.attr('id') == 'shortbar') {
+        const markerLine = typeof element.select === 'function'
+            ? element.select('.shortbar-marker-line')
+            : null;
+        const transformState = typeof element.transform === 'function' ? element.transform() : null;
+        const localMatrix = transformState && transformState.localMatrix ? transformState.localMatrix : null;
+        const markerX = markerLine
+            ? Number(markerLine.attr('x1'))
+            : NaN;
+        const explicitAnchorY = Number(element.attr('data-shortbar-anchor-y'));
+        const markerY1 = markerLine
+            ? Number(markerLine.attr('y1'))
+            : NaN;
+        const markerY2 = markerLine
+            ? Number(markerLine.attr('y2'))
+            : NaN;
+        if (Number.isFinite(markerX) && (Number.isFinite(explicitAnchorY) || (Number.isFinite(markerY1) && Number.isFinite(markerY2)))) {
+            return {
+                x: markerX + (localMatrix ? localMatrix.e : 0),
+                y: (Number.isFinite(explicitAnchorY) ? explicitAnchorY : ((markerY1 + markerY2) / 2)) +
+                    (localMatrix ? localMatrix.f : 0)
+            };
+        }
+        const shortBarBounds = element.getBBox();
+        return {
+            x: shortBarBounds.cx,
+            y: shortBarBounds.cy
+        };
+    }
     return {
         x: element.getBBox().cx,
         y: element.getBBox().cy
     };
+}
+
+function getControlLineSlotIndex(centerX, readConfig, controlType) {
+    if (controlType === 'shortbar') {
+        if (rhythm == 'binaer') {
+            return Math.ceil(((centerX - 25) / 12.5) - 7);
+        }
+        if (rhythm == 'tenaer') {
+            return Math.ceil(((centerX - 34) / 16.5) - 5);
+        }
+        return Math.ceil((centerX - 121.25) / 21.25);
+    }
+    return readConfig.getLineSlotIndex(centerX);
 }
 
 function getBarIndexFromPosition(centerX, centerY, readConfig, lineCount) {
@@ -2447,7 +2573,9 @@ function buildBarSummary(rhythmBars) {
                     return controlA.stepIndex - controlB.stepIndex;
                 })
                 .map(function (control) {
-                    const controlLabel = control.type === 'in' ? 'In' : 'Out';
+                    const controlLabel = control.type === 'in'
+                        ? 'In'
+                        : (control.type === 'shortbar' ? 'ShortBar' : 'Out');
                     return controlLabel + '@' + (control.stepIndex + 1);
                 })
                 .join(', ');
@@ -2824,7 +2952,17 @@ function callPHPScript_lesen(anzahl, options) {
         }
 
         const elementPosition = getElementReadPosition(el);
-        const positionInfo = getBarIndexFromPosition(elementPosition.x, elementPosition.y, readConfig, anzahl);
+        const rawPositionInfo = getBarIndexFromPosition(elementPosition.x, elementPosition.y, readConfig, anzahl);
+        if (elementId === 'shortbar') {
+            rawPositionInfo.rawLineSlotIndex = getControlLineSlotIndex(elementPosition.x, readConfig, elementId);
+            rawPositionInfo.lineSlotIndex = rawPositionInfo.rawLineSlotIndex;
+            if (rawPositionInfo.lineSlotIndex > readConfig.stepsPerBar) {
+                rawPositionInfo.lineSlotIndex -= Number(readConfig.gapSlotCount) || 2;
+            }
+            rawPositionInfo.barIndex = rawPositionInfo.lineIndex * 2 +
+                (rawPositionInfo.rawLineSlotIndex > readConfig.stepsPerBar + (Number(readConfig.gapSlotCount) || 2) ? 1 : 0);
+        }
+        const positionInfo = rawPositionInfo;
         const rhythmBar = rhythmBars[positionInfo.barIndex];
         if (!rhythmBar) {
             return;
@@ -3047,7 +3185,7 @@ async function saveCurrentScoreLocal(nameOverride, folderIdOverride, options) {
         id: scoreId,
         title: name,
         folderId: folderId,
-        format: 'txt',
+        format: 'bbs',
         content: serializedRhythm
     });
 
@@ -3171,7 +3309,7 @@ async function deleteLocalScore() {
 
 async function publishCurrentScoreToServer(nameOverride) {
     const savedScore = await saveCurrentScoreLocal(nameOverride);
-    const serverBaseName = String(savedScore.serverPath || '').replace(/\.txt$/i, '');
+    const serverBaseName = String(savedScore.serverPath || '').replace(/\.(bbs|txt)$/i, '');
     const localBaseName = String(savedScore.title || '').trim();
     const publishToken = String(savedScore.publishToken || '').trim();
     const canUpdatePublishedScore = Boolean(
@@ -3646,6 +3784,10 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     document.querySelector('#practiceAccompanimentBetweenPatterns').addEventListener('change', function (event) {
         practiceState.accompanimentBetweenPatterns = Boolean(event.target.checked);
+        notifyPracticeSelectionChanged();
+    });
+    document.querySelector('#practicePauseAccompanimentForLeadInPatterns').addEventListener('change', function (event) {
+        practiceState.pauseAccompanimentForLeadInPatterns = Boolean(event.target.checked);
         notifyPracticeSelectionChanged();
     });
     document.querySelector('#practiceRepeatCount').addEventListener('input', function (event) {

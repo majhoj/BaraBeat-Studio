@@ -9,14 +9,14 @@ function respond_json($statusCode, $payload) {
 
 function normalize_score_filename($rawName) {
     $baseName = basename(trim($rawName));
-    $baseName = preg_replace('/\.txt$/i', '', $baseName);
+    $baseName = preg_replace('/\.(bbs|txt)$/i', '', $baseName);
     $baseName = trim($baseName);
 
     if ($baseName === '' || $baseName === '.' || $baseName === '..') {
         return '';
     }
 
-    return $baseName . '.txt';
+    return $baseName . '.bbs';
 }
 
 $title = $_POST['title'] ?? $_POST['b'] ?? '';
@@ -67,8 +67,8 @@ if (file_put_contents($metaPath, json_encode($meta, JSON_PRETTY_PRINT | JSON_UNE
 respond_json(200, [
     'success' => true,
     'serverPath' => $fileName,
-    'title' => preg_replace('/\.txt$/i', '', $fileName),
-    'format' => 'txt',
+    'title' => preg_replace('/\.(bbs|txt)$/i', '', $fileName),
+    'format' => 'bbs',
     'publishToken' => $publishToken,
     'updatedAt' => $timestamp
 ]);

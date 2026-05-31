@@ -12,8 +12,8 @@ function normalize_server_path($rawPath) {
     if ($fileName === '' || $fileName === '.' || $fileName === '..') {
         return '';
     }
-    if (!preg_match('/\.txt$/i', $fileName)) {
-        $fileName .= '.txt';
+    if (!preg_match('/\.(bbs|txt)$/i', $fileName)) {
+        $fileName .= '.bbs';
     }
     return $fileName;
 }

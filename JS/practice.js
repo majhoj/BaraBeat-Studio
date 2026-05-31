@@ -9,8 +9,10 @@ const practiceState = {
     timerMinutes: 0,
     accompanimentStart: 'immediate',
     accompanimentBetweenPatterns: false,
+    pauseAccompanimentForLeadInPatterns: false,
     audioLatencyMs: 30,
     h2hRestMute: false,
+    instrumentVolumes: {},
     patternHandModes: {},
     patternTargetInstruments: {},
     patternChooserExpanded: false,
@@ -123,6 +125,32 @@ function normalizePracticeAudioLatency(rawValue) {
         return 0;
     }
     return Math.max(0, Math.min(1000, Math.round(numericValue)));
+}
+
+function normalizePracticeInstrumentVolume(rawValue) {
+    const numericValue = Number(rawValue);
+    if (!Number.isFinite(numericValue)) {
+        return 1;
+    }
+    return Math.max(0, Math.min(2, numericValue));
+}
+
+function normalizePracticeInstrumentVolumes(rawVolumes) {
+    const sourceVolumes = rawVolumes && typeof rawVolumes === 'object' ? rawVolumes : {};
+    return practiceTrackInstrumentNames.reduce(function (volumes, instrumentName) {
+        const normalizedVolume = normalizePracticeInstrumentVolume(sourceVolumes[instrumentName]);
+        if (normalizedVolume !== 1) {
+            volumes[instrumentName] = normalizedVolume;
+        }
+        return volumes;
+    }, {});
+}
+
+function getPracticeInstrumentVolume(instrumentName) {
+    if (Object.prototype.hasOwnProperty.call(practiceState.instrumentVolumes, instrumentName)) {
+        return normalizePracticeInstrumentVolume(practiceState.instrumentVolumes[instrumentName]);
+    }
+    return 1;
 }
 
 function normalizePracticeTimerMinutes(rawValue) {
@@ -255,8 +283,10 @@ function buildPracticeMetadata() {
         sourceHash: timelineState.sourceHash,
         accompanimentStart: practiceState.accompanimentStart,
         accompanimentBetweenPatterns: practiceState.accompanimentBetweenPatterns,
+        pauseAccompanimentForLeadInPatterns: practiceState.pauseAccompanimentForLeadInPatterns,
         audioLatencyMs: practiceState.audioLatencyMs,
         h2hRestMute: practiceState.h2hRestMute,
+        instrumentVolumes: normalizePracticeInstrumentVolumes(practiceState.instrumentVolumes),
         loopsWithoutSolo: practiceState.loopsWithoutSolo,
         loopsWithSolo: practiceState.loopsWithSolo,
         repeatCount: practiceState.repeatCount,
@@ -276,6 +306,7 @@ function resetPracticeForSource(sourceHash) {
     practiceState.accompanimentPatternIds = [];
     practiceState.soloPatternIds = [];
     practiceState.patternTargetInstruments = {};
+    practiceState.instrumentVolumes = {};
     practiceState.defaultsApplied = false;
     practiceState.defaultSelectionSourceHash = sourceHash || timelineState.sourceHash || '';
 }
@@ -288,8 +319,10 @@ function applyPracticeMetadata(metadata, patternLibrary, sourceHash) {
 
     practiceState.accompanimentStart = normalizePracticeStartMode(metadata.accompanimentStart);
     practiceState.accompanimentBetweenPatterns = Boolean(metadata.accompanimentBetweenPatterns);
+    practiceState.pauseAccompanimentForLeadInPatterns = Boolean(metadata.pauseAccompanimentForLeadInPatterns);
     practiceState.audioLatencyMs = normalizePracticeAudioLatency(metadata.audioLatencyMs);
     practiceState.h2hRestMute = Boolean(metadata.h2hRestMute);
+    practiceState.instrumentVolumes = normalizePracticeInstrumentVolumes(metadata.instrumentVolumes);
     practiceState.loopsWithoutSolo = normalizePracticeCount(metadata.loopsWithoutSolo, 1, 0, 32);
     practiceState.loopsWithSolo = normalizePracticeCount(metadata.loopsWithSolo, 1, 1, 32);
     practiceState.repeatCount = normalizePracticeCount(metadata.repeatCount, 4, 1, practiceRepeatCountMax);
@@ -671,6 +704,7 @@ function updatePracticeInputs() {
     const timerEl = document.getElementById('practiceTimerMinutes');
     const accompanimentStartEl = document.getElementById('practiceAccompanimentStart');
     const accompanimentBetweenPatternsEl = document.getElementById('practiceAccompanimentBetweenPatterns');
+    const pauseAccompanimentForLeadInPatternsEl = document.getElementById('practicePauseAccompanimentForLeadInPatterns');
     const audioLatencyEl = document.getElementById('practiceAudioLatency');
     const audioLatencyRangeEl = document.getElementById('practiceAudioLatencyRange');
     const h2hRestMuteEl = document.getElementById('practiceH2HRestMute');
@@ -701,6 +735,9 @@ function updatePracticeInputs() {
     }
     if (accompanimentBetweenPatternsEl) {
         accompanimentBetweenPatternsEl.checked = Boolean(practiceState.accompanimentBetweenPatterns);
+    }
+    if (pauseAccompanimentForLeadInPatternsEl) {
+        pauseAccompanimentForLeadInPatternsEl.checked = Boolean(practiceState.pauseAccompanimentForLeadInPatterns);
     }
     if (audioLatencyEl) {
         audioLatencyEl.value = practiceState.audioLatencyMs;
@@ -810,16 +847,43 @@ function addPracticeParallelGroup(entries, patterns, blockIndex, repeatCount, is
     });
 }
 
-function getPracticeLeadInPatterns() {
+function getPracticeLeadInLabelTypes() {
     const allowedLabelsByStartMode = {
         afterCall: ['Call'],
         afterIntro: ['Intro'],
         afterCallIntro: ['Call', 'Intro']
     };
-    const allowedLabels = allowedLabelsByStartMode[practiceState.accompanimentStart] || [];
-    return timelineState.sourcePatterns.filter(function (pattern) {
-        return pattern && allowedLabels.indexOf(pattern.labelType) !== -1;
+    return allowedLabelsByStartMode[practiceState.accompanimentStart] || [];
+}
+
+function getPracticeLeadInPatterns() {
+    const allowedLabels = getPracticeLeadInLabelTypes();
+    const selectedLeadInPatterns = (practiceState.soloPatternIds || [])
+        .map(function (patternId) {
+            return findPatternById(patternId);
+        })
+        .filter(function (pattern) {
+            return pattern && allowedLabels.indexOf(pattern.labelType) !== -1;
+        });
+    const selectedLeadInIds = selectedLeadInPatterns.map(function (pattern) {
+        return pattern.id;
     });
+    const sheetLeadInPatterns = timelineState.sourcePatterns.filter(function (pattern) {
+        return pattern &&
+            allowedLabels.indexOf(pattern.labelType) !== -1 &&
+            selectedLeadInIds.indexOf(pattern.id) === -1;
+    });
+    return selectedLeadInPatterns.concat(sheetLeadInPatterns);
+}
+
+function isPracticePatternInLeadIn(pattern, leadInPatternIds) {
+    return pattern && Array.isArray(leadInPatternIds) && leadInPatternIds.indexOf(pattern.id) !== -1;
+}
+
+function shouldPausePracticeAccompanimentForPattern(pattern) {
+    return Boolean(practiceState.pauseAccompanimentForLeadInPatterns) &&
+        pattern &&
+        (pattern.labelType === 'Call' || pattern.labelType === 'Intro');
 }
 
 function buildPracticeEntries(options) {
@@ -829,18 +893,25 @@ function buildPracticeEntries(options) {
         : practiceState.repeatCount;
     const accompanimentPatterns = getPracticePatternsByIds(practiceState.accompanimentPatternIds);
     const soloPatterns = getPracticePatternsByIds(practiceState.soloPatternIds);
-    const entries = [];
     const startsAfterLeadIn = practiceState.accompanimentStart !== 'immediate';
-    const initialLoopsWithoutSolo = startsAfterLeadIn && soloPatterns.length > 0
+    const leadInPatterns = startsAfterLeadIn ? getPracticeLeadInPatterns() : [];
+    const leadInPatternIds = leadInPatterns.map(function (pattern) {
+        return pattern.id;
+    });
+    const cycleSoloPatterns = soloPatterns.filter(function (pattern) {
+        return !isPracticePatternInLeadIn(pattern, leadInPatternIds);
+    });
+    const entries = [];
+    const initialLoopsWithoutSolo = startsAfterLeadIn && cycleSoloPatterns.length > 0
         ? Math.max(0, practiceState.loopsWithoutSolo - 1)
         : practiceState.loopsWithoutSolo;
-    const trailingLoopsWithoutSolo = startsAfterLeadIn && soloPatterns.length > 0
+    const trailingLoopsWithoutSolo = startsAfterLeadIn && cycleSoloPatterns.length > 0
         ? practiceState.loopsWithoutSolo - initialLoopsWithoutSolo
         : 0;
     let blockIndex = 1;
 
     if (startsAfterLeadIn) {
-        getPracticeLeadInPatterns().forEach(function (leadInPattern) {
+        leadInPatterns.forEach(function (leadInPattern) {
             addPracticeParallelGroup(entries, [leadInPattern], blockIndex, 1, true);
             blockIndex += 1;
         });
@@ -853,14 +924,17 @@ function buildPracticeEntries(options) {
             blockIndex += 1;
         }
 
-        if (soloPatterns.length === 0) {
+        if (cycleSoloPatterns.length === 0) {
             continue;
         }
 
-        soloPatterns.forEach(function (soloPattern, soloPatternIndex) {
-            addPracticeParallelGroup(entries, accompanimentPatterns.concat([soloPattern]), blockIndex, practiceState.loopsWithSolo);
+        cycleSoloPatterns.forEach(function (soloPattern, soloPatternIndex) {
+            const groupPatterns = shouldPausePracticeAccompanimentForPattern(soloPattern)
+                ? [soloPattern]
+                : accompanimentPatterns.concat([soloPattern]);
+            addPracticeParallelGroup(entries, groupPatterns, blockIndex, practiceState.loopsWithSolo);
             blockIndex += 1;
-            if (practiceState.accompanimentBetweenPatterns && soloPatternIndex < soloPatterns.length - 1) {
+            if (practiceState.accompanimentBetweenPatterns && soloPatternIndex < cycleSoloPatterns.length - 1) {
                 if (practiceState.loopsWithoutSolo > 0) {
                     addPracticeParallelGroup(entries, accompanimentPatterns, blockIndex, practiceState.loopsWithoutSolo);
                     blockIndex += 1;
@@ -1010,11 +1084,47 @@ function normalizePracticeTargetInstruments(targetInstruments) {
 
 function flattenPracticePatternNotes(pattern) {
     return expandPracticePatternBars(pattern).reduce(function (allNotes, bar) {
-        if (bar && Array.isArray(bar.notes)) {
-            return allNotes.concat(bar.notes);
+        const notes = getPracticeBarPlayableNotes(bar);
+        if (notes.length > 0) {
+            return allNotes.concat(notes);
         }
         return allNotes;
     }, []);
+}
+
+function getPracticeBarShortLength(bar) {
+    const notes = bar && Array.isArray(bar.notes) ? bar.notes : [];
+    const controls = bar && Array.isArray(bar.controls) ? bar.controls : [];
+    const shortBarControl = controls
+        .filter(function (control) {
+            return control && control.type === 'shortbar';
+        })
+        .sort(function (controlA, controlB) {
+            return Number(controlA.stepIndex) - Number(controlB.stepIndex);
+        })[0];
+
+    if (!shortBarControl || notes.length === 0) {
+        return notes.length;
+    }
+
+    const shortStep = Math.round(Number(shortBarControl.stepIndex));
+    if (!Number.isFinite(shortStep)) {
+        return notes.length;
+    }
+    return Math.max(0, Math.min(notes.length, shortStep));
+}
+
+function getPracticeBarPlayableNotes(bar) {
+    const notes = bar && Array.isArray(bar.notes) ? bar.notes : [];
+    return notes.slice(0, getPracticeBarShortLength(bar));
+}
+
+function practiceBarHasShortBar(bar) {
+    return getPracticeBarShortLength(bar) < (bar && Array.isArray(bar.notes) ? bar.notes.length : 0);
+}
+
+function isPlayablePracticeNote(noteValue) {
+    return noteValue !== 'f' && noteValue !== null && noteValue !== undefined && noteValue !== '';
 }
 
 function getPracticeRepeatMarkerList(markerValue) {
@@ -1153,7 +1263,7 @@ function getPracticePatternControlStep(pattern, controlType) {
 
     for (let barIndex = 0; barIndex < bars.length; barIndex += 1) {
         const bar = bars[barIndex];
-        const notes = bar && Array.isArray(bar.notes) ? bar.notes : [];
+        const notes = getPracticeBarPlayableNotes(bar);
         const controls = bar && Array.isArray(bar.controls) ? bar.controls : [];
         const matchingControl = controls
             .filter(function (control) {
@@ -1177,6 +1287,14 @@ function getPracticePatternControlStep(pattern, controlType) {
     return matchedControlStep;
 }
 
+function practicePatternEndsWithShortBar(pattern) {
+    const bars = expandPracticePatternBars(pattern);
+    if (bars.length === 0) {
+        return false;
+    }
+    return practiceBarHasShortBar(bars[bars.length - 1]);
+}
+
 function getPracticePatternInStep(pattern) {
     return getPracticePatternControlStep(pattern, 'in');
 }
@@ -1190,7 +1308,7 @@ function getPracticeStepsPerBar() {
         return 24;
     }
     if (rhythm === 'neunaer') {
-        return 9;
+        return 18;
     }
     return 32;
 }
@@ -1203,9 +1321,14 @@ function buildPracticePickupNotes(notes, inStep) {
 
     const stepsPerBar = getPracticeStepsPerBar();
     const safeInStep = Math.max(0, Math.min(safeNotes.length - 1, Number(inStep) || 0));
-    const pickupStep = stepsPerBar > 0 ? safeInStep % stepsPerBar : safeInStep;
-    const pickupNotes = Array(Math.max(stepsPerBar, pickupStep + 1)).fill('f');
-    pickupNotes[pickupStep] = safeNotes[safeInStep] || 'f';
+    const pickupStartStep = stepsPerBar > 0
+        ? Math.floor(safeInStep / stepsPerBar) * stepsPerBar
+        : 0;
+    const pickupLength = Math.max(stepsPerBar, safeNotes.length - pickupStartStep);
+    const pickupNotes = Array(pickupLength).fill('f');
+    for (let sourceStep = safeInStep; sourceStep < safeNotes.length; sourceStep += 1) {
+        pickupNotes[sourceStep - pickupStartStep] = safeNotes[sourceStep] || 'f';
+    }
     return pickupNotes;
 }
 
@@ -1216,7 +1339,7 @@ function mergePracticeNotesIntoTrack(targetNotes, sourceNotes) {
         while (mergedNotes.length <= noteIndex) {
             mergedNotes.push('f');
         }
-        if (noteValue !== 'f' && noteValue !== null && noteValue !== undefined && noteValue !== '') {
+        if (isPlayablePracticeNote(noteValue)) {
             mergedNotes[noteIndex] = noteValue;
         }
     });
@@ -1232,7 +1355,7 @@ function mergePracticeNotesIntoTrackAtOffset(targetNotes, sourceNotes, offset) {
         while (mergedNotes.length <= targetIndex) {
             mergedNotes.push('f');
         }
-        if (noteValue !== 'f' && noteValue !== null && noteValue !== undefined && noteValue !== '') {
+        if (isPlayablePracticeNote(noteValue)) {
             mergedNotes[targetIndex] = noteValue;
         }
     });
@@ -1251,6 +1374,8 @@ function createPracticeSection(block, blockIndex, sectionSuffix) {
             trackHandModes: createEmptyPracticeTrackHandModes(),
             trackTargetFlags: createEmptyPracticeTrackFlags(),
             finalRepeatOutSteps: createEmptyPracticeTrackStepMap(),
+            forceFinalOutAtSectionEnd: false,
+            barStartSteps: [],
             practiceTargetInstruments: []
     };
 }
@@ -1267,6 +1392,8 @@ function clonePracticeSection(section, sectionSuffix) {
         trackHandModes: createEmptyPracticeTrackHandModes(),
         trackTargetFlags: createEmptyPracticeTrackFlags(),
         finalRepeatOutSteps: createEmptyPracticeTrackStepMap(),
+        forceFinalOutAtSectionEnd: Boolean(section.forceFinalOutAtSectionEnd),
+        barStartSteps: Array.isArray(section.barStartSteps) ? section.barStartSteps.slice() : [],
         practiceTargetInstruments: Array.isArray(section.practiceTargetInstruments)
             ? section.practiceTargetInstruments.slice()
             : []
@@ -1295,6 +1422,31 @@ function getPracticeSectionLength(section) {
     }).concat(0));
 }
 
+function mergePracticeBarStartSteps(targetSteps, sourceSteps) {
+    const mergedSteps = Array.isArray(targetSteps) ? targetSteps.slice() : [];
+    (Array.isArray(sourceSteps) ? sourceSteps : []).forEach(function (stepValue) {
+        const step = Math.max(0, Math.round(Number(stepValue) || 0));
+        if (mergedSteps.indexOf(step) === -1) {
+            mergedSteps.push(step);
+        }
+    });
+    mergedSteps.sort(function (stepA, stepB) {
+        return stepA - stepB;
+    });
+    return mergedSteps;
+}
+
+function getPracticePatternBarStartSteps(pattern) {
+    const bars = expandPracticePatternBars(pattern);
+    const barStartSteps = [];
+    let stepOffset = 0;
+    bars.forEach(function (bar) {
+        barStartSteps.push(stepOffset);
+        stepOffset += getPracticeBarPlayableNotes(bar).length;
+    });
+    return barStartSteps;
+}
+
 function sectionHasPracticeNotes(section) {
     return practiceTrackInstrumentNames.some(function (instrumentName) {
         return Array.isArray(section.trackNotes[instrumentName]) && section.trackNotes[instrumentName].length > 0;
@@ -1304,7 +1456,8 @@ function sectionHasPracticeNotes(section) {
 function mergePracticePickupIntoHostSection(hostSection, pickupSection) {
     const hostLength = getPracticeSectionLength(hostSection);
     const stepsPerBar = getPracticeStepsPerBar();
-    const pickupOffset = Math.max(0, hostLength - stepsPerBar);
+    const pickupLength = getPracticeSectionLength(pickupSection);
+    const pickupOffset = Math.max(0, hostLength - Math.max(stepsPerBar, pickupLength));
 
     practiceTrackInstrumentNames.forEach(function (instrumentName) {
         const pickupNotes = pickupSection.trackNotes[instrumentName];
@@ -1389,6 +1542,7 @@ function normalizePracticeSectionTrackLoops(section) {
 
     practiceTrackInstrumentNames.forEach(function (instrumentName) {
         const notes = section.trackNotes[instrumentName];
+        const sourceLength = Array.isArray(notes) ? notes.length : 0;
         if (!Array.isArray(notes) || notes.length === 0 || notes.length >= sectionLength) {
             return;
         }
@@ -1398,6 +1552,24 @@ function normalizePracticeSectionTrackLoops(section) {
             loopedNotes.push(notes[stepIndex % notes.length] || 'f');
         }
         section.trackNotes[instrumentName] = loopedNotes;
+
+        if (section.finalRepeatOutSteps && section.finalRepeatOutSteps[instrumentName] !== null &&
+                section.finalRepeatOutSteps[instrumentName] !== undefined) {
+            const rawOutStep = Number(section.finalRepeatOutSteps[instrumentName]);
+            if (Number.isFinite(rawOutStep) && rawOutStep >= 0 && sourceLength > 0) {
+                const lastLoopStart = Math.floor((sectionLength - 1) / sourceLength) * sourceLength;
+                const outStepInSource = Math.max(0, Math.min(
+                    sourceLength - 1,
+                    Math.round(rawOutStep) >= sourceLength
+                        ? sourceLength - 1
+                        : Math.round(rawOutStep)
+                ));
+                section.finalRepeatOutSteps[instrumentName] = Math.min(
+                    sectionLength - 1,
+                    lastLoopStart + outStepInSource
+                );
+            }
+        }
 
         if (section.trackTargetFlags && Array.isArray(section.trackTargetFlags[instrumentName])) {
             const flags = section.trackTargetFlags[instrumentName];
@@ -1437,8 +1609,8 @@ function appendPracticeSectionWithFinalOut(sections, section) {
         sections.push(repeatedSection);
         section.repeatCount = 1;
     }
-    trimPracticeSectionToFinalOut(section);
     normalizePracticeSectionTrackLoops(section);
+    trimPracticeSectionToFinalOut(section);
     sections.push(section);
 }
 
@@ -1485,26 +1657,118 @@ function appendPracticeSectionWithPickup(sections, section, pickupSection, hasPi
         section.repeatCount = 1;
         sections.push(repeatedSection);
     }
-    trimPracticeSectionToFinalOut(section);
     normalizePracticeSectionTrackLoops(section);
+    trimPracticeSectionToFinalOut(section);
     sections.push(section);
     return pickupWasPlacedInLeadIn ? pickupSection : null;
+}
+
+function practiceBlockHasAccompanimentWithOut(block) {
+    return Boolean(block && Array.isArray(block.entries) && block.entries.some(function (entry) {
+        const pattern = findPatternById(entry.patternId);
+        return pattern && pattern.labelType === 'Begleitung' && getPracticePatternOutStep(pattern) !== null;
+    }));
+}
+
+function practiceBlockPausesAccompaniment(block) {
+    return Boolean(block && Array.isArray(block.entries) && block.entries.some(function (entry) {
+        return shouldPausePracticeAccompanimentForPattern(findPatternById(entry.patternId));
+    }));
+}
+
+function practiceSectionPausesAccompaniment(section) {
+    return Boolean(practiceState.pauseAccompanimentForLeadInPatterns) &&
+        section &&
+        (section.label === 'Call' || section.label === 'Intro');
+}
+
+function practiceSectionHasAccompanimentOut(section) {
+    if (!section || !section.finalRepeatOutSteps) {
+        return false;
+    }
+    return practiceTrackInstrumentNames.some(function (instrumentName) {
+        const outStep = section.finalRepeatOutSteps[instrumentName];
+        return outStep !== null && outStep !== undefined && outStep !== '';
+    });
+}
+
+function mutePracticeSectionAfterFinalOut(section) {
+    if (!section || !section.finalRepeatOutSteps) {
+        return;
+    }
+
+    practiceTrackInstrumentNames.forEach(function (instrumentName) {
+        const outStep = section.finalRepeatOutSteps[instrumentName];
+        if (outStep === null || outStep === undefined || outStep === '') {
+            return;
+        }
+        const safeOutStep = Math.max(0, Math.round(Number(outStep) || 0));
+        const notes = section.trackNotes && Array.isArray(section.trackNotes[instrumentName])
+            ? section.trackNotes[instrumentName]
+            : [];
+        for (let stepIndex = safeOutStep + 1; stepIndex < notes.length; stepIndex += 1) {
+            notes[stepIndex] = 'f';
+        }
+        if (section.trackTargetFlags && Array.isArray(section.trackTargetFlags[instrumentName])) {
+            for (let stepIndex = safeOutStep + 1; stepIndex < section.trackTargetFlags[instrumentName].length; stepIndex += 1) {
+                section.trackTargetFlags[instrumentName][stepIndex] = false;
+            }
+        }
+    });
+}
+
+function markPracticeSectionsBeforePausedAccompaniment(sections) {
+    const safeSections = Array.isArray(sections) ? sections : [];
+    if (!practiceState.pauseAccompanimentForLeadInPatterns || safeSections.length === 0) {
+        return;
+    }
+
+    const hasOuterPracticeLoop = practiceState.repeatCount > 1 || practiceState.timerMinutes > 0;
+    const firstLoopSection = safeSections.find(function (section) {
+        return section && !section.isLeadIn && sectionHasPracticeNotes(section);
+    });
+
+    safeSections.forEach(function (section, sectionIndex) {
+        if (!practiceSectionHasAccompanimentOut(section)) {
+            return;
+        }
+        const nextSection = safeSections[sectionIndex + 1] || (hasOuterPracticeLoop ? firstLoopSection : null);
+        if (practiceSectionPausesAccompaniment(nextSection)) {
+            section.forceFinalOutAtSectionEnd = true;
+            mutePracticeSectionAfterFinalOut(section);
+        }
+    });
+}
+
+function practiceBlockEndsWithShortBar(block) {
+    return Boolean(block && Array.isArray(block.entries) && block.entries.some(function (entry) {
+        return practicePatternEndsWithShortBar(findPatternById(entry.patternId));
+    }));
 }
 
 function buildPracticeSectionsFromEntries(entries) {
     const sections = [];
     let loopStartPickupSection = null;
-    buildPracticeBlocksFromEntries(entries).forEach(function (block, blockIndex) {
+    const blocks = buildPracticeBlocksFromEntries(entries);
+    const hasOuterPracticeLoop = practiceState.repeatCount > 1 || practiceState.timerMinutes > 0;
+    const firstRepeatedBlock = blocks.find(function (block) {
+        return block && !block.isLeadIn;
+    });
+    let previousBlockEndedWithShortBar = false;
+    blocks.forEach(function (block, blockIndex) {
+        const nextBlock = blocks[blockIndex + 1] || (hasOuterPracticeLoop ? firstRepeatedBlock : null);
         const section = createPracticeSection(block, blockIndex, '');
         section.repeatCount = normalizePracticeCount(block.repeatCount, 1, 1, 32);
         section.isLeadIn = Boolean(block.isLeadIn);
+        section.forceFinalOutAtSectionEnd = practiceBlockHasAccompanimentWithOut(block) &&
+            practiceBlockPausesAccompaniment(nextBlock);
         const pickupSection = createPracticeSection(block, blockIndex, '::pickup');
         pickupSection.id = block.id + '-pickup';
         pickupSection.repeatCount = 1;
         pickupSection.isLeadIn = true;
         const labels = [];
         const labelNames = [];
-        const blockHasPickup = !section.isLeadIn && block.entries.some(function (entry) {
+        const blockHasPickup = !section.isLeadIn && !previousBlockEndedWithShortBar && block.entries.some(function (entry) {
             const pattern = findPatternById(entry.patternId);
             return pattern && getPracticePatternInStep(pattern) !== null;
         });
@@ -1519,6 +1783,7 @@ function buildPracticeSectionsFromEntries(entries) {
             const patternInStep = getPracticePatternInStep(pattern);
             const patternNotes = rawPatternNotes.slice();
             const patternOutStep = getPracticePatternOutStep(pattern);
+            const patternBarStartSteps = getPracticePatternBarStartSteps(pattern);
             const targetInstruments = normalizePracticeTargetInstruments(entry.targetInstruments);
             const label = pattern.labelType || pattern.label || '';
             const labelName = pattern.labelName || pattern.name || label;
@@ -1541,7 +1806,7 @@ function buildPracticeSectionsFromEntries(entries) {
                         pickupSection.trackTargetFlags[instrumentName] = mergePracticeFlagsIntoTrackAtOffset(
                             pickupSection.trackTargetFlags[instrumentName],
                             pickupNotes.map(function (noteValue) {
-                                return noteValue !== 'f' && noteValue !== null && noteValue !== undefined && noteValue !== '';
+                                return isPlayablePracticeNote(noteValue);
                             }),
                             0
                         );
@@ -1560,6 +1825,7 @@ function buildPracticeSectionsFromEntries(entries) {
                     section.trackNotes[instrumentName],
                     patternNotes
                 );
+                section.barStartSteps = mergePracticeBarStartSteps(section.barStartSteps, patternBarStartSteps);
                 if (entry.isPracticeTarget && section.practiceTargetInstruments.indexOf(instrumentName) === -1) {
                     section.practiceTargetInstruments.push(instrumentName);
                 }
@@ -1584,6 +1850,7 @@ function buildPracticeSectionsFromEntries(entries) {
         if (!loopStartPickupSection && loopPickupSection) {
             loopStartPickupSection = loopPickupSection;
         }
+        previousBlockEndedWithShortBar = practiceBlockEndsWithShortBar(block);
     });
 
     if (loopStartPickupSection && (practiceState.repeatCount > 1 || practiceState.timerMinutes > 0)) {
@@ -1594,6 +1861,8 @@ function buildPracticeSectionsFromEntries(entries) {
             }
         }
     }
+
+    markPracticeSectionsBeforePausedAccompaniment(sections);
 
     return sections.filter(function (section) {
         return sectionHasPracticeNotes(section);
@@ -1620,6 +1889,21 @@ function notifyPracticeHandModeChanged() {
     }
 }
 
+function notifyPracticeInstrumentVolumesChanged() {
+    if (typeof updateTimelineMetadataNode === 'function') {
+        updateTimelineMetadataNode();
+    }
+
+    if (typeof sendPracticeAudioMessage !== 'function') {
+        return;
+    }
+
+    sendPracticeAudioMessage({
+        type: 'barabeat-practice-instrument-volumes',
+        volumes: normalizePracticeInstrumentVolumes(practiceState.instrumentVolumes)
+    });
+}
+
 function buildPracticePlayerPayload() {
     if (!Array.isArray(timelineState.sourcePatterns) || timelineState.sourcePatterns.length === 0) {
         throw new Error('Es wurden noch keine Pattern aus dem Notenblatt gelesen.');
@@ -1639,6 +1923,7 @@ function buildPracticePlayerPayload() {
         payload[0].PracticeBlocks = buildPracticeBlocksFromEntries(entries);
         payload[0].PracticeSections = buildPracticeSectionsFromEntries(entries);
         payload[0].PracticeH2HRestMute = Boolean(practiceState.h2hRestMute);
+        payload[0].PracticeInstrumentVolumes = normalizePracticeInstrumentVolumes(practiceState.instrumentVolumes);
         payload[0].TimelineLoop = false;
         payload[0].TimelineLoopCount = practiceState.timerMinutes > 0
             ? 'loop'
@@ -1655,7 +1940,7 @@ function getPracticeScrollerStepsPerBar() {
         return 24;
     }
     if (rhythm === 'neunaer') {
-        return 9;
+        return 18;
     }
     return 32;
 }
@@ -1665,7 +1950,7 @@ function getPracticeScrollerStepsPerBeat() {
         return 6;
     }
     if (rhythm === 'neunaer') {
-        return 3;
+        return 6;
     }
     return 8;
 }
@@ -1788,9 +2073,12 @@ function createPracticeScrollerNoteSymbol(noteValue) {
 function flattenPracticeScrollerSections(sections) {
     const safeSections = Array.isArray(sections) ? sections : [];
     const visualLoopCopies = getPracticeScrollerVisualLoopCopies();
+    const hasOuterPracticeLoop = practiceState.repeatCount > 1 || practiceState.timerMinutes > 0;
+    const extraVisualLoopCopies = hasOuterPracticeLoop ? visualLoopCopies : 0;
     const trackNotes = createEmptyPracticeTrackNotes();
     const targetSteps = createEmptyPracticeTrackFlags();
     const sectionBoundaries = [];
+    const barStartSteps = [];
     const loopSegments = [];
     const playbackSegments = [];
     let stepOffset = 0;
@@ -1822,6 +2110,17 @@ function flattenPracticeScrollerSections(sections) {
             step: stepOffset,
             label: section.labelName || section.label || ''
         });
+        const sectionBarStartSteps = Array.isArray(section.barStartSteps) && section.barStartSteps.length > 0
+            ? section.barStartSteps
+            : [0];
+        for (let repeatIndex = 0; repeatIndex < renderRepeatCount; repeatIndex += 1) {
+            sectionBarStartSteps.forEach(function (barStep) {
+                const safeBarStep = Math.max(0, Math.round(Number(barStep) || 0));
+                if (safeBarStep < sectionLength) {
+                    barStartSteps.push(stepOffset + repeatIndex * sectionLength + safeBarStep);
+                }
+            });
+        }
         if (!isLeadIn) {
             loopSegments.push({
                 start: stepOffset,
@@ -1852,9 +2151,11 @@ function flattenPracticeScrollerSections(sections) {
             const safeOutStep = outStep === null || outStep === undefined
                 ? null
                 : Math.max(0, Number(outStep) || 0);
+            const forceFinalOutAtSectionEnd = Boolean(section && section.forceFinalOutAtSectionEnd);
             for (let repeatIndex = 0; repeatIndex < renderRepeatCount; repeatIndex += 1) {
                 for (let stepIndex = 0; stepIndex < sectionLength; stepIndex += 1) {
                     const shouldMuteForOut = safeOutStep !== null &&
+                        (isPracticeTarget || !hasOuterPracticeLoop || forceFinalOutAtSectionEnd) &&
                         repeatIndex === repeatCount - 1 &&
                         stepIndex > safeOutStep;
                     trackNotes[instrumentName].push(shouldMuteForOut ? 'f' : (notes[stepIndex] || 'f'));
@@ -1879,19 +2180,38 @@ function flattenPracticeScrollerSections(sections) {
     const playbackLoopLength = Math.max(0, playbackOffset - safePlaybackLoopStart);
     const baseTrackNotes = {};
     const baseTargetSteps = {};
+    const baseBarStartSteps = barStartSteps
+        .filter(function (step) {
+            return step >= safeLoopStartStep;
+        })
+        .map(function (step) {
+            return step - safeLoopStartStep;
+        });
     practiceTrackInstrumentNames.forEach(function (instrumentName) {
         baseTrackNotes[instrumentName] = trackNotes[instrumentName].slice(safeLoopStartStep);
         baseTargetSteps[instrumentName] = targetSteps[instrumentName].slice(safeLoopStartStep);
     });
 
-    for (let copyIndex = 0; copyIndex < visualLoopCopies; copyIndex += 1) {
+    for (let copyIndex = 0; copyIndex < extraVisualLoopCopies; copyIndex += 1) {
+        const copyStartStep = visualCycleSteps + copyIndex * visualLoopLength;
+        baseBarStartSteps.forEach(function (step) {
+            barStartSteps.push(copyStartStep + step);
+        });
         practiceTrackInstrumentNames.forEach(function (instrumentName) {
             trackNotes[instrumentName] = trackNotes[instrumentName].concat(baseTrackNotes[instrumentName]);
             targetSteps[instrumentName] = targetSteps[instrumentName].concat(baseTargetSteps[instrumentName]);
         });
     }
-    const visualTailSteps = getPracticeScrollerTailSteps(visualLoopLength);
+    const visualTailSteps = extraVisualLoopCopies > 0
+        ? getPracticeScrollerTailSteps(visualLoopLength)
+        : 0;
     if (visualTailSteps > 0) {
+        const tailStartStep = visualCycleSteps + extraVisualLoopCopies * visualLoopLength;
+        baseBarStartSteps.forEach(function (step) {
+            if (step < visualTailSteps) {
+                barStartSteps.push(tailStartStep + step);
+            }
+        });
         practiceTrackInstrumentNames.forEach(function (instrumentName) {
             trackNotes[instrumentName] = trackNotes[instrumentName].concat(
                 baseTrackNotes[instrumentName].slice(0, visualTailSteps)
@@ -1906,6 +2226,7 @@ function flattenPracticeScrollerSections(sections) {
         trackNotes: trackNotes,
         targetSteps: targetSteps,
         sectionBoundaries: sectionBoundaries,
+        barStartSteps: barStartSteps,
         loopSegments: loopSegments,
         loopLength: loopSegments.reduce(function (sum, segment) {
             return sum + segment.length;
@@ -1917,14 +2238,15 @@ function flattenPracticeScrollerSections(sections) {
         playbackLoopStart: safePlaybackLoopStart,
         playbackLoopLength: playbackLoopLength,
         visualCycleSteps: visualCycleSteps,
-        visualLoopCopies: visualLoopCopies,
+        visualLoopCopies: extraVisualLoopCopies,
         visualTailSteps: visualTailSteps,
-        totalSteps: visualCycleSteps + (visualLoopLength * visualLoopCopies) + visualTailSteps
+        totalSteps: visualCycleSteps + (visualLoopLength * extraVisualLoopCopies) + visualTailSteps
     };
 }
 
-function createPracticeScrollerCell(noteValue, stepIndex, stepsPerBar, isPracticeTarget) {
+function createPracticeScrollerCell(noteValue, stepIndex, stepsPerBar, isPracticeTarget, barStartInfo) {
     const cellEl = document.createElement('span');
+    const safeBarStartInfo = barStartInfo || {};
     cellEl.className = 'practice-scroller-cell ' + getPracticeScrollerNoteClass(noteValue);
     if (isPracticeTarget) {
         cellEl.classList.add('is-practice-target');
@@ -1935,11 +2257,18 @@ function createPracticeScrollerCell(noteValue, stepIndex, stepsPerBar, isPractic
     } else {
         cellEl.textContent = getPracticeScrollerNoteLabel(noteValue);
     }
-    if (stepsPerBar > 0 && stepIndex % stepsPerBar === 0) {
+    const isBarStart = safeBarStartInfo.barStartSet
+        ? safeBarStartInfo.barStartSet.has(stepIndex)
+        : (stepsPerBar > 0 && stepIndex % stepsPerBar === 0);
+    if (isBarStart) {
         cellEl.classList.add('is-bar-start');
         const barNumberEl = document.createElement('span');
         barNumberEl.className = 'practice-bar-number';
-        barNumberEl.textContent = String(Math.floor(stepIndex / stepsPerBar) + 1);
+        barNumberEl.textContent = String(
+            safeBarStartInfo.barNumberByStep && safeBarStartInfo.barNumberByStep[stepIndex]
+                ? safeBarStartInfo.barNumberByStep[stepIndex]
+                : Math.floor(stepIndex / stepsPerBar) + 1
+        );
         cellEl.appendChild(barNumberEl);
     }
     return cellEl;
@@ -1949,7 +2278,7 @@ function getPracticeScrollerPreRollLineSteps() {
     return Math.max(practiceScrollerState.preRollLineSteps, practiceScrollerState.stepsPerBar);
 }
 
-function appendPracticeScrollerCells(laneEl, notes, targetSteps, visualStepOffset, stepsPerBar) {
+function appendPracticeScrollerCells(laneEl, notes, targetSteps, visualStepOffset, stepsPerBar, barStartInfo) {
     const safeNotes = Array.isArray(notes) ? notes : [];
     const safeTargetSteps = Array.isArray(targetSteps) ? targetSteps : [];
     safeNotes.forEach(function (noteValue, stepIndex) {
@@ -1957,7 +2286,8 @@ function appendPracticeScrollerCells(laneEl, notes, targetSteps, visualStepOffse
             noteValue,
             visualStepOffset + stepIndex,
             stepsPerBar,
-            safeTargetSteps[stepIndex]
+            safeTargetSteps[stepIndex],
+            barStartInfo
         ));
     });
 }
@@ -1999,6 +2329,115 @@ function getCollapsedPracticeDjembeRows(flattened) {
     };
 }
 
+function closePracticeInstrumentVolumePopover() {
+    const popoverEl = document.getElementById('practiceInstrumentVolumePopover');
+    if (popoverEl) {
+        popoverEl.remove();
+    }
+}
+
+function openPracticeInstrumentVolumePopover(instrumentNames, anchorEl, labelText) {
+    const targetInstruments = (Array.isArray(instrumentNames) ? instrumentNames : [instrumentNames])
+        .filter(function (instrumentName) {
+            return practiceTrackInstrumentNames.indexOf(instrumentName) !== -1;
+        });
+    if (targetInstruments.length === 0 || !anchorEl) {
+        return;
+    }
+
+    closePracticeInstrumentVolumePopover();
+
+    const label = labelText || practiceScrollerInstrumentLabels[targetInstruments[0]] || targetInstruments[0];
+    const volume = targetInstruments.reduce(function (sum, instrumentName) {
+        return sum + getPracticeInstrumentVolume(instrumentName);
+    }, 0) / targetInstruments.length;
+    const popoverEl = document.createElement('div');
+    popoverEl.id = 'practiceInstrumentVolumePopover';
+    popoverEl.className = 'practice-volume-popover';
+    popoverEl.dataset.instrumentName = targetInstruments.join(',');
+
+    const titleEl = document.createElement('div');
+    titleEl.className = 'practice-volume-title';
+    titleEl.textContent = label;
+
+    const valueEl = document.createElement('output');
+    valueEl.className = 'practice-volume-value';
+    valueEl.value = Math.round(volume * 100) + '%';
+    valueEl.textContent = valueEl.value;
+
+    const rangeEl = document.createElement('input');
+    rangeEl.type = 'range';
+    rangeEl.min = '0';
+    rangeEl.max = '200';
+    rangeEl.step = '5';
+    rangeEl.value = Math.round(volume * 100);
+    rangeEl.setAttribute('aria-label', label + ' Lautstärke');
+
+    const actionsEl = document.createElement('div');
+    actionsEl.className = 'practice-volume-actions';
+
+    const muteButtonEl = document.createElement('button');
+    muteButtonEl.type = 'button';
+    muteButtonEl.textContent = 'Stumm';
+
+    const resetButtonEl = document.createElement('button');
+    resetButtonEl.type = 'button';
+    resetButtonEl.textContent = '100%';
+
+    function applyVolume(percentValue) {
+        const normalizedVolume = normalizePracticeInstrumentVolume(Number(percentValue) / 100);
+        if (normalizedVolume === 1) {
+            targetInstruments.forEach(function (instrumentName) {
+                delete practiceState.instrumentVolumes[instrumentName];
+            });
+        } else {
+            targetInstruments.forEach(function (instrumentName) {
+                practiceState.instrumentVolumes[instrumentName] = normalizedVolume;
+            });
+        }
+        rangeEl.value = String(Math.round(normalizedVolume * 100));
+        valueEl.value = Math.round(normalizedVolume * 100) + '%';
+        valueEl.textContent = valueEl.value;
+        notifyPracticeInstrumentVolumesChanged();
+    }
+
+    rangeEl.addEventListener('input', function (event) {
+        applyVolume(event.target.value);
+    });
+    muteButtonEl.addEventListener('click', function () {
+        applyVolume(0);
+    });
+    resetButtonEl.addEventListener('click', function () {
+        applyVolume(100);
+    });
+
+    actionsEl.append(muteButtonEl, resetButtonEl);
+    popoverEl.append(titleEl, rangeEl, valueEl, actionsEl);
+    document.body.appendChild(popoverEl);
+
+    const anchorRect = anchorEl.getBoundingClientRect();
+    const popoverRect = popoverEl.getBoundingClientRect();
+    const left = Math.max(8, Math.min(
+        window.innerWidth - popoverRect.width - 8,
+        anchorRect.left + (anchorRect.width / 2) - (popoverRect.width / 2)
+    ));
+    const top = Math.max(8, anchorRect.top - popoverRect.height - 8);
+    popoverEl.style.left = left + 'px';
+    popoverEl.style.top = top + 'px';
+}
+
+document.addEventListener('click', function (event) {
+    const popoverEl = document.getElementById('practiceInstrumentVolumePopover');
+    if (!popoverEl) {
+        return;
+    }
+    if (popoverEl.contains(event.target) ||
+            (event.target && event.target.closest && event.target.closest('.practice-scroller-label'))) {
+        return;
+    }
+    closePracticeInstrumentVolumePopover();
+});
+
 function renderPracticeScrollerFromPayload(playerPayload) {
     const scrollerEl = document.getElementById('practiceScroller');
     const rowsEl = document.getElementById('practiceScrollerRows');
@@ -2018,6 +2457,7 @@ function renderPracticeScrollerFromPayload(playerPayload) {
     practiceScrollerState.playbackEvents = [];
     practiceScrollerState.playbackAnchor = null;
     practiceScrollerState.activeCells = [];
+    closePracticeInstrumentVolumePopover();
 
     const flattened = flattenPracticeScrollerSections(sections);
     const stepsPerBar = getPracticeScrollerStepsPerBar();
@@ -2047,6 +2487,25 @@ function renderPracticeScrollerFromPayload(playerPayload) {
     }
 
     const collapsedDjembeRows = getCollapsedPracticeDjembeRows(flattened);
+    const preRollLineSteps = getPracticeScrollerPreRollLineSteps();
+    const barStartSteps = (Array.isArray(flattened.barStartSteps) ? flattened.barStartSteps : [])
+        .map(function (step) {
+            return Math.max(0, Math.round(Number(step) || 0)) + preRollLineSteps;
+        })
+        .filter(function (step, index, steps) {
+            return steps.indexOf(step) === index;
+        })
+        .sort(function (stepA, stepB) {
+            return stepA - stepB;
+        });
+    const barNumberByStep = {};
+    barStartSteps.forEach(function (step, index) {
+        barNumberByStep[step] = index + 1;
+    });
+    const barStartInfo = {
+        barStartSet: new Set(barStartSteps),
+        barNumberByStep: barNumberByStep
+    };
     practiceTrackInstrumentNames.forEach(function (instrumentName) {
         if (collapsedDjembeRows.hiddenRows.indexOf(instrumentName) !== -1) {
             return;
@@ -2073,9 +2532,27 @@ function renderPracticeScrollerFromPayload(playerPayload) {
 
         const labelEl = document.createElement('div');
         labelEl.className = 'practice-scroller-label';
-        labelEl.textContent = collapsedDjembeRows.labels[instrumentName] ||
+        labelEl.tabIndex = 0;
+        labelEl.setAttribute('role', 'button');
+        labelEl.dataset.instrumentName = instrumentName;
+        const displayLabel = collapsedDjembeRows.labels[instrumentName] ||
             practiceScrollerInstrumentLabels[instrumentName] ||
             instrumentName;
+        labelEl.setAttribute('aria-label', 'Lautstärke für ' + displayLabel + ' einstellen');
+        const volumeInstruments = collapsedDjembeRows.labels[instrumentName] === 'Djembe'
+            ? ['Djembe_1', 'Djembe_2', 'Djembe_3']
+            : [instrumentName];
+        labelEl.textContent = displayLabel;
+        labelEl.addEventListener('click', function (event) {
+            event.stopPropagation();
+            openPracticeInstrumentVolumePopover(volumeInstruments, labelEl, displayLabel);
+        });
+        labelEl.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                openPracticeInstrumentVolumePopover(volumeInstruments, labelEl, displayLabel);
+            }
+        });
 
         const laneWrapEl = document.createElement('div');
         laneWrapEl.className = 'practice-scroller-lane-wrap';
@@ -2083,12 +2560,11 @@ function renderPracticeScrollerFromPayload(playerPayload) {
         const laneEl = document.createElement('div');
         laneEl.className = 'practice-scroller-lane';
 
-        const preRollLineSteps = getPracticeScrollerPreRollLineSteps();
         for (let leadInIndex = 0; leadInIndex < preRollLineSteps; leadInIndex += 1) {
-            laneEl.appendChild(createPracticeScrollerCell('f', leadInIndex, stepsPerBar, false));
+            laneEl.appendChild(createPracticeScrollerCell('f', leadInIndex, stepsPerBar, false, barStartInfo));
         }
 
-        appendPracticeScrollerCells(laneEl, notes, targetSteps, preRollLineSteps, stepsPerBar);
+        appendPracticeScrollerCells(laneEl, notes, targetSteps, preRollLineSteps, stepsPerBar, barStartInfo);
 
         laneWrapEl.appendChild(laneEl);
         rowEl.append(labelEl, laneWrapEl);
@@ -2353,6 +2829,7 @@ function updatePracticeScrollerState(nextState, leadInMs) {
         stopPracticeScrollerAnimation();
         practiceScrollerState.playbackEvents = [];
         practiceScrollerState.playbackAnchor = null;
+        closePracticeInstrumentVolumePopover();
         updatePracticeScrollerPosition(-practiceScrollerState.visualLeadInSteps);
     }
 }
@@ -2365,6 +2842,7 @@ function clearPracticeScrollerPlayback() {
     stopPracticeScrollerAnimation();
     practiceScrollerState.playbackEvents = [];
     practiceScrollerState.playbackAnchor = null;
+    closePracticeInstrumentVolumePopover();
     updatePracticeScrollerState('stopped');
 }
 

@@ -349,7 +349,7 @@
     const timestamp = nowIso();
     const publishedScore = Object.assign({}, score, {
       isPublished: true,
-      serverPath: normalizeName(serverPath, score.serverPath || score.title + ".txt"),
+      serverPath: normalizeName(serverPath, score.serverPath || score.title + ".bbs"),
       publishToken: publishToken || score.publishToken || null,
       syncState: "published",
       publishedAt: score.publishedAt || timestamp,

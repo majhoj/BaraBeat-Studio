@@ -52,8 +52,12 @@
     return data;
   }
 
-  function stripTextExtension(fileName) {
-    return String(fileName || "").replace(/\.txt$/i, "");
+  function stripScoreExtension(fileName) {
+    return String(fileName || "").replace(/\.(bbs|txt)$/i, "");
+  }
+
+  function getScoreFormat(fileName) {
+    return /\.txt$/i.test(String(fileName || "")) ? "txt" : "bbs";
   }
 
   function listScores() {
@@ -70,16 +74,16 @@
         .map(function (fileName) {
           return {
             fileName: fileName,
-            title: stripTextExtension(fileName),
+            title: stripScoreExtension(fileName),
             serverPath: fileName,
-            format: "txt"
+            format: getScoreFormat(fileName)
           };
         });
     });
   }
 
   function getPublishBaseName(score) {
-    return stripTextExtension(score.fileName || score.serverPath || score.title || score.name || "Unbenannt");
+    return stripScoreExtension(score.fileName || score.serverPath || score.title || score.name || "Unbenannt");
   }
 
   function getPublishContent(score) {
@@ -118,7 +122,7 @@
     }
 
     return postJsonEndpoint(ENDPOINTS.update, {
-      serverPath: score.serverPath || baseName + ".txt",
+      serverPath: score.serverPath || baseName + ".bbs",
       content: getPublishContent(score),
       publishToken: score.publishToken
     });
@@ -132,10 +136,10 @@
 
     return postEndpoint(ENDPOINTS.load, { b: fileName }).then(function (content) {
       return {
-        title: stripTextExtension(fileName),
+        title: stripScoreExtension(fileName),
         fileName: fileName,
         serverPath: fileName,
-        format: "txt",
+        format: getScoreFormat(fileName),
         content: content
       };
     });

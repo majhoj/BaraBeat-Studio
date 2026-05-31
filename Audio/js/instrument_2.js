@@ -119,7 +119,8 @@ class Instrumente {
       const vol_tone = this._audioCtx.createGain();
 
       sampleSource.buffer = this._snd[name];
-      vol_tone.gain.value = this._vol * Math.max(0, Number(gainMultiplier) || 1);
+      const numericGain = Number(gainMultiplier);
+      vol_tone.gain.value = this._vol * Math.max(0, Number.isFinite(numericGain) ? numericGain : 1);
 
       if (this._panNode) {
         sampleSource.connect(vol_tone).connect(this._panNode);

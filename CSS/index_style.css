@@ -608,6 +608,13 @@ html {
     display: none;
 }
 
+.practice-options-title {
+    grid-column: 1 / -1;
+    margin: 0 0 10px;
+    font-size: 16px;
+    color: var(--ui-text);
+}
+
 .practice-pattern-options {
     grid-column: 1 / -1;
     display: flex;
@@ -849,10 +856,66 @@ html {
     font-weight: 700;
     text-align: right;
     white-space: nowrap;
+    cursor: pointer;
+    border-radius: 6px;
 }
 
 .practice-scroller-row.has-practice-target .practice-scroller-label {
     color: #8f2d2d;
+}
+
+.practice-scroller-label:hover,
+.practice-scroller-label:focus-visible {
+    color: #185f3d;
+    background: rgba(24, 95, 61, 0.08);
+    outline: none;
+}
+
+.practice-volume-popover {
+    position: fixed;
+    z-index: 10000;
+    width: 220px;
+    padding: 10px;
+    border: 1px solid #b9dbc7;
+    border-radius: 8px;
+    background: #fbfefc;
+    box-shadow: 0 10px 26px rgba(20, 45, 31, 0.18);
+    color: #1d4f36;
+}
+
+.practice-volume-title {
+    margin-bottom: 8px;
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.practice-volume-popover input[type="range"] {
+    width: 100%;
+}
+
+.practice-volume-value {
+    display: block;
+    margin-top: 4px;
+    color: #4a6a58;
+    font-size: 12px;
+    text-align: right;
+}
+
+.practice-volume-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.practice-volume-actions button {
+    flex: 1;
+    min-height: 28px;
+    border: 1px solid #b9dbc7;
+    border-radius: 6px;
+    background: #e7f5ed;
+    color: #185f3d;
+    font-weight: 700;
+    cursor: pointer;
 }
 
 .practice-scroller-lane-wrap {

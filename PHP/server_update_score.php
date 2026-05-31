@@ -12,8 +12,8 @@ function normalize_server_path($rawPath) {
     if ($fileName === '' || $fileName === '.' || $fileName === '..') {
         return '';
     }
-    if (!preg_match('/\.txt$/i', $fileName)) {
-        $fileName .= '.txt';
+    if (!preg_match('/\.(bbs|txt)$/i', $fileName)) {
+        $fileName .= '.bbs';
     }
     return $fileName;
 }
@@ -69,8 +69,8 @@ if (file_put_contents($metaPath, json_encode($meta, JSON_PRETTY_PRINT | JSON_UNE
 respond_json(200, [
     'success' => true,
     'serverPath' => $serverPath,
-    'title' => preg_replace('/\.txt$/i', '', $serverPath),
-    'format' => 'txt',
+    'title' => preg_replace('/\.(bbs|txt)$/i', '', $serverPath),
+    'format' => preg_match('/\.txt$/i', $serverPath) ? 'txt' : 'bbs',
     'updatedAt' => $timestamp
 ]);
 ?>

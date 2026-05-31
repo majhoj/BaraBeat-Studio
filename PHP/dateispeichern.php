@@ -1,11 +1,11 @@
 <?php
 $inhalt = $_POST["a"] ?? "";
 $dateiname = basename(trim($_POST["b"] ?? ""));
-$dateiname = preg_replace('/\.txt$/i', '', $dateiname);
-$dateiname = $dateiname . ".txt";
+$dateiname = preg_replace('/\.(bbs|txt)$/i', '', $dateiname);
+$dateiname = $dateiname . ".bbs";
 $pfad = __DIR__ . "/../Noten/" . $dateiname;
 
-if ($dateiname === ".txt" || $dateiname === "..txt") {
+if ($dateiname === ".bbs" || $dateiname === "..bbs") {
     http_response_code(400);
     echo "Ungültiger Dateiname";
     exit;

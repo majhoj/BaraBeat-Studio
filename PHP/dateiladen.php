@@ -1,8 +1,13 @@
 <?php
 $dateiname = basename($_POST["b"] ?? "");
-$pfad = __DIR__ . "/../Noten/" . $dateiname;
 
-if ($dateiname === "" || !is_file($pfad)) {
+if ($dateiname === "" || !preg_match('/\.(bbs|txt)$/i', $dateiname)) {
+    echo "";
+    exit;
+}
+
+$pfad = __DIR__ . "/../Noten/" . $dateiname;
+if (!is_file($pfad)) {
     echo "";
     exit;
 }

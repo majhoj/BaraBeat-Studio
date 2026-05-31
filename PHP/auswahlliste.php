@@ -31,7 +31,7 @@ foreach($dat_array as $file) {
     }
 
      // Höhere Verzeichnisse nicht anzeigen!
-     if ($file != "." && $file != ".." && $file != ".DS_Store" && $flag == "false") {
+     if ($file != "." && $file != ".." && $file != ".DS_Store" && $flag == "false" && preg_match('/\.(bbs|txt)$/i', $file)) {
      // Link erstellen
      //echo "<a href=\"Noten/$file\">$file</a><br>\n";
 
