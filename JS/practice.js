@@ -14,6 +14,7 @@ const practiceState = {
     h2hRestMute: false,
     instrumentVolumes: {},
     patternHandModes: {},
+    patternSwingFactors: {},
     patternTargetInstruments: {},
     patternChooserExpanded: false,
     defaultsApplied: false,
@@ -161,6 +162,20 @@ function normalizePracticeHandMode(rawValue) {
     return rawValue === 'h2h' || rawValue === 'hoh' ? rawValue : 'auto';
 }
 
+function normalizePracticePatternSwingFactor(rawValue) {
+    if (rawValue === null || rawValue === undefined || rawValue === '') {
+        return null;
+    }
+    if (typeof normalizeTimelineSwingFactor === 'function') {
+        return normalizeTimelineSwingFactor(rawValue);
+    }
+    const numericValue = Number(rawValue);
+    if (!Number.isFinite(numericValue)) {
+        return null;
+    }
+    return Math.max(0, Math.min(100, Math.round(numericValue)));
+}
+
 function getPracticePatternsByIds(patternIds) {
     const ids = Array.isArray(patternIds) ? patternIds : [];
     return ids
@@ -193,6 +208,17 @@ function getPracticePatternTargetsBySourceKey(patternTargets) {
             targetBySourceKey[pattern.sourceKey] = patternTargets[patternId];
         }
         return targetBySourceKey;
+    }, {});
+}
+
+function getPracticePatternSwingFactorsBySourceKey(patternSwingFactors) {
+    return Object.keys(patternSwingFactors || {}).reduce(function (factorBySourceKey, patternId) {
+        const pattern = findPatternById(patternId);
+        const normalizedFactor = normalizePracticePatternSwingFactor(patternSwingFactors[patternId]);
+        if (pattern && pattern.sourceKey && normalizedFactor !== null) {
+            factorBySourceKey[pattern.sourceKey] = normalizedFactor;
+        }
+        return factorBySourceKey;
     }, {});
 }
 
@@ -249,6 +275,28 @@ function getPracticePatternTargetsFromMetadata(patternTargets, patternTargetsByS
     }, {});
 }
 
+function getPracticePatternSwingFactorsFromMetadata(patternSwingFactors, patternSwingFactorsBySourceKey, patternLibrary) {
+    const patterns = Array.isArray(patternLibrary) ? patternLibrary : timelineState.sourcePatterns;
+    const factorById = patternSwingFactors && typeof patternSwingFactors === 'object' ? patternSwingFactors : {};
+    const factorBySourceKey = patternSwingFactorsBySourceKey && typeof patternSwingFactorsBySourceKey === 'object'
+        ? patternSwingFactorsBySourceKey
+        : {};
+
+    return patterns.reduce(function (resolvedFactors, pattern) {
+        if (!pattern || !pattern.id) {
+            return resolvedFactors;
+        }
+        const rawFactor = factorBySourceKey[pattern.sourceKey] !== undefined
+            ? factorBySourceKey[pattern.sourceKey]
+            : factorById[pattern.id];
+        const normalizedFactor = normalizePracticePatternSwingFactor(rawFactor);
+        if (normalizedFactor !== null) {
+            resolvedFactors[pattern.id] = normalizedFactor;
+        }
+        return resolvedFactors;
+    }, {});
+}
+
 function getPracticePatternIdsFromMetadata(sourceKeys, patternIds, patternLibrary) {
     const patterns = Array.isArray(patternLibrary) ? patternLibrary : timelineState.sourcePatterns;
     const sourceKeyList = Array.isArray(sourceKeys) ? sourceKeys : [];
@@ -297,6 +345,8 @@ function buildPracticeMetadata() {
         soloPatternSourceKeys: getPracticePatternSourceKeys(practiceState.soloPatternIds),
         patternHandModes: Object.assign({}, practiceState.patternHandModes),
         patternHandModesBySourceKey: getPracticePatternHandModesBySourceKey(practiceState.patternHandModes),
+        patternSwingFactors: Object.assign({}, practiceState.patternSwingFactors),
+        patternSwingFactorsBySourceKey: getPracticePatternSwingFactorsBySourceKey(practiceState.patternSwingFactors),
         patternTargetInstruments: persistedPatternTargets,
         patternTargetInstrumentsBySourceKey: getPracticePatternTargetsBySourceKey(persistedPatternTargets)
     };
@@ -306,6 +356,7 @@ function resetPracticeForSource(sourceHash) {
     practiceState.accompanimentPatternIds = [];
     practiceState.soloPatternIds = [];
     practiceState.patternTargetInstruments = {};
+    practiceState.patternSwingFactors = {};
     practiceState.instrumentVolumes = {};
     practiceState.defaultsApplied = false;
     practiceState.defaultSelectionSourceHash = sourceHash || timelineState.sourceHash || '';
@@ -347,6 +398,11 @@ function applyPracticeMetadata(metadata, patternLibrary, sourceHash) {
         metadata.patternTargetInstrumentsBySourceKey,
         patternLibrary
     );
+    practiceState.patternSwingFactors = getPracticePatternSwingFactorsFromMetadata(
+        metadata.patternSwingFactors,
+        metadata.patternSwingFactorsBySourceKey,
+        patternLibrary
+    );
     const hasPersistedPatternSelection =
         practiceState.accompanimentPatternIds.length > 0 ||
         practiceState.soloPatternIds.length > 0;
@@ -372,6 +428,14 @@ function syncPracticeSelectionsWithPatternLibrary() {
     Object.keys(practiceState.patternHandModes).forEach(function (patternId) {
         if (availableIds.indexOf(patternId) === -1) {
             delete practiceState.patternHandModes[patternId];
+        }
+    });
+    Object.keys(practiceState.patternSwingFactors).forEach(function (patternId) {
+        const normalizedFactor = normalizePracticePatternSwingFactor(practiceState.patternSwingFactors[patternId]);
+        if (availableIds.indexOf(patternId) === -1 || normalizedFactor === null) {
+            delete practiceState.patternSwingFactors[patternId];
+        } else {
+            practiceState.patternSwingFactors[patternId] = normalizedFactor;
         }
     });
     Object.keys(practiceState.patternTargetInstruments).forEach(function (patternId) {
@@ -633,6 +697,36 @@ function createPracticePatternRow(pattern, listName) {
         rowEl.appendChild(handModeEl);
     }
     if (inputEl.checked) {
+        const swingFactorEl = document.createElement('label');
+        swingFactorEl.className = 'practice-pattern-swing-factor';
+        swingFactorEl.appendChild(document.createTextNode('Swing'));
+        const swingInputEl = document.createElement('input');
+        swingInputEl.type = 'number';
+        swingInputEl.min = '0';
+        swingInputEl.max = '100';
+        swingInputEl.step = '1';
+        swingInputEl.placeholder = typeof normalizeTimelineSwingFactor === 'function'
+            ? String(normalizeTimelineSwingFactor(timelineState.swingFactor))
+            : '0';
+        const patternSwingFactor = normalizePracticePatternSwingFactor(practiceState.patternSwingFactors[pattern.id]);
+        swingInputEl.value = patternSwingFactor === null ? '' : String(patternSwingFactor);
+        swingInputEl.addEventListener('click', function (event) {
+            event.stopPropagation();
+        });
+        swingInputEl.addEventListener('change', function () {
+            const normalizedFactor = normalizePracticePatternSwingFactor(swingInputEl.value);
+            if (normalizedFactor === null) {
+                delete practiceState.patternSwingFactors[pattern.id];
+                swingInputEl.value = '';
+            } else {
+                practiceState.patternSwingFactors[pattern.id] = normalizedFactor;
+                swingInputEl.value = String(normalizedFactor);
+            }
+            notifyPracticePatternOrderChanged();
+        });
+        swingFactorEl.appendChild(swingInputEl);
+        rowEl.appendChild(swingFactorEl);
+
         const targetOptions = getPracticeTargetOptionsForPattern(pattern);
         if (targetOptions.length > 0) {
             const targetEl = document.createElement('select');
@@ -788,6 +882,9 @@ function renderPracticePanel() {
     }
 
     updatePracticeInputs();
+    if (typeof window.syncTimingControlValues === 'function') {
+        window.syncTimingControlValues();
+    }
     if (chooserEl) {
         chooserEl.hidden = !practiceState.patternChooserExpanded;
     }
@@ -829,7 +926,7 @@ function createPracticeEntry(pattern, parallelGroupId, blockId, repeatCount, isL
         handMode: pattern.instrument === 'Djembe'
             ? normalizePracticeHandMode(practiceState.patternHandModes[pattern.id])
             : '',
-        swingFactor: null,
+        swingFactor: normalizePracticePatternSwingFactor(practiceState.patternSwingFactors[pattern.id]),
         targetInstruments: getPracticePatternPlaybackTargets(pattern)
     };
 }

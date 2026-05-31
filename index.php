@@ -172,10 +172,10 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
                 </label>
                 <div class="timeline-swing-profile" id="timelineSwingProfile">
                     <span>Profil</span>
-                    <label>S1 <input type="number" id="timelineSwingAnchor1" step="1" value="6" /></label>
-                    <label>S2 <input type="number" id="timelineSwingAnchor2" step="1" value="-5" /></label>
-                    <label>S3 <input type="number" id="timelineSwingAnchor3" step="1" value="6" /></label>
-                    <label>S4 <input type="number" id="timelineSwingAnchor4" step="1" value="10" /></label>
+                    <label>S1 <input type="number" id="timelineSwingAnchor1" step="1" value="0" /></label>
+                    <label>S2 <input type="number" id="timelineSwingAnchor2" step="1" value="0" /></label>
+                    <label>S3 <input type="number" id="timelineSwingAnchor3" step="1" value="0" /></label>
+                    <label>S4 <input type="number" id="timelineSwingAnchor4" step="1" value="0" /></label>
                 </div>
                 <div class="timeline-swing-profile" id="timelineFeelProfile">
                     <span>Feel ms</span>
@@ -219,6 +219,18 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
         </div>
         <div id="practicePatternChooser" class="timeline-panel-body practice-panel-body" hidden>
             <h3 class="practice-options-title">Einstellungen</h3>
+            <div class="practice-timing-options">
+                <label class="timeline-tempo-control" for="practiceTempo">
+                    Tempo
+                    <input type="number" id="practiceTempo" min="30" max="180" step="1" value="100" />
+                </label>
+                <label class="timeline-swing-control" for="practiceSwingFactor">
+                    Swing
+                    <input type="number" id="practiceSwingFactor" min="0" max="100" step="1" value="0" />
+                </label>
+                <button type="button" id="practiceSwingProfileButton">Swing-Profil</button>
+                <button type="button" id="practiceFeelProfileButton">Feel</button>
+            </div>
             <div class="practice-pattern-options">
                 <label class="timeline-tempo-control" for="practiceAccompanimentStart">
                     Begleitung startet
@@ -303,6 +315,48 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
                     <div id="practiceScrollerRows" class="practice-scroller-rows"></div>
                 </div>
             </div>
+        </section>
+    </div>
+
+    <div id="practiceSwingProfileDialog" class="swing-profile-dialog-backdrop" hidden>
+        <section class="swing-profile-dialog" role="dialog" aria-modal="true" aria-labelledby="practiceSwingProfileTitle">
+            <header class="swing-profile-dialog-header">
+                <h2 id="practiceSwingProfileTitle">Swing-Profil</h2>
+                <button type="button" id="practiceSwingProfileCloseButton" aria-label="Swing-Profil schließen">Schließen</button>
+            </header>
+            <div class="swing-profile-preview" id="practiceSwingProfilePreview" aria-hidden="true"></div>
+            <div class="swing-profile-controls" id="practiceSwingProfileControls">
+                <label>S1 <input type="number" id="practiceSwingAnchor1" step="1" value="0" /></label>
+                <label>S2 <input type="number" id="practiceSwingAnchor2" step="1" value="0" /></label>
+                <label>S3 <input type="number" id="practiceSwingAnchor3" step="1" value="0" /></label>
+                <label>S4 <input type="number" id="practiceSwingAnchor4" step="1" value="0" /></label>
+            </div>
+            <footer class="swing-profile-dialog-footer">
+                <button type="button" id="practiceSwingProfileResetButton">Zurücksetzen</button>
+                <button type="button" id="practiceSwingProfileDoneButton" class="primary">Fertig</button>
+            </footer>
+        </section>
+    </div>
+
+    <div id="practiceFeelProfileDialog" class="swing-profile-dialog-backdrop" hidden>
+        <section class="swing-profile-dialog" role="dialog" aria-modal="true" aria-labelledby="practiceFeelProfileTitle">
+            <header class="swing-profile-dialog-header">
+                <h2 id="practiceFeelProfileTitle">Feel ms</h2>
+                <button type="button" id="practiceFeelProfileCloseButton" aria-label="Feel schließen">Schließen</button>
+            </header>
+            <div class="swing-profile-controls feel-profile-controls" id="practiceFeelProfileControls">
+                <label>Kenkeni <input type="number" id="practiceFeelKenkeni" step="1" value="0" /></label>
+                <label>Sangban <input type="number" id="practiceFeelSangban" step="1" value="0" /></label>
+                <label>Doundoun <input type="number" id="practiceFeelDoundoun" step="1" value="0" /></label>
+                <label>Dreierbass <input type="number" id="practiceFeelDreierbass" step="1" value="0" /></label>
+                <label>Djembe 1 <input type="number" id="practiceFeelDjembe1" step="1" value="0" /></label>
+                <label>Djembe 2 <input type="number" id="practiceFeelDjembe2" step="1" value="0" /></label>
+                <label>Djembe 3 <input type="number" id="practiceFeelDjembe3" step="1" value="0" /></label>
+            </div>
+            <footer class="swing-profile-dialog-footer">
+                <button type="button" id="practiceFeelProfileResetButton">Zurücksetzen</button>
+                <button type="button" id="practiceFeelProfileDoneButton" class="primary">Fertig</button>
+            </footer>
         </section>
     </div>
 
@@ -3876,51 +3930,325 @@ document.addEventListener('DOMContentLoaded', function () {
         timelineState.visible = false;
         renderTimelinePanel();
     });
-    document.querySelector('#timelineTempo').addEventListener('input', function (event) {
-        timelineState.tempo = normalizeTimelineTempo(event.target.value);
-        event.target.value = timelineState.tempo;
+    function getSwingProfileTitle() {
+        const currentProfileKey = getCurrentTimelineSwingProfileKey();
+        if (currentProfileKey === 'binaer') {
+            return 'Profil 16/8';
+        }
+        return currentProfileKey === 'tenaer' ? 'Profil 12/8' : 'Profil 9/8';
+    }
+    function renderPracticeSwingProfilePreview() {
+        const previewEl = document.querySelector('#practiceSwingProfilePreview');
+        const titleEl = document.querySelector('#practiceSwingProfileTitle');
+        const currentProfileKey = getCurrentTimelineSwingProfileKey();
+        const currentProfile = normalizeTimelineSwingProfile(
+            timelineState.swingProfile && timelineState.swingProfile[currentProfileKey],
+            currentProfileKey
+        );
+        const profileTitle = getSwingProfileTitle();
+        if (titleEl) {
+            titleEl.textContent = 'Swing-' + profileTitle;
+        }
+        [
+            'practiceSwingAnchor1',
+            'practiceSwingAnchor2',
+            'practiceSwingAnchor3',
+            'practiceSwingAnchor4'
+        ].forEach(function (inputId, inputIndex) {
+            const inputEl = document.querySelector('#' + inputId);
+            const labelEl = inputEl ? inputEl.closest('label') : null;
+            if (labelEl) {
+                labelEl.classList.toggle('is-hidden', inputIndex >= currentProfile.length);
+            }
+        });
+        if (!previewEl) {
+            return;
+        }
+
+        const svgNs = 'http://www.w3.org/2000/svg';
+        const svgEl = document.createElementNS(svgNs, 'svg');
+        const width = 620;
+        const height = 150;
+        const left = 58;
+        const right = 562;
+        const top = 46;
+        const bottom = 108;
+        const noteY = 78;
+        const span = right - left;
+        const stepWidth = span / currentProfile.length;
+        svgEl.setAttribute('viewBox', '0 0 ' + width + ' ' + height);
+        previewEl.innerHTML = '';
+
+        function addSvgElement(type, attrs) {
+            const el = document.createElementNS(svgNs, type);
+            Object.keys(attrs || {}).forEach(function (attrName) {
+                el.setAttribute(attrName, attrs[attrName]);
+            });
+            svgEl.appendChild(el);
+            return el;
+        }
+
+        addSvgElement('rect', {
+            x: left,
+            y: top,
+            width: span,
+            height: bottom - top,
+            fill: '#fbfbfb',
+            stroke: '#d0d0d0',
+            'stroke-width': 1
+        });
+        addSvgElement('line', { x1: left, y1: noteY, x2: right, y2: noteY, stroke: '#d7d7d7', 'stroke-width': 1 });
+        for (let lineIndex = 0; lineIndex <= currentProfile.length; lineIndex += 1) {
+            const x = left + lineIndex * stepWidth;
+            addSvgElement('line', {
+                x1: x,
+                y1: top,
+                x2: x,
+                y2: bottom,
+                stroke: lineIndex === 0 || lineIndex === currentProfile.length ? '#777' : '#c8d8cf',
+                'stroke-width': lineIndex === 0 || lineIndex === currentProfile.length ? 2 : 1,
+                'stroke-dasharray': lineIndex === 0 || lineIndex === currentProfile.length ? '' : '4 4'
+            });
+        }
+
+        currentProfile.forEach(function (profileValue, profileIndex) {
+            const neutralX = left + profileIndex * stepWidth;
+            const shiftedX = neutralX + ((Number(profileValue) || 0) / 100) * stepWidth;
+            addSvgElement('line', {
+                x1: neutralX,
+                y1: profileIndex > 0 ? noteY + 11 : top - 12,
+                x2: neutralX,
+                y2: bottom + 12,
+                stroke: profileIndex > 0 ? '#8fb39d' : '#e1e1e1',
+                'stroke-width': profileIndex > 0 ? 2 : 1
+            });
+            addSvgElement('line', {
+                x1: shiftedX,
+                y1: noteY - 22,
+                x2: shiftedX,
+                y2: noteY + 28,
+                stroke: '#9ab9a7',
+                'stroke-width': 2
+            });
+            addSvgElement('circle', {
+                cx: shiftedX,
+                cy: noteY,
+                r: 7,
+                fill: '#111'
+            });
+            addSvgElement('text', {
+                x: shiftedX,
+                y: noteY - 30,
+                'text-anchor': 'middle',
+                'font-size': 12,
+                fill: '#333'
+            }).textContent = 'S' + (profileIndex + 1);
+        });
+
+        addSvgElement('text', {
+            x: left,
+            y: 28,
+            'font-size': 13,
+            fill: '#333'
+        }).textContent = profileTitle + ' Vorschau bei Swing 100%';
+        addSvgElement('text', {
+            x: left,
+            y: 136,
+            'font-size': 12,
+            fill: '#666'
+        }).textContent = 'grau = Raster, schwarz = verschobene Note';
+
+        previewEl.appendChild(svgEl);
+    }
+    function openPracticeSwingProfileDialog() {
+        const dialogEl = document.querySelector('#practiceSwingProfileDialog');
+        if (!dialogEl) {
+            return;
+        }
+        syncTimingControlValues();
+        renderPracticeSwingProfilePreview();
+        dialogEl.hidden = false;
+    }
+    function closePracticeSwingProfileDialog() {
+        const dialogEl = document.querySelector('#practiceSwingProfileDialog');
+        if (dialogEl) {
+            dialogEl.hidden = true;
+        }
+    }
+    function openPracticeFeelProfileDialog() {
+        const dialogEl = document.querySelector('#practiceFeelProfileDialog');
+        if (!dialogEl) {
+            return;
+        }
+        syncTimingControlValues();
+        dialogEl.hidden = false;
+    }
+    function closePracticeFeelProfileDialog() {
+        const dialogEl = document.querySelector('#practiceFeelProfileDialog');
+        if (dialogEl) {
+            dialogEl.hidden = true;
+        }
+    }
+    function syncTimingControlValues() {
+        ['timelineTempo', 'practiceTempo'].forEach(function (inputId) {
+            const inputEl = document.querySelector('#' + inputId);
+            if (inputEl) {
+                inputEl.value = normalizeTimelineTempo(timelineState.tempo);
+            }
+        });
+        ['timelineSwingFactor', 'practiceSwingFactor'].forEach(function (inputId) {
+            const inputEl = document.querySelector('#' + inputId);
+            if (inputEl) {
+                inputEl.value = normalizeTimelineSwingFactor(timelineState.swingFactor);
+            }
+        });
+        const currentProfileKey = getCurrentTimelineSwingProfileKey();
+        const currentProfile = normalizeTimelineSwingProfile(
+            timelineState.swingProfile && timelineState.swingProfile[currentProfileKey],
+            currentProfileKey
+        );
+        [
+            ['timelineSwingAnchor1', 'practiceSwingAnchor1'],
+            ['timelineSwingAnchor2', 'practiceSwingAnchor2'],
+            ['timelineSwingAnchor3', 'practiceSwingAnchor3'],
+            ['timelineSwingAnchor4', 'practiceSwingAnchor4']
+        ].forEach(function (swingConfig, inputIndex) {
+            swingConfig.forEach(function (inputId) {
+                const inputEl = document.querySelector('#' + inputId);
+                if (inputEl && inputIndex < currentProfile.length) {
+                    inputEl.value = currentProfile[inputIndex];
+                }
+            });
+        });
+        const feelOffsets = normalizeTimelineFeelOffsets(timelineState.feelOffsets);
+        [
+            ['timelineFeelKenkeni', 'practiceFeelKenkeni', 'Kenkeni'],
+            ['timelineFeelSangban', 'practiceFeelSangban', 'Sangban'],
+            ['timelineFeelDoundoun', 'practiceFeelDoundoun', 'Doundoun'],
+            ['timelineFeelDreierbass', 'practiceFeelDreierbass', 'Dreierbass'],
+            ['timelineFeelDjembe1', 'practiceFeelDjembe1', 'Djembe_1'],
+            ['timelineFeelDjembe2', 'practiceFeelDjembe2', 'Djembe_2'],
+            ['timelineFeelDjembe3', 'practiceFeelDjembe3', 'Djembe_3']
+        ].forEach(function (feelConfig) {
+            [feelConfig[0], feelConfig[1]].forEach(function (inputId) {
+                const inputEl = document.querySelector('#' + inputId);
+                if (inputEl) {
+                    inputEl.value = feelOffsets[feelConfig[2]];
+                }
+            });
+        });
+    }
+    window.syncTimingControlValues = syncTimingControlValues;
+    function notifyTimingControlsChanged() {
+        syncTimingControlValues();
+        renderPracticeSwingProfilePreview();
         updateTimelineMetadataNode();
-    });
-    document.querySelector('#timelineSwingFactor').addEventListener('input', function (event) {
-        timelineState.swingFactor = normalizeTimelineSwingFactor(event.target.value);
-        event.target.value = timelineState.swingFactor;
-        updateTimelineMetadataNode();
-    });
-    [
-        ['timelineFeelKenkeni', 'Kenkeni'],
-        ['timelineFeelSangban', 'Sangban'],
-        ['timelineFeelDoundoun', 'Doundoun'],
-        ['timelineFeelDreierbass', 'Dreierbass'],
-        ['timelineFeelDjembe1', 'Djembe_1'],
-        ['timelineFeelDjembe2', 'Djembe_2'],
-        ['timelineFeelDjembe3', 'Djembe_3']
-    ].forEach(function (feelConfig) {
-        const inputEl = document.querySelector('#' + feelConfig[0]);
+        if (isPracticeAudioModeActive() && practiceAudioPlaybackState !== 'playing') {
+            schedulePracticeAudioRefresh(250);
+        }
+    }
+    ['timelineTempo', 'practiceTempo'].forEach(function (inputId) {
+        const inputEl = document.querySelector('#' + inputId);
         if (!inputEl) {
             return;
         }
         inputEl.addEventListener('input', function (event) {
-            const nextFeelOffsets = normalizeTimelineFeelOffsets(timelineState.feelOffsets);
-            nextFeelOffsets[feelConfig[1]] = normalizeTimelineFeelOffset(event.target.value);
-            timelineState.feelOffsets = nextFeelOffsets;
-            event.target.value = nextFeelOffsets[feelConfig[1]];
-            updateTimelineMetadataNode();
+            timelineState.tempo = normalizeTimelineTempo(event.target.value);
+            notifyTimingControlsChanged();
         });
     });
-    ['timelineSwingAnchor1', 'timelineSwingAnchor2', 'timelineSwingAnchor3', 'timelineSwingAnchor4'].forEach(function (inputId, inputIndex) {
-        document.querySelector('#' + inputId).addEventListener('input', function (event) {
-            const currentProfileKey = getCurrentTimelineSwingProfileKey();
-            const nextProfiles = normalizeAllTimelineSwingProfiles(timelineState.swingProfile);
-            const currentProfile = normalizeTimelineSwingProfile(nextProfiles[currentProfileKey], currentProfileKey);
-            if (inputIndex >= currentProfile.length) {
+    ['timelineSwingFactor', 'practiceSwingFactor'].forEach(function (inputId) {
+        const inputEl = document.querySelector('#' + inputId);
+        if (!inputEl) {
+            return;
+        }
+        inputEl.addEventListener('input', function (event) {
+            timelineState.swingFactor = normalizeTimelineSwingFactor(event.target.value);
+            notifyTimingControlsChanged();
+        });
+    });
+    [
+        ['timelineFeelKenkeni', 'practiceFeelKenkeni', 'Kenkeni'],
+        ['timelineFeelSangban', 'practiceFeelSangban', 'Sangban'],
+        ['timelineFeelDoundoun', 'practiceFeelDoundoun', 'Doundoun'],
+        ['timelineFeelDreierbass', 'practiceFeelDreierbass', 'Dreierbass'],
+        ['timelineFeelDjembe1', 'practiceFeelDjembe1', 'Djembe_1'],
+        ['timelineFeelDjembe2', 'practiceFeelDjembe2', 'Djembe_2'],
+        ['timelineFeelDjembe3', 'practiceFeelDjembe3', 'Djembe_3']
+    ].forEach(function (feelConfig) {
+        [feelConfig[0], feelConfig[1]].forEach(function (inputId) {
+            const inputEl = document.querySelector('#' + inputId);
+            if (!inputEl) {
                 return;
             }
-            currentProfile[inputIndex] = normalizeSwingProfileValue(event.target.value);
-            nextProfiles[currentProfileKey] = currentProfile;
-            timelineState.swingProfile = nextProfiles;
-            event.target.value = currentProfile[inputIndex];
-            updateTimelineMetadataNode();
+            inputEl.addEventListener('input', function (event) {
+                const nextFeelOffsets = normalizeTimelineFeelOffsets(timelineState.feelOffsets);
+                nextFeelOffsets[feelConfig[2]] = normalizeTimelineFeelOffset(event.target.value);
+                timelineState.feelOffsets = nextFeelOffsets;
+                notifyTimingControlsChanged();
+            });
         });
+    });
+    [
+        ['timelineSwingAnchor1', 'practiceSwingAnchor1'],
+        ['timelineSwingAnchor2', 'practiceSwingAnchor2'],
+        ['timelineSwingAnchor3', 'practiceSwingAnchor3'],
+        ['timelineSwingAnchor4', 'practiceSwingAnchor4']
+    ].forEach(function (swingConfig, inputIndex) {
+        swingConfig.forEach(function (inputId) {
+            const inputEl = document.querySelector('#' + inputId);
+            if (!inputEl) {
+                return;
+            }
+            inputEl.addEventListener('input', function (event) {
+                const currentProfileKey = getCurrentTimelineSwingProfileKey();
+                const nextProfiles = normalizeAllTimelineSwingProfiles(timelineState.swingProfile);
+                const currentProfile = normalizeTimelineSwingProfile(nextProfiles[currentProfileKey], currentProfileKey);
+                if (inputIndex >= currentProfile.length) {
+                    return;
+                }
+                currentProfile[inputIndex] = normalizeSwingProfileValue(event.target.value);
+                nextProfiles[currentProfileKey] = currentProfile;
+                timelineState.swingProfile = nextProfiles;
+                notifyTimingControlsChanged();
+                if (typeof renderTimelinePanel === 'function') {
+                    renderTimelinePanel();
+                }
+            });
+        });
+    });
+    document.querySelector('#practiceSwingProfileButton').addEventListener('click', openPracticeSwingProfileDialog);
+    document.querySelector('#practiceSwingProfileCloseButton').addEventListener('click', closePracticeSwingProfileDialog);
+    document.querySelector('#practiceSwingProfileDoneButton').addEventListener('click', closePracticeSwingProfileDialog);
+    document.querySelector('#practiceSwingProfileDialog').addEventListener('click', function (event) {
+        if (event.target && event.target.id === 'practiceSwingProfileDialog') {
+            closePracticeSwingProfileDialog();
+        }
+    });
+    document.querySelector('#practiceSwingProfileResetButton').addEventListener('click', function () {
+        const currentProfileKey = getCurrentTimelineSwingProfileKey();
+        const nextProfiles = normalizeAllTimelineSwingProfiles(timelineState.swingProfile);
+        nextProfiles[currentProfileKey] = normalizeTimelineSwingProfile(null, currentProfileKey);
+        timelineState.swingProfile = nextProfiles;
+        notifyTimingControlsChanged();
+        if (typeof renderTimelinePanel === 'function') {
+            renderTimelinePanel();
+        }
+    });
+    document.querySelector('#practiceFeelProfileButton').addEventListener('click', openPracticeFeelProfileDialog);
+    document.querySelector('#practiceFeelProfileCloseButton').addEventListener('click', closePracticeFeelProfileDialog);
+    document.querySelector('#practiceFeelProfileDoneButton').addEventListener('click', closePracticeFeelProfileDialog);
+    document.querySelector('#practiceFeelProfileDialog').addEventListener('click', function (event) {
+        if (event.target && event.target.id === 'practiceFeelProfileDialog') {
+            closePracticeFeelProfileDialog();
+        }
+    });
+    document.querySelector('#practiceFeelProfileResetButton').addEventListener('click', function () {
+        timelineState.feelOffsets = normalizeTimelineFeelOffsets(null);
+        notifyTimingControlsChanged();
+        if (typeof renderTimelinePanel === 'function') {
+            renderTimelinePanel();
+        }
     });
 
     document.querySelector('#button6').addEventListener('click', function () {

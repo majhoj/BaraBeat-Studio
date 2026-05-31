@@ -538,6 +538,120 @@ html {
     cursor: default;
 }
 
+.swing-profile-dialog-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.18);
+    font-family: var(--ui-font);
+}
+
+.swing-profile-dialog-backdrop[hidden] {
+    display: none;
+}
+
+.swing-profile-dialog {
+    width: min(680px, calc(100vw - 28px));
+    max-height: calc(100vh - 28px);
+    display: grid;
+    grid-template-rows: auto auto auto auto;
+    overflow: hidden;
+    background: rgba(248, 248, 248, 0.98);
+    border: 1px solid var(--ui-border);
+    border-radius: 12px;
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
+}
+
+.swing-profile-dialog-header,
+.swing-profile-dialog-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 14px;
+    border-bottom: 1px solid #dedede;
+}
+
+.swing-profile-dialog-footer {
+    justify-content: flex-end;
+    border-top: 1px solid #dedede;
+    border-bottom: 0;
+}
+
+.swing-profile-dialog-header h2 {
+    margin: 0;
+    font-size: 16px;
+    color: var(--ui-text);
+}
+
+.swing-profile-dialog button {
+    border: 1px solid var(--ui-border);
+    border-radius: var(--ui-radius-small);
+    background: #fbfbfb;
+    padding: 7px 12px;
+    font-size: 13px;
+    color: var(--ui-text);
+    cursor: pointer;
+}
+
+.swing-profile-dialog button.primary {
+    border-color: #007aff;
+    background: #007aff;
+    color: white;
+}
+
+.swing-profile-preview {
+    padding: 16px 18px 8px;
+    min-height: 150px;
+    background: #ffffff;
+    border-bottom: 1px solid #eeeeee;
+}
+
+.swing-profile-preview svg {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+.swing-profile-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 12px 14px;
+}
+
+.swing-profile-controls label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--ui-text);
+}
+
+.swing-profile-controls label.is-hidden {
+    display: none;
+}
+
+.swing-profile-controls input {
+    width: 64px;
+    padding: 5px 6px;
+    border: 1px solid var(--ui-border);
+    border-radius: var(--ui-radius-small);
+    font-size: 13px;
+}
+
+.feel-profile-controls {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(180px, 1fr));
+}
+
+.feel-profile-controls label {
+    justify-content: space-between;
+}
+
 .file-dialog-format {
     display: flex;
     align-items: center;
@@ -615,6 +729,14 @@ html {
     color: var(--ui-text);
 }
 
+.practice-timing-options {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
 .practice-pattern-options {
     grid-column: 1 / -1;
     display: flex;
@@ -688,7 +810,8 @@ html {
 }
 
 .practice-pattern-hand-mode,
-.practice-pattern-target {
+.practice-pattern-target,
+.practice-pattern-swing-factor {
     grid-column: 3;
     padding: 5px 6px;
     border: 1px solid var(--ui-border);
@@ -696,6 +819,17 @@ html {
     background: white;
     color: var(--ui-text);
     font-size: 13px;
+}
+
+.practice-pattern-swing-factor {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.practice-pattern-swing-factor input {
+    width: 56px;
+    grid-row: auto;
 }
 
 .practice-pattern-title {
@@ -1888,6 +2022,12 @@ html {
         gap: 8px;
     }
 
+    .practice-timing-options {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
     .timeline-swing-control,
     .timeline-tempo-control {
         justify-content: space-between;
@@ -1959,7 +2099,8 @@ html {
     }
 
     .practice-pattern-hand-mode,
-    .practice-pattern-target {
+    .practice-pattern-target,
+    .practice-pattern-swing-factor {
         grid-column: 2;
         grid-row: auto;
         justify-self: start;

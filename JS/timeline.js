@@ -3,9 +3,9 @@ const timelineDjembeTargets = ['Djembe_1', 'Djembe_2', 'Djembe_3'];
 const timelineBassTargets = ['Kenkeni', 'Sangban', 'Doundoun'];
 const timelineMetadataVersion = 7;
 const defaultTimelineSwingProfiles = {
-    binaer: [6, -5, 6, 10],
-    tenaer: [0, -15, -10],
-    neunaer: [0, 15, 10]
+    binaer: [0, 0, 0, 0],
+    tenaer: [0, 0, 0],
+    neunaer: [0, 0, 0]
 };
 const defaultTimelineFeelOffsets = {
     Kenkeni: 0,
@@ -2177,7 +2177,9 @@ function renderTimelinePanel() {
     const panelEl = document.getElementById('timelinePanel');
     const statusEl = document.getElementById('timelineStatus');
     const tempoInputEl = document.getElementById('timelineTempo');
+    const practiceTempoInputEl = document.getElementById('practiceTempo');
     const swingInputEl = document.getElementById('timelineSwingFactor');
+    const practiceSwingInputEl = document.getElementById('practiceSwingFactor');
     const feelInputMap = {
         Kenkeni: document.getElementById('timelineFeelKenkeni'),
         Sangban: document.getElementById('timelineFeelSangban'),
@@ -2187,12 +2189,28 @@ function renderTimelinePanel() {
         Djembe_2: document.getElementById('timelineFeelDjembe2'),
         Djembe_3: document.getElementById('timelineFeelDjembe3')
     };
+    const practiceFeelInputMap = {
+        Kenkeni: document.getElementById('practiceFeelKenkeni'),
+        Sangban: document.getElementById('practiceFeelSangban'),
+        Doundoun: document.getElementById('practiceFeelDoundoun'),
+        Dreierbass: document.getElementById('practiceFeelDreierbass'),
+        Djembe_1: document.getElementById('practiceFeelDjembe1'),
+        Djembe_2: document.getElementById('practiceFeelDjembe2'),
+        Djembe_3: document.getElementById('practiceFeelDjembe3')
+    };
     const swingProfileWrapEl = document.getElementById('timelineSwingProfile');
+    const practiceSwingProfileWrapEl = document.getElementById('practiceSwingProfile');
     const swingProfileInputs = [
         document.getElementById('timelineSwingAnchor1'),
         document.getElementById('timelineSwingAnchor2'),
         document.getElementById('timelineSwingAnchor3'),
         document.getElementById('timelineSwingAnchor4')
+    ];
+    const practiceSwingProfileInputs = [
+        document.getElementById('practiceSwingAnchor1'),
+        document.getElementById('practiceSwingAnchor2'),
+        document.getElementById('practiceSwingAnchor3'),
+        document.getElementById('practiceSwingAnchor4')
     ];
     const patternDisplayInfo = buildPatternDisplayLabelMap(timelineState.sourcePatterns);
     const timelineDisplayGroups = buildTimelineDisplayGroups(timelineState.entries, timelineState.sourcePatterns);
@@ -2204,13 +2222,22 @@ function renderTimelinePanel() {
     if (tempoInputEl) {
         tempoInputEl.value = normalizeTimelineTempo(timelineState.tempo);
     }
+    if (practiceTempoInputEl) {
+        practiceTempoInputEl.value = normalizeTimelineTempo(timelineState.tempo);
+    }
     if (swingInputEl) {
         swingInputEl.value = normalizeTimelineSwingFactor(timelineState.swingFactor);
+    }
+    if (practiceSwingInputEl) {
+        practiceSwingInputEl.value = normalizeTimelineSwingFactor(timelineState.swingFactor);
     }
     const currentFeelOffsets = normalizeTimelineFeelOffsets(timelineState.feelOffsets);
     Object.keys(feelInputMap).forEach(function (instrumentName) {
         if (feelInputMap[instrumentName]) {
             feelInputMap[instrumentName].value = currentFeelOffsets[instrumentName];
+        }
+        if (practiceFeelInputMap[instrumentName]) {
+            practiceFeelInputMap[instrumentName].value = currentFeelOffsets[instrumentName];
         }
     });
     const currentProfileKey = getCurrentTimelineSwingProfileKey();
@@ -2232,9 +2259,31 @@ function renderTimelinePanel() {
             inputEl.value = currentProfile[inputIndex];
         }
     });
+    practiceSwingProfileInputs.forEach(function (inputEl, inputIndex) {
+        if (!inputEl) {
+            return;
+        }
+        const inputLabel = inputEl.closest('label');
+        const isActive = inputIndex < currentProfile.length;
+        if (inputLabel) {
+            inputLabel.classList.toggle('is-inline-flex', isActive);
+            inputLabel.classList.toggle('is-hidden', !isActive);
+        }
+        if (isActive) {
+            inputEl.value = currentProfile[inputIndex];
+        }
+    });
     const profileTitleEl = swingProfileWrapEl ? swingProfileWrapEl.querySelector('span') : null;
     if (profileTitleEl) {
         profileTitleEl.textContent = currentProfileKey === 'binaer'
+            ? 'Profil 16/8'
+            : (currentProfileKey === 'tenaer' ? 'Profil 12/8' : 'Profil 9/8');
+    }
+    const practiceProfileTitleEl = practiceSwingProfileWrapEl
+        ? practiceSwingProfileWrapEl.querySelector('span')
+        : document.getElementById('practiceSwingProfileTitle');
+    if (practiceProfileTitleEl) {
+        practiceProfileTitleEl.textContent = currentProfileKey === 'binaer'
             ? 'Profil 16/8'
             : (currentProfileKey === 'tenaer' ? 'Profil 12/8' : 'Profil 9/8');
     }
