@@ -634,6 +634,9 @@ function cloneTimelineEntryFromPattern(pattern, overrides) {
         id: overrideConfig.id || ('timeline-entry-' + nextId),
         blockId: overrideConfig.blockId || '',
         parallelGroupId: overrideConfig.parallelGroupId || '',
+        overlayRepeatIndex: overrideConfig.overlayRepeatIndex === null || overrideConfig.overlayRepeatIndex === undefined
+            ? null
+            : Math.max(0, Math.round(Number(overrideConfig.overlayRepeatIndex) || 0)),
         patternId: pattern.id,
         patternSourceKey: pattern.sourceKey,
         handMode: pattern.instrument === 'Djembe'
@@ -661,6 +664,9 @@ function cloneTimelineEntry(entry) {
     return cloneTimelineEntryFromPattern(sourcePattern, {
         blockId: entry.blockId || '',
         parallelGroupId: entry.parallelGroupId || '',
+        overlayRepeatIndex: entry.overlayRepeatIndex === null || entry.overlayRepeatIndex === undefined
+            ? null
+            : Math.max(0, Math.round(Number(entry.overlayRepeatIndex) || 0)),
         handMode: entry.handMode || 'auto',
         swingFactor: entry.swingFactor,
         targetInstruments: Array.isArray(entry.targetInstruments) ? entry.targetInstruments.slice() : []
@@ -887,6 +893,9 @@ function syncTimelineEntriesWithPatternLibrary(patternLibrary, existingEntries, 
             id: entry.id || ('timeline-entry-' + timelineState.nextEntryId++),
             blockId: entry.blockId || '',
             parallelGroupId: entry.parallelGroupId || '',
+            overlayRepeatIndex: entry.overlayRepeatIndex === null || entry.overlayRepeatIndex === undefined
+                ? null
+                : Math.max(0, Math.round(Number(entry.overlayRepeatIndex) || 0)),
             patternId: matchedPattern.id,
             patternSourceKey: matchedPattern.sourceKey,
             handMode: matchedPattern.instrument === 'Djembe'
@@ -974,6 +983,9 @@ function buildTimelinePlayerPayload(patternLibrary, timelineEntries) {
                 id: entry.id,
                 blockId: entry.blockId || '',
                 parallelGroupId: entry.parallelGroupId || '',
+                overlayRepeatIndex: entry.overlayRepeatIndex === null || entry.overlayRepeatIndex === undefined
+                    ? null
+                    : Math.max(0, Math.round(Number(entry.overlayRepeatIndex) || 0)),
                 patternId: entry.patternId,
                 patternSourceKey: entry.patternSourceKey,
                 handMode: entry.handMode || '',
@@ -1013,6 +1025,9 @@ function updateTimelineMetadataNode() {
                 id: entry.id,
                 blockId: entry.blockId || '',
                 parallelGroupId: entry.parallelGroupId || '',
+                overlayRepeatIndex: entry.overlayRepeatIndex === null || entry.overlayRepeatIndex === undefined
+                    ? null
+                    : Math.max(0, Math.round(Number(entry.overlayRepeatIndex) || 0)),
                 patternId: entry.patternId,
                 patternSourceKey: entry.patternSourceKey,
                 handMode: entry.handMode || '',
@@ -1381,7 +1396,7 @@ function normalizeTimelineGroupRepeatCount(rawValue) {
     if (!Number.isFinite(numericValue) || numericValue < 1) {
         return 1;
     }
-    return Math.max(1, Math.min(32, Math.round(numericValue)));
+    return Math.max(1, Math.min(100, Math.round(numericValue)));
 }
 
 function setTimelineGroupRepeatCount(group, repeatInfo, nextRepeatCount) {
@@ -1412,7 +1427,9 @@ function setTimelineGroupRepeatCount(group, repeatInfo, nextRepeatCount) {
 }
 
 function getTimelineRowRepeatInfo(rowGroups) {
-    const groups = Array.isArray(rowGroups) ? rowGroups.filter(Boolean) : [];
+    const groups = Array.isArray(rowGroups) ? rowGroups.filter(function (group) {
+        return group && !isTimelineOverlayGroup(group);
+    }) : [];
     const groupRepeatInfos = groups.map(function (group) {
         return {
             group: group,
@@ -1641,6 +1658,11 @@ function buildTimelineVisualRows(entryGroups, patternLibrary) {
             if (!rowParallelGroupId && nextGroup.count !== firstGroup.count) {
                 break;
             }
+            if (rowParallelGroupId && isTimelineOverlayGroup(nextGroup)) {
+                currentRow.push(nextGroup);
+                nextIndex += 1;
+                continue;
+            }
             if (doTimelineTargetsOverlap(currentTargets, nextEntry.targetInstruments)) {
                 break;
             }
@@ -1764,6 +1786,15 @@ function buildTimelineContinuationBlocks(visualRows, patternLibrary) {
 
 function getTimelineGroupKey(group) {
     return String(group && group.startIndex) + ':' + String(group && group.endIndex);
+}
+
+function isTimelineOverlayEntry(entry) {
+    return entry && entry.overlayRepeatIndex !== null && entry.overlayRepeatIndex !== undefined;
+}
+
+function isTimelineOverlayGroup(group) {
+    const firstEntry = group && Array.isArray(group.entries) ? group.entries[0] : null;
+    return isTimelineOverlayEntry(firstEntry);
 }
 
 function buildPatternDisplayLabelMap(patternLibrary) {
@@ -1919,6 +1950,74 @@ function insertTimelineEntryParallelToRow(payload, rowGroups) {
     }
 }
 
+function insertTimelineOverlayIntoRepeatSlot(payload, rowGroups, repeatIndex) {
+    const groups = Array.isArray(rowGroups) ? rowGroups.filter(Boolean) : [];
+    if (!payload || groups.length === 0) {
+        return;
+    }
+
+    const normalizedRepeatIndex = Math.max(0, Math.round(Number(repeatIndex) || 0));
+    const parallelGroupId = ensureParallelGroupForRow(groups);
+    const insertIndex = groups.reduce(function (maxIndex, group) {
+        return Math.max(maxIndex, group.endIndex);
+    }, 0);
+
+    function cloneOverlayEntry(sourceEntry) {
+        const sourcePattern = findPatternById(sourceEntry.patternId);
+        if (!sourcePattern || sourcePattern.labelType === 'Begleitung') {
+            return null;
+        }
+        return cloneTimelineEntryFromPattern(sourcePattern, {
+            blockId: nextTimelineBlockId(),
+            parallelGroupId: parallelGroupId,
+            overlayRepeatIndex: normalizedRepeatIndex,
+            handMode: sourceEntry.handMode || 'auto',
+            swingFactor: sourceEntry.swingFactor,
+            targetInstruments: Array.isArray(sourceEntry.targetInstruments) ? sourceEntry.targetInstruments.slice() : []
+        });
+    }
+
+    let entriesToInsert = [];
+    if (payload.type === 'pattern-group') {
+        entriesToInsert = (Array.isArray(payload.entries) ? payload.entries : [])
+            .map(cloneOverlayEntry)
+            .filter(Boolean)
+            .slice(0, 1);
+    } else if (payload.type === 'timeline-entry-group') {
+        const groupStartIndex = Number(payload.startIndex);
+        const groupCount = Number(payload.count);
+        if (!Number.isFinite(groupStartIndex) || !Number.isFinite(groupCount) || groupCount < 1) {
+            return;
+        }
+        const movedEntries = timelineState.entries.splice(groupStartIndex, groupCount);
+        entriesToInsert = movedEntries.map(function (entry) {
+            const sourcePattern = findPatternById(entry.patternId);
+            if (!sourcePattern || sourcePattern.labelType === 'Begleitung') {
+                return null;
+            }
+            entry.parallelGroupId = parallelGroupId;
+            entry.overlayRepeatIndex = normalizedRepeatIndex;
+            return entry;
+        }).filter(Boolean).slice(0, 1);
+    }
+
+    if (entriesToInsert.length === 0) {
+        return;
+    }
+
+    const existingOverlayGroup = groups.find(function (group) {
+        const entry = group && group.entries && group.entries[0];
+        return isTimelineOverlayEntry(entry) && Number(entry.overlayRepeatIndex) === normalizedRepeatIndex;
+    });
+    if (existingOverlayGroup) {
+        timelineState.entries.splice(existingOverlayGroup.startIndex, existingOverlayGroup.count);
+    }
+
+    timelineState.entries.splice.apply(timelineState.entries, [insertIndex, 0].concat(entriesToInsert));
+    updateTimelineMetadataNode();
+    renderTimelinePanel();
+}
+
 function createTimelineDropzone(targetIndex) {
     const dropzone = document.createElement('div');
     dropzone.className = 'timeline-dropzone';
@@ -2049,7 +2148,7 @@ function createTimelineSectionHeader(rowGroups, rowIndex) {
     const sectionRepeatInputEl = document.createElement('input');
     sectionRepeatInputEl.type = 'number';
     sectionRepeatInputEl.min = '1';
-    sectionRepeatInputEl.max = '32';
+    sectionRepeatInputEl.max = '100';
     sectionRepeatInputEl.step = '1';
     sectionRepeatInputEl.placeholder = rowRepeatInfo.mixed
         ? 'gemischt'
@@ -2072,6 +2171,38 @@ function createTimelineSectionHeader(rowGroups, rowIndex) {
     return sectionHeaderEl;
 }
 
+function getTimelineDisplayParts(pattern, patternDisplayInfo) {
+    const fallbackName = pattern ? pattern.name || '' : 'Pattern';
+    const displayName = pattern
+        ? (patternDisplayInfo.displayNameByPatternId[pattern.id] || fallbackName)
+        : fallbackName;
+    const splitMatch = String(displayName).match(/^(P\d+)\s*-\s*([^/]+?)\s*\/\s*(.+)$/);
+    if (splitMatch) {
+        return {
+            main: splitMatch[1] + ' - ' + splitMatch[2].trim(),
+            sub: splitMatch[3].trim()
+        };
+    }
+
+    return {
+        main: displayName,
+        sub: fallbackName && fallbackName !== displayName ? fallbackName : ''
+    };
+}
+
+function appendTimelineChipLabel(parentEl, pattern, patternDisplayInfo) {
+    const displayParts = getTimelineDisplayParts(pattern, patternDisplayInfo);
+    const mainEl = document.createElement('strong');
+    mainEl.textContent = displayParts.main;
+    parentEl.appendChild(mainEl);
+    if (displayParts.sub) {
+        const subEl = document.createElement('small');
+        subEl.textContent = displayParts.sub;
+        subEl.className = 'timeline-chip-subtitle';
+        parentEl.appendChild(subEl);
+    }
+}
+
 function createTimelineEntryChip(group, rowGroups, patternDisplayInfo) {
     const entry = group.entries[0];
     const pattern = findPatternById(group.patternId);
@@ -2083,6 +2214,15 @@ function createTimelineEntryChip(group, rowGroups, patternDisplayInfo) {
     entryCard.className = 'timeline-entry timeline-entry-chip';
     entryCard.draggable = true;
     bindParallelDropTarget(entryCard, rowGroups);
+    entryCard.addEventListener('dblclick', function (event) {
+        if (event.target && event.target.closest('input, select, button')) {
+            return;
+        }
+        const detailsEl = entryCard.querySelector('.timeline-entry-details');
+        if (detailsEl) {
+            detailsEl.open = !detailsEl.open;
+        }
+    });
     entryCard.addEventListener('dragstart', function (event) {
         event.dataTransfer.setData('text/plain', JSON.stringify({
             type: 'timeline-entry-group',
@@ -2093,13 +2233,26 @@ function createTimelineEntryChip(group, rowGroups, patternDisplayInfo) {
 
     const chipHeadEl = document.createElement('div');
     chipHeadEl.className = 'timeline-chip-head';
-    const titleEl = document.createElement('strong');
-    titleEl.textContent = patternDisplayInfo.displayNameByPatternId[pattern.id] || pattern.name;
+    const chipLabelEl = document.createElement('div');
+    chipLabelEl.className = 'timeline-chip-label';
+    appendTimelineChipLabel(chipLabelEl, pattern, patternDisplayInfo);
+    const removeButton = document.createElement('button');
+    removeButton.type = 'button';
+    removeButton.className = 'timeline-chip-remove';
+    removeButton.textContent = 'x';
+    removeButton.setAttribute('aria-label', 'Pattern entfernen');
+    removeButton.addEventListener('click', function (event) {
+        event.stopPropagation();
+        timelineState.entries.splice(group.startIndex, group.count);
+        updateTimelineMetadataNode();
+        renderTimelinePanel();
+    });
+    chipHeadEl.appendChild(chipLabelEl);
+    chipHeadEl.appendChild(removeButton);
     const groupSummary = buildTimelineGroupSummary(group, timelineState.sourcePatterns);
     const metaEl = document.createElement('small');
     const displayedBarCount = groupSummary.totalBars || (Array.isArray(pattern.bars) ? pattern.bars.length : 0);
     metaEl.textContent = groupSummary.barText || ('Takte: ' + displayedBarCount);
-    chipHeadEl.appendChild(titleEl);
     entryCard.appendChild(chipHeadEl);
 
     const detailsEl = document.createElement('details');
@@ -2219,22 +2372,100 @@ function createTimelineEntryChip(group, rowGroups, patternDisplayInfo) {
         detailBodyEl.appendChild(fixedTargetEl);
     }
 
-    const actionWrap = document.createElement('div');
-    actionWrap.className = 'timeline-entry-actions';
-    const removeButton = document.createElement('button');
-    removeButton.type = 'button';
-    removeButton.textContent = 'Entfernen';
-    removeButton.addEventListener('click', function () {
-        timelineState.entries.splice(group.startIndex, group.count);
-        updateTimelineMetadataNode();
-        renderTimelinePanel();
-    });
-    actionWrap.appendChild(removeButton);
-    detailBodyEl.appendChild(actionWrap);
-
     detailsEl.appendChild(detailBodyEl);
     entryCard.appendChild(detailsEl);
     return entryCard;
+}
+
+function timelineRowHasAccompaniment(rowGroups) {
+    return (Array.isArray(rowGroups) ? rowGroups : []).some(function (group) {
+        if (!group || isTimelineOverlayGroup(group)) {
+            return false;
+        }
+        const pattern = findPatternById(group.patternId);
+        return pattern && pattern.labelType === 'Begleitung';
+    });
+}
+
+function createTimelineOverlayGrid(rowGroups, patternDisplayInfo) {
+    const rowRepeatInfo = getTimelineRowRepeatInfo(rowGroups);
+    const repeatCount = normalizeTimelineGroupRepeatCount(rowRepeatInfo.repeatCount || 1);
+    if (!timelineRowHasAccompaniment(rowGroups) || repeatCount <= 1) {
+        return null;
+    }
+
+    const overlayGroupsByRepeat = {};
+    (Array.isArray(rowGroups) ? rowGroups : []).forEach(function (group) {
+        const entry = group && Array.isArray(group.entries) ? group.entries[0] : null;
+        if (!isTimelineOverlayEntry(entry)) {
+            return;
+        }
+        const repeatIndex = Math.max(0, Math.round(Number(entry.overlayRepeatIndex) || 0));
+        if (repeatIndex < repeatCount && !overlayGroupsByRepeat[repeatIndex]) {
+            overlayGroupsByRepeat[repeatIndex] = group;
+        }
+    });
+
+    const gridEl = document.createElement('div');
+    gridEl.className = 'timeline-overlay-grid';
+    gridEl.style.gridTemplateColumns = 'repeat(' + Math.min(20, repeatCount) + ', minmax(130px, 1fr))';
+
+    for (let repeatIndex = 0; repeatIndex < repeatCount; repeatIndex++) {
+        const cellEl = document.createElement('div');
+        cellEl.className = 'timeline-overlay-cell';
+        cellEl.title = 'Solo fuer Wiederholung ' + String(repeatIndex + 1);
+        cellEl.addEventListener('dragover', function (event) {
+            event.preventDefault();
+        });
+        cellEl.addEventListener('drop', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            const payload = getTimelineDragPayload(event.dataTransfer.getData('text/plain'));
+            insertTimelineOverlayIntoRepeatSlot(payload, rowGroups, repeatIndex);
+        });
+
+        const overlayGroup = overlayGroupsByRepeat[repeatIndex];
+        if (overlayGroup) {
+            const entry = overlayGroup.entries[0];
+            const pattern = findPatternById(overlayGroup.patternId);
+            const chipEl = document.createElement('div');
+            chipEl.className = 'timeline-overlay-chip';
+            chipEl.draggable = true;
+            chipEl.addEventListener('dragstart', function (event) {
+                event.dataTransfer.setData('text/plain', JSON.stringify({
+                    type: 'timeline-entry-group',
+                    startIndex: overlayGroup.startIndex,
+                    count: overlayGroup.count
+                }));
+            });
+            const titleEl = document.createElement('span');
+            titleEl.className = 'timeline-overlay-chip-label';
+            if (pattern) {
+                appendTimelineChipLabel(titleEl, pattern, patternDisplayInfo);
+            } else {
+                titleEl.textContent = 'Pattern';
+            }
+            const removeButton = document.createElement('button');
+            removeButton.type = 'button';
+            removeButton.textContent = 'x';
+            removeButton.setAttribute('aria-label', 'Solo aus Zelle entfernen');
+            removeButton.addEventListener('click', function (event) {
+                event.stopPropagation();
+                timelineState.entries.splice(overlayGroup.startIndex, overlayGroup.count);
+                updateTimelineMetadataNode();
+                renderTimelinePanel();
+            });
+            chipEl.appendChild(titleEl);
+            chipEl.appendChild(removeButton);
+            cellEl.appendChild(chipEl);
+        } else {
+            cellEl.textContent = String(repeatIndex + 1);
+        }
+
+        gridEl.appendChild(cellEl);
+    }
+
+    return gridEl;
 }
 
 function alignPatternLibraryCardWidths() {
@@ -2331,7 +2562,8 @@ function renderTimelineSequence() {
             return;
         }
         const visibleGroups = rowGroups.filter(function (group) {
-            return !continuationInfo.continuingGroupKeys[getTimelineGroupKey(group)];
+            return !continuationInfo.continuingGroupKeys[getTimelineGroupKey(group)] &&
+                !isTimelineOverlayGroup(group);
         });
         if (visibleGroups.length === 0) {
             return;
@@ -2361,6 +2593,10 @@ function renderTimelineSequence() {
 
         rowEl.appendChild(createTimelineParallelDropzone(rowGroups));
         rowCellEl.appendChild(rowEl);
+        const overlayGridEl = createTimelineOverlayGrid(rowGroups, patternDisplayInfo);
+        if (overlayGridEl) {
+            rowCellEl.appendChild(overlayGridEl);
+        }
         gridEl.appendChild(rowCellEl);
     });
 

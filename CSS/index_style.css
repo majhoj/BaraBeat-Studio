@@ -2113,22 +2113,42 @@ html {
 }
 
 .timeline-chip-head {
-    display: grid;
-    gap: 2px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
     min-width: 0;
+    width: 100%;
 }
 
-.timeline-chip-head strong {
+.timeline-chip-label {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.timeline-chip-head strong,
+.timeline-chip-subtitle {
     display: block;
     margin: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: 15px;
+    font-weight: 700;
+    color: var(--ui-text);
 }
 
 .timeline-chip-head small {
     color: var(--ui-text-soft);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.timeline-chip-remove {
+    flex: 0 0 auto;
+    padding: 1px 6px;
+    line-height: 1.2;
 }
 
 .timeline-entry-details {
@@ -2136,12 +2156,7 @@ html {
 }
 
 .timeline-entry-details summary {
-    display: inline-flex;
-    align-items: center;
-    cursor: pointer;
-    color: var(--ui-text-soft);
-    font-size: 12px;
-    font-weight: 700;
+    display: none;
 }
 
 .timeline-entry-detail-body {
@@ -2154,6 +2169,65 @@ html {
     display: block;
     color: var(--ui-text-soft);
     margin-bottom: 6px;
+}
+
+.timeline-overlay-grid {
+    display: grid;
+    gap: 2px;
+    width: 100%;
+    overflow-x: auto;
+}
+
+.timeline-overlay-cell {
+    min-height: 34px;
+    border: 1px solid rgba(80, 80, 80, 0.42);
+    background: rgba(255, 255, 255, 0.62);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3px;
+    color: var(--ui-text-soft);
+    font-size: 12px;
+    box-sizing: border-box;
+}
+
+.timeline-overlay-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    width: 100%;
+    min-width: 0;
+    border: 1px solid var(--ui-border-strong);
+    border-radius: 6px;
+    background: var(--ui-soft-bg);
+    color: var(--ui-text);
+    padding: 4px 5px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: grab;
+    box-sizing: border-box;
+}
+
+.timeline-overlay-chip-label {
+    display: block;
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+}
+
+.timeline-overlay-chip-label strong,
+.timeline-overlay-chip-label small {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.timeline-overlay-chip button {
+    flex: 0 0 auto;
+    padding: 1px 5px;
+    line-height: 1.1;
 }
 
 .timeline-entry-main {

@@ -975,17 +975,37 @@ function getRepeatedEntryUnitLength(entryDataList) {
 
 function buildRepeatedParallelEntryUnits(entryDataList) {
   const entries = Array.isArray(entryDataList) ? entryDataList : [];
-  const repeatedUnitLength = getRepeatedEntryUnitLength(entries);
-  if (repeatedUnitLength > 0 && repeatedUnitLength < entries.length) {
-    const units = [];
-    for (let unitStartIndex = 0; unitStartIndex < entries.length; unitStartIndex += repeatedUnitLength) {
-      units.push(entries.slice(unitStartIndex, unitStartIndex + repeatedUnitLength));
+  const overlayEntriesByRepeatIndex = {};
+  const baseEntries = entries.filter(function (entryData) {
+    if (entryData && entryData.overlayRepeatIndex !== null && entryData.overlayRepeatIndex !== undefined) {
+      const repeatIndex = Math.max(0, Math.round(Number(entryData.overlayRepeatIndex) || 0));
+      if (!overlayEntriesByRepeatIndex[repeatIndex]) {
+        overlayEntriesByRepeatIndex[repeatIndex] = [];
+      }
+      overlayEntriesByRepeatIndex[repeatIndex].push(entryData);
+      return false;
     }
-    return units;
+    return true;
+  });
+  const repeatedUnitLength = getRepeatedEntryUnitLength(baseEntries);
+
+  function attachOverlayEntries(units) {
+    return units.map(function (unitEntries, repeatIndex) {
+      const overlayEntries = overlayEntriesByRepeatIndex[repeatIndex] || [];
+      return unitEntries.concat(overlayEntries);
+    });
+  }
+
+  if (repeatedUnitLength > 0 && repeatedUnitLength < baseEntries.length) {
+    const units = [];
+    for (let unitStartIndex = 0; unitStartIndex < baseEntries.length; unitStartIndex += repeatedUnitLength) {
+      units.push(baseEntries.slice(unitStartIndex, unitStartIndex + repeatedUnitLength));
+    }
+    return attachOverlayEntries(units);
   }
 
   const runs = [];
-  entries.forEach(function (entryData) {
+  baseEntries.forEach(function (entryData) {
     const signature = String(entryData && entryData.entrySignature || '');
     const previousRun = runs.length > 0 ? runs[runs.length - 1] : null;
     if (previousRun && previousRun.signature === signature) {
@@ -999,7 +1019,7 @@ function buildRepeatedParallelEntryUnits(entryDataList) {
   });
 
   if (runs.length <= 1) {
-    return [entries];
+    return attachOverlayEntries([baseEntries]);
   }
 
   const runLength = runs[0].entries.length;
@@ -1008,7 +1028,7 @@ function buildRepeatedParallelEntryUnits(entryDataList) {
   });
 
   if (!canZipRuns) {
-    return [entries];
+    return attachOverlayEntries([baseEntries]);
   }
 
   const zippedUnits = [];
@@ -1017,7 +1037,7 @@ function buildRepeatedParallelEntryUnits(entryDataList) {
       return run.entries[repeatIndex];
     }));
   }
-  return zippedUnits;
+  return attachOverlayEntries(zippedUnits);
 }
 
 function hasTimelineEntryLabel(entryDataList, labelName) {
@@ -1083,7 +1103,7 @@ function normalizeSectionRepeatCount(rawValue) {
   if (!Number.isFinite(numericValue) || numericValue < 1) {
     return 1;
   }
-  return Math.max(1, Math.min(32, Math.round(numericValue)));
+  return Math.max(1, Math.min(100, Math.round(numericValue)));
 }
 
 function normalizeSectionOutStep(rawValue) {
@@ -1413,6 +1433,9 @@ function buildTimelineSections(config) {
       labelName: pattern.labelName || pattern.label || '',
       blockId: String(entry.blockId || ''),
       parallelGroupId: String(entry.parallelGroupId || ''),
+      overlayRepeatIndex: entry.overlayRepeatIndex === null || entry.overlayRepeatIndex === undefined
+        ? null
+        : Math.max(0, Math.round(Number(entry.overlayRepeatIndex) || 0)),
       patternFingerprint: pattern.sourceKey || pattern.id || '',
       entrySignature: entrySignature,
       handMode: String(entry.handMode || ''),
@@ -1501,7 +1524,12 @@ function buildTimelineSections(config) {
           const repeatedSection = createOrderedSection(blockLabel);
           const repeatContainsEchauffement = hasTimelineEntryLabel(repeatEntries, 'Echauffement');
           const repeatContainsOnlyAccompaniment = hasOnlyTimelineEntryLabel(repeatEntries, 'Begleitung');
-          const repeatTargetLength = repeatContainsEchauffement ? getMaxPatternNotesLength(repeatEntries) : 0;
+          const repeatContainsOverlay = repeatEntries.some(function (entryData) {
+            return entryData && entryData.overlayRepeatIndex !== null && entryData.overlayRepeatIndex !== undefined;
+          });
+          const repeatTargetLength = repeatContainsEchauffement || repeatContainsOverlay
+            ? getMaxPatternNotesLength(repeatEntries)
+            : 0;
           repeatedSection.loopTracksToLongest = repeatContainsOnlyAccompaniment;
           repeatedSection.padTracksToLongest = !repeatContainsEchauffement && !repeatContainsOnlyAccompaniment;
           const repeatedSectionLabelNames = [];
@@ -1514,7 +1542,7 @@ function buildTimelineSections(config) {
             const effectiveNotes = getTimelineEntryEffectiveNotes(
               entryData,
               shouldApplyOut,
-              repeatContainsEchauffement ? repeatTargetLength : 0
+              repeatContainsEchauffement || repeatContainsOverlay ? repeatTargetLength : 0
             );
 
             entryData.targetInstruments.forEach(function (instrumentName) {
@@ -1556,7 +1584,12 @@ function buildTimelineSections(config) {
       }
 
       const mergedSection = createOrderedSection(blockLabel);
-      const blockTargetLength = currentBlockContainsEchauffement ? getMaxPatternNotesLength(blockEntries) : 0;
+      const currentBlockContainsOverlay = blockEntries.some(function (entryData) {
+        return entryData && entryData.overlayRepeatIndex !== null && entryData.overlayRepeatIndex !== undefined;
+      });
+      const blockTargetLength = currentBlockContainsEchauffement || currentBlockContainsOverlay
+        ? getMaxPatternNotesLength(blockEntries)
+        : 0;
       const currentBlockContainsOnlyAccompaniment = hasOnlyTimelineEntryLabel(blockEntries, 'Begleitung');
       mergedSection.loopTracksToLongest = Boolean(parallelGroupId && !isPracticeBlock && currentBlockContainsOnlyAccompaniment);
       mergedSection.padTracksToLongest = Boolean(
@@ -1572,7 +1605,7 @@ function buildTimelineSections(config) {
         const effectiveNotes = getTimelineEntryEffectiveNotes(
           entryData,
           shouldApplyOut,
-          currentBlockContainsEchauffement ? blockTargetLength : 0
+          currentBlockContainsEchauffement || currentBlockContainsOverlay ? blockTargetLength : 0
         );
 
         entryData.targetInstruments.forEach(function (instrumentName) {
