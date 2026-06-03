@@ -113,6 +113,22 @@ class Instrumente {
     }
   }
 
+  async ensureSoundFiles(soundFiles) {
+    const files = Array.isArray(soundFiles) ? soundFiles : [];
+    for (let i = 0; i < files.length; i++) {
+      const filepath = files[i];
+      const name = this.getSoundName(filepath);
+      if (Object.prototype.hasOwnProperty.call(this._snd, name)) {
+        continue;
+      }
+      if (this._sounds.indexOf(filepath) === -1) {
+        this._sounds.push(filepath);
+      }
+      const audioBuffer = await this.getFile(filepath);
+      this._snd[name] = audioBuffer;
+    }
+  }
+
   play(name, time_i, gainMultiplier = 1) {
     if (Object.prototype.hasOwnProperty.call(this._snd, name)) {
       const sampleSource = this._audioCtx.createBufferSource();

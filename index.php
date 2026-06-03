@@ -33,6 +33,36 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
     ?>
 
     <nav id="appMenuBar" aria-label="Hauptmenü">
+        <div class="app-logo" aria-label="BaraBeat Studio">
+            <svg viewBox="0 0 64 64" role="img" aria-hidden="true" focusable="false">
+                <defs>
+                    <linearGradient id="logoSkyGradient" x1="14" y1="6" x2="50" y2="38" gradientUnits="userSpaceOnUse">
+                        <stop offset="0" stop-color="#ffe800" />
+                        <stop offset="0.35" stop-color="#ff9d00" />
+                        <stop offset="0.72" stop-color="#e94112" />
+                        <stop offset="1" stop-color="#7b170e" />
+                    </linearGradient>
+                    <clipPath id="logoCircleClip">
+                        <circle cx="32" cy="24" r="22" />
+                    </clipPath>
+                </defs>
+                <circle cx="32" cy="24" r="22" fill="url(#logoSkyGradient)" />
+                <g clip-path="url(#logoCircleClip)">
+                    <path d="M6 16 C18 19, 25 9, 38 12 C49 14, 55 9, 62 7" class="logo-wave" />
+                    <path d="M5 26 C18 29, 26 18, 39 22 C49 24, 57 18, 64 17" class="logo-wave" />
+                    <path d="M4 36 C17 40, 27 27, 41 31 C51 34, 58 28, 65 27" class="logo-wave" />
+                </g>
+                <path d="M10 37 C20 41, 44 41, 54 37 C53 51, 44 61, 32 62 C20 61, 11 51, 10 37 Z" class="logo-drum-body" />
+                <path d="M19 44 C21 49, 23 55, 21 61" class="logo-drum-cutout" />
+                <path d="M45 44 C43 49, 41 55, 43 61" class="logo-drum-cutout" />
+                <path d="M30 44 C27 50, 27 57, 28 62 L36 62 C37 57, 37 50, 34 44 Z" class="logo-drum-cutout" />
+                <circle cx="17" cy="43" r="2.2" class="logo-drum-dot" />
+                <circle cx="26" cy="46" r="2" class="logo-drum-dot" />
+                <circle cx="38" cy="46" r="2" class="logo-drum-dot" />
+                <circle cx="47" cy="43" r="2.2" class="logo-drum-dot" />
+                <path d="M9 36 C20 42, 44 42, 55 36" class="logo-drum-rim" />
+            </svg>
+        </div>
         <details class="app-menu">
             <summary>Datei</summary>
             <div class="app-menu-panel">
@@ -56,6 +86,7 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
             <div class="app-menu-panel">
                 <button type="button" id="button7">Instrument-Chooser</button>
                 <button type="button" id="button9">Funktions-Chooser</button>
+                <button type="button" id="resetPaletteButton">Palette zurücksetzen</button>
             </div>
         </details>
         <details class="app-menu" data-mobile-practice-menu="true">
@@ -63,8 +94,15 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
             <div class="app-menu-panel">
                 <button type="button" id="button10" hidden>Audiotest</button>
                 <button type="button" id="practiceButton">Üben</button>
-                <button type="button" id="button11">Abschnittstimeline</button>
-                <button type="button" id="button6">Scroll</button>
+                <button type="button" id="button11">Arrangieren</button>
+                <details class="app-submenu">
+                    <summary>Template</summary>
+                    <div class="app-submenu-panel">
+                        <button type="button" id="themeClearButton">Klar</button>
+                        <button type="button" id="themePlayfulButton">Verspielt</button>
+                        <button type="button" id="themeEarthButton">Erdig</button>
+                    </div>
+                </details>
             </div>
         </details>
         <button type="button" id="mobilePatternChooserButton" class="mobile-menu-action" hidden>Patternauswahl öffnen</button>
@@ -156,40 +194,29 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
     </div>
 
     <div id="timelinePanel" hidden>
-        <div class="timeline-panel-header">
-            <div>
-                <div class="timeline-panel-title">Abschnittstimeline</div>
-                <div id="timelineStatus" class="timeline-status">Pattern werden aus dem Notenblatt gelesen.</div>
-            </div>
-            <div class="timeline-panel-actions">
-                <label class="timeline-tempo-control" for="timelineTempo">
-                    Tempo
-                    <input type="number" id="timelineTempo" min="30" max="180" step="1" value="100" />
-                </label>
-                <label class="timeline-swing-control" for="timelineSwingFactor">
-                    Swing
-                    <input type="number" id="timelineSwingFactor" min="0" max="100" step="1" value="0" />
-                </label>
-                <div class="timeline-swing-profile" id="timelineSwingProfile">
-                    <span>Profil</span>
-                    <label>S1 <input type="number" id="timelineSwingAnchor1" step="1" value="0" /></label>
-                    <label>S2 <input type="number" id="timelineSwingAnchor2" step="1" value="0" /></label>
-                    <label>S3 <input type="number" id="timelineSwingAnchor3" step="1" value="0" /></label>
-                    <label>S4 <input type="number" id="timelineSwingAnchor4" step="1" value="0" /></label>
+        <div class="timeline-sticky-region">
+            <div class="timeline-panel-header">
+                <div>
+                    <div id="timelineTitle" class="timeline-panel-title">Arrangement</div>
                 </div>
-                <div class="timeline-swing-profile" id="timelineFeelProfile">
-                    <span>Feel ms</span>
-                    <label>Kk <input type="number" id="timelineFeelKenkeni" step="1" value="0" /></label>
-                    <label>Sg <input type="number" id="timelineFeelSangban" step="1" value="0" /></label>
-                    <label>Du <input type="number" id="timelineFeelDoundoun" step="1" value="0" /></label>
-                    <label>Dr <input type="number" id="timelineFeelDreierbass" step="1" value="0" /></label>
-                    <label>D1 <input type="number" id="timelineFeelDjembe1" step="1" value="0" /></label>
-                    <label>D2 <input type="number" id="timelineFeelDjembe2" step="1" value="0" /></label>
-                    <label>D3 <input type="number" id="timelineFeelDjembe3" step="1" value="0" /></label>
+                <div class="timeline-panel-actions">
+                    <label class="timeline-tempo-control" for="timelineTempo">
+                        Tempo
+                        <input type="number" id="timelineTempo" min="30" max="180" step="1" value="100" />
+                    </label>
+                    <label class="timeline-swing-control" for="timelineSwingFactor">
+                        Swing
+                        <input type="number" id="timelineSwingFactor" min="0" max="100" step="1" value="0" />
+                    </label>
+                    <button type="button" id="timelineSwingProfileButton">Swing-Profil</button>
+                    <button type="button" id="timelineFeelProfileButton">Feel</button>
+                    <button type="button" id="timelineRefreshButton">Aus Blatt aktualisieren</button>
+                    <button type="button" id="timelineCloseButton">Schließen</button>
                 </div>
-                <button type="button" id="timelineRefreshButton">Aus Blatt aktualisieren</button>
-                <button type="button" id="timelineCloseButton">Schließen</button>
             </div>
+            <section class="timeline-player-panel" hidden>
+                <iframe id="timelineAudioFrame" name="timelineAudioFrame" title="Audioplayer Arrangement"></iframe>
+            </section>
         </div>
         <div class="timeline-panel-body">
             <section class="timeline-column">
@@ -218,80 +245,82 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
             </div>
         </div>
         <div id="practicePatternChooser" class="timeline-panel-body practice-panel-body" hidden>
-            <h3 class="practice-options-title">Einstellungen</h3>
-            <div class="practice-timing-options">
-                <label class="timeline-tempo-control" for="practiceTempo">
-                    Tempo
-                    <input type="number" id="practiceTempo" min="30" max="180" step="1" value="100" />
-                </label>
-                <label class="timeline-swing-control" for="practiceSwingFactor">
-                    Swing
-                    <input type="number" id="practiceSwingFactor" min="0" max="100" step="1" value="0" />
-                </label>
-                <button type="button" id="practiceSwingProfileButton">Swing-Profil</button>
-                <button type="button" id="practiceFeelProfileButton">Feel</button>
-            </div>
-            <div class="practice-pattern-options">
-                <label class="timeline-tempo-control" for="practiceAccompanimentStart">
-                    Begleitung startet
-                    <select id="practiceAccompanimentStart">
-                        <option value="immediate">Sofort</option>
-                        <option value="afterCall">Nach Call</option>
-                        <option value="afterIntro">Nach Intro</option>
-                        <option value="afterCallIntro">Nach Call + Intro</option>
-                    </select>
-                </label>
-                <label class="timeline-tempo-control" for="practiceWithoutSoloLoops">
-                    Ohne Übungsteil
-                    <span class="practice-stepper">
-                        <button type="button" class="practice-stepper-button" data-practice-step-target="practiceWithoutSoloLoops" data-practice-step-delta="-1" aria-label="Ohne Übungsteil verringern">-</button>
-                        <input type="number" id="practiceWithoutSoloLoops" min="0" max="32" step="1" value="1" />
-                        <button type="button" class="practice-stepper-button" data-practice-step-target="practiceWithoutSoloLoops" data-practice-step-delta="1" aria-label="Ohne Übungsteil erhöhen">+</button>
-                    </span>
-                </label>
-                <label class="timeline-tempo-control" for="practiceWithSoloLoops">
-                    Mit Übungsteil
-                    <span class="practice-stepper">
-                        <button type="button" class="practice-stepper-button" data-practice-step-target="practiceWithSoloLoops" data-practice-step-delta="-1" aria-label="Mit Übungsteil verringern">-</button>
-                        <input type="number" id="practiceWithSoloLoops" min="1" max="32" step="1" value="1" />
-                        <button type="button" class="practice-stepper-button" data-practice-step-target="practiceWithSoloLoops" data-practice-step-delta="1" aria-label="Mit Übungsteil erhöhen">+</button>
-                    </span>
-                </label>
-                <label class="timeline-tempo-control" for="practiceAccompanimentBetweenPatterns">
-                    Zwischen Übungsteilen
-                    <input type="checkbox" id="practiceAccompanimentBetweenPatterns" />
-                </label>
-                <label class="timeline-tempo-control" for="practicePauseAccompanimentForLeadInPatterns">
-                    Begleitung stoppt bei Call/Intro
-                    <input type="checkbox" id="practicePauseAccompanimentForLeadInPatterns" />
-                </label>
-                <label class="timeline-tempo-control" for="practiceRepeatCount" id="practiceRepeatCountControl">
-                    Wiederholen
-                    <span class="practice-stepper">
-                        <button type="button" class="practice-stepper-button" data-practice-step-target="practiceRepeatCount" data-practice-step-delta="-1" aria-label="Wiederholungen verringern">-</button>
-                        <input type="number" id="practiceRepeatCount" min="1" max="999" step="1" value="4" />
-                        <button type="button" class="practice-stepper-button" data-practice-step-target="practiceRepeatCount" data-practice-step-delta="1" aria-label="Wiederholungen erhöhen">+</button>
-                    </span>
-                </label>
-                <label class="timeline-tempo-control" for="practiceTimerMinutes">
-                    Timer min
-                    <span class="practice-stepper">
-                        <button type="button" class="practice-stepper-button" data-practice-step-target="practiceTimerMinutes" data-practice-step-delta="-1" aria-label="Timer verringern">-</button>
-                        <input type="number" id="practiceTimerMinutes" min="0" max="240" step="1" value="0" />
-                        <button type="button" class="practice-stepper-button" data-practice-step-target="practiceTimerMinutes" data-practice-step-delta="1" aria-label="Timer erhöhen">+</button>
-                    </span>
-                </label>
-                <label class="timeline-tempo-control" for="practiceAudioLatency">
-                    Latenz ms
-                    <input type="range" id="practiceAudioLatencyRange" min="0" max="1000" step="10" value="30" />
-                    <input type="number" id="practiceAudioLatency" min="0" max="1000" step="10" value="30" />
-                </label>
-                <label class="timeline-tempo-control" for="practiceH2HRestMute">
-                    H2H Leer = Mute
-                    <input type="checkbox" id="practiceH2HRestMute" />
-                </label>
-                <button type="button" id="practiceRefreshButton">Aus Blatt aktualisieren</button>
-            </div>
+            <section class="practice-settings-column">
+                <h3 class="practice-options-title">Einstellungen</h3>
+                <div class="practice-timing-options">
+                    <label class="timeline-tempo-control" for="practiceTempo">
+                        Tempo
+                        <input type="number" id="practiceTempo" min="30" max="180" step="1" value="100" />
+                    </label>
+                    <label class="timeline-swing-control" for="practiceSwingFactor">
+                        Swing
+                        <input type="number" id="practiceSwingFactor" min="0" max="100" step="1" value="0" />
+                    </label>
+                    <button type="button" id="practiceSwingProfileButton">Swing-Profil</button>
+                    <button type="button" id="practiceFeelProfileButton">Feel</button>
+                </div>
+                <div class="practice-pattern-options">
+                    <label class="timeline-tempo-control" for="practiceAccompanimentStart">
+                        Begleitung startet
+                        <select id="practiceAccompanimentStart">
+                            <option value="immediate">Sofort</option>
+                            <option value="afterCall">Nach Call</option>
+                            <option value="afterIntro">Nach Intro</option>
+                            <option value="afterCallIntro">Nach Call + Intro</option>
+                        </select>
+                    </label>
+                    <label class="timeline-tempo-control" for="practiceWithoutSoloLoops">
+                        Ohne Übungsteil
+                        <span class="practice-stepper">
+                            <button type="button" class="practice-stepper-button" data-practice-step-target="practiceWithoutSoloLoops" data-practice-step-delta="-1" aria-label="Ohne Übungsteil verringern">-</button>
+                            <input type="number" id="practiceWithoutSoloLoops" min="0" max="32" step="1" value="1" />
+                            <button type="button" class="practice-stepper-button" data-practice-step-target="practiceWithoutSoloLoops" data-practice-step-delta="1" aria-label="Ohne Übungsteil erhöhen">+</button>
+                        </span>
+                    </label>
+                    <label class="timeline-tempo-control" for="practiceWithSoloLoops">
+                        Mit Übungsteil
+                        <span class="practice-stepper">
+                            <button type="button" class="practice-stepper-button" data-practice-step-target="practiceWithSoloLoops" data-practice-step-delta="-1" aria-label="Mit Übungsteil verringern">-</button>
+                            <input type="number" id="practiceWithSoloLoops" min="1" max="32" step="1" value="1" />
+                            <button type="button" class="practice-stepper-button" data-practice-step-target="practiceWithSoloLoops" data-practice-step-delta="1" aria-label="Mit Übungsteil erhöhen">+</button>
+                        </span>
+                    </label>
+                    <label class="timeline-tempo-control" for="practiceAccompanimentBetweenPatterns">
+                        Zwischen Übungsteilen
+                        <input type="checkbox" id="practiceAccompanimentBetweenPatterns" />
+                    </label>
+                    <label class="timeline-tempo-control" for="practicePauseAccompanimentForLeadInPatterns">
+                        Begleitung stoppt bei Call/Intro
+                        <input type="checkbox" id="practicePauseAccompanimentForLeadInPatterns" />
+                    </label>
+                    <label class="timeline-tempo-control" for="practiceRepeatCount" id="practiceRepeatCountControl">
+                        Wiederholen
+                        <span class="practice-stepper">
+                            <button type="button" class="practice-stepper-button" data-practice-step-target="practiceRepeatCount" data-practice-step-delta="-1" aria-label="Wiederholungen verringern">-</button>
+                            <input type="number" id="practiceRepeatCount" min="1" max="999" step="1" value="4" />
+                            <button type="button" class="practice-stepper-button" data-practice-step-target="practiceRepeatCount" data-practice-step-delta="1" aria-label="Wiederholungen erhöhen">+</button>
+                        </span>
+                    </label>
+                    <label class="timeline-tempo-control" for="practiceTimerMinutes">
+                        Timer min
+                        <span class="practice-stepper">
+                            <button type="button" class="practice-stepper-button" data-practice-step-target="practiceTimerMinutes" data-practice-step-delta="-1" aria-label="Timer verringern">-</button>
+                            <input type="number" id="practiceTimerMinutes" min="0" max="240" step="1" value="0" />
+                            <button type="button" class="practice-stepper-button" data-practice-step-target="practiceTimerMinutes" data-practice-step-delta="1" aria-label="Timer erhöhen">+</button>
+                        </span>
+                    </label>
+                    <label class="timeline-tempo-control" for="practiceAudioLatency">
+                        Latenz für Bluetooth ms
+                        <input type="range" id="practiceAudioLatencyRange" min="0" max="1000" step="10" value="30" />
+                        <input type="number" id="practiceAudioLatency" min="0" max="1000" step="10" value="30" />
+                    </label>
+                    <label class="timeline-tempo-control" for="practiceH2HRestMute">
+                        H2H Leer = Mute
+                        <input type="checkbox" id="practiceH2HRestMute" />
+                    </label>
+                    <button type="button" id="practiceRefreshButton">Aus Blatt aktualisieren</button>
+                </div>
+            </section>
             <section class="timeline-column practice-column practice-accompaniment-column">
                 <h3>Begleitung auswählen</h3>
                 <p class="timeline-column-note">Diese Pattern laufen parallel als Loop.</p>
@@ -379,6 +408,8 @@ var paletteOriginX,
     paletteOriginY,
     paletteFrame,
     paletteGroup,
+    paletteBaseBounds,
+    paletteInsertTargetX = 125,
     paletteDragDeltaX = 0,
     paletteDragDeltaY = 0,
     paletteOffsetX = 0,
@@ -475,16 +506,92 @@ elem.addEventListener ("keydown", function (event) {
 */
 
 // Funktionen
-edit_title = function () {
-    const text_a = this.attr('text');
-    const text_i = prompt('Gib hier bitte den gewünschten Text ein!', text_a);
-    if (text_i == null) {
+const defaultRhythmTitle = 'Rhythmusname';
+const legacyDefaultRhythmTitle = 'Enter the name of the Rhythm';
+
+function isDefaultTitleText(titleValue) {
+    const normalizedTitle = String(titleValue || '').trim();
+    return !normalizedTitle ||
+        normalizedTitle === defaultRhythmTitle ||
+        normalizedTitle === legacyDefaultRhythmTitle;
+}
+
+function setRhythmTitle(titleValue) {
+    if (!titel) {
         return;
     }
-    if (text_i !== text_a) {
-        recordHistorySnapshot();
+    const isPlaceholder = isDefaultTitleText(titleValue);
+    titel.attr({
+        text: isPlaceholder ? defaultRhythmTitle : String(titleValue).trim(),
+        fill: isPlaceholder ? '#8a8a8a' : '#111'
+    });
+}
+
+function startInlineRhythmTitleEdit() {
+    if (!titel || !titel.node || document.getElementById('rhythmTitleEditor')) {
+        return;
     }
-    this.attr({ text: text_i });
+
+    const currentTitle = titel.attr('text') || '';
+    const editorEl = document.createElement('input');
+    const titleBounds = titel.node.getBoundingClientRect();
+    const scrollX = window.pageXOffset || document.documentElement.scrollLeft || 0;
+    const scrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
+
+    editorEl.id = 'rhythmTitleEditor';
+    editorEl.type = 'text';
+    editorEl.value = isDefaultTitleText(currentTitle) ? '' : currentTitle;
+    editorEl.placeholder = defaultRhythmTitle;
+    editorEl.setAttribute('aria-label', 'Rhythmusname');
+    editorEl.style.position = 'absolute';
+    editorEl.style.left = (titleBounds.left + scrollX - 4) + 'px';
+    editorEl.style.top = (titleBounds.top + scrollY - 4) + 'px';
+    editorEl.style.width = Math.max(280, titleBounds.width + 80) + 'px';
+    editorEl.style.height = Math.max(32, titleBounds.height + 8) + 'px';
+    editorEl.style.zIndex = '10001';
+    editorEl.style.boxSizing = 'border-box';
+    editorEl.style.padding = '2px 4px';
+    editorEl.style.border = '1px solid #8c8c8c';
+    editorEl.style.borderRadius = '4px';
+    editorEl.style.background = 'rgba(255, 255, 255, 0.96)';
+    editorEl.style.color = '#111';
+    editorEl.style.font = 'bold 24px sans-serif';
+    let isFinishingTitleEdit = false;
+
+    function finishEditing(shouldCommit) {
+        if (isFinishingTitleEdit) {
+            return;
+        }
+        isFinishingTitleEdit = true;
+        const nextTitle = shouldCommit ? editorEl.value.trim() : currentTitle;
+        if (shouldCommit && nextTitle !== currentTitle && !(isDefaultTitleText(nextTitle) && isDefaultTitleText(currentTitle))) {
+            recordHistorySnapshot();
+        }
+        setRhythmTitle(shouldCommit ? nextTitle : currentTitle);
+        editorEl.remove();
+    }
+
+    editorEl.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            finishEditing(true);
+        }
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            finishEditing(false);
+        }
+    });
+    editorEl.addEventListener('blur', function () {
+        finishEditing(true);
+    });
+
+    document.body.appendChild(editorEl);
+    editorEl.focus();
+    editorEl.select();
+}
+
+edit_title = function () {
+    startInlineRhythmTitleEdit();
 };
 
 edit_text = function () {
@@ -987,12 +1094,16 @@ function saveContentWithCheck(config) {
     }
 }
 
-function loadRhythmContent(title, content, scoreId) {
+function loadRhythmContent(title, content, scoreId, options) {
     if (!content) {
         return;
     }
+    const loadOptions = options || {};
     loadedTitle = title || 'Unbenannt';
     currentScoreId = scoreId || null;
+    if (loadOptions.remember !== false) {
+        rememberLastLoadedScore(currentScoreId);
+    }
     setIoFieldValue(content);
     Snap.loadStr(content, onSVGLoaded);
 }
@@ -1145,7 +1256,7 @@ function restoreHistorySnapshot(snapshot) {
         s.append(Snap.parseStr(snapshot.elementsMarkup));
     }
     bindLoadedScoreElements();
-    titel.attr({ text: snapshot.title || 'Unbenannt' });
+    setRhythmTitle(snapshot.title || 'Unbenannt');
     syncStateAfterHistoryRestore(syncOptions);
 }
 
@@ -1219,13 +1330,52 @@ function resolveInsertTemplate(templateValue) {
     return typeof templateValue === 'function' ? templateValue() : templateValue;
 }
 
+function getPaletteCloneLocalReferenceX(templateElement) {
+    if (!templateElement || typeof templateElement.getBBox !== 'function') {
+        return NaN;
+    }
+
+    if (templateElement.attr && templateElement.attr('id') === 'shortbar') {
+        const markerLine = typeof templateElement.select === 'function'
+            ? templateElement.select('.shortbar-marker-line')
+            : null;
+        const markerX = markerLine ? Number(markerLine.attr('x1')) : NaN;
+        if (Number.isFinite(markerX)) {
+            return markerX;
+        }
+    }
+
+    const transformState = typeof templateElement.transform === 'function' ? templateElement.transform() : null;
+    const localMatrix = transformState && transformState.localMatrix ? transformState.localMatrix : null;
+    const bbox = templateElement.getBBox();
+    return bbox.cx - (localMatrix ? localMatrix.e : 0);
+}
+
+function getPaletteInsertReferenceX() {
+    const firstNoteLineX = Number(paletteInsertTargetX);
+    const snapStep = Number(gridSize);
+    const preferredPaletteX = Number(paletteOriginX) + Number(gridSizeX);
+
+    if (!Number.isFinite(firstNoteLineX) || !Number.isFinite(snapStep) || snapStep <= 0 || !Number.isFinite(preferredPaletteX)) {
+        return NaN;
+    }
+
+    const stepsBackFromFirstLine = Math.max(1, Math.round((firstNoteLineX - preferredPaletteX) / snapStep));
+    return paletteOffsetX + firstNoteLineX - stepsBackFromFirstLine * snapStep;
+}
+
 function createPaletteClone(templateElement, elementId, offsetX, offsetY) {
     const resolvedOffsetX = resolveInsertOffset(offsetX);
     const resolvedOffsetY = resolveInsertOffset(offsetY);
+    const localReferenceX = getPaletteCloneLocalReferenceX(templateElement);
+    const insertReferenceX = getPaletteInsertReferenceX();
+    const transformX = Number.isFinite(localReferenceX) && Number.isFinite(insertReferenceX)
+        ? insertReferenceX - localReferenceX
+        : paletteOffsetX + resolvedOffsetX;
     const clone = templateElement.clone().attr({
         class: 'shp',
         id: elementId,
-        transform: "t" + (paletteOffsetX + resolvedOffsetX) + "," + (paletteOffsetY + resolvedOffsetY)
+        transform: "t" + transformX + "," + (paletteOffsetY + resolvedOffsetY)
     });
     clone.drag(move, sel_start);
     return clone;
@@ -1376,6 +1526,7 @@ function drawRhythmSheet(config) {
     gridSizeY = 2.5;
     gridSizeX = config.gridSizeXValue;
     repeatMarkerGridOffsetX = config.repeatMarkerOffsetXValue;
+    paletteInsertTargetX = initialChooserX;
 
     clear_all();
     syllableIndex = 0;
@@ -1433,11 +1584,13 @@ function drawRhythmSheet(config) {
     if (shouldResetTitle) {
         currentScoreId = null;
         setSelectedFileSource('local');
-        titel.attr({ text: "Enter the name of the Rhythm" });
+        rememberLastLoadedScore('');
+        setRhythmTitle(defaultRhythmTitle);
     }
 }
 
-var titel = s.text(100, y - 100, "Enter the name of the Rhythm").attr({ id: 'basis', 'font-size': 24, 'font-family': 'sans-serif', 'font-weight': 'bold' });
+var titel = s.text(100, y - 100, defaultRhythmTitle).attr({ id: 'basis', 'font-size': 24, 'font-family': 'sans-serif', 'font-weight': 'bold', fill: '#8a8a8a', cursor: 'text' });
+titel.click(edit_title);
 titel.dblclick(edit_title);
 
 let zeilenAnzahl = 10;
@@ -1753,25 +1906,85 @@ renderLegend(125);
 
 
 // Funktionen zum Verschieben
+function getPaletteBoundsForOffset(offsetX, offsetY) {
+    const fallbackBounds = {
+        x: paletteOriginX - 14,
+        y: paletteOriginY - 16,
+        x2: paletteOriginX + 48,
+        y2: paletteOriginY + 286,
+        width: 62,
+        height: 302
+    };
+    const bounds = paletteBaseBounds || fallbackBounds;
+    return {
+        x: bounds.x + offsetX,
+        y: bounds.y + offsetY,
+        x2: bounds.x2 + offsetX,
+        y2: bounds.y2 + offsetY,
+        width: bounds.width,
+        height: bounds.height
+    };
+}
+
+function clampPaletteOffset(offsetX, offsetY) {
+    const sheetWidth = 1050;
+    const sheetHeight = 1480;
+    const margin = 10;
+    const bounds = paletteBaseBounds || getPaletteBoundsForOffset(0, 0);
+    const minX = margin - bounds.x;
+    const maxX = sheetWidth - margin - bounds.x2;
+    const minY = margin - bounds.y;
+    const maxY = sheetHeight - margin - bounds.y2;
+    return {
+        x: Math.max(minX, Math.min(maxX, offsetX)),
+        y: Math.max(minY, Math.min(maxY, offsetY))
+    };
+}
+
+function applyPaletteOffset(offsetX, offsetY) {
+    if (!paletteGroup) {
+        return;
+    }
+    const clampedOffset = clampPaletteOffset(offsetX, offsetY);
+    paletteOffsetX = clampedOffset.x;
+    paletteOffsetY = clampedOffset.y;
+    paletteDragDeltaX = 0;
+    paletteDragDeltaY = 0;
+    paletteGroup.transform(paletteOffsetX || paletteOffsetY
+        ? "t" + paletteOffsetX + "," + paletteOffsetY
+        : "");
+}
+
+function keepPaletteInsideSheet() {
+    applyPaletteOffset(paletteOffsetX, paletteOffsetY);
+}
+
+function resetPalettePosition() {
+    applyPaletteOffset(0, 0);
+}
+
 var move1 = function (dx, dy, x, y) {
-    var dx = Snap.snapTo(gridSize, dx, 50);
-    var dy = Snap.snapTo(gridSizeY, dy, 50);
+    var snappedDx = Snap.snapTo(gridSize, dx, 50);
+    var snappedDy = Snap.snapTo(gridSizeY, dy, 50);
+    var nextOffset = clampPaletteOffset(paletteOffsetX + snappedDx, paletteOffsetY + snappedDy);
+    var clampedDx = nextOffset.x - paletteOffsetX;
+    var clampedDy = nextOffset.y - paletteOffsetY;
     this.attr({
-        transform: this.data('origTransform') + (this.data('origTransform') ? "T" : "t") + [dx, dy]
+        transform: this.data('origTransform') + (this.data('origTransform') ? "T" : "t") + [clampedDx, clampedDy]
     });
-    paletteDragDeltaX = dx;
-    paletteDragDeltaY = dy;
+    paletteDragDeltaX = clampedDx;
+    paletteDragDeltaY = clampedDy;
 };
 
 var stop1 = function() {
     paletteOffsetX += paletteDragDeltaX;
     paletteOffsetY += paletteDragDeltaY;
-    paletteDragDeltaX = 0;
-    paletteDragDeltaY = 0;
+    applyPaletteOffset(paletteOffsetX, paletteOffsetY);
 };
 
 // Kartusche zeichnen
 paletteGroup = s.g(paletteFrame, ton, bass, slap, ton_g, slap_g, flam_ton, flam_slap, flam_bass_slap, In, Out, ShortBar, text_z_g, repeatMarkerGroup);
+paletteBaseBounds = paletteGroup.getBBox();
 paletteGroup.drag(move1, sel_start, stop1);
 
 // Duplicate der Noten erzeugen
@@ -2229,7 +2442,7 @@ function getElementReadPosition(element) {
 }
 
 function getControlLineSlotIndex(centerX, readConfig, controlType) {
-    if (controlType === 'shortbar') {
+    if (controlType === 'shortbar' || controlType === 'in' || controlType === 'out') {
         if (rhythm == 'binaer') {
             return Math.ceil(((centerX - 25) / 12.5) - 7);
         }
@@ -2808,10 +3021,11 @@ function openAudioTestTarget(playerRows, targetName, embedded) {
     form.action = 'Audio/audioplayer.php';
     form.method = 'POST';
     form.target = targetName || '_blank';
-    form.innerHTML = '<input type="hidden" name="myObj" /><input type="hidden" name="embedded" />';
+    form.innerHTML = '<input type="hidden" name="myObj" /><input type="hidden" name="embedded" /><input type="hidden" name="uiTheme" />';
     document.body.appendChild(form);
     form.querySelector('input[name="myObj"]').value = JSON.stringify(playerRows);
     form.querySelector('input[name="embedded"]').value = embedded ? '1' : '';
+    form.querySelector('input[name="uiTheme"]').value = document.body.dataset.uiTheme || '';
     form.submit();
     form.remove();
 }
@@ -2826,6 +3040,10 @@ function openAudioTestFrame(playerRows, frameName) {
 
 let practiceAudioRefreshTimer = null;
 let practiceAudioPlaybackState = 'stopped';
+let timelineAudioRefreshTimer = null;
+let timelineAudioPayloadSignature = '';
+let timelineAudioPlaybackState = 'stopped';
+window.suppressNextTimelineAudioRefresh = false;
 
 function isMobilePracticeViewport() {
     return window.matchMedia('(max-width: 760px)').matches ||
@@ -2872,6 +3090,7 @@ function updateMobilePracticeModeAvailability() {
 
     if (mobilePracticeViewport && timelineState.visible) {
         timelineState.visible = false;
+        clearTimelineAudioPlayer();
         renderTimelinePanel();
     }
 }
@@ -3007,7 +3226,7 @@ function callPHPScript_lesen(anzahl, options) {
 
         const elementPosition = getElementReadPosition(el);
         const rawPositionInfo = getBarIndexFromPosition(elementPosition.x, elementPosition.y, readConfig, anzahl);
-        if (elementId === 'shortbar') {
+        if (elementId === 'shortbar' || elementId === 'in' || elementId === 'out') {
             rawPositionInfo.rawLineSlotIndex = getControlLineSlotIndex(elementPosition.x, readConfig, elementId);
             rawPositionInfo.lineSlotIndex = rawPositionInfo.rawLineSlotIndex;
             if (rawPositionInfo.lineSlotIndex > readConfig.stepsPerBar) {
@@ -3119,6 +3338,59 @@ function schedulePracticeAudioRefresh(delayMs) {
     practiceAudioRefreshTimer = window.setTimeout(refreshPracticeAudioPlayer, Math.max(0, Number(delayMs) || 0));
 }
 
+function openTimelineAudioPlayer(playerPayload) {
+    const playerPanelEl = document.querySelector('.timeline-player-panel');
+    const playerFrameEl = document.getElementById('timelineAudioFrame');
+    if (!playerPanelEl || !playerFrameEl) {
+        openAudioTestWindow(playerPayload);
+        return;
+    }
+
+    playerPanelEl.hidden = false;
+    openAudioTestFrame(playerPayload, playerFrameEl.name || 'timelineAudioFrame');
+}
+
+function refreshTimelineAudioPlayer() {
+    if (!timelineState.visible) {
+        return;
+    }
+
+    try {
+        const audioTest = buildAudioTestPayload(false);
+        const payloadSignature = JSON.stringify(audioTest.playerPayload);
+        if (payloadSignature === timelineAudioPayloadSignature) {
+            return;
+        }
+        timelineAudioPayloadSignature = payloadSignature;
+        openTimelineAudioPlayer(audioTest.playerPayload);
+    } catch (error) {
+        console.error('refreshTimelineAudioPlayer failed', error);
+    }
+}
+
+function scheduleTimelineAudioRefresh(delayMs) {
+    if (!timelineState.visible) {
+        return;
+    }
+
+    window.clearTimeout(timelineAudioRefreshTimer);
+    timelineAudioRefreshTimer = window.setTimeout(refreshTimelineAudioPlayer, Math.max(0, Number(delayMs) || 0));
+}
+
+function clearTimelineAudioPlayer() {
+    const playerPanelEl = document.querySelector('.timeline-player-panel');
+    const playerFrameEl = document.getElementById('timelineAudioFrame');
+    window.clearTimeout(timelineAudioRefreshTimer);
+    timelineAudioPayloadSignature = '';
+    timelineAudioPlaybackState = 'stopped';
+    if (playerPanelEl) {
+        playerPanelEl.hidden = true;
+    }
+    if (playerFrameEl) {
+        playerFrameEl.src = 'about:blank';
+    }
+}
+
 function notifyPracticeSelectionChanged() {
     if (typeof updateTimelineMetadataNode === 'function') {
         updateTimelineMetadataNode();
@@ -3153,6 +3425,15 @@ function sendPracticeAudioMessage(message) {
     return true;
 }
 
+function sendTimelineAudioMessage(message) {
+    const playerFrameEl = document.getElementById('timelineAudioFrame');
+    if (!playerFrameEl || !playerFrameEl.contentWindow) {
+        return false;
+    }
+    playerFrameEl.contentWindow.postMessage(message, window.location.origin);
+    return true;
+}
+
 function handleEmbeddedAudioPlayerMessage(event) {
     if (event.origin !== window.location.origin) {
         return;
@@ -3163,26 +3444,34 @@ function handleEmbeddedAudioPlayerMessage(event) {
         return;
     }
 
-    const playerFrameEl = document.getElementById('practiceAudioFrame');
-    if (playerFrameEl && event.source !== playerFrameEl.contentWindow) {
+    const practiceFrameEl = document.getElementById('practiceAudioFrame');
+    const timelineFrameEl = document.getElementById('timelineAudioFrame');
+    const isPracticeFrame = practiceFrameEl && event.source === practiceFrameEl.contentWindow;
+    const isTimelineFrame = timelineFrameEl && event.source === timelineFrameEl.contentWindow;
+    if (!isPracticeFrame && !isTimelineFrame) {
         return;
     }
 
     if (message.type === 'barabeat-audio-tempo-change') {
         timelineState.tempo = normalizeTimelineTempo(message.tempo);
+        window.suppressNextTimelineAudioRefresh = isTimelineFrame;
         updateTimelineMetadataNode();
         renderTimelinePanel();
         return;
     }
 
-    if (message.type === 'barabeat-audio-step' && typeof updatePracticeScrollerPlayback === 'function') {
+    if (isPracticeFrame && message.type === 'barabeat-audio-step' && typeof updatePracticeScrollerPlayback === 'function') {
         updatePracticeScrollerPlayback(message.playbackStep, message.delayMs);
         return;
     }
 
     if (message.type === 'barabeat-audio-state') {
+        if (isTimelineFrame) {
+            timelineAudioPlaybackState = message.state || 'stopped';
+            return;
+        }
         practiceAudioPlaybackState = message.state || 'stopped';
-        if (typeof updatePracticeScrollerState === 'function') {
+        if (isPracticeFrame && typeof updatePracticeScrollerState === 'function') {
             updatePracticeScrollerState(message.state, message.leadInMs);
         }
     }
@@ -3244,7 +3533,7 @@ async function saveCurrentScoreLocal(nameOverride, folderIdOverride, options) {
     });
 
     currentScoreId = savedScore.id;
-    titel.attr({ text: savedScore.title });
+    setRhythmTitle(savedScore.title);
     setSelectedFileSource('local');
     await refreshFileList();
     return savedScore;
@@ -3255,7 +3544,7 @@ function getCurrentRhythmTitle() {
 }
 
 function isDefaultRhythmTitle(titleValue) {
-    return !titleValue || titleValue === 'Enter the name of the Rhythm';
+    return isDefaultTitleText(titleValue);
 }
 
 async function getSaveDialogModeForDirectSave() {
@@ -3320,7 +3609,7 @@ async function renameLocalScore() {
         }));
 
         currentScoreId = renamedScore.id;
-        titel.attr({ text: renamedScore.title });
+        setRhythmTitle(renamedScore.title);
         setSelectedFileSource('local');
         await refreshFileList();
         alert('"' + renamedScore.title + '" wurde lokal umbenannt.');
@@ -3352,6 +3641,9 @@ async function deleteLocalScore() {
         await localLibrary.deleteScore(score.id);
 
         setSelectedFileSource('local');
+        if (score.id === getRememberedLastLoadedScoreId()) {
+            rememberLastLoadedScore('');
+        }
         viererNoten();
         await refreshFileList();
         alert('"' + score.title + '" wurde lokal gelöscht.');
@@ -3415,7 +3707,7 @@ async function publishCurrentScore() {
 function applyDialogNameToTitle() {
     const nameValue = String(document.querySelector('#fileDialogName')?.value || '').trim();
     if (nameValue) {
-        titel.attr({ text: nameValue });
+        setRhythmTitle(nameValue);
     }
     return nameValue || titel.attr('text') || 'Unbenannt';
 }
@@ -3642,14 +3934,112 @@ async function deletePublishedFileDialogScore() {
 }
 
 let scrollOn = false;
+const uiThemeStorageKey = 'barabeat-ui-theme';
+const lastLoadedScoreStorageKey = 'barabeat-last-loaded-score-id';
+
+function setUiTheme(themeName) {
+    const normalizedTheme = themeName === 'playful' || themeName === 'earth' ? themeName : '';
+    if (normalizedTheme) {
+        document.body.dataset.uiTheme = normalizedTheme;
+        try {
+            window.localStorage.setItem(uiThemeStorageKey, normalizedTheme);
+        } catch (error) {
+            console.warn('Theme konnte nicht gespeichert werden', error);
+        }
+    } else {
+        document.body.removeAttribute('data-ui-theme');
+        try {
+            window.localStorage.removeItem(uiThemeStorageKey);
+        } catch (error) {
+            console.warn('Theme konnte nicht zurückgesetzt werden', error);
+        }
+    }
+
+    const themeClearButtonEl = document.getElementById('themeClearButton');
+    const themePlayfulButtonEl = document.getElementById('themePlayfulButton');
+    const themeEarthButtonEl = document.getElementById('themeEarthButton');
+    if (themeClearButtonEl) {
+        themeClearButtonEl.classList.toggle('is-active', !normalizedTheme);
+    }
+    if (themePlayfulButtonEl) {
+        themePlayfulButtonEl.classList.toggle('is-active', normalizedTheme === 'playful');
+    }
+    if (themeEarthButtonEl) {
+        themeEarthButtonEl.classList.toggle('is-active', normalizedTheme === 'earth');
+    }
+    sendPracticeAudioMessage({
+        type: 'barabeat-ui-theme',
+        theme: normalizedTheme
+    });
+    sendTimelineAudioMessage({
+        type: 'barabeat-ui-theme',
+        theme: normalizedTheme
+    });
+}
+
+function initializeUiTheme() {
+    let storedTheme = '';
+    try {
+        storedTheme = window.localStorage.getItem(uiThemeStorageKey) || '';
+    } catch (error) {
+        storedTheme = '';
+    }
+    setUiTheme(storedTheme);
+}
+
+function rememberLastLoadedScore(scoreId) {
+    const normalizedScoreId = String(scoreId || '').trim();
+    try {
+        if (normalizedScoreId) {
+            window.localStorage.setItem(lastLoadedScoreStorageKey, normalizedScoreId);
+        } else {
+            window.localStorage.removeItem(lastLoadedScoreStorageKey);
+        }
+    } catch (error) {
+        console.warn('Letzter geladener Titel konnte nicht gespeichert werden', error);
+    }
+}
+
+function getRememberedLastLoadedScoreId() {
+    try {
+        return window.localStorage.getItem(lastLoadedScoreStorageKey) || '';
+    } catch (error) {
+        return '';
+    }
+}
+
+async function loadRememberedLastScore() {
+    const rememberedScoreId = getRememberedLastLoadedScoreId();
+    if (!rememberedScoreId) {
+        return false;
+    }
+
+    try {
+        const score = await localLibrary.getScore(rememberedScoreId);
+        if (!score) {
+            rememberLastLoadedScore('');
+            return false;
+        }
+        loadRhythmContent(score.title, score.content || score.data, score.id, { remember: false });
+        setSelectedFileSource('local');
+        return true;
+    } catch (error) {
+        console.warn('Letzter geladener Titel konnte nicht geöffnet werden', error);
+        return false;
+    }
+}
 
 function closeAppMenus() {
     document.querySelectorAll('#appMenuBar details.app-menu[open]').forEach(function (menuEl) {
         menuEl.open = false;
     });
+    document.querySelectorAll('#appMenuBar details.app-submenu[open]').forEach(function (menuEl) {
+        menuEl.open = false;
+    });
 }
 
 document.addEventListener('DOMContentLoaded', function () {
+    initializeUiTheme();
     updateMobilePracticeModeAvailability();
     window.addEventListener('resize', updateMobilePracticeModeAvailability);
     window.addEventListener('orientationchange', function () {
@@ -3687,6 +4077,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
     document.addEventListener('click', function (event) {
         if (!event.target.closest('#appMenuBar')) {
+            closeAppMenus();
+        }
+    });
+
+    document.querySelector('#appMenuBar').addEventListener('click', function (event) {
+        if (event.target.closest('button')) {
             closeAppMenus();
         }
     });
@@ -3769,6 +4165,9 @@ document.addEventListener('DOMContentLoaded', function () {
         recordHistorySnapshot();
         addInitialFunctionChooser(260, 140);
     });
+    document.querySelector('#resetPaletteButton').addEventListener('click', function () {
+        resetPalettePosition();
+    });
     document.querySelector('#button11').addEventListener('click', function () {
         if (isMobilePracticeViewport()) {
             return;
@@ -3781,15 +4180,30 @@ document.addEventListener('DOMContentLoaded', function () {
             timelineState.visible = !timelineState.visible;
             renderPracticePanel();
             renderTimelinePanel();
+            if (timelineState.visible) {
+                scheduleTimelineAudioRefresh(0);
+            } else {
+                clearTimelineAudioPlayer();
+            }
         } catch (error) {
             console.error('Timeline konnte nicht aktualisiert werden', error);
             alert('Fehler beim Aufbau der Timeline: ' + error.message);
         }
     });
+    document.querySelector('#themeClearButton').addEventListener('click', function () {
+        setUiTheme('');
+    });
+    document.querySelector('#themePlayfulButton').addEventListener('click', function () {
+        setUiTheme('playful');
+    });
+    document.querySelector('#themeEarthButton').addEventListener('click', function () {
+        setUiTheme('earth');
+    });
     document.querySelector('#practiceButton').addEventListener('click', function () {
         try {
             refreshPracticeFromSheet(false);
             timelineState.visible = false;
+            clearTimelineAudioPlayer();
             practiceState.visible = !practiceState.visible;
             if (!practiceState.visible) {
                 clearPracticeAudioPlayer();
@@ -3921,6 +4335,7 @@ document.addEventListener('DOMContentLoaded', function () {
         try {
             const readResult = callPHPScript_lesen(zeilenAnzahl, { showAlert: false });
             syncTimelineStateFromReadResult(readResult);
+            scheduleTimelineAudioRefresh(0);
         } catch (error) {
             console.error('Timeline-Refresh fehlgeschlagen', error);
             alert('Fehler beim Aktualisieren der Timeline: ' + error.message);
@@ -3928,6 +4343,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     document.querySelector('#timelineCloseButton').addEventListener('click', function () {
         timelineState.visible = false;
+        clearTimelineAudioPlayer();
         renderTimelinePanel();
     });
     function getSwingProfileTitle() {
@@ -4217,6 +4633,10 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         });
     });
+    const timelineSwingProfileButtonEl = document.querySelector('#timelineSwingProfileButton');
+    if (timelineSwingProfileButtonEl) {
+        timelineSwingProfileButtonEl.addEventListener('click', openPracticeSwingProfileDialog);
+    }
     document.querySelector('#practiceSwingProfileButton').addEventListener('click', openPracticeSwingProfileDialog);
     document.querySelector('#practiceSwingProfileCloseButton').addEventListener('click', closePracticeSwingProfileDialog);
     document.querySelector('#practiceSwingProfileDoneButton').addEventListener('click', closePracticeSwingProfileDialog);
@@ -4235,6 +4655,10 @@ document.addEventListener('DOMContentLoaded', function () {
             renderTimelinePanel();
         }
     });
+    const timelineFeelProfileButtonEl = document.querySelector('#timelineFeelProfileButton');
+    if (timelineFeelProfileButtonEl) {
+        timelineFeelProfileButtonEl.addEventListener('click', openPracticeFeelProfileDialog);
+    }
     document.querySelector('#practiceFeelProfileButton').addEventListener('click', openPracticeFeelProfileDialog);
     document.querySelector('#practiceFeelProfileCloseButton').addEventListener('click', closePracticeFeelProfileDialog);
     document.querySelector('#practiceFeelProfileDoneButton').addEventListener('click', closePracticeFeelProfileDialog);
@@ -4251,18 +4675,22 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    document.querySelector('#button6').addEventListener('click', function () {
-        scrollOn = !scrollOn;
-        if (scrollOn) {
-            canv.attr({ fill: "none" });
-        } else {
-            canv.attr({ fill: "white" });
-        }
-    });
+    const scrollButtonEl = document.querySelector('#button6');
+    if (scrollButtonEl) {
+        scrollButtonEl.addEventListener('click', function () {
+            scrollOn = !scrollOn;
+            if (scrollOn) {
+                canv.attr({ fill: "none" });
+            } else {
+                canv.attr({ fill: "white" });
+            }
+        });
+    }
 
     [
         '#openFileDialogButton',
         '#saveFileDialogButton',
+        '#saveAsFileDialogButton',
         '#exportFileDialogButton',
         '#button3',
         '#button4',
@@ -4271,9 +4699,13 @@ document.addEventListener('DOMContentLoaded', function () {
         '#button7',
         '#button8',
         '#button9',
+        '#resetPaletteButton',
         '#button10',
         '#practiceButton',
-        '#button11'
+        '#button11',
+        '#themeClearButton',
+        '#themePlayfulButton',
+        '#themeEarthButton'
     ].forEach(function (selector) {
         const buttonEl = document.querySelector(selector);
         if (!buttonEl) {
@@ -4295,6 +4727,7 @@ function callPHPScript1() {
 
 function onSVGLoaded(data) {
     document.body.classList.add('has-loaded-score');
+    keepPaletteInsideSheet();
     const persistedTimelineMetadata = readTimelineMetadata(data);
 
     if (data.select("#rhythmus") == '<binaer id="rhythmus"/>') {
@@ -4309,7 +4742,7 @@ function onSVGLoaded(data) {
     s.append(loadedElements);
     bindLoadedScoreElements();
 
-    titel.attr({ text: loadedTitle });
+    setRhythmTitle(loadedTitle);
 
     try {
         const readResult = callPHPScript_lesen(zeilenAnzahl, { showAlert: false });
@@ -4406,7 +4839,17 @@ function get_value(e) {
     });
 }
 
-get_value();
+(async function initializeInitialScore() {
+    if (datei_name != "") {
+        viererNoten();
+        get_value();
+        return;
+    }
+    if (await loadRememberedLastScore()) {
+        return;
+    }
+    viererNoten();
+})();
 
     </script>
     <br>

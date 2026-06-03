@@ -1,6 +1,8 @@
 <?php
 $myObject = $_POST["myObj"] ?? "[]";
 $embedded = ($_POST["embedded"] ?? "") === "1";
+$uiTheme = $_POST["uiTheme"] ?? "";
+$uiThemeClass = $uiTheme === "playful" ? "audio-theme-playful" : ($uiTheme === "earth" ? "audio-theme-earth" : "");
 $playerJs = @filemtime(__DIR__ . '/js/instrument_2.js') ?: 1;
 $playerCss = @filemtime(__DIR__ . '/css/audio_style.css') ?: 1;
 ?>
@@ -32,11 +34,11 @@ $playerCss = @filemtime(__DIR__ . '/css/audio_style.css') ?: 1;
 <style type="text/css">
 a:link {
   text-decoration: none;
-  color: black;
+  color: inherit;
 }
 </style>
 
-<body class="<?php echo $embedded ? 'embedded-player' : ''; ?>">
+<body class="<?php echo trim(($embedded ? 'embedded-player ' : '') . $uiThemeClass); ?>">
 
 <div class="loading">
   <p>Loading...</p>
@@ -85,6 +87,11 @@ let isPlaying = false;
 let audioIsReady = false;
 let hasWaitedAfterFirstResume = false;
 let hasPrimedAudioOutput = false;
+
+function applyAudioTheme(themeName) {
+  document.body.classList.toggle('audio-theme-playful', themeName === 'playful');
+  document.body.classList.toggle('audio-theme-earth', themeName === 'earth');
+}
 
 playButton.disabled = true;
 exportWavButton.disabled = true;
@@ -198,6 +205,23 @@ function getActivePracticeTrackNames(config) {
 
 const activePracticeTrackNames = getActivePracticeTrackNames(playerConfig);
 
+function getActivePracticeTrackNamesFromSections(configuredSections) {
+  if (!Array.isArray(configuredSections)) {
+    return [];
+  }
+
+  const activeTracks = [];
+  configuredSections.forEach(function (section) {
+    const trackNotes = section && section.trackNotes ? section.trackNotes : {};
+    allPracticeTrackNames.forEach(function (trackName) {
+      if (activeTracks.indexOf(trackName) === -1 && hasPlayablePracticeNotes(trackNotes[trackName])) {
+        activeTracks.push(trackName);
+      }
+    });
+  });
+  return activeTracks;
+}
+
 function getPracticeInstrumentFiles(trackName, files) {
   if (!isPracticeMode || activePracticeTrackNames.indexOf(trackName) !== -1) {
     return files;
@@ -221,6 +245,38 @@ const sangban  = new Instrumente(getPracticeInstrumentFiles('Sangban', sangban_m
 const doundoun = new Instrumente(getPracticeInstrumentFiles('Doundoun', doundoun_mp3Files), -0.6, 1.5);
 const dreierbass = new Instrumente(getPracticeInstrumentFiles('Dreierbass', dreierbass_mp3Files), -1, 1.5);
 const allInstruments = [djembe_1, djembe_2, djembe_3, kenkeni, sangban, doundoun, dreierbass];
+const practiceInstrumentSoundFiles = {
+  Djembe_1: djembe_1_mp3Files,
+  Djembe_2: djembe_2_mp3Files,
+  Djembe_3: djembe_3_mp3Files,
+  Kenkeni: kenkeni_mp3Files,
+  Sangban: sangban_mp3Files,
+  Doundoun: doundoun_mp3Files,
+  Dreierbass: dreierbass_mp3Files
+};
+const practiceInstrumentInstances = {
+  Djembe_1: djembe_1,
+  Djembe_2: djembe_2,
+  Djembe_3: djembe_3,
+  Kenkeni: kenkeni,
+  Sangban: sangban,
+  Doundoun: doundoun,
+  Dreierbass: dreierbass
+};
+let practiceSectionUpdateLoadToken = 0;
+
+async function ensurePracticeTrackSoundsLoaded(trackNames) {
+  const safeTrackNames = Array.isArray(trackNames) ? trackNames : [];
+  const loadPromises = safeTrackNames.map(function (trackName) {
+    const instrumentInstance = practiceInstrumentInstances[trackName];
+    const soundFiles = practiceInstrumentSoundFiles[trackName];
+    if (!instrumentInstance || typeof instrumentInstance.ensureSoundFiles !== 'function' || !Array.isArray(soundFiles)) {
+      return Promise.resolve();
+    }
+    return instrumentInstance.ensureSoundFiles(soundFiles);
+  });
+  await Promise.all(loadPromises);
+}
 const sangbanStrokeGainMultiplier = 2.2;
 const h2hRestMuteGainMultipliers = {
   Djembe_1: 0.8,
@@ -415,6 +471,10 @@ window.addEventListener('message', function (event) {
     return;
   }
   const message = event.data || {};
+  if (message.type === 'barabeat-ui-theme') {
+    applyAudioTheme(message.theme || '');
+    return;
+  }
   if (message.type === 'barabeat-practice-h2h-rest-mute') {
     practiceH2HRestMute = Boolean(message.enabled);
     return;
@@ -683,6 +743,50 @@ function applyOutToPatternNotes(patternNotes, outStep) {
   return safeNotes;
 }
 
+function getPatternNotesLength(entryData) {
+  return Array.isArray(entryData && entryData.patternNotes) ? entryData.patternNotes.length : 0;
+}
+
+function getMaxPatternNotesLength(entryDataList) {
+  return (Array.isArray(entryDataList) ? entryDataList : []).reduce(function (maxLength, entryData) {
+    return Math.max(maxLength, getPatternNotesLength(entryData));
+  }, 0);
+}
+
+function getTimelineEntryOutStep(entryData, effectiveNotesLength) {
+  if (!entryData || entryData.patternOutStep === null || entryData.patternOutStep === undefined) {
+    return null;
+  }
+
+  const sourceLength = getPatternNotesLength(entryData);
+  const safeEffectiveLength = Math.max(0, Number(effectiveNotesLength) || 0);
+  let outStep = safeEffectiveLength > sourceLength && sourceLength > 0
+    ? safeEffectiveLength - sourceLength + entryData.patternOutStep
+    : entryData.patternOutStep;
+
+  if (entryData.label === 'Echauffement') {
+    outStep += 1;
+  }
+
+  return outStep;
+}
+
+function getTimelineEntryEffectiveNotes(entryData, shouldApplyOut, loopToLength) {
+  const sourceNotes = Array.isArray(entryData && entryData.patternNotes) ? entryData.patternNotes : [];
+  let effectiveNotes = sourceNotes.slice();
+  const safeLoopToLength = Math.max(0, Number(loopToLength) || 0);
+
+  if (entryData && entryData.label === 'Begleitung' && safeLoopToLength > effectiveNotes.length) {
+    effectiveNotes = loopNotesToLength(effectiveNotes, safeLoopToLength);
+  }
+
+  if (shouldApplyOut && entryData && entryData.patternOutStep !== null) {
+    effectiveNotes = applyOutToPatternNotes(effectiveNotes, getTimelineEntryOutStep(entryData, effectiveNotes.length));
+  }
+
+  return effectiveNotes;
+}
+
 function mergeNotesIntoTrack(targetNotes, sourceNotes, offset) {
   const writeOffset = Number(offset) || 0;
   const mergedNotes = targetNotes.slice();
@@ -767,6 +871,15 @@ function loopNotesToLength(sourceNotes, targetLength) {
   return loopedNotes;
 }
 
+function padNotesToLength(sourceNotes, targetLength) {
+  const paddedNotes = Array.isArray(sourceNotes) ? sourceNotes.slice() : [];
+  const safeTargetLength = Math.max(0, Number(targetLength) || 0);
+  while (paddedNotes.length < safeTargetLength) {
+    paddedNotes.push('f');
+  }
+  return paddedNotes;
+}
+
 function loopNotesFromOffset(sourceNotes, targetLength, startOffset) {
   const safeSourceNotes = Array.isArray(sourceNotes) ? sourceNotes.slice() : [];
   const safeTargetLength = Math.max(0, Number(targetLength) || 0);
@@ -795,6 +908,19 @@ function normalizeSectionTrackLoops(section) {
     return;
   }
 
+  if (section && section.padTracksToLongest) {
+    const targetLength = Math.max.apply(null, trackLengths);
+    trackInstrumentNames.forEach(function (instrumentName) {
+      const currentNotes = section.trackNotes[instrumentName];
+      const currentLength = getSectionLength(currentNotes);
+      if (currentLength <= 0 || currentLength >= targetLength) {
+        return;
+      }
+      section.trackNotes[instrumentName] = padNotesToLength(currentNotes, targetLength);
+    });
+    return;
+  }
+
   const targetLength = trackLengths.reduce(function (currentLength, trackLength) {
     return leastCommonMultiple(currentLength, trackLength);
   }, 0);
@@ -811,6 +937,136 @@ function normalizeSectionTrackLoops(section) {
     }
     section.trackNotes[instrumentName] = loopNotesToLength(currentNotes, targetLength);
   });
+}
+
+function getRepeatedEntryUnitLength(entryDataList) {
+  const entries = Array.isArray(entryDataList) ? entryDataList : [];
+  const totalCount = entries.length;
+  if (totalCount <= 1) {
+    return totalCount;
+  }
+
+  const signatures = entries.map(function (entryData) {
+    return String(entryData && entryData.entrySignature || '');
+  });
+
+  for (let unitLength = 1; unitLength <= totalCount; unitLength++) {
+    if (totalCount % unitLength !== 0) {
+      continue;
+    }
+
+    let isRepeatedUnit = true;
+    for (let entryIndex = 0; entryIndex < totalCount; entryIndex++) {
+      if (signatures[entryIndex] !== signatures[entryIndex % unitLength]) {
+        isRepeatedUnit = false;
+        break;
+      }
+    }
+
+    if (isRepeatedUnit) {
+      return unitLength;
+    }
+  }
+
+  return totalCount;
+}
+
+function buildRepeatedParallelEntryUnits(entryDataList) {
+  const entries = Array.isArray(entryDataList) ? entryDataList : [];
+  const repeatedUnitLength = getRepeatedEntryUnitLength(entries);
+  if (repeatedUnitLength > 0 && repeatedUnitLength < entries.length) {
+    const units = [];
+    for (let unitStartIndex = 0; unitStartIndex < entries.length; unitStartIndex += repeatedUnitLength) {
+      units.push(entries.slice(unitStartIndex, unitStartIndex + repeatedUnitLength));
+    }
+    return units;
+  }
+
+  const runs = [];
+  entries.forEach(function (entryData) {
+    const signature = String(entryData && entryData.entrySignature || '');
+    const previousRun = runs.length > 0 ? runs[runs.length - 1] : null;
+    if (previousRun && previousRun.signature === signature) {
+      previousRun.entries.push(entryData);
+      return;
+    }
+    runs.push({
+      signature: signature,
+      entries: [entryData]
+    });
+  });
+
+  if (runs.length <= 1) {
+    return [entries];
+  }
+
+  const runLength = runs[0].entries.length;
+  const canZipRuns = runLength > 1 && runs.every(function (run) {
+    return run.entries.length === runLength;
+  });
+
+  if (!canZipRuns) {
+    return [entries];
+  }
+
+  const zippedUnits = [];
+  for (let repeatIndex = 0; repeatIndex < runLength; repeatIndex++) {
+    zippedUnits.push(runs.map(function (run) {
+      return run.entries[repeatIndex];
+    }));
+  }
+  return zippedUnits;
+}
+
+function hasTimelineEntryLabel(entryDataList, labelName) {
+  return (Array.isArray(entryDataList) ? entryDataList : []).some(function (entryData) {
+    return entryData && entryData.label === labelName;
+  });
+}
+
+function getTimelineAccompanimentTargets(entryDataList) {
+  const targetNames = [];
+  (Array.isArray(entryDataList) ? entryDataList : []).forEach(function (entryData) {
+    if (!entryData || entryData.label !== 'Begleitung') {
+      return;
+    }
+    (Array.isArray(entryData.targetInstruments) ? entryData.targetInstruments : []).forEach(function (targetName) {
+      if (targetNames.indexOf(targetName) === -1) {
+        targetNames.push(targetName);
+      }
+    });
+  });
+  return targetNames;
+}
+
+function getTimelinePlaybackBlockEntries(playbackEntries, startIndex) {
+  const entries = Array.isArray(playbackEntries) ? playbackEntries : [];
+  const safeStartIndex = Math.max(0, Number(startIndex) || 0);
+  if (safeStartIndex >= entries.length) {
+    return [];
+  }
+
+  const firstEntry = entries[safeStartIndex];
+  const blockLabel = firstEntry.label;
+  const blockId = firstEntry.blockId;
+  const parallelGroupId = firstEntry.parallelGroupId;
+  const isPracticeBlock = isPracticeMode && blockId;
+  let endIndex = safeStartIndex + 1;
+
+  while (endIndex < entries.length) {
+    const nextEntry = entries[endIndex];
+    const belongsToCurrentBlock = isPracticeBlock
+      ? nextEntry.blockId === blockId
+      : (parallelGroupId
+          ? nextEntry.parallelGroupId === parallelGroupId
+          : nextEntry.label === blockLabel && nextEntry.blockId === blockId);
+    if (!belongsToCurrentBlock) {
+      break;
+    }
+    endIndex += 1;
+  }
+
+  return entries.slice(safeStartIndex, endIndex);
 }
 
 function normalizeSectionRepeatCount(rawValue) {
@@ -1164,9 +1420,7 @@ function buildTimelineSections(config) {
   const continuingAccompanimentEntries = expandedEntries.filter(function (entryData) {
     return entryData.startsContinuingAccompaniment;
   });
-  const playbackEntries = expandedEntries.filter(function (entryData) {
-    return !entryData.startsContinuingAccompaniment;
-  });
+  const playbackEntries = expandedEntries.slice();
 
   let blockStartIndex = 0;
   while (blockStartIndex < playbackEntries.length) {
@@ -1189,6 +1443,22 @@ function buildTimelineSections(config) {
     }
 
     const blockEntries = playbackEntries.slice(blockStartIndex, blockEndIndex);
+    const nextBlockEntries = getTimelinePlaybackBlockEntries(playbackEntries, blockEndIndex);
+    const currentBlockContainsEchauffement = hasTimelineEntryLabel(blockEntries, 'Echauffement');
+    const nextAccompanimentTargets = getTimelineAccompanimentTargets(nextBlockEntries);
+    function shouldApplyOutToTimelineEntry(entryData) {
+      if (isPracticeMode || !entryData || entryData.patternOutStep === null) {
+        return false;
+      }
+
+      if (entryData.label === 'Echauffement') {
+        return true;
+      }
+
+      return entryData.label === 'Begleitung' &&
+        (currentBlockContainsEchauffement ||
+          !doInstrumentSetsOverlap(entryData.targetInstruments, nextAccompanimentTargets));
+    }
     const blockLanes = [];
 
     blockEntries.forEach(function (entryData) {
@@ -1214,17 +1484,78 @@ function buildTimelineSections(config) {
     });
 
     if (parallelGroupId || isPracticeBlock) {
+      const repeatedParallelUnits = parallelGroupId && !isPracticeBlock
+        ? buildRepeatedParallelEntryUnits(blockEntries)
+        : [blockEntries];
+      if (parallelGroupId && !isPracticeBlock && repeatedParallelUnits.length > 1) {
+        repeatedParallelUnits.forEach(function (repeatEntries, repeatIndex) {
+          const repeatedSection = createOrderedSection(blockLabel);
+          const repeatContainsEchauffement = hasTimelineEntryLabel(repeatEntries, 'Echauffement');
+          const repeatTargetLength = repeatContainsEchauffement ? getMaxPatternNotesLength(repeatEntries) : 0;
+          repeatedSection.padTracksToLongest = !repeatContainsEchauffement;
+          const repeatedSectionLabelNames = [];
+          const isLastRepeatedParallelUnit = repeatIndex === repeatedParallelUnits.length - 1;
+
+          repeatEntries.forEach(function (entryData) {
+            const shouldApplyOut = !isPracticeMode &&
+              isLastRepeatedParallelUnit &&
+              shouldApplyOutToTimelineEntry(entryData);
+            const effectiveNotes = getTimelineEntryEffectiveNotes(
+              entryData,
+              shouldApplyOut,
+              repeatContainsEchauffement ? repeatTargetLength : 0
+            );
+
+            entryData.targetInstruments.forEach(function (instrumentName) {
+              repeatedSection.trackNotes[instrumentName] = mergeNotesIntoTrack(
+                repeatedSection.trackNotes[instrumentName],
+                effectiveNotes,
+                0
+              );
+              if (instrumentName.indexOf('Djembe_') === 0) {
+                repeatedSection.trackHandModes[instrumentName] = String(entryData.handMode || '');
+              }
+            });
+
+            if (repeatedSectionLabelNames.indexOf(entryData.labelName) === -1) {
+              repeatedSectionLabelNames.push(entryData.labelName);
+            }
+            if (repeatedSection.swingFactor === null && entryData.swingFactor !== null && entryData.swingFactor !== undefined) {
+              repeatedSection.swingFactor = entryData.swingFactor;
+            }
+            if (entryData.startsContinuingAccompaniment) {
+              entryData.targetInstruments.forEach(function (instrumentName) {
+                repeatedSection.continuingAccompaniments[instrumentName] = entryData.patternNotes.slice();
+              });
+            }
+          });
+
+          repeatedSection.labelName = repeatedSectionLabelNames.join(' + ');
+          repeatedSection.runtimeKey = [
+            'parallel',
+            parallelGroupId,
+            repeatIndex,
+            repeatedSection.labelName
+          ].join('::');
+          normalizeSectionTrackLoops(repeatedSection);
+          sections.push(repeatedSection);
+        });
+        blockStartIndex = blockEndIndex;
+        continue;
+      }
+
       const mergedSection = createOrderedSection(blockLabel);
+      const blockTargetLength = currentBlockContainsEchauffement ? getMaxPatternNotesLength(blockEntries) : 0;
+      mergedSection.padTracksToLongest = Boolean(parallelGroupId && !isPracticeBlock && !currentBlockContainsEchauffement);
       const sectionLabelNames = [];
 
       blockEntries.forEach(function (entryData) {
-        const shouldApplyOut = !isPracticeMode &&
-          blockEndIndex < playbackEntries.length &&
-          entryData.label === 'Begleitung' &&
-          entryData.patternOutStep !== null;
-        const effectiveNotes = shouldApplyOut
-          ? applyOutToPatternNotes(entryData.patternNotes, entryData.patternOutStep)
-          : entryData.patternNotes;
+        const shouldApplyOut = shouldApplyOutToTimelineEntry(entryData);
+        const effectiveNotes = getTimelineEntryEffectiveNotes(
+          entryData,
+          shouldApplyOut,
+          currentBlockContainsEchauffement ? blockTargetLength : 0
+        );
 
         entryData.targetInstruments.forEach(function (instrumentName) {
           mergedSection.trackNotes[instrumentName] = mergeNotesIntoTrack(
@@ -1265,7 +1596,6 @@ function buildTimelineSections(config) {
     const maxLaneLength = Math.max.apply(null, blockLanes.map(function (laneData) {
       return laneData.entries.length;
     }).concat(0));
-    const shouldApplyOutInLastCycle = blockLabel === 'Begleitung' && blockEndIndex < playbackEntries.length;
 
     for (let occurrenceIndex = 0; occurrenceIndex < maxLaneLength; occurrenceIndex++) {
       let currentCycleSection = null;
@@ -1277,9 +1607,9 @@ function buildTimelineSections(config) {
         }
 
         const isLastLaneOccurrence = occurrenceIndex === laneData.entries.length - 1;
-        const occurrenceEntry = shouldApplyOutInLastCycle && isLastLaneOccurrence && laneEntry.patternOutStep !== null
+        const occurrenceEntry = isLastLaneOccurrence && shouldApplyOutToTimelineEntry(laneEntry)
           ? Object.assign({}, laneEntry, {
-              patternNotes: applyOutToPatternNotes(laneEntry.patternNotes, laneEntry.patternOutStep)
+              patternNotes: getTimelineEntryEffectiveNotes(laneEntry, true, 0)
             })
           : laneEntry;
 
@@ -1659,17 +1989,30 @@ function queuePracticeSectionsUpdate(configuredSections, nextLoopCount, nextDura
     return;
   }
 
-  if (!isPlaying) {
-    replaceOrderedSectionsWithConfigured(configuredSections, nextLoopCount, nextDurationSeconds);
-    globalPlaybackStep = 0;
-    notifyEmbeddedPlaybackStep(globalPlaybackStep, nextNoteTime);
-    return;
-  }
+  const updateToken = ++practiceSectionUpdateLoadToken;
+  const requiredTrackNames = getActivePracticeTrackNamesFromSections(configuredSections);
+  ensurePracticeTrackSoundsLoaded(requiredTrackNames)
+    .then(function () {
+      if (updateToken !== practiceSectionUpdateLoadToken) {
+        return;
+      }
 
-  pendingPracticeSections = configuredSections;
-  pendingPracticeLoopCount = nextLoopCount;
-  pendingPracticeDurationSeconds = nextDurationSeconds;
-  pendingPracticeSectionsApplyStep = getNextPracticeSectionBoundaryStep(globalPlaybackStep);
+      if (!isPlaying) {
+        replaceOrderedSectionsWithConfigured(configuredSections, nextLoopCount, nextDurationSeconds);
+        globalPlaybackStep = 0;
+        notifyEmbeddedPlaybackStep(globalPlaybackStep, nextNoteTime);
+        return;
+      }
+
+      pendingPracticeSections = configuredSections;
+      pendingPracticeLoopCount = nextLoopCount;
+      pendingPracticeDurationSeconds = nextDurationSeconds;
+      pendingPracticeSectionsApplyStep = getNextPracticeSectionBoundaryStep(globalPlaybackStep);
+    })
+    .catch(function (error) {
+      console.error('Practice-Samples konnten nicht nachgeladen werden:', error);
+      updateLoadingStatus('Ladefehler: ' + (error && error.message ? error.message : String(error)));
+    });
 }
 
 function applyPendingPracticeSectionsIfReady() {
@@ -1833,6 +2176,10 @@ function recalculateOrderedSectionTiming() {
   orderedFallbackLoopLength = orderedFallbackLoopSections.reduce(function (sum, section) {
     return sum + section.playbackLength;
   }, 0);
+  if (isTimelineMode && orderedFallbackLoopLength <= 0) {
+    timelineLoopCount = false;
+    timelineLoop = false;
+  }
   timelinePlaybackLength = timelineLoopCount && timelineLoopCount !== 'loop' && orderedFallbackLoopLength > 0
     ? oneShotLength + (orderedFallbackLoopLength * Number(timelineLoopCount))
     : 0;
@@ -2417,6 +2764,15 @@ function getTrackPlaybackAtStep(trackName, trackState, playbackStep) {
     };
   }
 
+  if (isTimelineMode && oneShotLength > 0 && playbackStep >= oneShotLength) {
+    return {
+      note: null,
+      handMode: '',
+      sectionKey: '',
+      stepIndex: 0
+    };
+  }
+
   if (hasOutroSection) {
     return {
       note: null,
@@ -2713,6 +3069,18 @@ function markPracticeTimerFinalLoopIfNeeded(scheduledTime) {
   }
 }
 
+function shouldStopTimelineAtOneShotEnd() {
+  if (!isTimelineMode || oneShotLength <= 0 || globalPlaybackStep < oneShotLength) {
+    return false;
+  }
+
+  if (!timelineLoopCount) {
+    return true;
+  }
+
+  return orderedFallbackLoopLength <= 0;
+}
+
 function scheduler() {
   const dTime = instr._audioCtx.currentTime;
 
@@ -2738,7 +3106,7 @@ function scheduler() {
       notifyEmbeddedPlaybackState('ended');
       return;
     }
-    if (!timelineLoopCount && isTimelineMode && globalPlaybackStep >= oneShotLength) {
+    if (shouldStopTimelineAtOneShotEnd()) {
       isPlaying = false;
       playButton.dataset.playing = 'false';
       timerID = null;
