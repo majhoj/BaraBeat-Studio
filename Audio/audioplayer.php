@@ -908,7 +908,7 @@ function normalizeSectionTrackLoops(section) {
     return;
   }
 
-  if (section && section.padTracksToLongest) {
+  if (section && (section.padTracksToLongest || section.loopTracksToLongest)) {
     const targetLength = Math.max.apply(null, trackLengths);
     trackInstrumentNames.forEach(function (instrumentName) {
       const currentNotes = section.trackNotes[instrumentName];
@@ -916,7 +916,9 @@ function normalizeSectionTrackLoops(section) {
       if (currentLength <= 0 || currentLength >= targetLength) {
         return;
       }
-      section.trackNotes[instrumentName] = padNotesToLength(currentNotes, targetLength);
+      section.trackNotes[instrumentName] = section.loopTracksToLongest
+        ? loopNotesToLength(currentNotes, targetLength)
+        : padNotesToLength(currentNotes, targetLength);
     });
     return;
   }
@@ -1020,6 +1022,13 @@ function buildRepeatedParallelEntryUnits(entryDataList) {
 
 function hasTimelineEntryLabel(entryDataList, labelName) {
   return (Array.isArray(entryDataList) ? entryDataList : []).some(function (entryData) {
+    return entryData && entryData.label === labelName;
+  });
+}
+
+function hasOnlyTimelineEntryLabel(entryDataList, labelName) {
+  const entries = Array.isArray(entryDataList) ? entryDataList : [];
+  return entries.length > 0 && entries.every(function (entryData) {
     return entryData && entryData.label === labelName;
   });
 }
@@ -1491,8 +1500,10 @@ function buildTimelineSections(config) {
         repeatedParallelUnits.forEach(function (repeatEntries, repeatIndex) {
           const repeatedSection = createOrderedSection(blockLabel);
           const repeatContainsEchauffement = hasTimelineEntryLabel(repeatEntries, 'Echauffement');
+          const repeatContainsOnlyAccompaniment = hasOnlyTimelineEntryLabel(repeatEntries, 'Begleitung');
           const repeatTargetLength = repeatContainsEchauffement ? getMaxPatternNotesLength(repeatEntries) : 0;
-          repeatedSection.padTracksToLongest = !repeatContainsEchauffement;
+          repeatedSection.loopTracksToLongest = repeatContainsOnlyAccompaniment;
+          repeatedSection.padTracksToLongest = !repeatContainsEchauffement && !repeatContainsOnlyAccompaniment;
           const repeatedSectionLabelNames = [];
           const isLastRepeatedParallelUnit = repeatIndex === repeatedParallelUnits.length - 1;
 
@@ -1546,7 +1557,14 @@ function buildTimelineSections(config) {
 
       const mergedSection = createOrderedSection(blockLabel);
       const blockTargetLength = currentBlockContainsEchauffement ? getMaxPatternNotesLength(blockEntries) : 0;
-      mergedSection.padTracksToLongest = Boolean(parallelGroupId && !isPracticeBlock && !currentBlockContainsEchauffement);
+      const currentBlockContainsOnlyAccompaniment = hasOnlyTimelineEntryLabel(blockEntries, 'Begleitung');
+      mergedSection.loopTracksToLongest = Boolean(parallelGroupId && !isPracticeBlock && currentBlockContainsOnlyAccompaniment);
+      mergedSection.padTracksToLongest = Boolean(
+        parallelGroupId &&
+        !isPracticeBlock &&
+        !currentBlockContainsEchauffement &&
+        !currentBlockContainsOnlyAccompaniment
+      );
       const sectionLabelNames = [];
 
       blockEntries.forEach(function (entryData) {

@@ -1490,28 +1490,6 @@ function setTimelineRowRepeatCount(rowGroups, nextRepeatCount) {
     renderTimelinePanel();
 }
 
-function removeTimelineRowRepeatUnit(rowGroups) {
-    const rowRepeatInfo = getTimelineRowRepeatInfo(rowGroups);
-    if (!rowRepeatInfo.groupRepeatInfos.length || rowRepeatInfo.mixed || rowRepeatInfo.repeatCount <= 1) {
-        return;
-    }
-
-    const removalRanges = rowRepeatInfo.groupRepeatInfos.map(function (info) {
-        return {
-            startIndex: info.group.endIndex - info.repeatInfo.unitLength,
-            count: info.repeatInfo.unitLength
-        };
-    }).sort(function (leftRange, rightRange) {
-        return rightRange.startIndex - leftRange.startIndex;
-    });
-
-    removalRanges.forEach(function (range) {
-        timelineState.entries.splice(range.startIndex, range.count);
-    });
-    updateTimelineMetadataNode();
-    renderTimelinePanel();
-}
-
 function buildPatternLibraryGroups(patternLibrary) {
     const groups = [];
 
@@ -2054,6 +2032,211 @@ function renderTimelinePatternLibrary() {
     });
 }
 
+function createTimelineSectionHeader(rowGroups, rowIndex) {
+    const rowRepeatInfo = getTimelineRowRepeatInfo(rowGroups);
+    const sectionHeaderEl = document.createElement('div');
+    sectionHeaderEl.className = 'timeline-section-header';
+
+    const sectionTitleEl = document.createElement('strong');
+    sectionTitleEl.textContent = 'Abschnitt ' + String(rowIndex + 1);
+    sectionHeaderEl.appendChild(sectionTitleEl);
+
+    const sectionActionWrap = document.createElement('div');
+    sectionActionWrap.className = 'timeline-entry-actions timeline-section-actions';
+    const sectionRepeatEl = document.createElement('label');
+    sectionRepeatEl.className = 'timeline-entry-repeat-count';
+    sectionRepeatEl.appendChild(document.createTextNode('Wdh.'));
+    const sectionRepeatInputEl = document.createElement('input');
+    sectionRepeatInputEl.type = 'number';
+    sectionRepeatInputEl.min = '1';
+    sectionRepeatInputEl.max = '32';
+    sectionRepeatInputEl.step = '1';
+    sectionRepeatInputEl.placeholder = rowRepeatInfo.mixed
+        ? 'gemischt'
+        : String(normalizeTimelineGroupRepeatCount(rowRepeatInfo.repeatCount || 1));
+    sectionRepeatInputEl.value = rowRepeatInfo.mixed
+        ? ''
+        : String(normalizeTimelineGroupRepeatCount(rowRepeatInfo.repeatCount || 1));
+    sectionRepeatInputEl.addEventListener('click', function (event) {
+        event.stopPropagation();
+    });
+    sectionRepeatInputEl.addEventListener('change', function () {
+        const normalizedCount = normalizeTimelineGroupRepeatCount(sectionRepeatInputEl.value);
+        sectionRepeatInputEl.value = String(normalizedCount);
+        setTimelineRowRepeatCount(rowGroups, normalizedCount);
+    });
+    sectionRepeatEl.appendChild(sectionRepeatInputEl);
+
+    sectionActionWrap.appendChild(sectionRepeatEl);
+    sectionHeaderEl.appendChild(sectionActionWrap);
+    return sectionHeaderEl;
+}
+
+function createTimelineEntryChip(group, rowGroups, patternDisplayInfo) {
+    const entry = group.entries[0];
+    const pattern = findPatternById(group.patternId);
+    if (!pattern) {
+        return null;
+    }
+
+    const entryCard = document.createElement('div');
+    entryCard.className = 'timeline-entry timeline-entry-chip';
+    entryCard.draggable = true;
+    bindParallelDropTarget(entryCard, rowGroups);
+    entryCard.addEventListener('dragstart', function (event) {
+        event.dataTransfer.setData('text/plain', JSON.stringify({
+            type: 'timeline-entry-group',
+            startIndex: group.startIndex,
+            count: group.count
+        }));
+    });
+
+    const chipHeadEl = document.createElement('div');
+    chipHeadEl.className = 'timeline-chip-head';
+    const titleEl = document.createElement('strong');
+    titleEl.textContent = patternDisplayInfo.displayNameByPatternId[pattern.id] || pattern.name;
+    const groupSummary = buildTimelineGroupSummary(group, timelineState.sourcePatterns);
+    const metaEl = document.createElement('small');
+    const displayedBarCount = groupSummary.totalBars || (Array.isArray(pattern.bars) ? pattern.bars.length : 0);
+    metaEl.textContent = groupSummary.barText || ('Takte: ' + displayedBarCount);
+    chipHeadEl.appendChild(titleEl);
+    entryCard.appendChild(chipHeadEl);
+
+    const detailsEl = document.createElement('details');
+    detailsEl.className = 'timeline-entry-details';
+    const detailsSummaryEl = document.createElement('summary');
+    detailsSummaryEl.textContent = 'Einstellungen';
+    detailsEl.appendChild(detailsSummaryEl);
+
+    const detailBodyEl = document.createElement('div');
+    detailBodyEl.className = 'timeline-entry-detail-body';
+    metaEl.className = 'timeline-chip-meta';
+    detailBodyEl.appendChild(metaEl);
+
+    if (groupSummary.text) {
+        const summaryEl = document.createElement('small');
+        summaryEl.textContent = groupSummary.text;
+        summaryEl.className = 'timeline-card-summary';
+        detailBodyEl.appendChild(summaryEl);
+    }
+
+    const swingWrap = document.createElement('div');
+    swingWrap.className = 'timeline-entry-targets';
+    const swingLabelEl = document.createElement('label');
+    swingLabelEl.appendChild(document.createTextNode('Swing'));
+    const swingInputEl = document.createElement('input');
+    swingInputEl.type = 'number';
+    swingInputEl.min = '0';
+    swingInputEl.max = '100';
+    swingInputEl.step = '1';
+    swingInputEl.placeholder = String(normalizeTimelineSwingFactor(timelineState.swingFactor));
+    swingInputEl.value = entry.swingFactor === null || entry.swingFactor === undefined
+        ? ''
+        : String(normalizeTimelineSwingFactor(entry.swingFactor));
+    swingInputEl.classList.add('timeline-input-compact');
+    swingInputEl.addEventListener('change', function () {
+        const normalizedValue = swingInputEl.value === ''
+            ? null
+            : normalizeTimelineSwingFactor(swingInputEl.value);
+        group.entries.forEach(function (groupEntry) {
+            groupEntry.swingFactor = normalizedValue;
+        });
+        swingInputEl.value = normalizedValue === null ? '' : String(normalizedValue);
+        updateTimelineMetadataNode();
+        renderTimelinePanel();
+    });
+    swingLabelEl.appendChild(swingInputEl);
+    swingWrap.appendChild(swingLabelEl);
+    detailBodyEl.appendChild(swingWrap);
+
+    if (pattern.instrument === 'Djembe') {
+        const handWrap = document.createElement('div');
+        handWrap.className = 'timeline-entry-targets';
+        const handLabelEl = document.createElement('label');
+        handLabelEl.appendChild(document.createTextNode('Handsatz'));
+        const handSelectEl = document.createElement('select');
+        [
+            { value: 'auto', label: 'Auto' },
+            { value: 'h2h', label: 'H2H' },
+            { value: 'hoh', label: 'HOH' }
+        ].forEach(function (optionData) {
+            const optionEl = document.createElement('option');
+            optionEl.value = optionData.value;
+            optionEl.textContent = optionData.label;
+            handSelectEl.appendChild(optionEl);
+        });
+        handSelectEl.value = entry.handMode || 'auto';
+        handSelectEl.addEventListener('change', function () {
+            group.entries.forEach(function (groupEntry) {
+                groupEntry.handMode = handSelectEl.value;
+            });
+            updateTimelineMetadataNode();
+            renderTimelinePanel();
+        });
+        handLabelEl.appendChild(handSelectEl);
+        handWrap.appendChild(handLabelEl);
+        detailBodyEl.appendChild(handWrap);
+    }
+
+    if (pattern.instrument === 'Djembe' || pattern.instrument === 'Bässe') {
+        const targetWrap = document.createElement('div');
+        targetWrap.className = 'timeline-entry-targets';
+        const selectableTargets = pattern.instrument === 'Djembe'
+            ? timelineDjembeTargets
+            : timelineBassTargets;
+        selectableTargets.forEach(function (targetName) {
+            const labelEl = document.createElement('label');
+            const checkboxEl = document.createElement('input');
+            checkboxEl.type = 'checkbox';
+            checkboxEl.checked = entry.targetInstruments.indexOf(targetName) !== -1;
+            checkboxEl.addEventListener('change', function () {
+                group.entries.forEach(function (groupEntry) {
+                    if (checkboxEl.checked) {
+                        if (groupEntry.targetInstruments.indexOf(targetName) === -1) {
+                            groupEntry.targetInstruments.push(targetName);
+                        }
+                    } else {
+                        groupEntry.targetInstruments = groupEntry.targetInstruments.filter(function (name) {
+                            return name !== targetName;
+                        });
+                        if (groupEntry.targetInstruments.length === 0) {
+                            groupEntry.targetInstruments = [targetName];
+                            checkboxEl.checked = true;
+                        }
+                    }
+                });
+                updateTimelineMetadataNode();
+            });
+            labelEl.appendChild(checkboxEl);
+            labelEl.appendChild(document.createTextNode(targetName.replace('_', ' ')));
+            targetWrap.appendChild(labelEl);
+        });
+        detailBodyEl.appendChild(targetWrap);
+    } else {
+        const fixedTargetEl = document.createElement('div');
+        fixedTargetEl.className = 'timeline-entry-targets';
+        fixedTargetEl.textContent = 'Instrument: ' + pattern.instrument;
+        detailBodyEl.appendChild(fixedTargetEl);
+    }
+
+    const actionWrap = document.createElement('div');
+    actionWrap.className = 'timeline-entry-actions';
+    const removeButton = document.createElement('button');
+    removeButton.type = 'button';
+    removeButton.textContent = 'Entfernen';
+    removeButton.addEventListener('click', function () {
+        timelineState.entries.splice(group.startIndex, group.count);
+        updateTimelineMetadataNode();
+        renderTimelinePanel();
+    });
+    actionWrap.appendChild(removeButton);
+    detailBodyEl.appendChild(actionWrap);
+
+    detailsEl.appendChild(detailBodyEl);
+    entryCard.appendChild(detailsEl);
+    return entryCard;
+}
+
 function alignPatternLibraryCardWidths() {
     const listEl = document.getElementById('timelinePatternList');
     if (!listEl) {
@@ -2163,252 +2346,17 @@ function renderTimelineSequence() {
         const rowEl = document.createElement('div');
         rowEl.className = 'timeline-sequence-row';
         bindParallelDropTarget(rowEl, rowGroups);
-        const rowIsParallelSection = visibleGroups.length > 1 || String(rowGroups[0].parallelGroupId || '') !== '';
-        const rowRepeatInfo = getTimelineRowRepeatInfo(rowGroups);
-
-        if (rowIsParallelSection) {
+        rowEl.classList.add('is-compact-section');
+        if (visibleGroups.length > 1 || String(rowGroups[0].parallelGroupId || '') !== '') {
             rowEl.classList.add('is-parallel-section');
-
-            const sectionHeaderEl = document.createElement('div');
-            sectionHeaderEl.className = 'timeline-section-header';
-            const sectionTitleEl = document.createElement('strong');
-            sectionTitleEl.textContent = 'Abschnitt';
-            sectionHeaderEl.appendChild(sectionTitleEl);
-
-            const sectionActionWrap = document.createElement('div');
-            sectionActionWrap.className = 'timeline-entry-actions timeline-section-actions';
-            const sectionRepeatEl = document.createElement('label');
-            sectionRepeatEl.className = 'timeline-entry-repeat-count';
-            sectionRepeatEl.appendChild(document.createTextNode('Wdh.'));
-            const sectionRepeatInputEl = document.createElement('input');
-            sectionRepeatInputEl.type = 'number';
-            sectionRepeatInputEl.min = '1';
-            sectionRepeatInputEl.max = '32';
-            sectionRepeatInputEl.step = '1';
-            sectionRepeatInputEl.placeholder = rowRepeatInfo.mixed
-                ? 'gemischt'
-                : String(normalizeTimelineGroupRepeatCount(rowRepeatInfo.repeatCount || 1));
-            sectionRepeatInputEl.value = rowRepeatInfo.mixed
-                ? ''
-                : String(normalizeTimelineGroupRepeatCount(rowRepeatInfo.repeatCount || 1));
-            sectionRepeatInputEl.addEventListener('click', function (event) {
-                event.stopPropagation();
-            });
-            sectionRepeatInputEl.addEventListener('change', function () {
-                const normalizedCount = normalizeTimelineGroupRepeatCount(sectionRepeatInputEl.value);
-                sectionRepeatInputEl.value = String(normalizedCount);
-                setTimelineRowRepeatCount(rowGroups, normalizedCount);
-            });
-            sectionRepeatEl.appendChild(sectionRepeatInputEl);
-
-            const sectionReduceButton = document.createElement('button');
-            sectionReduceButton.type = 'button';
-            sectionReduceButton.textContent = '-';
-            sectionReduceButton.disabled = rowRepeatInfo.mixed || rowRepeatInfo.repeatCount <= 1;
-            sectionReduceButton.addEventListener('click', function () {
-                removeTimelineRowRepeatUnit(rowGroups);
-            });
-
-            sectionActionWrap.appendChild(sectionRepeatEl);
-            sectionActionWrap.appendChild(sectionReduceButton);
-            sectionHeaderEl.appendChild(sectionActionWrap);
-            rowEl.appendChild(sectionHeaderEl);
         }
+        rowEl.appendChild(createTimelineSectionHeader(rowGroups, rowIndex));
 
         visibleGroups.forEach(function (group) {
-            const entry = group.entries[0];
-            const pattern = findPatternById(group.patternId);
-            if (!pattern) {
-                return;
+            const entryChip = createTimelineEntryChip(group, rowGroups, patternDisplayInfo);
+            if (entryChip) {
+                rowEl.appendChild(entryChip);
             }
-            const repeatInfo = getTimelineGroupRepeatInfo(group);
-
-            const entryCard = document.createElement('div');
-            entryCard.className = 'timeline-entry';
-            entryCard.draggable = true;
-            bindParallelDropTarget(entryCard, rowGroups);
-            entryCard.addEventListener('dragstart', function (event) {
-                event.dataTransfer.setData('text/plain', JSON.stringify({
-                    type: 'timeline-entry-group',
-                    startIndex: group.startIndex,
-                    count: group.count
-                }));
-            });
-
-            const mainWrap = document.createElement('div');
-            mainWrap.className = 'timeline-entry-main';
-            const titleEl = document.createElement('strong');
-            titleEl.textContent = patternDisplayInfo.displayNameByPatternId[pattern.id] || pattern.name;
-            const groupSummary = buildTimelineGroupSummary(group, timelineState.sourcePatterns);
-            const metaEl = document.createElement('small');
-            const displayedBarCount = groupSummary.totalBars || (Array.isArray(pattern.bars) ? pattern.bars.length : 0);
-            const repeatSuffix = !rowIsParallelSection && repeatInfo.repeatCount > 1
-                ? ' | Wiederholung x' + repeatInfo.repeatCount
-                : '';
-            metaEl.textContent = groupSummary.barText
-                ? (groupSummary.barText + repeatSuffix)
-                : ('Takte: ' + displayedBarCount + (!groupSummary.text ? repeatSuffix : ''));
-            mainWrap.appendChild(titleEl);
-            mainWrap.appendChild(metaEl);
-            if (groupSummary.text) {
-                const summaryEl = document.createElement('small');
-                summaryEl.textContent = groupSummary.text;
-                summaryEl.className = 'timeline-card-summary';
-                mainWrap.appendChild(summaryEl);
-            }
-
-            const swingWrap = document.createElement('div');
-            swingWrap.className = 'timeline-entry-targets';
-            const swingLabelEl = document.createElement('label');
-            swingLabelEl.appendChild(document.createTextNode('Swing'));
-            const swingInputEl = document.createElement('input');
-            swingInputEl.type = 'number';
-            swingInputEl.min = '0';
-            swingInputEl.max = '100';
-            swingInputEl.step = '1';
-            swingInputEl.placeholder = String(normalizeTimelineSwingFactor(timelineState.swingFactor));
-            swingInputEl.value = entry.swingFactor === null || entry.swingFactor === undefined
-                ? ''
-                : String(normalizeTimelineSwingFactor(entry.swingFactor));
-            swingInputEl.classList.add('timeline-input-compact');
-            swingInputEl.addEventListener('change', function () {
-                const normalizedValue = swingInputEl.value === ''
-                    ? null
-                    : normalizeTimelineSwingFactor(swingInputEl.value);
-                group.entries.forEach(function (groupEntry) {
-                    groupEntry.swingFactor = normalizedValue;
-                });
-                swingInputEl.value = normalizedValue === null ? '' : String(normalizedValue);
-                updateTimelineMetadataNode();
-                renderTimelinePanel();
-            });
-            swingLabelEl.appendChild(swingInputEl);
-            swingWrap.appendChild(swingLabelEl);
-            mainWrap.appendChild(swingWrap);
-
-            if (pattern.instrument === 'Djembe') {
-                const handWrap = document.createElement('div');
-                handWrap.className = 'timeline-entry-targets';
-                const handLabelEl = document.createElement('label');
-                handLabelEl.appendChild(document.createTextNode('Handsatz'));
-                const handSelectEl = document.createElement('select');
-                [
-                    { value: 'auto', label: 'Auto' },
-                    { value: 'h2h', label: 'H2H' },
-                    { value: 'hoh', label: 'HOH' }
-                ].forEach(function (optionData) {
-                    const optionEl = document.createElement('option');
-                    optionEl.value = optionData.value;
-                    optionEl.textContent = optionData.label;
-                    handSelectEl.appendChild(optionEl);
-                });
-                handSelectEl.value = entry.handMode || 'auto';
-                handSelectEl.addEventListener('change', function () {
-                    group.entries.forEach(function (groupEntry) {
-                        groupEntry.handMode = handSelectEl.value;
-                    });
-                    updateTimelineMetadataNode();
-                    renderTimelinePanel();
-                });
-                handLabelEl.appendChild(handSelectEl);
-                handWrap.appendChild(handLabelEl);
-                mainWrap.appendChild(handWrap);
-            }
-
-            if (pattern.instrument === 'Djembe' || pattern.instrument === 'Bässe') {
-                const targetWrap = document.createElement('div');
-                targetWrap.className = 'timeline-entry-targets';
-                const selectableTargets = pattern.instrument === 'Djembe'
-                    ? timelineDjembeTargets
-                    : timelineBassTargets;
-                selectableTargets.forEach(function (targetName) {
-                    const labelEl = document.createElement('label');
-                    const checkboxEl = document.createElement('input');
-                    checkboxEl.type = 'checkbox';
-                    checkboxEl.checked = entry.targetInstruments.indexOf(targetName) !== -1;
-                    checkboxEl.addEventListener('change', function () {
-                        group.entries.forEach(function (groupEntry) {
-                            if (checkboxEl.checked) {
-                                if (groupEntry.targetInstruments.indexOf(targetName) === -1) {
-                                    groupEntry.targetInstruments.push(targetName);
-                                }
-                            } else {
-                                groupEntry.targetInstruments = groupEntry.targetInstruments.filter(function (name) {
-                                    return name !== targetName;
-                                });
-                                if (groupEntry.targetInstruments.length === 0) {
-                                    groupEntry.targetInstruments = [targetName];
-                                    checkboxEl.checked = true;
-                                }
-                            }
-                        });
-                        updateTimelineMetadataNode();
-                    });
-                    labelEl.appendChild(checkboxEl);
-                    labelEl.appendChild(document.createTextNode(targetName.replace('_', ' ')));
-                    targetWrap.appendChild(labelEl);
-                });
-                mainWrap.appendChild(targetWrap);
-            } else {
-                const fixedTargetEl = document.createElement('div');
-                fixedTargetEl.className = 'timeline-entry-targets';
-                fixedTargetEl.textContent = 'Instrument: ' + pattern.instrument;
-                mainWrap.appendChild(fixedTargetEl);
-            }
-
-            const actionWrap = document.createElement('div');
-            actionWrap.className = 'timeline-entry-actions';
-            if (!rowIsParallelSection) {
-                const repeatCountEl = document.createElement('label');
-                repeatCountEl.className = 'timeline-entry-repeat-count';
-                repeatCountEl.appendChild(document.createTextNode('Wdh.'));
-                const repeatInputEl = document.createElement('input');
-                repeatInputEl.type = 'number';
-                repeatInputEl.min = '1';
-                repeatInputEl.max = '32';
-                repeatInputEl.step = '1';
-                repeatInputEl.value = String(normalizeTimelineGroupRepeatCount(repeatInfo.repeatCount));
-                repeatInputEl.addEventListener('click', function (event) {
-                    event.stopPropagation();
-                });
-                repeatInputEl.addEventListener('change', function () {
-                    const normalizedCount = normalizeTimelineGroupRepeatCount(repeatInputEl.value);
-                    repeatInputEl.value = String(normalizedCount);
-                    setTimelineGroupRepeatCount(group, repeatInfo, normalizedCount);
-                });
-                repeatCountEl.appendChild(repeatInputEl);
-
-                const reduceButton = document.createElement('button');
-                reduceButton.type = 'button';
-                reduceButton.textContent = '-';
-                reduceButton.disabled = repeatInfo.repeatCount <= 1;
-                reduceButton.addEventListener('click', function () {
-                    if (repeatInfo.repeatCount <= 1 || repeatInfo.unitLength <= 0) {
-                        return;
-                    }
-                    timelineState.entries.splice(group.endIndex - repeatInfo.unitLength, repeatInfo.unitLength);
-                    updateTimelineMetadataNode();
-                    renderTimelinePanel();
-                });
-
-                actionWrap.appendChild(repeatCountEl);
-                actionWrap.appendChild(reduceButton);
-            }
-
-            const removeButton = document.createElement('button');
-            removeButton.type = 'button';
-            removeButton.textContent = 'Entfernen';
-            removeButton.addEventListener('click', function () {
-                timelineState.entries.splice(group.startIndex, group.count);
-                updateTimelineMetadataNode();
-                renderTimelinePanel();
-            });
-
-            actionWrap.appendChild(removeButton);
-
-            entryCard.appendChild(mainWrap);
-            entryCard.appendChild(actionWrap);
-            rowEl.appendChild(entryCard);
         });
 
         rowEl.appendChild(createTimelineParallelDropzone(rowGroups));
