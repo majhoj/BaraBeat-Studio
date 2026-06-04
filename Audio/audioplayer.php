@@ -729,14 +729,172 @@ function getPatternOutStep(pattern) {
   return matchedOutStep;
 }
 
+function getPatternControlStep(pattern, controlType) {
+  const patternBars = expandPatternBars(pattern);
+  if (patternBars.length === 0) {
+    return null;
+  }
+
+  let stepOffset = 0;
+  let matchedControlStep = null;
+
+  for (let barIndex = 0; barIndex < patternBars.length; barIndex++) {
+    const bar = patternBars[barIndex];
+    const barNotes = getBarPlayableNotes(bar);
+    const barControls = bar && Array.isArray(bar.controls) ? bar.controls : [];
+    const matchingControl = barControls
+      .filter(function (control) {
+        return control && control.type === controlType;
+      })
+      .sort(function (controlA, controlB) {
+        return Number(controlA.stepIndex) - Number(controlB.stepIndex);
+      })[0];
+
+    if (matchingControl) {
+      const controlStep = Math.max(0, Number(matchingControl.stepIndex) || 0);
+      matchedControlStep = stepOffset + Math.min(controlStep, barNotes.length);
+      if (controlType !== 'out') {
+        return matchedControlStep;
+      }
+    }
+
+    stepOffset += barNotes.length;
+  }
+
+  return matchedControlStep;
+}
+
+function getPatternInStep(pattern) {
+  return getPatternControlStep(pattern, 'in');
+}
+
+function getTimelineStepsPerBar() {
+  if (rhythmType === 'tenaer') {
+    return 24;
+  }
+  if (rhythmType === 'neunaer') {
+    return 18;
+  }
+  return 32;
+}
+
+function buildTimelinePickupNotes(notes, inStep) {
+  const safeNotes = Array.isArray(notes) ? notes : [];
+  if (safeNotes.length === 0 || inStep === null || inStep === undefined) {
+    return [];
+  }
+
+  const stepsPerBar = getTimelineStepsPerBar();
+  const safeInStep = Math.max(0, Math.min(safeNotes.length - 1, Number(inStep) || 0));
+  const pickupStartStep = stepsPerBar > 0
+    ? Math.floor(safeInStep / stepsPerBar) * stepsPerBar
+    : 0;
+  const pickupLength = Math.max(stepsPerBar, safeNotes.length - pickupStartStep);
+  const pickupNotes = new Array(pickupLength).fill('f');
+
+  for (let sourceStep = safeInStep; sourceStep < safeNotes.length; sourceStep++) {
+    pickupNotes[sourceStep - pickupStartStep] = safeNotes[sourceStep] || 'f';
+  }
+
+  return pickupNotes;
+}
+
+function sectionHasTimelineNotes(section) {
+  return trackInstrumentNames.some(function (instrumentName) {
+    return Array.isArray(section && section.trackNotes && section.trackNotes[instrumentName]) &&
+      section.trackNotes[instrumentName].some(function (noteValue) {
+        return noteValue && noteValue !== 'f';
+      });
+  });
+}
+
+function mergeTimelinePickupIntoHostSection(hostSection, pickupSection) {
+  if (!hostSection || !pickupSection) {
+    return;
+  }
+
+  const hostLength = Math.max.apply(null, trackInstrumentNames.map(function (instrumentName) {
+    return getSectionLength(hostSection.trackNotes[instrumentName]);
+  }).concat(0));
+  const stepsPerBar = getTimelineStepsPerBar();
+  const pickupLength = Math.max.apply(null, trackInstrumentNames.map(function (instrumentName) {
+    return getSectionLength(pickupSection.trackNotes[instrumentName]);
+  }).concat(0));
+  const pickupOffset = Math.max(0, hostLength - Math.max(stepsPerBar, pickupLength));
+
+  trackInstrumentNames.forEach(function (instrumentName) {
+    const pickupNotes = pickupSection.trackNotes[instrumentName];
+    if (!Array.isArray(pickupNotes) || pickupNotes.length === 0) {
+      return;
+    }
+    hostSection.trackNotes[instrumentName] = mergeNotesIntoTrack(
+      hostSection.trackNotes[instrumentName],
+      pickupNotes,
+      pickupOffset
+    );
+    if (pickupSection.trackHandModes[instrumentName]) {
+      hostSection.trackHandModes[instrumentName] = pickupSection.trackHandModes[instrumentName];
+    }
+  });
+}
+
+function mergeTimelineEntryPickupsIntoPreviousSection(sections, entryDataList) {
+  const entries = Array.isArray(entryDataList) ? entryDataList : [];
+  const pickupSection = createOrderedSection('Auftakt');
+  const pickupLabelNames = [];
+
+  entries.forEach(function (entryData) {
+    if (!entryData || entryData.patternInStep === null || entryData.patternInStep === undefined) {
+      return;
+    }
+    const pickupNotes = buildTimelinePickupNotes(entryData.patternNotes, entryData.patternInStep);
+    if (pickupNotes.length === 0) {
+      return;
+    }
+    entryData.targetInstruments.forEach(function (instrumentName) {
+      pickupSection.trackNotes[instrumentName] = mergeNotesIntoTrack(
+        pickupSection.trackNotes[instrumentName],
+        pickupNotes,
+        0
+      );
+      if (instrumentName.indexOf('Djembe_') === 0) {
+        pickupSection.trackHandModes[instrumentName] = String(entryData.handMode || '');
+      }
+    });
+    if (entryData.labelName && pickupLabelNames.indexOf(entryData.labelName) === -1) {
+      pickupLabelNames.push(entryData.labelName);
+    }
+    if (pickupSection.swingFactor === null && entryData.swingFactor !== null && entryData.swingFactor !== undefined) {
+      pickupSection.swingFactor = entryData.swingFactor;
+    }
+  });
+
+  if (!sectionHasTimelineNotes(pickupSection)) {
+    return;
+  }
+
+  pickupSection.labelName = pickupLabelNames.length > 0
+    ? pickupLabelNames.join(' + ') + ' Auftakt'
+    : 'Auftakt';
+
+  for (let sectionIndex = sections.length - 1; sectionIndex >= 0; sectionIndex--) {
+    if (sectionHasTimelineNotes(sections[sectionIndex])) {
+      mergeTimelinePickupIntoHostSection(sections[sectionIndex], pickupSection);
+      return;
+    }
+  }
+
+  sections.push(pickupSection);
+}
+
 function applyOutToPatternNotes(patternNotes, outStep) {
   const safeNotes = Array.isArray(patternNotes) ? patternNotes.slice() : [];
   if (outStep === null || outStep === undefined) {
     return safeNotes;
   }
 
-  const safeOutStep = Math.max(0, Math.min(safeNotes.length, Number(outStep) || 0));
-  for (let stepIndex = safeOutStep; stepIndex < safeNotes.length; stepIndex++) {
+  const safeOutStep = Math.max(0, Math.min(safeNotes.length - 1, Number(outStep) || 0));
+  for (let stepIndex = safeOutStep + 1; stepIndex < safeNotes.length; stepIndex++) {
     safeNotes[stepIndex] = 'f';
   }
 
@@ -783,10 +941,6 @@ function getTimelineEntryOutStep(entryData, effectiveNotesLength) {
   let outStep = safeEffectiveLength > sourceLength && sourceLength > 0
     ? safeEffectiveLength - sourceLength + entryData.patternOutStep
     : entryData.patternOutStep;
-
-  if (entryData.label === 'Echauffement') {
-    outStep += 1;
-  }
 
   return outStep;
 }
@@ -1449,6 +1603,7 @@ function buildTimelineSections(config) {
     const patternNotes = startsContinuingAccompaniment
       ? flattenContinuingAccompanimentNotes(pattern)
       : flattenPatternNotes(pattern);
+    const patternInStep = getPatternInStep(pattern);
     const patternOutStep = getPatternOutStep(pattern);
     expandedEntries.push({
       label: sectionLabel,
@@ -1467,6 +1622,7 @@ function buildTimelineSections(config) {
         : Math.max(0, Math.min(100, Number(entry.swingFactor) || 0)),
       startsContinuingAccompaniment: startsContinuingAccompaniment,
       patternNotes: patternNotes,
+      patternInStep: patternInStep,
       patternOutStep: patternOutStep
     });
   });
@@ -1506,6 +1662,10 @@ function buildTimelineSections(config) {
       }
 
       if (entryData.label === 'Echauffement') {
+        return true;
+      }
+
+      if (entryData.label !== 'Begleitung') {
         return true;
       }
 
@@ -1601,6 +1761,7 @@ function buildTimelineSections(config) {
             repeatedSection.labelName
           ].join('::');
           normalizeSectionTrackLoops(repeatedSection);
+          mergeTimelineEntryPickupsIntoPreviousSection(sections, repeatEntries);
           sections.push(repeatedSection);
         });
         blockStartIndex = blockEndIndex;
@@ -1665,6 +1826,7 @@ function buildTimelineSections(config) {
         mergedSection.labelName
       ].join('::');
       normalizeSectionTrackLoops(mergedSection);
+      mergeTimelineEntryPickupsIntoPreviousSection(sections, blockEntries);
       sections.push(mergedSection);
       blockStartIndex = blockEndIndex;
       continue;
@@ -1692,7 +1854,6 @@ function buildTimelineSections(config) {
 
         if (!currentCycleSection) {
           currentCycleSection = createSectionFromEntry(blockLabel, occurrenceEntry.labelName, occurrenceEntry);
-          sections.push(currentCycleSection);
           return;
         }
 
@@ -1718,6 +1879,13 @@ function buildTimelineSections(config) {
 
       if (currentCycleSection) {
         normalizeSectionTrackLoops(currentCycleSection);
+        const cycleEntries = blockLanes
+          .map(function (laneData) {
+            return laneData.entries[occurrenceIndex];
+          })
+          .filter(Boolean);
+        mergeTimelineEntryPickupsIntoPreviousSection(sections, cycleEntries);
+        sections.push(currentCycleSection);
       }
     }
 
