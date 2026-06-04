@@ -299,7 +299,7 @@ html {
     display: block;
     margin-left: auto;
     margin-right: auto;
-    background: white;
+    background: transparent;
     box-shadow: var(--ui-shadow-soft);
 }
 
@@ -2292,11 +2292,11 @@ html {
     border: 1px dashed var(--ui-border-strong);
     border-radius: 10px;
     color: var(--ui-text-soft);
-    min-height: 34px;
+    min-height: 17px;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 4px 8px;
+    padding: 2px 8px;
     width: min(100%, var(--timeline-library-card-width, 260px));
     align-self: flex-start;
     background: rgba(255, 255, 255, 0.72);
@@ -2308,7 +2308,7 @@ html {
     min-width: 120px;
     flex: 0 0 auto;
     align-self: flex-start;
-    min-height: 58px;
+    min-height: 29px;
     box-sizing: border-box;
 }
 

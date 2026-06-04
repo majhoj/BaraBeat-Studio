@@ -78,6 +78,8 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
                 <button type="button" id="button4">Binäres Notenblatt</button>
                 <button type="button" id="button5">Tenäres Notenblatt</button>
                 <button type="button" id="button8">Tenäres 9/8 Notenblatt</button>
+                <button type="button" id="addSheetPageButton">Blatt hinzufügen</button>
+                <button type="button" id="deleteSheetPageButton">Blatt löschen</button>
                 <button type="button" id="button3">Noten lesen</button>
             </div>
         </details>
@@ -398,6 +400,10 @@ var y = 172,
     paletteBaseY = 202,
     syllableIndex = 0,
     staffStartY = 172,
+    sheetWidth = 1050,
+    sheetPageHeight = 1480,
+    sheetPageGapY = 70,
+    sheetLineStepY = 120,
     gridSize = (850 / 34) / 2,
     gridSizeY = 2.5,
     gridSizeX = 29,
@@ -472,6 +478,7 @@ const instrumentChooserSelector = ".instrument-chooser, #instrumentChooser";
 const functionChooserSelector = ".function-chooser, #functionChooser";
 const chooserSelector = instrumentChooserSelector + ", " + functionChooserSelector;
 const timelineMetadataSelector = "#timeline_metadata";
+const scoreMetadataSelector = "#score_metadata";
 const removableCanvasElementSelector = canvasElementSelector + ", " + chooserSelector + ", " + timelineMetadataSelector;
 const exportableElementSelector = "#notenlinien, #basis, " + removableCanvasElementSelector;
 const readableElementSelector = "#wiederholung, " + chooserSelector;
@@ -607,12 +614,12 @@ edit_text = function () {
 };
 
 // Zeichenfläche und Titel festlegen
-var s = Snap(1050, 1480).attr({ id: "myRect1" });
+var s = Snap(sheetWidth, sheetPageHeight).attr({ id: "myRect1" });
 if (s.node) {
-    s.node.setAttribute('viewBox', '0 0 1050 1480');
+    s.node.setAttribute('viewBox', '0 0 ' + sheetWidth + ' ' + sheetPageHeight);
     s.node.setAttribute('preserveAspectRatio', 'xMinYMin meet');
 }
-var canv = s.rect(0, 0, 1050, 1480).attr({ fill: "white", stroke: "black", strokeWidth: 0.5, opacity: 0.300, id: "myRect2" });
+var canv = s.rect(0, 0, sheetWidth, sheetPageHeight).attr({ fill: "white", stroke: "none", opacity: 0.001, id: "myRect2" });
 canv.drag(shadow_move, shadow_start, shadow_end);
 
 if (s.node) {
@@ -1130,6 +1137,7 @@ function getCurrentHistorySnapshot() {
     });
     return {
         rhythm: rhythm || 'tenaer',
+        lineCount: normalizeSheetLineCount(zeilenAnzahl),
         title: titel ? (titel.attr('text') || '') : '',
         elementsMarkup: elementMarkup.join('')
     };
@@ -1138,6 +1146,7 @@ function getCurrentHistorySnapshot() {
 function areHistorySnapshotsEqual(leftSnapshot, rightSnapshot) {
     return Boolean(leftSnapshot && rightSnapshot) &&
         leftSnapshot.rhythm === rightSnapshot.rhythm &&
+        normalizeSheetLineCount(leftSnapshot.lineCount) === normalizeSheetLineCount(rightSnapshot.lineCount) &&
         leftSnapshot.title === rightSnapshot.title &&
         leftSnapshot.elementsMarkup === rightSnapshot.elementsMarkup;
 }
@@ -1250,6 +1259,7 @@ function restoreHistorySnapshot(snapshot) {
     }
     resetSelectionArtifacts();
     const syncOptions = buildCurrentTimelineSyncOptions();
+    zeilenAnzahl = normalizeSheetLineCount(snapshot.lineCount || zeilenProBlatt);
     drawHistoryBaseSheet(snapshot.rhythm);
     removeCanvasElements(removableCanvasElementSelector);
     if (snapshot.elementsMarkup) {
@@ -1330,7 +1340,7 @@ function resolveInsertTemplate(templateValue) {
     return typeof templateValue === 'function' ? templateValue() : templateValue;
 }
 
-function getPaletteCloneLocalReferenceX(templateElement) {
+function getPaletteCloneLocalReferenceX(templateElement, elementId) {
     if (!templateElement || typeof templateElement.getBBox !== 'function') {
         return NaN;
     }
@@ -1342,6 +1352,17 @@ function getPaletteCloneLocalReferenceX(templateElement) {
         const markerX = markerLine ? Number(markerLine.attr('x1')) : NaN;
         if (Number.isFinite(markerX)) {
             return markerX;
+        }
+    }
+    if (elementId === 'wiederholung') {
+        const repeatDots = typeof templateElement.selectAll === 'function'
+            ? templateElement.selectAll('circle')
+            : [];
+        if (repeatDots && repeatDots.length) {
+            const dotX = Number(repeatDots[0].attr('cx'));
+            if (Number.isFinite(dotX)) {
+                return dotX;
+            }
         }
     }
 
@@ -1364,20 +1385,41 @@ function getPaletteInsertReferenceX() {
     return paletteOffsetX + firstNoteLineX - stepsBackFromFirstLine * snapStep;
 }
 
+function getPaletteInsertFineTuneX(elementId) {
+    const noteSymbolIds = [
+        'tone',
+        'bass',
+        'slap',
+        'tone_muffled',
+        'slap_muffled',
+        'tone_flam',
+        'slap_flam',
+        'bass_slap_flam'
+    ];
+    if (noteSymbolIds.indexOf(elementId) !== -1) {
+        return 1;
+    }
+    return 0;
+}
+
+function getPaletteInsertFineTuneY(elementId) {
+    return elementId === 'wiederholung' ? -10 : 0;
+}
+
 function createPaletteClone(templateElement, elementId, offsetX, offsetY) {
     const resolvedOffsetX = resolveInsertOffset(offsetX);
     const resolvedOffsetY = resolveInsertOffset(offsetY);
-    const localReferenceX = getPaletteCloneLocalReferenceX(templateElement);
+    const localReferenceX = getPaletteCloneLocalReferenceX(templateElement, elementId);
     const insertReferenceX = getPaletteInsertReferenceX();
     const transformX = Number.isFinite(localReferenceX) && Number.isFinite(insertReferenceX)
-        ? insertReferenceX - localReferenceX
+        ? insertReferenceX - localReferenceX + getPaletteInsertFineTuneX(elementId)
         : paletteOffsetX + resolvedOffsetX;
     const clone = templateElement.clone().attr({
         class: 'shp',
         id: elementId,
-        transform: "t" + transformX + "," + (paletteOffsetY + resolvedOffsetY)
+        transform: "t" + transformX + "," + (paletteOffsetY + resolvedOffsetY + getPaletteInsertFineTuneY(elementId))
     });
-    clone.drag(move, sel_start);
+    clone.drag(move, sel_start, stop_m);
     return clone;
 }
 
@@ -1399,7 +1441,7 @@ function bindPaletteInsert(sourceElement, templateElement, elementId, offsetX, o
 }
 
 function bindEditableTextElement(textElement) {
-    textElement.drag(move, sel_start);
+    textElement.drag(move, sel_start, stop_m);
     textElement.dblclick(edit_text);
     textElement.touchstart(captureTextTouchStart);
     textElement.touchend(handleTextTouchEnd);
@@ -1500,7 +1542,7 @@ function snapElementToVerticalTarget(element) {
     const localMatrix = transformState && transformState.localMatrix ? transformState.localMatrix : null;
     const nextX = localMatrix ? localMatrix.e : 0;
     const nextY = (localMatrix ? localMatrix.f : 0) + deltaY;
-    element.transform("translate(" + nextX + "," + nextY + ")");
+    element.transform("t" + nextX + "," + nextY);
     return element;
 }
 
@@ -1528,14 +1570,21 @@ function drawRhythmSheet(config) {
     repeatMarkerGridOffsetX = config.repeatMarkerOffsetXValue;
     paletteInsertTargetX = initialChooserX;
 
+    if (shouldResetTitle && config.resetLineCount !== false) {
+        zeilenAnzahl = zeilenProBlatt;
+    }
+    zeilenAnzahl = normalizeSheetLineCount(zeilenAnzahl);
+    updateSheetCanvasDimensions();
     clear_all();
+    drawSheetPageFrames();
     syllableIndex = 0;
 
     for (var j = 0; j < zeilenAnzahl; j++) {
-        s.rect(100, staffStartY - 10 + j * 120, 3, 60).attr({ id: "notenlinien" });
-        s.rect(525, staffStartY - 10 + j * 120, 3, 60).attr({ id: "notenlinien" });
-        s.rect(950, staffStartY - 10 + j * 120, 3, 60).attr({ id: "notenlinien" });
-        s.text(90, staffStartY + 30 + j * 120, j + 1).attr({
+        const lineBaseY = getSheetLineBaseY(j);
+        s.rect(100, lineBaseY - 10, 3, 60).attr({ id: "notenlinien" });
+        s.rect(525, lineBaseY - 10, 3, 60).attr({ id: "notenlinien" });
+        s.rect(950, lineBaseY - 10, 3, 60).attr({ id: "notenlinien" });
+        s.text(90, lineBaseY + 30, j + 1).attr({
             id: "notenlinien",
             'font-size': 24,
             'font-family': 'sans-serif',
@@ -1548,7 +1597,7 @@ function drawRhythmSheet(config) {
             const x = 100 + gridLineStepX * i;
 
             if (i != config.centerDividerIndex) {
-                s.text(x - 3, staffStartY + j * 120 + config.syllableYOffset, config.countSyllables[syllableIndex]).attr({
+                s.text(x - 3, lineBaseY + config.syllableYOffset, config.countSyllables[syllableIndex]).attr({
                     id: "notenlinien",
                     'font-size': 10
                 });
@@ -1556,7 +1605,7 @@ function drawRhythmSheet(config) {
                 if (syllableIndex == config.countSyllables.length) {
                     syllableIndex = 0;
                 }
-                s.rect(x, staffStartY + j * 120, 1.5, 40).attr({ id: "notenlinien" });
+                s.rect(x, lineBaseY, 1.5, 40).attr({ id: "notenlinien" });
             }
 
             if (config.beatStartIndices.indexOf(i) !== -1) {
@@ -1564,12 +1613,12 @@ function drawRhythmSheet(config) {
                 if (beatNumber > config.beatWrapAt) {
                     beatNumber -= config.beatWrapAt;
                 }
-                s.text(x - 3, staffStartY + j * 120 + config.beatNumberYOffset, beatNumber).attr({
+                s.text(x - 3, lineBaseY + config.beatNumberYOffset, beatNumber).attr({
                     id: "notenlinien",
                     'font-size': 10
                 });
-                s.rect(x, staffStartY + j * 120, beatBarWidth, 1.5).attr({ id: "notenlinien" });
-                s.rect(x, staffStartY + j * 120 + 5, beatBarWidth, 1.5).attr({ id: "notenlinien" });
+                s.rect(x, lineBaseY, beatBarWidth, 1.5).attr({ id: "notenlinien" });
+                s.rect(x, lineBaseY + 5, beatBarWidth, 1.5).attr({ id: "notenlinien" });
             }
         }
     }
@@ -1593,8 +1642,159 @@ var titel = s.text(100, y - 100, defaultRhythmTitle).attr({ id: 'basis', 'font-s
 titel.click(edit_title);
 titel.dblclick(edit_title);
 
+const zeilenProBlatt = 10;
 let zeilenAnzahl = 10;
 let rhythm = "binaer";
+
+function normalizeSheetLineCount(lineCount) {
+    const normalizedLineCount = Math.ceil(Number(lineCount) || zeilenProBlatt);
+    return Math.max(zeilenProBlatt, normalizedLineCount);
+}
+
+function getSheetPageCount(lineCount) {
+    return Math.max(1, Math.ceil(normalizeSheetLineCount(lineCount || zeilenAnzahl) / zeilenProBlatt));
+}
+
+function getSheetPageOffsetY(pageIndex) {
+    return pageIndex * (sheetPageHeight + sheetPageGapY);
+}
+
+function getSheetDocumentHeight(lineCount) {
+    const pageCount = getSheetPageCount(lineCount);
+    return pageCount * sheetPageHeight + (pageCount - 1) * sheetPageGapY;
+}
+
+function getSheetLinePageIndex(lineIndex) {
+    return Math.floor(Math.max(0, Number(lineIndex) || 0) / zeilenProBlatt);
+}
+
+function getSheetLineLocalIndex(lineIndex) {
+    return Math.max(0, Number(lineIndex) || 0) % zeilenProBlatt;
+}
+
+function getSheetLineBaseY(lineIndex) {
+    const pageIndex = getSheetLinePageIndex(lineIndex);
+    return staffStartY + getSheetLineLocalIndex(lineIndex) * sheetLineStepY + getSheetPageOffsetY(pageIndex);
+}
+
+function getSheetLineIndexFromY(centerY, lineCount, referenceOffsetY) {
+    const resolvedLineCount = normalizeSheetLineCount(lineCount || zeilenAnzahl);
+    const resolvedReferenceOffsetY = Number(referenceOffsetY) || 0;
+    let closestLineIndex = 0;
+    let closestDistance = Infinity;
+
+    for (let lineIndex = 0; lineIndex < resolvedLineCount; lineIndex++) {
+        const expectedY = getSheetLineBaseY(lineIndex) + resolvedReferenceOffsetY;
+        const distance = Math.abs(centerY - expectedY);
+        if (distance < closestDistance) {
+            closestDistance = distance;
+            closestLineIndex = lineIndex;
+        }
+    }
+
+    return closestLineIndex;
+}
+
+function updateSheetCanvasDimensions() {
+    const documentHeight = getSheetDocumentHeight(zeilenAnzahl);
+    if (s && s.node) {
+        s.attr({ width: sheetWidth, height: documentHeight });
+        s.node.setAttribute('viewBox', '0 0 ' + sheetWidth + ' ' + documentHeight);
+    }
+    if (canv) {
+        canv.attr({ width: sheetWidth, height: documentHeight });
+    }
+    updateSheetPageControls();
+}
+
+function updateSheetPageControls() {
+    const deleteButtonEl = document.getElementById('deleteSheetPageButton');
+    if (deleteButtonEl) {
+        deleteButtonEl.disabled = getSheetPageCount(zeilenAnzahl) <= 1;
+    }
+}
+
+function redrawCurrentSheetFromSnapshot(snapshot, syncOptions) {
+    if (!snapshot) {
+        return;
+    }
+    resetSelectionArtifacts();
+    zeilenAnzahl = normalizeSheetLineCount(snapshot.lineCount || zeilenProBlatt);
+    drawHistoryBaseSheet(snapshot.rhythm || rhythm);
+    removeCanvasElements(removableCanvasElementSelector);
+    if (snapshot.elementsMarkup) {
+        s.append(Snap.parseStr(snapshot.elementsMarkup));
+    }
+    bindLoadedScoreElements();
+    setRhythmTitle(snapshot.title || 'Unbenannt');
+    syncStateAfterHistoryRestore(syncOptions || buildCurrentTimelineSyncOptions());
+}
+
+function removeElementsOutsideSheetLineCount(lineCount) {
+    const nextSheetHeight = getSheetDocumentHeight(lineCount);
+    s.selectAll(removableCanvasElementSelector).forEach(function (el) {
+        if (el.attr('id') == 'timeline_metadata') {
+            return;
+        }
+        const bbox = typeof el.getBBox === 'function' ? el.getBBox() : null;
+        if (!bbox || !Number.isFinite(bbox.cy)) {
+            return;
+        }
+        if (bbox.cy > nextSheetHeight) {
+            el.remove();
+        }
+    });
+}
+
+function addSheetPage() {
+    recordHistorySnapshot();
+    const syncOptions = buildCurrentTimelineSyncOptions();
+    const snapshot = getCurrentHistorySnapshot();
+    snapshot.lineCount = normalizeSheetLineCount(zeilenAnzahl) + zeilenProBlatt;
+    redrawCurrentSheetFromSnapshot(snapshot, syncOptions);
+}
+
+function deleteSheetPage() {
+    if (getSheetPageCount(zeilenAnzahl) <= 1) {
+        return;
+    }
+    const shouldDelete = confirm('Das letzte Blatt löschen? Inhalte auf diesem Blatt werden entfernt.');
+    if (!shouldDelete) {
+        return;
+    }
+    recordHistorySnapshot();
+    const syncOptions = buildCurrentTimelineSyncOptions();
+    const nextLineCount = normalizeSheetLineCount(zeilenAnzahl) - zeilenProBlatt;
+    removeElementsOutsideSheetLineCount(nextLineCount);
+    const snapshot = getCurrentHistorySnapshot();
+    snapshot.lineCount = nextLineCount;
+    redrawCurrentSheetFromSnapshot(snapshot, syncOptions);
+}
+
+function drawSheetPageFrames() {
+    const pageCount = getSheetPageCount(zeilenAnzahl);
+    removeCanvasElements(".sheet-page-background, .sheet-page-number");
+    for (let pageIndex = 0; pageIndex < pageCount; pageIndex++) {
+        const pageOffsetY = getSheetPageOffsetY(pageIndex);
+        s.rect(0, pageOffsetY, sheetWidth, sheetPageHeight).attr({
+            id: "basis",
+            class: "sheet-page-background",
+            fill: "white",
+            stroke: "#d8d0c4",
+            strokeWidth: 0.7,
+            pointerEvents: "none"
+        }).insertAfter(canv);
+        s.text(sheetWidth - 34, pageOffsetY + sheetPageHeight - 34, (pageIndex + 1) + "/" + pageCount).attr({
+            id: "basis",
+            class: "sheet-page-number",
+            'font-size': 11,
+            'font-family': 'sans-serif',
+            fill: "#666",
+            'text-anchor': 'end',
+            pointerEvents: "none"
+        });
+    }
+}
 
 // Notenlinien anlegen für binären Rhythmus
 function viererNoten() {
@@ -1825,7 +2025,7 @@ text_z_g = s.g(textPaletteBox, textPaletteVerticalLine, textPaletteHorizontalLin
 y += 20;
 
 // Wiederholungszeichen
-repeatMarkerHitbox = s.rect(paletteOriginX - 4, y - 27, 10, 20).attr({ opacity: 0.001 });
+repeatMarkerHitbox = s.rect(paletteOriginX - 9, paletteOriginY + 220, 20, 44).attr({ opacity: 0.001 });
 repeatMarkerDotTop = s.circle(paletteOriginX + 1, paletteOriginY + 228, 2.5);
 repeatMarkerDotBottom = s.circle(paletteOriginX + 1, paletteOriginY + 236, 2.5);
 repeatMarkerCountText = s.text(paletteOriginX + 1, paletteOriginY + 252, " ").attr({ 'font-size': 12, 'font-family': 'sans-serif', 'font-weight': 'bold', 'text-anchor': 'middle' });
@@ -1866,13 +2066,14 @@ ShortBar = s.g(shortbar_a, shortbar_b, shortbar_v1, shortbar_v2, shortbar_c).att
 });
 
 // Legende schreiben
-function addLegendEntry(symbol, label, symbolX, symbolY, labelOffsetX, labelOffsetY, legendOffsetX) {
+function addLegendEntry(symbol, label, symbolX, symbolY, labelOffsetX, labelOffsetY, legendOffsetX, legendOffsetY) {
     const shiftedSymbolX = symbolX + legendOffsetX;
+    const shiftedSymbolY = symbolY + (Number(legendOffsetY) || 0);
     const legendClone = symbol.clone();
     s.append(legendClone);
-    legendClone.attr({ id: "basis", transform: "t" + shiftedSymbolX + "," + symbolY });
+    legendClone.attr({ id: "basis", transform: "t" + shiftedSymbolX + "," + shiftedSymbolY });
     legendClone.addClass("legend-entry");
-    s.text(shiftedSymbolX + labelOffsetX, symbolY + labelOffsetY, label).attr({
+    s.text(shiftedSymbolX + labelOffsetX, shiftedSymbolY + labelOffsetY, label).attr({
         id: "basis",
         class: "legend-entry",
         'font-size': 15,
@@ -1885,21 +2086,22 @@ function renderLegend(initialChooserX) {
     const legendAnchorX = Number.isFinite(initialChooserX) ? initialChooserX : 125;
     const toneLegendReferenceLeft = 92 + ton.getBBox().x;
     const legendOffsetX = legendAnchorX - toneLegendReferenceLeft;
+    const legendOffsetY = getSheetPageOffsetY(getSheetPageCount(zeilenAnzahl) - 1);
 
     removeCanvasElements(".legend-entry");
 
-    ton_c = addLegendEntry(ton, "Tone", 92, 1166, 45, 178, legendOffsetX);
-    bass_c = addLegendEntry(bass, "Bass", 157, 1146, 46, 198, legendOffsetX);
-    slap_c = addLegendEntry(slap, "Slap/Glocke", 222, 1126, 45, 218, legendOffsetX);
-    flam_ton_c = addLegendEntry(flam_ton, "Flam mit Tones", 337, 1105, 49, 240, legendOffsetX);
-    flam_slap_c = addLegendEntry(flam_slap, "Flam mit Slaps", 475, 1087, 49, 259, legendOffsetX);
-    flam_bass_slap_c = addLegendEntry(flam_bass_slap, "Flam mit Bass und Slaps", 613, 1069, 49, 279, legendOffsetX);
-    ton_g_c = addLegendEntry(ton_g, "gedämpfter Tone", 92, 1078, 48, 299, legendOffsetX);
-    slap_g_c = addLegendEntry(slap_g, "gedämpfter Slap / Klick", 240, 1058, 48, 319, legendOffsetX);
-    In_c = addLegendEntry(In, "In", 428, 1034, 44, 343, legendOffsetX);
-    Out_c = addLegendEntry(Out, "Out", 470, 1011, 44, 366, legendOffsetX);
-    ShortBar_c = addLegendEntry(ShortBar, "ShortBar", 521, 943, 44, 434, legendOffsetX);
-    repeatMarkerLegendClone = addLegendEntry(repeatMarkerGroup, "Wiederholung", 605, 968, 44, 409, legendOffsetX);
+    ton_c = addLegendEntry(ton, "Tone", 92, 1166, 45, 178, legendOffsetX, legendOffsetY);
+    bass_c = addLegendEntry(bass, "Bass", 157, 1146, 46, 198, legendOffsetX, legendOffsetY);
+    slap_c = addLegendEntry(slap, "Slap/Glocke", 222, 1126, 45, 218, legendOffsetX, legendOffsetY);
+    flam_ton_c = addLegendEntry(flam_ton, "Flam mit Tones", 337, 1105, 49, 240, legendOffsetX, legendOffsetY);
+    flam_slap_c = addLegendEntry(flam_slap, "Flam mit Slaps", 475, 1087, 49, 259, legendOffsetX, legendOffsetY);
+    flam_bass_slap_c = addLegendEntry(flam_bass_slap, "Flam mit Bass und Slaps", 613, 1069, 49, 279, legendOffsetX, legendOffsetY);
+    ton_g_c = addLegendEntry(ton_g, "gedämpfter Tone", 92, 1078, 48, 299, legendOffsetX, legendOffsetY);
+    slap_g_c = addLegendEntry(slap_g, "gedämpfter Slap / Klick", 240, 1058, 48, 319, legendOffsetX, legendOffsetY);
+    In_c = addLegendEntry(In, "In", 428, 1034, 44, 343, legendOffsetX, legendOffsetY);
+    Out_c = addLegendEntry(Out, "Out", 470, 1011, 44, 366, legendOffsetX, legendOffsetY);
+    ShortBar_c = addLegendEntry(ShortBar, "ShortBar", 521, 943, 44, 434, legendOffsetX, legendOffsetY);
+    repeatMarkerLegendClone = addLegendEntry(repeatMarkerGroup, "Wiederholung", 605, 968, 44, 409, legendOffsetX, legendOffsetY);
 }
 
 renderLegend(125);
@@ -1927,8 +2129,7 @@ function getPaletteBoundsForOffset(offsetX, offsetY) {
 }
 
 function clampPaletteOffset(offsetX, offsetY) {
-    const sheetWidth = 1050;
-    const sheetHeight = 1480;
+    const sheetHeight = getSheetDocumentHeight(zeilenAnzahl);
     const margin = 10;
     const bounds = paletteBaseBounds || getPaletteBoundsForOffset(0, 0);
     const minX = margin - bounds.x;
@@ -1981,6 +2182,75 @@ var stop1 = function() {
     paletteOffsetY += paletteDragDeltaY;
     applyPaletteOffset(paletteOffsetX, paletteOffsetY);
 };
+
+let paletteViewportFollowFrame = null;
+
+function getClientYAsSvgY(clientY) {
+    if (!s || !s.node || typeof s.node.createSVGPoint !== 'function' || !s.node.getScreenCTM()) {
+        return null;
+    }
+    const point = s.node.createSVGPoint();
+    point.x = 0;
+    point.y = clientY;
+    return point.matrixTransform(s.node.getScreenCTM().inverse()).y;
+}
+
+function getVisibleSheetViewportYBounds() {
+    if (!s || !s.node) {
+        return null;
+    }
+    const svgBounds = s.node.getBoundingClientRect();
+    const menuBarEl = document.getElementById('appMenuBar');
+    const menuBottom = menuBarEl ? menuBarEl.getBoundingClientRect().bottom : 0;
+    const topClientY = Math.max(svgBounds.top, menuBottom, 0) + 12;
+    const bottomClientY = Math.min(svgBounds.bottom, window.innerHeight) - 12;
+    if (bottomClientY <= topClientY) {
+        return null;
+    }
+    const topY = getClientYAsSvgY(topClientY);
+    const bottomY = getClientYAsSvgY(bottomClientY);
+    if (!Number.isFinite(topY) || !Number.isFinite(bottomY)) {
+        return null;
+    }
+    return {
+        top: Math.min(topY, bottomY),
+        bottom: Math.max(topY, bottomY)
+    };
+}
+
+function keepPaletteInVisibleViewport() {
+    if (!paletteGroup) {
+        return;
+    }
+    const visibleBounds = getVisibleSheetViewportYBounds();
+    if (!visibleBounds) {
+        return;
+    }
+    const paletteBounds = getPaletteBoundsForOffset(paletteOffsetX, paletteOffsetY);
+    let nextOffsetY = paletteOffsetY;
+
+    if (paletteBounds.height >= visibleBounds.bottom - visibleBounds.top) {
+        nextOffsetY += visibleBounds.top - paletteBounds.y;
+    } else if (paletteBounds.y < visibleBounds.top) {
+        nextOffsetY += visibleBounds.top - paletteBounds.y;
+    } else if (paletteBounds.y2 > visibleBounds.bottom) {
+        nextOffsetY -= paletteBounds.y2 - visibleBounds.bottom;
+    }
+
+    if (nextOffsetY !== paletteOffsetY) {
+        applyPaletteOffset(paletteOffsetX, nextOffsetY);
+    }
+}
+
+function schedulePaletteViewportFollow() {
+    if (paletteViewportFollowFrame !== null) {
+        return;
+    }
+    paletteViewportFollowFrame = window.requestAnimationFrame(function () {
+        paletteViewportFollowFrame = null;
+        keepPaletteInVisibleViewport();
+    });
+}
 
 // Kartusche zeichnen
 paletteGroup = s.g(paletteFrame, ton, bass, slap, ton_g, slap_g, flam_ton, flam_slap, flam_bass_slap, In, Out, ShortBar, text_z_g, repeatMarkerGroup);
@@ -2084,7 +2354,7 @@ function buildExportSvgContent() {
         }
         const ax = el.getBBox().cx;
         const ay = el.getBBox().cy;
-        if (ax < 0 || ax > 1050 || ay < 0 || ay > 1480) {
+        if (ax < 0 || ax > sheetWidth || ay < 0 || ay > getSheetDocumentHeight(zeilenAnzahl)) {
             el.remove();
         }
     });
@@ -2112,10 +2382,10 @@ function buildExportSvgContent() {
     const viewBoxY = hasFiniteBounds ? Math.max(0, contentBounds.minY - exportPadding) : 0;
     const viewBoxWidth = hasFiniteBounds
         ? Math.max(1, (contentBounds.maxX - contentBounds.minX) + exportPadding * 2)
-        : 1050;
+        : sheetWidth;
     const viewBoxHeight = hasFiniteBounds
         ? Math.max(1, (contentBounds.maxY - contentBounds.minY) + exportPadding * 2)
-        : 1480;
+        : getSheetDocumentHeight(zeilenAnzahl);
 
     return '<svg height="' + viewBoxHeight + '" version="1.1" width="' + viewBoxWidth + '" viewBox="' +
         [viewBoxX, viewBoxY, viewBoxWidth, viewBoxHeight].join(' ') +
@@ -2164,6 +2434,12 @@ function buildSerializedRhythm() {
         serializedRhythm = '<tenaer id="rhythmus"/>';
     }
 
+    if (normalizeSheetLineCount(zeilenAnzahl) !== zeilenProBlatt) {
+        serializedRhythm += '<score_metadata id="score_metadata" data-line-count="' +
+            normalizeSheetLineCount(zeilenAnzahl) +
+            '" />';
+    }
+
     let elementsToSave = s.selectAll(removableCanvasElementSelector);
     elementsToSave.forEach(function (el) {
         if (el.attr('id') == 'timeline_metadata') {
@@ -2171,7 +2447,7 @@ function buildSerializedRhythm() {
         }
         const ax = el.getBBox().cx;
         const ay = el.getBBox().cy;
-        if (ax < 70 || ax > 1050 || ay < 0 || ay > 1480) {
+        if (ax < 70 || ax > sheetWidth || ay < 0 || ay > getSheetDocumentHeight(zeilenAnzahl)) {
             el.remove();
         }
     });
@@ -2462,7 +2738,7 @@ function getBarIndexFromPosition(centerX, centerY, readConfig, lineCount) {
         lineSlotIndex -= gapSlotCount;
     }
     const barOffset = rawLineSlotIndex > readConfig.stepsPerBar + gapSlotCount ? 1 : 0;
-    const lineIndex = Math.max(0, Math.min(lineCount - 1, Math.round((centerY - 237) / 120)));
+    const lineIndex = getSheetLineIndexFromY(centerY, lineCount, 65);
     return {
         rawLineSlotIndex: rawLineSlotIndex,
         lineSlotIndex: lineSlotIndex,
@@ -2479,7 +2755,7 @@ function getBarIndexForMetaElement(centerX, centerY, readConfig, lineCount) {
         lineSlotIndex -= gapSlotCount;
     }
     const barOffset = rawLineSlotIndex > readConfig.stepsPerBar + gapSlotCount ? 1 : 0;
-    const lineIndex = Math.max(0, Math.min(lineCount - 1, Math.round((centerY - 140) / 120)));
+    const lineIndex = getSheetLineIndexFromY(centerY, lineCount, -32);
     return {
         rawLineSlotIndex: rawLineSlotIndex,
         lineSlotIndex: lineSlotIndex,
@@ -2489,7 +2765,7 @@ function getBarIndexForMetaElement(centerX, centerY, readConfig, lineCount) {
 }
 
 function getRepeatTarget(centerX, centerY, lineCount) {
-    const lineIndex = Math.max(0, Math.min(lineCount - 1, Math.round((centerY - 237) / 120)));
+    const lineIndex = getSheetLineIndexFromY(centerY, lineCount, 65);
     const leftBarLineX = 100;
     const middleBarLineX = 525;
     const rightBarLineX = 950;
@@ -3071,6 +3347,8 @@ function updateMobilePracticeModeAvailability() {
         'button4',
         'button5',
         'button8',
+        'addSheetPageButton',
+        'deleteSheetPageButton',
         'button7',
         'button9',
         'button11',
@@ -3087,6 +3365,7 @@ function updateMobilePracticeModeAvailability() {
             buttonEl.removeAttribute('title');
         }
     });
+    updateSheetPageControls();
 
     if (mobilePracticeViewport && timelineState.visible) {
         timelineState.visible = false;
@@ -4087,6 +4366,10 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
+    window.addEventListener('scroll', schedulePaletteViewportFollow, { passive: true });
+    window.addEventListener('resize', schedulePaletteViewportFollow);
+    schedulePaletteViewportFollow();
+
     document.querySelector('#openFileDialogButton').addEventListener('click', function () {
         openFileDialog('open');
     });
@@ -4157,6 +4440,8 @@ document.addEventListener('DOMContentLoaded', function () {
         recordHistorySnapshot();
         neunerNoten();
     });
+    document.querySelector('#addSheetPageButton').addEventListener('click', addSheetPage);
+    document.querySelector('#deleteSheetPageButton').addEventListener('click', deleteSheetPage);
     document.querySelector('#button7').addEventListener('click', function () {
         recordHistorySnapshot();
         addInitialInstrumentChooser(125, 140);
@@ -4695,6 +4980,8 @@ document.addEventListener('DOMContentLoaded', function () {
         '#button3',
         '#button4',
         '#button5',
+        '#addSheetPageButton',
+        '#deleteSheetPageButton',
         '#button6',
         '#button7',
         '#button8',
@@ -4725,10 +5012,23 @@ function callPHPScript1() {
     refreshFileList();
 }
 
+function getLoadedSheetLineCount(data) {
+    const metadataEl = data && typeof data.select === 'function'
+        ? data.select(scoreMetadataSelector)
+        : null;
+    const metadataLineCount = metadataEl && typeof metadataEl.attr === 'function'
+        ? Number(metadataEl.attr('data-line-count'))
+        : NaN;
+    if (Number.isFinite(metadataLineCount) && metadataLineCount > 0) {
+        return normalizeSheetLineCount(metadataLineCount);
+    }
+    return zeilenProBlatt;
+}
+
 function onSVGLoaded(data) {
     document.body.classList.add('has-loaded-score');
-    keepPaletteInsideSheet();
     const persistedTimelineMetadata = readTimelineMetadata(data);
+    zeilenAnzahl = getLoadedSheetLineCount(data);
 
     if (data.select("#rhythmus") == '<binaer id="rhythmus"/>') {
         viererNotenOhneStartChooser();
@@ -4737,6 +5037,7 @@ function onSVGLoaded(data) {
     } else {
         dreierNotenOhneStartChooser();
     }
+    keepPaletteInsideSheet();
 
     let loadedElements = data.selectAll(removableCanvasElementSelector);
     s.append(loadedElements);

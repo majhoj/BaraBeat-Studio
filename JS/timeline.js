@@ -2296,7 +2296,6 @@ function createTimelineEntryChip(group, rowGroups, patternDisplayInfo) {
         });
         swingInputEl.value = normalizedValue === null ? '' : String(normalizedValue);
         updateTimelineMetadataNode();
-        renderTimelinePanel();
     });
     swingLabelEl.appendChild(swingInputEl);
     swingWrap.appendChild(swingLabelEl);
@@ -2324,7 +2323,6 @@ function createTimelineEntryChip(group, rowGroups, patternDisplayInfo) {
                 groupEntry.handMode = handSelectEl.value;
             });
             updateTimelineMetadataNode();
-            renderTimelinePanel();
         });
         handLabelEl.appendChild(handSelectEl);
         handWrap.appendChild(handLabelEl);

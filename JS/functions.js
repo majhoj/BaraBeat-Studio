@@ -132,6 +132,16 @@ function getChooserLabelSeed(name, chooserText) {
 }
 
 function getChooserPosition(chooserGruppe) {
+  if (chooserGruppe && chooserGruppe.node && chooserGruppe.node.transform && chooserGruppe.node.transform.baseVal) {
+    let consolidatedTransform = chooserGruppe.node.transform.baseVal.consolidate();
+    let matrix = consolidatedTransform && consolidatedTransform.matrix ? consolidatedTransform.matrix : null;
+    if (matrix) {
+      return {
+        x: matrix.e,
+        y: matrix.f,
+      };
+    }
+  }
   let transformState = typeof chooserGruppe.transform === "function" ? chooserGruppe.transform() : null;
   let localMatrix = transformState && transformState.localMatrix ? transformState.localMatrix : null;
   if (localMatrix) {
@@ -271,6 +281,8 @@ function bindChooserInteraction(chooserGruppe, chooserText, menuGruppe, onSelect
   let toggleSuppressDuration = 300;
   let chooserDragRebindTimer = null;
   let chooserDragReleaseHandler = null;
+  let nativeChooserDragMoveHandler = null;
+  let nativeChooserDragEndHandler = null;
 
   function ungroupSelectionBeforeChooserAction() {
     if (typeof selections === "undefined" || !selections || !selections.node || !chooserGruppe.node) {
@@ -310,7 +322,7 @@ function bindChooserInteraction(chooserGruppe, chooserText, menuGruppe, onSelect
 
     chooserDragRebindTimer = window.setTimeout(function () {
       chooserGruppe.data("suppressChooserDrag", false);
-      chooserGruppe.drag(chooser_move, chooser_sel_start, chooser_drag_end);
+      installNativeChooserDrag();
     }, 300);
   }
 
@@ -332,7 +344,7 @@ function bindChooserInteraction(chooserGruppe, chooserText, menuGruppe, onSelect
     }
 
     chooserDragRebindTimer = window.setTimeout(function () {
-      chooserGruppe.drag(chooser_move, chooser_sel_start, chooser_drag_end);
+      installNativeChooserDrag();
     }, 0);
   }
 
@@ -348,14 +360,76 @@ function bindChooserInteraction(chooserGruppe, chooserText, menuGruppe, onSelect
     rebindChooserDragAfterPointerRelease();
   }
 
+  function snapChooserToFinalPosition() {
+    let rawDx = Number(chooserGruppe.data("currentChooserDragDx"));
+    let rawDy = Number(chooserGruppe.data("currentChooserDragDy"));
+    let startX = Number(chooserGruppe.data("origChooserX"));
+    let startY = Number(chooserGruppe.data("origChooserY"));
+    if (!Number.isFinite(rawDx)) {
+      rawDx = 0;
+    }
+    if (!Number.isFinite(rawDy)) {
+      rawDy = 0;
+    }
+    if (!Number.isFinite(startX) || !Number.isFinite(startY)) {
+      let chooserPosition = getChooserPosition(chooserGruppe);
+      startX = chooserPosition.x;
+      startY = chooserPosition.y;
+    }
+
+    let snappedDx = typeof Snap !== "undefined" && typeof gridSize !== "undefined"
+      ? Snap.snapTo(gridSize, rawDx, 50)
+      : rawDx;
+    let targetY = startY + rawDy;
+    let snappedY = typeof snapToVerticalTargets === "function"
+      ? snapToVerticalTargets(targetY, chooserGruppe)
+      : targetY;
+
+    chooserGruppe.attr({
+      transform: "t" + (startX + snappedDx) + "," + snappedY,
+    });
+  }
+
+  function finishChooserDrag() {
+    if (chooserGruppe.data("chooserDragMoved")) {
+      snapChooserToFinalPosition();
+    }
+    forceChooserDragEnd();
+  }
+
   function installChooserDragReleaseFallback() {
     removeChooserDragReleaseFallback();
     chooserDragReleaseHandler = function () {
-      forceChooserDragEnd();
+      finishChooserDrag();
     };
     window.addEventListener("mouseup", chooserDragReleaseHandler, true);
     window.addEventListener("touchend", chooserDragReleaseHandler, true);
     window.addEventListener("touchcancel", chooserDragReleaseHandler, true);
+  }
+
+  function getChooserDragPoint(event) {
+    let sourceEvent = event && (event.touches ? event.touches[0] : (event.changedTouches ? event.changedTouches[0] : event));
+    if (typeof getSvgPointerPosition === "function") {
+      return getSvgPointerPosition(event, sourceEvent && sourceEvent.clientX, sourceEvent && sourceEvent.clientY);
+    }
+    return {
+      x: sourceEvent && typeof sourceEvent.clientX === "number" ? sourceEvent.clientX : 0,
+      y: sourceEvent && typeof sourceEvent.clientY === "number" ? sourceEvent.clientY : 0,
+    };
+  }
+
+  function removeNativeChooserDragListeners() {
+    if (nativeChooserDragMoveHandler) {
+      window.removeEventListener("mousemove", nativeChooserDragMoveHandler, true);
+      window.removeEventListener("touchmove", nativeChooserDragMoveHandler, true);
+      nativeChooserDragMoveHandler = null;
+    }
+    if (nativeChooserDragEndHandler) {
+      window.removeEventListener("mouseup", nativeChooserDragEndHandler, true);
+      window.removeEventListener("touchend", nativeChooserDragEndHandler, true);
+      window.removeEventListener("touchcancel", nativeChooserDragEndHandler, true);
+      nativeChooserDragEndHandler = null;
+    }
   }
 
   if (menuGruppe.node) {
@@ -481,9 +555,58 @@ function bindChooserInteraction(chooserGruppe, chooserText, menuGruppe, onSelect
     chooserGruppe.data("warDrag", false);
     chooserGruppe.data("chooserDragMoved", false);
     chooserGruppe.data("suppressChooserDrag", false);
+    chooserGruppe.data("alreadyCloned", false);
+    chooserGruppe.data("historyCaptured", false);
+    chooserGruppe.data("currentChooserDragDx", 0);
+    chooserGruppe.data("currentChooserDragDy", 0);
     installChooserDragReleaseFallback();
     bringChooserToFront(chooserGruppe, menuGruppe);
-    sel_start.call(this, x, y, event);
+    let ev = event && (event.originalEvent || event);
+    chooserGruppe.data("cloneThisDrag", !!((ev && ev.altKey) || (typeof altKeyIsDown !== "undefined" && altKeyIsDown)));
+    let chooserPosition = getChooserPosition(chooserGruppe);
+    chooserGruppe.data("origChooserX", chooserPosition.x);
+    chooserGruppe.data("origChooserY", chooserPosition.y);
+  }
+
+  function moveChooserDirectly(dx, dy) {
+    let rawDx = Number(dx);
+    let rawDy = Number(dy);
+    if (!Number.isFinite(rawDx)) {
+      rawDx = 0;
+    }
+    if (!Number.isFinite(rawDy)) {
+      rawDy = 0;
+    }
+
+    if (chooserGruppe.data("cloneThisDrag") && !chooserGruppe.data("alreadyCloned")) {
+      if (typeof captureHistoryForEditorDrag === "function") {
+        captureHistoryForEditorDrag(chooserGruppe);
+      }
+    } else if (rawDx !== 0 || rawDy !== 0) {
+      if (typeof captureHistoryForEditorDrag === "function") {
+        captureHistoryForEditorDrag(chooserGruppe);
+      }
+    }
+
+    let startX = Number(chooserGruppe.data("origChooserX"));
+    let startY = Number(chooserGruppe.data("origChooserY"));
+    if (!Number.isFinite(startX) || !Number.isFinite(startY)) {
+      let chooserPosition = getChooserPosition(chooserGruppe);
+      startX = chooserPosition.x;
+      startY = chooserPosition.y;
+    }
+    chooserGruppe.data("currentChooserDragDx", rawDx);
+    chooserGruppe.data("currentChooserDragDy", rawDy);
+    chooserGruppe.attr({
+      transform: "t" + (startX + rawDx) + "," + (startY + rawDy),
+    });
+
+    if (chooserGruppe.data("cloneThisDrag") && !chooserGruppe.data("alreadyCloned")) {
+      chooserGruppe.data("alreadyCloned", true);
+      if (typeof appendBoundClone === "function") {
+        appendBoundClone(chooserGruppe);
+      }
+    }
   }
 
   function chooser_move(dx, dy, px, py, event) {
@@ -499,14 +622,81 @@ function bindChooserInteraction(chooserGruppe, chooserText, menuGruppe, onSelect
       chooserGruppe.data("suppressChooserToggleUntil", Date.now() + toggleSuppressDuration);
       setChooserMenuVisible(menuGruppe, false);
     }
-    move.call(this, dx, dy, px, py, event);
+    moveChooserDirectly(dx, dy);
   }
 
   function chooser_drag_end() {
-    forceChooserDragEnd();
+    finishChooserDrag();
   }
 
-  chooserGruppe.drag(chooser_move, chooser_sel_start, chooser_drag_end);
+  function nativeChooserDragStart(event) {
+    if (chooserGruppe.data("suppressChooserDrag") || isChooserMenuVisible(menuGruppe) || isEventInsideChooserMenu(event, menuGruppe)) {
+      stopChooserEvent(event);
+      return;
+    }
+    chooserGruppe.data("warDrag", false);
+    chooserGruppe.data("chooserDragMoved", false);
+    chooserGruppe.data("suppressChooserDrag", false);
+    chooserGruppe.data("alreadyCloned", false);
+    chooserGruppe.data("historyCaptured", false);
+    chooserGruppe.data("currentChooserDragDx", 0);
+    chooserGruppe.data("currentChooserDragDy", 0);
+    let ev = event && (event.originalEvent || event);
+    chooserGruppe.data("cloneThisDrag", !!((ev && ev.altKey) || (typeof altKeyIsDown !== "undefined" && altKeyIsDown)));
+    bringChooserToFront(chooserGruppe, menuGruppe);
+
+    let startPoint = getChooserDragPoint(event);
+    let chooserPosition = getChooserPosition(chooserGruppe);
+    chooserGruppe.data("origChooserX", chooserPosition.x);
+    chooserGruppe.data("origChooserY", chooserPosition.y);
+
+    removeNativeChooserDragListeners();
+    nativeChooserDragMoveHandler = function (moveEvent) {
+      if (chooserGruppe.data("suppressChooserDrag") || isChooserMenuVisible(menuGruppe) || isEventInsideChooserMenu(moveEvent, menuGruppe)) {
+        return;
+      }
+      let nextPoint = getChooserDragPoint(moveEvent);
+      let dx = nextPoint.x - startPoint.x;
+      let dy = nextPoint.y - startPoint.y;
+      if (!chooserGruppe.data("warDrag")) {
+        if (Math.abs(dx) < dragSchwelle && Math.abs(dy) < dragSchwelle) {
+          return;
+        }
+        chooserGruppe.data("warDrag", true);
+        chooserGruppe.data("chooserDragMoved", true);
+        chooserGruppe.data("suppressChooserToggleUntil", Date.now() + toggleSuppressDuration);
+        setChooserMenuVisible(menuGruppe, false);
+      }
+      moveChooserDirectly(dx, dy);
+      stopChooserEvent(moveEvent);
+    };
+    nativeChooserDragEndHandler = function () {
+      removeNativeChooserDragListeners();
+      finishChooserDrag();
+    };
+    window.addEventListener("mousemove", nativeChooserDragMoveHandler, true);
+    window.addEventListener("touchmove", nativeChooserDragMoveHandler, { capture: true, passive: false });
+    window.addEventListener("mouseup", nativeChooserDragEndHandler, true);
+    window.addEventListener("touchend", nativeChooserDragEndHandler, true);
+    window.addEventListener("touchcancel", nativeChooserDragEndHandler, true);
+  }
+
+  function installNativeChooserDrag() {
+    chooserGruppe.undrag();
+    removeNativeChooserDragListeners();
+    if (!chooserGruppe.node) {
+      return;
+    }
+    if (chooserGruppe.node.__nativeChooserDragStart) {
+      chooserGruppe.node.removeEventListener("mousedown", chooserGruppe.node.__nativeChooserDragStart, true);
+      chooserGruppe.node.removeEventListener("touchstart", chooserGruppe.node.__nativeChooserDragStart, true);
+    }
+    chooserGruppe.node.__nativeChooserDragStart = nativeChooserDragStart;
+    chooserGruppe.node.addEventListener("mousedown", chooserGruppe.node.__nativeChooserDragStart, true);
+    chooserGruppe.node.addEventListener("touchstart", chooserGruppe.node.__nativeChooserDragStart, { capture: true, passive: false });
+  }
+
+  installNativeChooserDrag();
 }
 
 function bindInstrumentChooserInteraction(chooserGruppe, instrumentText, menuGruppe) {
