@@ -553,9 +553,15 @@ function togglePracticePatternSelection(listName, patternId, selected) {
     const selectedIds = practiceState[listName];
     const currentIndex = selectedIds.indexOf(patternId);
     if (selected && currentIndex === -1) {
+        if (typeof recordArrangementHistorySnapshot === 'function') {
+            recordArrangementHistorySnapshot();
+        }
         selectedIds.push(patternId);
     }
     if (!selected && currentIndex !== -1) {
+        if (typeof recordArrangementHistorySnapshot === 'function') {
+            recordArrangementHistorySnapshot();
+        }
         selectedIds.splice(currentIndex, 1);
     }
 }
@@ -568,6 +574,9 @@ function movePracticePatternSelection(listName, patternId, direction) {
         return false;
     }
 
+    if (typeof recordArrangementHistorySnapshot === 'function') {
+        recordArrangementHistorySnapshot();
+    }
     selectedIds.splice(currentIndex, 1);
     selectedIds.splice(targetIndex, 0, patternId);
     return true;
@@ -581,6 +590,9 @@ function reorderPracticePatternSelection(listName, draggedPatternId, targetPatte
         return false;
     }
 
+    if (typeof recordArrangementHistorySnapshot === 'function') {
+        recordArrangementHistorySnapshot();
+    }
     selectedIds.splice(currentIndex, 1);
     selectedIds.splice(targetIndex, 0, draggedPatternId);
     return true;
@@ -779,6 +791,10 @@ function createPracticePatternRow(pattern, listName) {
         });
         handModeEl.addEventListener('change', function () {
             const selectedMode = normalizePracticeHandMode(handModeEl.value);
+            const previousMode = normalizePracticeHandMode(practiceState.patternHandModes[pattern.id]);
+            if (previousMode !== selectedMode && typeof recordArrangementHistorySnapshot === 'function') {
+                recordArrangementHistorySnapshot();
+            }
             if (selectedMode === 'auto') {
                 delete practiceState.patternHandModes[pattern.id];
             } else {
@@ -807,6 +823,10 @@ function createPracticePatternRow(pattern, listName) {
             });
             repeatInputEl.addEventListener('change', function () {
                 const normalizedCount = normalizePracticePatternRepeatCount(repeatInputEl.value);
+                const previousCount = normalizePracticePatternRepeatCount(practiceState.patternRepeatCounts[pattern.id]);
+                if (previousCount !== normalizedCount && typeof recordArrangementHistorySnapshot === 'function') {
+                    recordArrangementHistorySnapshot();
+                }
                 if (normalizedCount === null) {
                     delete practiceState.patternRepeatCounts[pattern.id];
                     repeatInputEl.value = '';
@@ -838,6 +858,10 @@ function createPracticePatternRow(pattern, listName) {
         });
         swingInputEl.addEventListener('change', function () {
             const normalizedFactor = normalizePracticePatternSwingFactor(swingInputEl.value);
+            const previousFactor = normalizePracticePatternSwingFactor(practiceState.patternSwingFactors[pattern.id]);
+            if (previousFactor !== normalizedFactor && typeof recordArrangementHistorySnapshot === 'function') {
+                recordArrangementHistorySnapshot();
+            }
             if (normalizedFactor === null) {
                 delete practiceState.patternSwingFactors[pattern.id];
                 swingInputEl.value = '';
@@ -865,6 +889,10 @@ function createPracticePatternRow(pattern, listName) {
                 event.stopPropagation();
             });
             targetEl.addEventListener('change', function () {
+                if (practiceState.patternTargetInstruments[pattern.id] !== targetEl.value &&
+                        typeof recordArrangementHistorySnapshot === 'function') {
+                    recordArrangementHistorySnapshot();
+                }
                 practiceState.patternTargetInstruments[pattern.id] = targetEl.value;
                 notifyPracticePatternOrderChanged();
             });
@@ -2609,6 +2637,13 @@ function openPracticeInstrumentVolumePopover(instrumentNames, anchorEl, labelTex
 
     function applyVolume(percentValue) {
         const normalizedVolume = normalizePracticeInstrumentVolume(Number(percentValue) / 100);
+        const previousVolumes = normalizePracticeInstrumentVolumes(practiceState.instrumentVolumes);
+        const volumeWillChange = targetInstruments.some(function (instrumentName) {
+            return normalizePracticeInstrumentVolume(previousVolumes[instrumentName]) !== normalizedVolume;
+        });
+        if (volumeWillChange && typeof recordArrangementHistorySnapshot === 'function') {
+            recordArrangementHistorySnapshot();
+        }
         if (normalizedVolume === 1) {
             targetInstruments.forEach(function (instrumentName) {
                 delete practiceState.instrumentVolumes[instrumentName];

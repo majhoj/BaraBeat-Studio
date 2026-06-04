@@ -1139,8 +1139,19 @@ function getCurrentHistorySnapshot() {
         rhythm: rhythm || 'tenaer',
         lineCount: normalizeSheetLineCount(zeilenAnzahl),
         title: titel ? (titel.attr('text') || '') : '',
-        elementsMarkup: elementMarkup.join('')
+        elementsMarkup: elementMarkup.join(''),
+        timelineSyncOptions: typeof buildCurrentTimelineSyncOptions === 'function'
+            ? buildCurrentTimelineSyncOptions()
+            : null
     };
+}
+
+function stringifyHistoryState(value) {
+    try {
+        return JSON.stringify(value || null);
+    } catch (error) {
+        return '';
+    }
 }
 
 function areHistorySnapshotsEqual(leftSnapshot, rightSnapshot) {
@@ -1148,7 +1159,8 @@ function areHistorySnapshotsEqual(leftSnapshot, rightSnapshot) {
         leftSnapshot.rhythm === rightSnapshot.rhythm &&
         normalizeSheetLineCount(leftSnapshot.lineCount) === normalizeSheetLineCount(rightSnapshot.lineCount) &&
         leftSnapshot.title === rightSnapshot.title &&
-        leftSnapshot.elementsMarkup === rightSnapshot.elementsMarkup;
+        leftSnapshot.elementsMarkup === rightSnapshot.elementsMarkup &&
+        stringifyHistoryState(leftSnapshot.timelineSyncOptions) === stringifyHistoryState(rightSnapshot.timelineSyncOptions);
 }
 
 function recordHistorySnapshot() {
@@ -1156,6 +1168,10 @@ function recordHistorySnapshot() {
         return;
     }
     pushHistorySnapshot(getCurrentHistorySnapshot());
+}
+
+function recordArrangementHistorySnapshot() {
+    recordHistorySnapshot();
 }
 
 function pushHistorySnapshot(snapshot) {
@@ -1258,7 +1274,7 @@ function restoreHistorySnapshot(snapshot) {
         return;
     }
     resetSelectionArtifacts();
-    const syncOptions = buildCurrentTimelineSyncOptions();
+    const syncOptions = snapshot.timelineSyncOptions || buildCurrentTimelineSyncOptions();
     zeilenAnzahl = normalizeSheetLineCount(snapshot.lineCount || zeilenProBlatt);
     drawHistoryBaseSheet(snapshot.rhythm);
     removeCanvasElements(removableCanvasElementSelector);
@@ -3732,7 +3748,11 @@ function handleEmbeddedAudioPlayerMessage(event) {
     }
 
     if (message.type === 'barabeat-audio-tempo-change') {
-        timelineState.tempo = normalizeTimelineTempo(message.tempo);
+        const nextTempo = normalizeTimelineTempo(message.tempo);
+        if (timelineState.tempo !== nextTempo) {
+            recordArrangementHistorySnapshot();
+        }
+        timelineState.tempo = nextTempo;
         window.suppressNextTimelineAudioRefresh = isTimelineFrame;
         updateTimelineMetadataNode();
         renderTimelinePanel();
@@ -4526,21 +4546,37 @@ document.addEventListener('DOMContentLoaded', function () {
         renderPracticePanel();
     });
     document.querySelector('#practiceWithoutSoloLoops').addEventListener('input', function (event) {
-        practiceState.loopsWithoutSolo = normalizePracticeCount(event.target.value, 1, 0, 32);
+        const nextValue = normalizePracticeCount(event.target.value, 1, 0, 32);
+        if (practiceState.loopsWithoutSolo !== nextValue) {
+            recordArrangementHistorySnapshot();
+        }
+        practiceState.loopsWithoutSolo = nextValue;
         event.target.value = practiceState.loopsWithoutSolo;
         notifyPracticeSelectionChanged();
     });
     document.querySelector('#practiceWithSoloLoops').addEventListener('input', function (event) {
-        practiceState.loopsWithSolo = normalizePracticeCount(event.target.value, 1, 1, 32);
+        const nextValue = normalizePracticeCount(event.target.value, 1, 1, 32);
+        if (practiceState.loopsWithSolo !== nextValue) {
+            recordArrangementHistorySnapshot();
+        }
+        practiceState.loopsWithSolo = nextValue;
         event.target.value = practiceState.loopsWithSolo;
         notifyPracticeSelectionChanged();
     });
     document.querySelector('#practiceAccompanimentBetweenPatterns').addEventListener('change', function (event) {
-        practiceState.accompanimentBetweenPatterns = Boolean(event.target.checked);
+        const nextValue = Boolean(event.target.checked);
+        if (practiceState.accompanimentBetweenPatterns !== nextValue) {
+            recordArrangementHistorySnapshot();
+        }
+        practiceState.accompanimentBetweenPatterns = nextValue;
         notifyPracticeSelectionChanged();
     });
     document.querySelector('#practicePauseAccompanimentForLeadInPatterns').addEventListener('change', function (event) {
-        practiceState.pauseAccompanimentForLeadInPatterns = Boolean(event.target.checked);
+        const nextValue = Boolean(event.target.checked);
+        if (practiceState.pauseAccompanimentForLeadInPatterns !== nextValue) {
+            recordArrangementHistorySnapshot();
+        }
+        practiceState.pauseAccompanimentForLeadInPatterns = nextValue;
         notifyPracticeSelectionChanged();
     });
     document.querySelector('#practiceRepeatCount').addEventListener('input', function (event) {
@@ -4548,12 +4584,20 @@ document.addEventListener('DOMContentLoaded', function () {
             event.target.value = practiceState.repeatCount;
             return;
         }
-        practiceState.repeatCount = normalizePracticeCount(event.target.value, 4, 1, practiceRepeatCountMax);
+        const nextValue = normalizePracticeCount(event.target.value, 4, 1, practiceRepeatCountMax);
+        if (practiceState.repeatCount !== nextValue) {
+            recordArrangementHistorySnapshot();
+        }
+        practiceState.repeatCount = nextValue;
         event.target.value = practiceState.repeatCount;
         notifyPracticeSelectionChanged();
     });
     document.querySelector('#practiceTimerMinutes').addEventListener('input', function (event) {
-        practiceState.timerMinutes = normalizePracticeTimerMinutes(event.target.value);
+        const nextValue = normalizePracticeTimerMinutes(event.target.value);
+        if (practiceState.timerMinutes !== nextValue) {
+            recordArrangementHistorySnapshot();
+        }
+        practiceState.timerMinutes = nextValue;
         event.target.value = practiceState.timerMinutes;
         updatePracticeInputs();
         notifyPracticeSelectionChanged();
@@ -4577,7 +4621,11 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
     function updatePracticeAudioLatencyControl(nextValue) {
-        practiceState.audioLatencyMs = normalizePracticeAudioLatency(nextValue);
+        const normalizedValue = normalizePracticeAudioLatency(nextValue);
+        if (practiceState.audioLatencyMs !== normalizedValue) {
+            recordArrangementHistorySnapshot();
+        }
+        practiceState.audioLatencyMs = normalizedValue;
         const audioLatencyEl = document.querySelector('#practiceAudioLatency');
         const audioLatencyRangeEl = document.querySelector('#practiceAudioLatencyRange');
         if (audioLatencyEl) {
@@ -4597,7 +4645,11 @@ document.addEventListener('DOMContentLoaded', function () {
         updatePracticeAudioLatencyControl(event.target.value);
     });
     document.querySelector('#practiceH2HRestMute').addEventListener('change', function (event) {
-        practiceState.h2hRestMute = Boolean(event.target.checked);
+        const nextValue = Boolean(event.target.checked);
+        if (practiceState.h2hRestMute !== nextValue) {
+            recordArrangementHistorySnapshot();
+        }
+        practiceState.h2hRestMute = nextValue;
         if (typeof updateTimelineMetadataNode === 'function') {
             updateTimelineMetadataNode();
         }
@@ -4608,11 +4660,15 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     document.querySelector('#practiceAccompanimentStart').addEventListener('change', function (event) {
         const selectedStartMode = event.target.value;
-        practiceState.accompanimentStart = selectedStartMode === 'afterCall' ||
+        const nextValue = selectedStartMode === 'afterCall' ||
             selectedStartMode === 'afterIntro' ||
             selectedStartMode === 'afterCallIntro'
             ? selectedStartMode
             : 'immediate';
+        if (practiceState.accompanimentStart !== nextValue) {
+            recordArrangementHistorySnapshot();
+        }
+        practiceState.accompanimentStart = nextValue;
         renderPracticePanel();
         notifyPracticeSelectionChanged();
     });
@@ -4854,7 +4910,11 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
         inputEl.addEventListener('input', function (event) {
-            timelineState.tempo = normalizeTimelineTempo(event.target.value);
+            const nextValue = normalizeTimelineTempo(event.target.value);
+            if (timelineState.tempo !== nextValue) {
+                recordArrangementHistorySnapshot();
+            }
+            timelineState.tempo = nextValue;
             notifyTimingControlsChanged();
         });
     });
@@ -4864,7 +4924,11 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
         inputEl.addEventListener('input', function (event) {
-            timelineState.swingFactor = normalizeTimelineSwingFactor(event.target.value);
+            const nextValue = normalizeTimelineSwingFactor(event.target.value);
+            if (timelineState.swingFactor !== nextValue) {
+                recordArrangementHistorySnapshot();
+            }
+            timelineState.swingFactor = nextValue;
             notifyTimingControlsChanged();
         });
     });
@@ -4884,7 +4948,11 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             inputEl.addEventListener('input', function (event) {
                 const nextFeelOffsets = normalizeTimelineFeelOffsets(timelineState.feelOffsets);
-                nextFeelOffsets[feelConfig[2]] = normalizeTimelineFeelOffset(event.target.value);
+                const nextValue = normalizeTimelineFeelOffset(event.target.value);
+                if (nextFeelOffsets[feelConfig[2]] !== nextValue) {
+                    recordArrangementHistorySnapshot();
+                }
+                nextFeelOffsets[feelConfig[2]] = nextValue;
                 timelineState.feelOffsets = nextFeelOffsets;
                 notifyTimingControlsChanged();
             });
@@ -4908,7 +4976,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (inputIndex >= currentProfile.length) {
                     return;
                 }
-                currentProfile[inputIndex] = normalizeSwingProfileValue(event.target.value);
+                const nextValue = normalizeSwingProfileValue(event.target.value);
+                if (currentProfile[inputIndex] !== nextValue) {
+                    recordArrangementHistorySnapshot();
+                }
+                currentProfile[inputIndex] = nextValue;
                 nextProfiles[currentProfileKey] = currentProfile;
                 timelineState.swingProfile = nextProfiles;
                 notifyTimingControlsChanged();
@@ -4933,6 +5005,7 @@ document.addEventListener('DOMContentLoaded', function () {
     document.querySelector('#practiceSwingProfileResetButton').addEventListener('click', function () {
         const currentProfileKey = getCurrentTimelineSwingProfileKey();
         const nextProfiles = normalizeAllTimelineSwingProfiles(timelineState.swingProfile);
+        recordArrangementHistorySnapshot();
         nextProfiles[currentProfileKey] = normalizeTimelineSwingProfile(null, currentProfileKey);
         timelineState.swingProfile = nextProfiles;
         notifyTimingControlsChanged();
@@ -4953,6 +5026,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
     document.querySelector('#practiceFeelProfileResetButton').addEventListener('click', function () {
+        recordArrangementHistorySnapshot();
         timelineState.feelOffsets = normalizeTimelineFeelOffsets(null);
         notifyTimingControlsChanged();
         if (typeof renderTimelinePanel === 'function') {

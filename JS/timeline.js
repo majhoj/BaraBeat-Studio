@@ -1157,6 +1157,9 @@ function buildCurrentTimelineSyncOptions() {
                 swingFactor: entry.swingFactor === null || entry.swingFactor === undefined
                     ? null
                     : normalizeTimelineSwingFactor(entry.swingFactor),
+                overlayRepeatIndex: entry.overlayRepeatIndex === null || entry.overlayRepeatIndex === undefined
+                    ? null
+                    : Math.max(0, Math.round(Number(entry.overlayRepeatIndex) || 0)),
                 targetInstruments: Array.isArray(entry.targetInstruments) ? entry.targetInstruments.slice() : []
             };
         }),
@@ -1421,6 +1424,9 @@ function setTimelineGroupRepeatCount(group, repeatInfo, nextRepeatCount) {
         return;
     }
 
+    if (typeof recordArrangementHistorySnapshot === 'function') {
+        recordArrangementHistorySnapshot();
+    }
     timelineState.entries.splice.apply(timelineState.entries, [group.startIndex, group.count].concat(replacementEntries));
     updateTimelineMetadataNode();
     renderTimelinePanel();
@@ -1499,6 +1505,9 @@ function setTimelineRowRepeatCount(rowGroups, nextRepeatCount) {
         return;
     }
 
+    if (typeof recordArrangementHistorySnapshot === 'function') {
+        recordArrangementHistorySnapshot();
+    }
     timelineState.entries.splice.apply(
         timelineState.entries,
         [rowRepeatInfo.startIndex, rowRepeatInfo.endIndex - rowRepeatInfo.startIndex].concat(replacementEntries)
@@ -1830,6 +1839,9 @@ function insertTimelineEntryAtIndex(payload, targetIndex) {
         if (!sourcePattern) {
             return;
         }
+        if (typeof recordArrangementHistorySnapshot === 'function') {
+            recordArrangementHistorySnapshot();
+        }
         timelineState.entries.splice(insertIndex, 0, cloneTimelineEntryFromPattern(sourcePattern));
         updateTimelineMetadataNode();
         renderTimelinePanel();
@@ -1854,6 +1866,9 @@ function insertTimelineEntryAtIndex(payload, targetIndex) {
         if (entriesToInsert.length === 0) {
             return;
         }
+        if (typeof recordArrangementHistorySnapshot === 'function') {
+            recordArrangementHistorySnapshot();
+        }
         timelineState.entries.splice.apply(timelineState.entries, [insertIndex, 0].concat(entriesToInsert));
         updateTimelineMetadataNode();
         renderTimelinePanel();
@@ -1865,6 +1880,9 @@ function insertTimelineEntryAtIndex(payload, targetIndex) {
         const groupCount = Number(payload.count);
         if (!Number.isFinite(groupStartIndex) || !Number.isFinite(groupCount) || groupCount < 1) {
             return;
+        }
+        if (typeof recordArrangementHistorySnapshot === 'function') {
+            recordArrangementHistorySnapshot();
         }
         const movedEntries = timelineState.entries.splice(groupStartIndex, groupCount);
         const adjustedIndex = groupStartIndex < insertIndex ? insertIndex - groupCount : insertIndex;
@@ -1927,6 +1945,9 @@ function insertTimelineEntryParallelToRow(payload, rowGroups) {
         if (entriesToInsert.length === 0) {
             return;
         }
+        if (typeof recordArrangementHistorySnapshot === 'function') {
+            recordArrangementHistorySnapshot();
+        }
         timelineState.entries.splice.apply(timelineState.entries, [insertIndex, 0].concat(entriesToInsert));
         updateTimelineMetadataNode();
         renderTimelinePanel();
@@ -1938,6 +1959,9 @@ function insertTimelineEntryParallelToRow(payload, rowGroups) {
         const groupCount = Number(payload.count);
         if (!Number.isFinite(groupStartIndex) || !Number.isFinite(groupCount) || groupCount < 1) {
             return;
+        }
+        if (typeof recordArrangementHistorySnapshot === 'function') {
+            recordArrangementHistorySnapshot();
         }
         const movedEntries = timelineState.entries.splice(groupStartIndex, groupCount);
         const adjustedIndex = groupStartIndex < insertIndex ? insertIndex - groupCount : insertIndex;
@@ -2005,6 +2029,9 @@ function insertTimelineOverlayIntoRepeatSlot(payload, rowGroups, repeatIndex) {
         return;
     }
 
+    if (typeof recordArrangementHistorySnapshot === 'function') {
+        recordArrangementHistorySnapshot();
+    }
     const existingOverlayGroup = groups.find(function (group) {
         const entry = group && group.entries && group.entries[0];
         return isTimelineOverlayEntry(entry) && Number(entry.overlayRepeatIndex) === normalizedRepeatIndex;
@@ -2116,6 +2143,9 @@ function renderTimelinePatternLibrary() {
                     targetInstruments: Array.isArray(entry.targetInstruments) ? entry.targetInstruments.slice() : []
                 });
             });
+            if (typeof recordArrangementHistorySnapshot === 'function') {
+                recordArrangementHistorySnapshot();
+            }
             timelineState.entries.push.apply(timelineState.entries, newEntries.filter(Boolean));
             updateTimelineMetadataNode();
             renderTimelinePanel();
@@ -2243,6 +2273,9 @@ function createTimelineEntryChip(group, rowGroups, patternDisplayInfo) {
     removeButton.setAttribute('aria-label', 'Pattern entfernen');
     removeButton.addEventListener('click', function (event) {
         event.stopPropagation();
+        if (typeof recordArrangementHistorySnapshot === 'function') {
+            recordArrangementHistorySnapshot();
+        }
         timelineState.entries.splice(group.startIndex, group.count);
         updateTimelineMetadataNode();
         renderTimelinePanel();
@@ -2291,6 +2324,11 @@ function createTimelineEntryChip(group, rowGroups, patternDisplayInfo) {
         const normalizedValue = swingInputEl.value === ''
             ? null
             : normalizeTimelineSwingFactor(swingInputEl.value);
+        if (group.entries.some(function (groupEntry) {
+            return (groupEntry.swingFactor === null || groupEntry.swingFactor === undefined ? null : normalizeTimelineSwingFactor(groupEntry.swingFactor)) !== normalizedValue;
+        }) && typeof recordArrangementHistorySnapshot === 'function') {
+            recordArrangementHistorySnapshot();
+        }
         group.entries.forEach(function (groupEntry) {
             groupEntry.swingFactor = normalizedValue;
         });
@@ -2319,6 +2357,11 @@ function createTimelineEntryChip(group, rowGroups, patternDisplayInfo) {
         });
         handSelectEl.value = entry.handMode || 'auto';
         handSelectEl.addEventListener('change', function () {
+            if (group.entries.some(function (groupEntry) {
+                return (groupEntry.handMode || 'auto') !== handSelectEl.value;
+            }) && typeof recordArrangementHistorySnapshot === 'function') {
+                recordArrangementHistorySnapshot();
+            }
             group.entries.forEach(function (groupEntry) {
                 groupEntry.handMode = handSelectEl.value;
             });
@@ -2341,6 +2384,9 @@ function createTimelineEntryChip(group, rowGroups, patternDisplayInfo) {
             checkboxEl.type = 'checkbox';
             checkboxEl.checked = entry.targetInstruments.indexOf(targetName) !== -1;
             checkboxEl.addEventListener('change', function () {
+                if (typeof recordArrangementHistorySnapshot === 'function') {
+                    recordArrangementHistorySnapshot();
+                }
                 group.entries.forEach(function (groupEntry) {
                     if (checkboxEl.checked) {
                         if (groupEntry.targetInstruments.indexOf(targetName) === -1) {
@@ -2449,6 +2495,9 @@ function createTimelineOverlayGrid(rowGroups, patternDisplayInfo) {
             removeButton.setAttribute('aria-label', 'Solo aus Zelle entfernen');
             removeButton.addEventListener('click', function (event) {
                 event.stopPropagation();
+                if (typeof recordArrangementHistorySnapshot === 'function') {
+                    recordArrangementHistorySnapshot();
+                }
                 timelineState.entries.splice(overlayGroup.startIndex, overlayGroup.count);
                 updateTimelineMetadataNode();
                 renderTimelinePanel();
@@ -2542,6 +2591,9 @@ function renderTimelineSequence() {
         removeButton.type = 'button';
         removeButton.textContent = 'Entfernen';
         removeButton.addEventListener('click', function () {
+            if (typeof recordArrangementHistorySnapshot === 'function') {
+                recordArrangementHistorySnapshot();
+            }
             timelineState.entries.splice(block.group.startIndex, block.group.count);
             updateTimelineMetadataNode();
             renderTimelinePanel();
