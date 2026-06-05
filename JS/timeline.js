@@ -1181,6 +1181,29 @@ function getTimelineDragPayload(rawPayload) {
 
 function setTimelineDragDropTargetsVisible(isVisible) {
     document.body.classList.toggle('is-timeline-dragging', Boolean(isVisible));
+    if (!isVisible) {
+        document.querySelectorAll('.timeline-dropzone.is-drop-target').forEach(function (dropzoneEl) {
+            dropzoneEl.classList.remove('is-drop-target');
+        });
+    }
+}
+
+function markTimelineDropTarget(targetEl) {
+    if (!targetEl || !targetEl.classList || !targetEl.classList.contains('timeline-dropzone')) {
+        return;
+    }
+    document.querySelectorAll('.timeline-dropzone.is-drop-target').forEach(function (dropzoneEl) {
+        if (dropzoneEl !== targetEl) {
+            dropzoneEl.classList.remove('is-drop-target');
+        }
+    });
+    targetEl.classList.add('is-drop-target');
+}
+
+function unmarkTimelineDropTarget(targetEl) {
+    if (targetEl && targetEl.classList) {
+        targetEl.classList.remove('is-drop-target');
+    }
 }
 
 function getTimelineTargetSignature(targetInstruments) {
@@ -2057,6 +2080,10 @@ function createTimelineDropzone(targetIndex) {
         : 'Hier einfügen';
     dropzone.addEventListener('dragover', function (event) {
         event.preventDefault();
+        markTimelineDropTarget(dropzone);
+    });
+    dropzone.addEventListener('dragleave', function () {
+        unmarkTimelineDropTarget(dropzone);
     });
     dropzone.addEventListener('drop', function (event) {
         event.preventDefault();
@@ -2082,6 +2109,10 @@ function bindParallelDropTarget(targetEl, rowGroups) {
 
     targetEl.addEventListener('dragover', function (event) {
         event.preventDefault();
+        markTimelineDropTarget(targetEl);
+    });
+    targetEl.addEventListener('dragleave', function () {
+        unmarkTimelineDropTarget(targetEl);
     });
     targetEl.addEventListener('drop', function (event) {
         event.preventDefault();
@@ -2133,7 +2164,10 @@ function renderTimelinePatternLibrary() {
         });
 
         const patternTitle = document.createElement('strong');
-        patternTitle.textContent = patternDisplayInfo.displayNameByPatternId[firstPattern.id] || firstPattern.name;
+        const libraryDisplayParts = getTimelineDisplayParts(firstPattern, patternDisplayInfo);
+        patternTitle.textContent = libraryDisplayParts.sub
+            ? libraryDisplayParts.main + ' · ' + libraryDisplayParts.sub
+            : libraryDisplayParts.main;
         const actionWrap = document.createElement('div');
         actionWrap.className = 'timeline-card-actions';
         const addButton = document.createElement('button');
@@ -2160,11 +2194,7 @@ function renderTimelinePatternLibrary() {
             updateTimelineMetadataNode();
             renderTimelinePanel();
         });
-        const addHint = document.createElement('small');
-        addHint.textContent = 'Ans Ende der Timeline hinzufuegen';
-
         actionWrap.appendChild(addButton);
-        actionWrap.appendChild(addHint);
         card.appendChild(patternTitle);
         card.appendChild(actionWrap);
         listEl.appendChild(card);
@@ -2549,19 +2579,8 @@ function alignPatternLibraryCardWidths() {
         cardEl.style.width = '';
     });
 
-    const widestCardWidth = cards.reduce(function (maxWidth, cardEl) {
-        const computedStyle = window.getComputedStyle(cardEl);
-        const horizontalPadding = (parseFloat(computedStyle.paddingLeft) || 0) +
-            (parseFloat(computedStyle.paddingRight) || 0) +
-            (parseFloat(computedStyle.borderLeftWidth) || 0) +
-            (parseFloat(computedStyle.borderRightWidth) || 0);
-        const contentWidth = Array.from(cardEl.children).reduce(function (childMaxWidth, childEl) {
-            return Math.max(childMaxWidth, Math.ceil(childEl.scrollWidth || childEl.getBoundingClientRect().width || 0));
-        }, 0);
-        return Math.max(maxWidth, Math.ceil(contentWidth + horizontalPadding));
-    }, 0);
     const availableWidth = Math.max(180, Math.floor(listEl.clientWidth));
-    const targetWidth = Math.max(180, Math.min(widestCardWidth, availableWidth));
+    const targetWidth = availableWidth;
     document.documentElement.style.setProperty('--timeline-library-card-width', targetWidth + 'px');
 
     cards.forEach(function (cardEl) {

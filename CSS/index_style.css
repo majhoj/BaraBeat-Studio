@@ -1902,6 +1902,8 @@ html {
     gap: 14px;
     align-items: start;
     min-height: 0;
+    height: calc(100vh - 330px);
+    min-height: 260px;
 }
 
 .timeline-column {
@@ -1910,9 +1912,11 @@ html {
     border-radius: 12px;
     min-height: 180px;
     padding: 12px;
-    max-height: calc(100vh - 170px);
+    height: 100%;
+    max-height: none;
     overflow: auto;
     box-shadow: var(--ui-shadow-soft);
+    box-sizing: border-box;
 }
 
 .timeline-column h3 {
@@ -1930,11 +1934,16 @@ html {
 }
 
 .timeline-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
     border: 1px solid var(--ui-border);
     border-radius: 10px;
     background: var(--ui-panel-bg);
-    padding: 10px;
-    min-width: 180px;
+    padding: 6px 8px;
+    width: 100%;
+    min-width: 0;
     max-width: 100%;
     cursor: grab;
     box-shadow: var(--ui-shadow-soft);
@@ -1944,7 +1953,13 @@ html {
 .timeline-card strong,
 .timeline-entry-main strong {
     display: block;
-    margin-bottom: 4px;
+    margin-bottom: 0;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ui-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .timeline-card small,
@@ -1963,6 +1978,8 @@ html {
 .timeline-card-actions {
     align-items: center;
     flex-wrap: nowrap;
+    margin-top: 0;
+    margin-left: auto;
 }
 
 .timeline-card-actions small {
@@ -2040,7 +2057,7 @@ html {
 .timeline-entry {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 4px;
     align-items: flex-start;
     border: 1px solid var(--ui-border-strong);
     border-radius: 10px;
@@ -2053,19 +2070,19 @@ html {
 }
 
 .timeline-entry-chip {
-    min-width: 190px;
-    max-width: 260px;
-    flex: 0 1 230px;
-    padding: 8px 10px;
-    min-height: 58px;
+    min-width: max-content;
+    max-width: 100%;
+    flex: 0 0 auto;
+    padding: 3px 6px;
+    min-height: 26px;
     box-sizing: border-box;
 }
 
 .timeline-sequence-row {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
-    align-items: flex-start;
+    gap: 6px;
+    align-items: center;
     width: 100%;
     overflow-x: visible;
     padding-bottom: 2px;
@@ -2076,7 +2093,7 @@ html {
     border: 1px solid var(--ui-border);
     border-radius: 12px;
     background: rgba(255, 255, 255, 0.42);
-    padding: 8px;
+    padding: 6px 8px;
 }
 
 .timeline-section-header {
@@ -2088,13 +2105,13 @@ html {
     align-items: center;
     justify-content: flex-start;
     gap: 8px;
-    border: 1px solid var(--ui-border);
-    border-radius: 10px;
-    background: var(--ui-panel-bg);
-    padding: 8px 10px;
-    min-height: 58px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    padding: 0 4px 0 0;
+    min-height: 30px;
     box-sizing: border-box;
-    box-shadow: var(--ui-shadow-soft);
+    box-shadow: none;
 }
 
 .timeline-section-header strong {
@@ -2110,32 +2127,43 @@ html {
 
 .timeline-section-header .timeline-entry-repeat-count {
     padding: 4px 6px;
+    background: var(--ui-panel-bg);
 }
 
 .timeline-chip-head {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
-    gap: 8px;
+    gap: 5px;
     min-width: 0;
     width: 100%;
 }
 
 .timeline-chip-label {
-    min-width: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+    min-width: max-content;
     flex: 1 1 auto;
+    overflow: hidden;
 }
 
 .timeline-chip-head strong,
 .timeline-chip-subtitle {
-    display: block;
+    display: inline;
     margin: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 15px;
+    font-size: 12px;
     font-weight: 700;
     color: var(--ui-text);
+}
+
+.timeline-chip-subtitle::before {
+    content: "\00b7";
+    margin-right: 5px;
+    color: var(--ui-text-soft);
 }
 
 .timeline-chip-head small {
@@ -2147,12 +2175,18 @@ html {
 
 .timeline-chip-remove {
     flex: 0 0 auto;
-    padding: 1px 6px;
-    line-height: 1.2;
+    padding: 0 6px;
+    line-height: 1;
+    min-width: 22px;
+    min-height: 22px;
 }
 
 .timeline-entry-details {
     width: 100%;
+}
+
+.timeline-entry-details:not([open]) {
+    display: none;
 }
 
 .timeline-entry-details summary {
@@ -2173,21 +2207,21 @@ html {
 
 .timeline-overlay-grid {
     display: grid;
-    gap: 2px;
+    gap: 1px;
     width: 100%;
     overflow-x: auto;
 }
 
 .timeline-overlay-cell {
-    min-height: 34px;
-    border: 1px solid rgba(80, 80, 80, 0.42);
-    background: rgba(255, 255, 255, 0.62);
+    min-height: 24px;
+    border: 1px solid rgba(80, 80, 80, 0.18);
+    background: rgba(255, 255, 255, 0.34);
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 3px;
-    color: var(--ui-text-soft);
-    font-size: 12px;
+    padding: 2px;
+    color: rgba(70, 70, 70, 0.52);
+    font-size: 11px;
     box-sizing: border-box;
 }
 
@@ -2201,23 +2235,23 @@ body:not(.is-timeline-dragging) .timeline-overlay-cell:empty {
 }
 
 body.is-timeline-dragging .timeline-overlay-cell {
-    border-color: var(--ui-border-strong);
-    background: rgba(255, 255, 255, 0.78);
+    border-color: rgba(80, 80, 80, 0.36);
+    background: rgba(255, 255, 255, 0.62);
 }
 
 .timeline-overlay-chip {
     display: inline-flex;
     align-items: center;
     justify-content: space-between;
-    gap: 6px;
+    gap: 4px;
     width: 100%;
     min-width: 0;
-    border: 1px solid var(--ui-border-strong);
-    border-radius: 6px;
-    background: var(--ui-soft-bg);
+    border: 1px solid var(--ui-border);
+    border-radius: 5px;
+    background: rgba(231, 246, 238, 0.9);
     color: var(--ui-text);
-    padding: 4px 5px;
-    font-size: 12px;
+    padding: 2px 4px;
+    font-size: 11px;
     font-weight: 700;
     cursor: grab;
     box-sizing: border-box;
@@ -2232,16 +2266,23 @@ body.is-timeline-dragging .timeline-overlay-cell {
 
 .timeline-overlay-chip-label strong,
 .timeline-overlay-chip-label small {
-    display: block;
+    display: inline;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
+.timeline-overlay-chip-label small::before {
+    content: "\00b7";
+    margin: 0 4px;
+    color: var(--ui-text-soft);
+}
+
 .timeline-overlay-chip button {
     flex: 0 0 auto;
-    padding: 1px 5px;
-    line-height: 1.1;
+    padding: 0 4px;
+    line-height: 1;
+    min-height: 12px;
 }
 
 .timeline-entry-main {
@@ -2306,59 +2347,71 @@ body.is-timeline-dragging .timeline-overlay-cell {
     border: 1px dashed var(--ui-border-strong);
     border-radius: 10px;
     color: var(--ui-text-soft);
-    min-height: 17px;
+    min-height: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 2px 8px;
+    padding: 0 8px;
     width: min(100%, var(--timeline-library-card-width, 260px));
     align-self: flex-start;
-    background: rgba(255, 255, 255, 0.72);
+    background: transparent;
     font-size: 12px;
     opacity: 0;
-    max-height: 0;
-    min-height: 0;
-    padding-top: 0;
-    padding-bottom: 0;
+    height: 12px;
     overflow: hidden;
     pointer-events: none;
-    transition: opacity 120ms ease, max-height 120ms ease, padding 120ms ease;
+    color: transparent;
+    transition: opacity 120ms ease, background-color 120ms ease;
+    box-sizing: border-box;
 }
 
 body.is-timeline-dragging .timeline-dropzone {
-    opacity: 1;
-    max-height: 40px;
-    min-height: 17px;
-    padding-top: 2px;
-    padding-bottom: 2px;
+    opacity: 0;
+    min-height: 12px;
+    height: 12px;
+    padding-top: 0;
+    padding-bottom: 0;
+    border-color: transparent;
+    background: transparent;
     pointer-events: auto;
 }
 
+body.is-timeline-dragging .timeline-dropzone.is-drop-target {
+    opacity: 1;
+    border-color: var(--ui-border-strong);
+    background: rgba(184, 125, 59, 0.28);
+}
+
 .timeline-dropzone-inline {
-    width: auto;
-    min-width: 120px;
+    width: 28px;
+    min-width: 28px;
     flex: 0 0 auto;
     align-self: flex-start;
-    min-height: 29px;
+    min-height: 12px;
     box-sizing: border-box;
 }
 
 body:not(.is-timeline-dragging) .timeline-dropzone-inline {
-    width: 0;
-    min-width: 0;
-    min-height: 0;
+    width: 28px;
+    min-width: 28px;
+    min-height: 12px;
     padding-left: 0;
     padding-right: 0;
-    border-width: 0;
+    border-color: transparent;
 }
 
 body.is-timeline-dragging .timeline-dropzone-inline {
-    width: auto;
-    min-height: 29px;
-    min-width: 120px;
-    padding-left: 8px;
-    padding-right: 8px;
-    border-width: 1px;
+    width: 28px;
+    min-height: 12px;
+    min-width: 28px;
+    padding-left: 0;
+    padding-right: 0;
+    border-color: transparent;
+}
+
+.timeline-sequence-list > .timeline-dropzone,
+.timeline-row-cell > .timeline-dropzone {
+    width: 100%;
 }
 
 .timeline-column-note {
