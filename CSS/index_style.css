@@ -2191,6 +2191,20 @@ html {
     box-sizing: border-box;
 }
 
+body:not(.is-timeline-dragging) .timeline-overlay-cell:empty {
+    min-height: 0;
+    height: 6px;
+    padding: 0;
+    border-color: transparent;
+    background: transparent;
+    color: transparent;
+}
+
+body.is-timeline-dragging .timeline-overlay-cell {
+    border-color: var(--ui-border-strong);
+    background: rgba(255, 255, 255, 0.78);
+}
+
 .timeline-overlay-chip {
     display: inline-flex;
     align-items: center;
@@ -2301,6 +2315,23 @@ html {
     align-self: flex-start;
     background: rgba(255, 255, 255, 0.72);
     font-size: 12px;
+    opacity: 0;
+    max-height: 0;
+    min-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    overflow: hidden;
+    pointer-events: none;
+    transition: opacity 120ms ease, max-height 120ms ease, padding 120ms ease;
+}
+
+body.is-timeline-dragging .timeline-dropzone {
+    opacity: 1;
+    max-height: 40px;
+    min-height: 17px;
+    padding-top: 2px;
+    padding-bottom: 2px;
+    pointer-events: auto;
 }
 
 .timeline-dropzone-inline {
@@ -2310,6 +2341,24 @@ html {
     align-self: flex-start;
     min-height: 29px;
     box-sizing: border-box;
+}
+
+body:not(.is-timeline-dragging) .timeline-dropzone-inline {
+    width: 0;
+    min-width: 0;
+    min-height: 0;
+    padding-left: 0;
+    padding-right: 0;
+    border-width: 0;
+}
+
+body.is-timeline-dragging .timeline-dropzone-inline {
+    width: auto;
+    min-height: 29px;
+    min-width: 120px;
+    padding-left: 8px;
+    padding-right: 8px;
+    border-width: 1px;
 }
 
 .timeline-column-note {

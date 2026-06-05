@@ -1179,6 +1179,10 @@ function getTimelineDragPayload(rawPayload) {
     }
 }
 
+function setTimelineDragDropTargetsVisible(isVisible) {
+    document.body.classList.toggle('is-timeline-dragging', Boolean(isVisible));
+}
+
 function getTimelineTargetSignature(targetInstruments) {
     return (Array.isArray(targetInstruments) ? targetInstruments.slice() : [])
         .sort()
@@ -2056,6 +2060,7 @@ function createTimelineDropzone(targetIndex) {
     });
     dropzone.addEventListener('drop', function (event) {
         event.preventDefault();
+        setTimelineDragDropTargetsVisible(false);
         const payload = getTimelineDragPayload(event.dataTransfer.getData('text/plain'));
         insertTimelineEntryAtIndex(payload, targetIndex);
     });
@@ -2081,6 +2086,7 @@ function bindParallelDropTarget(targetEl, rowGroups) {
     targetEl.addEventListener('drop', function (event) {
         event.preventDefault();
         event.stopPropagation();
+        setTimelineDragDropTargetsVisible(false);
         const payload = getTimelineDragPayload(event.dataTransfer.getData('text/plain'));
         insertTimelineEntryParallelToRow(payload, rowGroups);
     });
@@ -2107,6 +2113,7 @@ function renderTimelinePatternLibrary() {
         card.className = 'timeline-card';
         card.draggable = true;
         card.addEventListener('dragstart', function (event) {
+            setTimelineDragDropTargetsVisible(true);
             event.dataTransfer.setData('text/plain', JSON.stringify({
                 type: 'pattern-group',
                 entries: (patternGroup.entries || []).map(function (entry) {
@@ -2120,6 +2127,9 @@ function renderTimelinePatternLibrary() {
                     };
                 })
             }));
+        });
+        card.addEventListener('dragend', function () {
+            setTimelineDragDropTargetsVisible(false);
         });
 
         const patternTitle = document.createElement('strong');
@@ -2209,7 +2219,7 @@ function getTimelineDisplayParts(pattern, patternDisplayInfo) {
     const splitMatch = String(displayName).match(/^(P\d+)\s*-\s*([^/]+?)\s*\/\s*(.+)$/);
     if (splitMatch) {
         return {
-            main: splitMatch[1] + ' - ' + splitMatch[2].trim(),
+            main: splitMatch[2].trim(),
             sub: splitMatch[3].trim()
         };
     }
@@ -2254,11 +2264,15 @@ function createTimelineEntryChip(group, rowGroups, patternDisplayInfo) {
         }
     });
     entryCard.addEventListener('dragstart', function (event) {
+        setTimelineDragDropTargetsVisible(true);
         event.dataTransfer.setData('text/plain', JSON.stringify({
             type: 'timeline-entry-group',
             startIndex: group.startIndex,
             count: group.count
         }));
+    });
+    entryCard.addEventListener('dragend', function () {
+        setTimelineDragDropTargetsVisible(false);
     });
 
     const chipHeadEl = document.createElement('div');
@@ -2464,6 +2478,7 @@ function createTimelineOverlayGrid(rowGroups, patternDisplayInfo) {
         cellEl.addEventListener('drop', function (event) {
             event.preventDefault();
             event.stopPropagation();
+            setTimelineDragDropTargetsVisible(false);
             const payload = getTimelineDragPayload(event.dataTransfer.getData('text/plain'));
             insertTimelineOverlayIntoRepeatSlot(payload, rowGroups, repeatIndex);
         });
@@ -2476,11 +2491,15 @@ function createTimelineOverlayGrid(rowGroups, patternDisplayInfo) {
             chipEl.className = 'timeline-overlay-chip';
             chipEl.draggable = true;
             chipEl.addEventListener('dragstart', function (event) {
+                setTimelineDragDropTargetsVisible(true);
                 event.dataTransfer.setData('text/plain', JSON.stringify({
                     type: 'timeline-entry-group',
                     startIndex: overlayGroup.startIndex,
                     count: overlayGroup.count
                 }));
+            });
+            chipEl.addEventListener('dragend', function () {
+                setTimelineDragDropTargetsVisible(false);
             });
             const titleEl = document.createElement('span');
             titleEl.className = 'timeline-overlay-chip-label';
