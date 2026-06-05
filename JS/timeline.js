@@ -37,6 +37,7 @@ const timelineState = {
     },
     feelOffsets: Object.assign({}, defaultTimelineFeelOffsets)
 };
+let timelineActiveDragPayload = null;
 
 function normalizeTimelineSwingFactor(rawValue) {
     const numericValue = Number(rawValue);
@@ -1182,6 +1183,7 @@ function getTimelineDragPayload(rawPayload) {
 function setTimelineDragDropTargetsVisible(isVisible) {
     document.body.classList.toggle('is-timeline-dragging', Boolean(isVisible));
     if (!isVisible) {
+        timelineActiveDragPayload = null;
         document.querySelectorAll('.timeline-dropzone.is-drop-target').forEach(function (dropzoneEl) {
             dropzoneEl.classList.remove('is-drop-target');
         });
@@ -1204,6 +1206,11 @@ function unmarkTimelineDropTarget(targetEl) {
     if (targetEl && targetEl.classList) {
         targetEl.classList.remove('is-drop-target');
     }
+}
+
+function setTimelineActiveDragPayload(payload) {
+    timelineActiveDragPayload = payload || null;
+    setTimelineDragDropTargetsVisible(Boolean(payload));
 }
 
 function getTimelineTargetSignature(targetInstruments) {
@@ -1944,9 +1951,78 @@ function ensureParallelGroupForRow(rowGroups) {
     return newParallelGroupId;
 }
 
+function getTimelinePayloadCandidateEntries(payload) {
+    if (!payload) {
+        return [];
+    }
+
+    if (payload.type === 'pattern') {
+        const sourcePattern = findPatternById(payload.patternId);
+        return sourcePattern ? [{
+            patternId: sourcePattern.id,
+            targetInstruments: sourcePattern.defaultTargets.slice()
+        }] : [];
+    }
+
+    if (payload.type === 'pattern-group') {
+        return (Array.isArray(payload.entries) ? payload.entries : []).map(function (entry) {
+            const sourcePattern = findPatternById(entry.patternId);
+            if (!sourcePattern) {
+                return null;
+            }
+            return {
+                patternId: sourcePattern.id,
+                targetInstruments: Array.isArray(entry.targetInstruments) && entry.targetInstruments.length > 0
+                    ? entry.targetInstruments.slice()
+                    : sourcePattern.defaultTargets.slice()
+            };
+        }).filter(Boolean);
+    }
+
+    if (payload.type === 'timeline-entry-group') {
+        const groupStartIndex = Number(payload.startIndex);
+        const groupCount = Number(payload.count);
+        if (!Number.isFinite(groupStartIndex) || !Number.isFinite(groupCount) || groupCount < 1) {
+            return [];
+        }
+        return timelineState.entries.slice(groupStartIndex, groupStartIndex + groupCount).map(function (entry) {
+            return {
+                id: entry.id,
+                patternId: entry.patternId,
+                targetInstruments: Array.isArray(entry.targetInstruments) ? entry.targetInstruments.slice() : []
+            };
+        });
+    }
+
+    return [];
+}
+
+function canInsertTimelinePayloadParallelToRow(payload, rowGroups) {
+    const groups = Array.isArray(rowGroups) ? rowGroups.filter(Boolean) : [];
+    const candidateEntries = getTimelinePayloadCandidateEntries(payload);
+    if (!payload || groups.length === 0 || candidateEntries.length === 0) {
+        return false;
+    }
+
+    const candidateIds = candidateEntries.map(function (entry) {
+        return entry.id;
+    }).filter(Boolean);
+
+    return !groups.some(function (group) {
+        return (group.entries || []).some(function (rowEntry) {
+            if (candidateIds.indexOf(rowEntry.id) !== -1) {
+                return false;
+            }
+            return candidateEntries.some(function (candidateEntry) {
+                return doTimelineTargetsOverlap(rowEntry.targetInstruments, candidateEntry.targetInstruments);
+            });
+        });
+    });
+}
+
 function insertTimelineEntryParallelToRow(payload, rowGroups) {
     const groups = Array.isArray(rowGroups) ? rowGroups.filter(Boolean) : [];
-    if (groups.length === 0) {
+    if (groups.length === 0 || !canInsertTimelinePayloadParallelToRow(payload, rowGroups)) {
         return;
     }
 
@@ -2108,7 +2184,14 @@ function bindParallelDropTarget(targetEl, rowGroups) {
     }
 
     targetEl.addEventListener('dragover', function (event) {
+        const payload = timelineActiveDragPayload || getTimelineDragPayload(event.dataTransfer.getData('text/plain'));
+        if (!canInsertTimelinePayloadParallelToRow(payload, rowGroups)) {
+            event.dataTransfer.dropEffect = 'none';
+            unmarkTimelineDropTarget(targetEl);
+            return;
+        }
         event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
         markTimelineDropTarget(targetEl);
     });
     targetEl.addEventListener('dragleave', function () {
@@ -2117,8 +2200,8 @@ function bindParallelDropTarget(targetEl, rowGroups) {
     targetEl.addEventListener('drop', function (event) {
         event.preventDefault();
         event.stopPropagation();
+        const payload = timelineActiveDragPayload || getTimelineDragPayload(event.dataTransfer.getData('text/plain'));
         setTimelineDragDropTargetsVisible(false);
-        const payload = getTimelineDragPayload(event.dataTransfer.getData('text/plain'));
         insertTimelineEntryParallelToRow(payload, rowGroups);
     });
 }
@@ -2144,8 +2227,7 @@ function renderTimelinePatternLibrary() {
         card.className = 'timeline-card';
         card.draggable = true;
         card.addEventListener('dragstart', function (event) {
-            setTimelineDragDropTargetsVisible(true);
-            event.dataTransfer.setData('text/plain', JSON.stringify({
+            const payload = {
                 type: 'pattern-group',
                 entries: (patternGroup.entries || []).map(function (entry) {
                     return {
@@ -2157,7 +2239,9 @@ function renderTimelinePatternLibrary() {
                         targetInstruments: Array.isArray(entry.targetInstruments) ? entry.targetInstruments.slice() : []
                     };
                 })
-            }));
+            };
+            setTimelineActiveDragPayload(payload);
+            event.dataTransfer.setData('text/plain', JSON.stringify(payload));
         });
         card.addEventListener('dragend', function () {
             setTimelineDragDropTargetsVisible(false);
@@ -2294,12 +2378,13 @@ function createTimelineEntryChip(group, rowGroups, patternDisplayInfo) {
         }
     });
     entryCard.addEventListener('dragstart', function (event) {
-        setTimelineDragDropTargetsVisible(true);
-        event.dataTransfer.setData('text/plain', JSON.stringify({
+        const payload = {
             type: 'timeline-entry-group',
             startIndex: group.startIndex,
             count: group.count
-        }));
+        };
+        setTimelineActiveDragPayload(payload);
+        event.dataTransfer.setData('text/plain', JSON.stringify(payload));
     });
     entryCard.addEventListener('dragend', function () {
         setTimelineDragDropTargetsVisible(false);
@@ -2508,8 +2593,8 @@ function createTimelineOverlayGrid(rowGroups, patternDisplayInfo) {
         cellEl.addEventListener('drop', function (event) {
             event.preventDefault();
             event.stopPropagation();
+            const payload = timelineActiveDragPayload || getTimelineDragPayload(event.dataTransfer.getData('text/plain'));
             setTimelineDragDropTargetsVisible(false);
-            const payload = getTimelineDragPayload(event.dataTransfer.getData('text/plain'));
             insertTimelineOverlayIntoRepeatSlot(payload, rowGroups, repeatIndex);
         });
 
@@ -2521,12 +2606,13 @@ function createTimelineOverlayGrid(rowGroups, patternDisplayInfo) {
             chipEl.className = 'timeline-overlay-chip';
             chipEl.draggable = true;
             chipEl.addEventListener('dragstart', function (event) {
-                setTimelineDragDropTargetsVisible(true);
-                event.dataTransfer.setData('text/plain', JSON.stringify({
+                const payload = {
                     type: 'timeline-entry-group',
                     startIndex: overlayGroup.startIndex,
                     count: overlayGroup.count
-                }));
+                };
+                setTimelineActiveDragPayload(payload);
+                event.dataTransfer.setData('text/plain', JSON.stringify(payload));
             });
             chipEl.addEventListener('dragend', function () {
                 setTimelineDragDropTargetsVisible(false);

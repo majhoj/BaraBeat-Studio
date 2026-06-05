@@ -2018,7 +2018,7 @@ html {
     display: grid;
     grid-template-columns: minmax(150px, 180px) minmax(0, 1fr);
     column-gap: 10px;
-    row-gap: 10px;
+    row-gap: 0;
     width: 100%;
     align-items: stretch;
 }
@@ -2050,7 +2050,7 @@ html {
 .timeline-row-cell {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 0;
     min-width: 0;
 }
 
@@ -2380,30 +2380,34 @@ body.is-timeline-dragging .timeline-dropzone.is-drop-target {
     opacity: 1;
     border-color: var(--ui-border-strong);
     background: rgba(184, 125, 59, 0.28);
+    color: var(--ui-text-soft);
 }
 
 .timeline-dropzone-inline {
-    width: 28px;
-    min-width: 28px;
-    flex: 0 0 auto;
-    align-self: flex-start;
-    min-height: 12px;
+    width: auto;
+    min-width: 72px;
+    flex: 1 1 72px;
+    align-self: center;
+    min-height: 26px;
+    height: 26px;
     box-sizing: border-box;
 }
 
 body:not(.is-timeline-dragging) .timeline-dropzone-inline {
-    width: 28px;
-    min-width: 28px;
-    min-height: 12px;
+    width: auto;
+    min-width: 72px;
+    min-height: 26px;
+    height: 26px;
     padding-left: 0;
     padding-right: 0;
     border-color: transparent;
 }
 
 body.is-timeline-dragging .timeline-dropzone-inline {
-    width: 28px;
-    min-height: 12px;
-    min-width: 28px;
+    width: auto;
+    min-height: 26px;
+    height: 26px;
+    min-width: 72px;
     padding-left: 0;
     padding-right: 0;
     border-color: transparent;
