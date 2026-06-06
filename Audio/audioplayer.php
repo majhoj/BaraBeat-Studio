@@ -827,6 +827,12 @@ function mergeTimelinePickupIntoHostSection(hostSection, pickupSection) {
     if (!Array.isArray(pickupNotes) || pickupNotes.length === 0) {
       return;
     }
+    const hostSectionTargets = Array.isArray(hostSection.sectionTargets)
+      ? hostSection.sectionTargets
+      : [];
+    if (hostSectionTargets.indexOf(instrumentName) !== -1) {
+      return;
+    }
     hostSection.trackNotes[instrumentName] = mergeNotesIntoTrack(
       hostSection.trackNotes[instrumentName],
       pickupNotes,
@@ -950,10 +956,14 @@ function getTimelineEntryEffectiveNotes(entryData, shouldApplyOut, loopToLength)
   let effectiveNotes = sourceNotes.slice();
   const safeLoopToLength = Math.max(0, Number(loopToLength) || 0);
 
-  if (entryData && entryData.label === 'Begleitung' && safeLoopToLength > 0) {
-    effectiveNotes = safeLoopToLength > effectiveNotes.length
-      ? loopNotesToLength(effectiveNotes, safeLoopToLength)
-      : effectiveNotes.slice(0, safeLoopToLength);
+  if (safeLoopToLength > 0) {
+    if (entryData && entryData.label === 'Begleitung') {
+      effectiveNotes = safeLoopToLength > effectiveNotes.length
+        ? loopNotesToLength(effectiveNotes, safeLoopToLength)
+        : effectiveNotes.slice(0, safeLoopToLength);
+    } else if (safeLoopToLength > effectiveNotes.length) {
+      effectiveNotes = padNotesToLength(effectiveNotes, safeLoopToLength);
+    }
   }
 
   if (shouldApplyOut && entryData && entryData.patternOutStep !== null) {
@@ -985,6 +995,32 @@ function mergeNotesIntoTrack(targetNotes, sourceNotes, offset) {
   });
 
   return mergedNotes;
+}
+
+function silenceTrackRange(targetNotes, offset, length) {
+  const writeOffset = Math.max(0, Number(offset) || 0);
+  const silenceLength = Math.max(0, Number(length) || 0);
+  const silencedNotes = Array.isArray(targetNotes) ? targetNotes.slice() : [];
+
+  for (let noteIndex = 0; noteIndex < silenceLength; noteIndex++) {
+    const writeIndex = writeOffset + noteIndex;
+    while (silencedNotes.length <= writeIndex) {
+      silencedNotes.push('f');
+    }
+    silencedNotes[writeIndex] = 'f';
+  }
+
+  return silencedNotes;
+}
+
+function isTimelineOverlayEntryData(entryData) {
+  return entryData &&
+    entryData.overlayRepeatIndex !== null &&
+    entryData.overlayRepeatIndex !== undefined;
+}
+
+function getTimelineOverlayReplacementLength(entryData) {
+  return Math.max(0, getPatternNotesLength(entryData));
 }
 
 function doInstrumentSetsOverlap(instrumentNamesA, instrumentNamesB) {
@@ -1697,22 +1733,30 @@ function buildTimelineSections(config) {
       matchingLane.entries.push(entryData);
     });
 
-    if (parallelGroupId || isPracticeBlock) {
+    const shouldMergeBlockAsParallel = Boolean(
+      parallelGroupId ||
+      isPracticeBlock ||
+      (!parallelGroupId && !isPracticeBlock && blockLanes.length > 1 && blockLabel !== 'Begleitung')
+    );
+
+    if (shouldMergeBlockAsParallel) {
       const repeatedParallelUnits = parallelGroupId && !isPracticeBlock
         ? buildRepeatedParallelEntryUnits(blockEntries)
         : [blockEntries];
       if (parallelGroupId && !isPracticeBlock && repeatedParallelUnits.length > 1) {
         repeatedParallelUnits.forEach(function (repeatEntries, repeatIndex) {
           const repeatedSection = createOrderedSection(blockLabel);
+          repeatedSection.sectionTargets = [];
           const repeatContainsEchauffement = hasTimelineEntryLabel(repeatEntries, 'Echauffement');
           const repeatContainsOnlyAccompaniment = hasOnlyTimelineEntryLabel(repeatEntries, 'Begleitung');
           const repeatContainsOverlay = repeatEntries.some(function (entryData) {
             return entryData && entryData.overlayRepeatIndex !== null && entryData.overlayRepeatIndex !== undefined;
           });
+          const repeatShouldPadToLongest = !repeatContainsOnlyAccompaniment;
           const repeatTargetLength = getTimelineParallelTargetLength(
             repeatEntries,
             repeatContainsEchauffement,
-            repeatContainsOverlay
+            repeatContainsOverlay || repeatShouldPadToLongest
           );
           repeatedSection.loopTracksToLongest = repeatContainsOnlyAccompaniment;
           repeatedSection.padTracksToLongest = !repeatContainsEchauffement && !repeatContainsOnlyAccompaniment;
@@ -1726,10 +1770,20 @@ function buildTimelineSections(config) {
             const effectiveNotes = getTimelineEntryEffectiveNotes(
               entryData,
               shouldApplyOut,
-              repeatContainsEchauffement || repeatContainsOverlay ? repeatTargetLength : 0
+              repeatShouldPadToLongest ? repeatTargetLength : 0
             );
 
             entryData.targetInstruments.forEach(function (instrumentName) {
+              if (repeatedSection.sectionTargets.indexOf(instrumentName) === -1) {
+                repeatedSection.sectionTargets.push(instrumentName);
+              }
+              if (isTimelineOverlayEntryData(entryData)) {
+                repeatedSection.trackNotes[instrumentName] = silenceTrackRange(
+                  repeatedSection.trackNotes[instrumentName],
+                  0,
+                  getTimelineOverlayReplacementLength(entryData)
+                );
+              }
               repeatedSection.trackNotes[instrumentName] = mergeNotesIntoTrack(
                 repeatedSection.trackNotes[instrumentName],
                 effectiveNotes,
@@ -1769,18 +1823,20 @@ function buildTimelineSections(config) {
       }
 
       const mergedSection = createOrderedSection(blockLabel);
+      mergedSection.sectionTargets = [];
       const currentBlockContainsOverlay = blockEntries.some(function (entryData) {
         return entryData && entryData.overlayRepeatIndex !== null && entryData.overlayRepeatIndex !== undefined;
       });
+      const currentBlockContainsOnlyAccompaniment = hasOnlyTimelineEntryLabel(blockEntries, 'Begleitung');
+      const currentBlockShouldPadToLongest = !currentBlockContainsOnlyAccompaniment;
       const blockTargetLength = getTimelineParallelTargetLength(
         blockEntries,
         currentBlockContainsEchauffement,
-        currentBlockContainsOverlay
+        currentBlockContainsOverlay || currentBlockShouldPadToLongest
       );
-      const currentBlockContainsOnlyAccompaniment = hasOnlyTimelineEntryLabel(blockEntries, 'Begleitung');
       mergedSection.loopTracksToLongest = Boolean(parallelGroupId && !isPracticeBlock && currentBlockContainsOnlyAccompaniment);
       mergedSection.padTracksToLongest = Boolean(
-        parallelGroupId &&
+        shouldMergeBlockAsParallel &&
         !isPracticeBlock &&
         !currentBlockContainsEchauffement &&
         !currentBlockContainsOnlyAccompaniment
@@ -1792,10 +1848,20 @@ function buildTimelineSections(config) {
         const effectiveNotes = getTimelineEntryEffectiveNotes(
           entryData,
           shouldApplyOut,
-          currentBlockContainsEchauffement || currentBlockContainsOverlay ? blockTargetLength : 0
+          currentBlockShouldPadToLongest ? blockTargetLength : 0
         );
 
         entryData.targetInstruments.forEach(function (instrumentName) {
+          if (mergedSection.sectionTargets.indexOf(instrumentName) === -1) {
+            mergedSection.sectionTargets.push(instrumentName);
+          }
+          if (isTimelineOverlayEntryData(entryData)) {
+            mergedSection.trackNotes[instrumentName] = silenceTrackRange(
+              mergedSection.trackNotes[instrumentName],
+              0,
+              getTimelineOverlayReplacementLength(entryData)
+            );
+          }
           mergedSection.trackNotes[instrumentName] = mergeNotesIntoTrack(
             mergedSection.trackNotes[instrumentName],
             effectiveNotes,

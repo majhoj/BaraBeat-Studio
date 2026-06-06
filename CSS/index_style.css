@@ -1462,10 +1462,36 @@ html {
     color: #1d4f36;
 }
 
+.practice-volume-popover-wide {
+    width: min(360px, calc(100vw - 24px));
+}
+
 .practice-volume-title {
     margin-bottom: 8px;
     font-size: 13px;
     font-weight: 800;
+}
+
+.practice-volume-row {
+    display: grid;
+    grid-template-columns: 86px minmax(90px, 1fr) 44px;
+    align-items: center;
+    gap: 8px;
+    min-height: 30px;
+    font-size: 12px;
+}
+
+.practice-volume-row-name {
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.practice-volume-row-value {
+    color: #4a6a58;
+    font-size: 11px;
+    text-align: right;
 }
 
 .practice-volume-popover input[type="range"] {

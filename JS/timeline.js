@@ -950,6 +950,9 @@ function buildTimelinePlayerPayload(patternLibrary, timelineEntries) {
         SwingFactor: normalizeTimelineSwingFactor(timelineState.swingFactor),
         SwingProfile: normalizeAllTimelineSwingProfiles(timelineState.swingProfile),
         FeelOffsets: normalizeTimelineFeelOffsets(timelineState.feelOffsets),
+        PracticeInstrumentVolumes: typeof normalizePracticeInstrumentVolumes === 'function'
+            ? normalizePracticeInstrumentVolumes(practiceState.instrumentVolumes)
+            : {},
         RepeatRanges: [],
         PatternLibrary: patternLibrary.map(function (pattern) {
             return {
@@ -2289,10 +2292,6 @@ function createTimelineSectionHeader(rowGroups, rowIndex) {
     const rowRepeatInfo = getTimelineRowRepeatInfo(rowGroups);
     const sectionHeaderEl = document.createElement('div');
     sectionHeaderEl.className = 'timeline-section-header';
-
-    const sectionTitleEl = document.createElement('strong');
-    sectionTitleEl.textContent = 'Abschnitt ' + String(rowIndex + 1);
-    sectionHeaderEl.appendChild(sectionTitleEl);
 
     const sectionActionWrap = document.createElement('div');
     sectionActionWrap.className = 'timeline-entry-actions timeline-section-actions';

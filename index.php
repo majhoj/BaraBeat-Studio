@@ -212,6 +212,7 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
                     </label>
                     <button type="button" id="timelineSwingProfileButton">Swing-Profil</button>
                     <button type="button" id="timelineFeelProfileButton">Feel</button>
+                    <button type="button" id="timelineVolumeButton">Lautstärke</button>
                     <button type="button" id="timelineRefreshButton">Aus Blatt aktualisieren</button>
                     <button type="button" id="timelineCloseButton">Schließen</button>
                 </div>
@@ -3652,7 +3653,7 @@ function refreshTimelineAudioPlayer() {
 
     try {
         const audioTest = buildAudioTestPayload(false);
-        const payloadSignature = JSON.stringify(audioTest.playerPayload);
+        const payloadSignature = JSON.stringify(getAudioPayloadRefreshSignature(audioTest.playerPayload));
         if (payloadSignature === timelineAudioPayloadSignature) {
             return;
         }
@@ -3661,6 +3662,21 @@ function refreshTimelineAudioPlayer() {
     } catch (error) {
         console.error('refreshTimelineAudioPlayer failed', error);
     }
+}
+
+function getAudioPayloadRefreshSignature(playerPayload) {
+    if (!Array.isArray(playerPayload)) {
+        return playerPayload;
+    }
+
+    return playerPayload.map(function (config) {
+        if (!config || typeof config !== 'object') {
+            return config;
+        }
+        const signatureConfig = Object.assign({}, config);
+        delete signatureConfig.PracticeInstrumentVolumes;
+        return signatureConfig;
+    });
 }
 
 function scheduleTimelineAudioRefresh(delayMs) {
@@ -5016,6 +5032,16 @@ document.addEventListener('DOMContentLoaded', function () {
     const timelineFeelProfileButtonEl = document.querySelector('#timelineFeelProfileButton');
     if (timelineFeelProfileButtonEl) {
         timelineFeelProfileButtonEl.addEventListener('click', openPracticeFeelProfileDialog);
+    }
+    const timelineVolumeButtonEl = document.querySelector('#timelineVolumeButton');
+    if (timelineVolumeButtonEl) {
+        timelineVolumeButtonEl.addEventListener('click', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            if (typeof openTimelineInstrumentVolumesPopover === 'function') {
+                openTimelineInstrumentVolumesPopover(timelineVolumeButtonEl);
+            }
+        });
     }
     document.querySelector('#practiceFeelProfileButton').addEventListener('click', openPracticeFeelProfileDialog);
     document.querySelector('#practiceFeelProfileCloseButton').addEventListener('click', closePracticeFeelProfileDialog);

@@ -2145,14 +2145,20 @@ function notifyPracticeInstrumentVolumesChanged() {
         updateTimelineMetadataNode();
     }
 
+    const volumeMessage = {
+        type: 'barabeat-practice-instrument-volumes',
+        volumes: normalizePracticeInstrumentVolumes(practiceState.instrumentVolumes)
+    };
+
+    if (typeof sendTimelineAudioMessage === 'function') {
+        sendTimelineAudioMessage(volumeMessage);
+    }
+
     if (typeof sendPracticeAudioMessage !== 'function') {
         return;
     }
 
-    sendPracticeAudioMessage({
-        type: 'barabeat-practice-instrument-volumes',
-        volumes: normalizePracticeInstrumentVolumes(practiceState.instrumentVolumes)
-    });
+    sendPracticeAudioMessage(volumeMessage);
 }
 
 function buildPracticePlayerPayload() {
@@ -2680,6 +2686,98 @@ function openPracticeInstrumentVolumePopover(instrumentNames, anchorEl, labelTex
         anchorRect.left + (anchorRect.width / 2) - (popoverRect.width / 2)
     ));
     const top = Math.max(8, anchorRect.top - popoverRect.height - 8);
+    popoverEl.style.left = left + 'px';
+    popoverEl.style.top = top + 'px';
+}
+
+function openTimelineInstrumentVolumesPopover(anchorEl) {
+    if (!anchorEl) {
+        return;
+    }
+
+    closePracticeInstrumentVolumePopover();
+
+    const popoverEl = document.createElement('div');
+    popoverEl.id = 'practiceInstrumentVolumePopover';
+    popoverEl.className = 'practice-volume-popover practice-volume-popover-wide';
+
+    const titleEl = document.createElement('div');
+    titleEl.className = 'practice-volume-title';
+    titleEl.textContent = 'Instrumentlautstärken';
+    popoverEl.appendChild(titleEl);
+
+    practiceTrackInstrumentNames.forEach(function (instrumentName) {
+        const labelText = practiceScrollerInstrumentLabels[instrumentName] || instrumentName.replace('_', ' ');
+        const rowEl = document.createElement('label');
+        rowEl.className = 'practice-volume-row';
+
+        const nameEl = document.createElement('span');
+        nameEl.className = 'practice-volume-row-name';
+        nameEl.textContent = labelText;
+
+        const rangeEl = document.createElement('input');
+        rangeEl.type = 'range';
+        rangeEl.min = '0';
+        rangeEl.max = '200';
+        rangeEl.step = '5';
+        rangeEl.value = Math.round(getPracticeInstrumentVolume(instrumentName) * 100);
+        rangeEl.setAttribute('aria-label', labelText + ' Lautstärke');
+
+        const valueEl = document.createElement('output');
+        valueEl.className = 'practice-volume-row-value';
+        valueEl.value = rangeEl.value + '%';
+        valueEl.textContent = valueEl.value;
+
+        rangeEl.addEventListener('input', function (event) {
+            const normalizedVolume = normalizePracticeInstrumentVolume(Number(event.target.value) / 100);
+            const previousVolume = getPracticeInstrumentVolume(instrumentName);
+            if (previousVolume !== normalizedVolume && typeof recordArrangementHistorySnapshot === 'function') {
+                recordArrangementHistorySnapshot();
+            }
+            if (normalizedVolume === 1) {
+                delete practiceState.instrumentVolumes[instrumentName];
+            } else {
+                practiceState.instrumentVolumes[instrumentName] = normalizedVolume;
+            }
+            valueEl.value = Math.round(normalizedVolume * 100) + '%';
+            valueEl.textContent = valueEl.value;
+            notifyPracticeInstrumentVolumesChanged();
+        });
+
+        rowEl.append(nameEl, rangeEl, valueEl);
+        popoverEl.appendChild(rowEl);
+    });
+
+    const actionsEl = document.createElement('div');
+    actionsEl.className = 'practice-volume-actions';
+
+    const resetButtonEl = document.createElement('button');
+    resetButtonEl.type = 'button';
+    resetButtonEl.textContent = 'Alle 100%';
+    resetButtonEl.addEventListener('click', function () {
+        if (Object.keys(normalizePracticeInstrumentVolumes(practiceState.instrumentVolumes)).length > 0 &&
+                typeof recordArrangementHistorySnapshot === 'function') {
+            recordArrangementHistorySnapshot();
+        }
+        practiceState.instrumentVolumes = {};
+        notifyPracticeInstrumentVolumesChanged();
+        openTimelineInstrumentVolumesPopover(anchorEl);
+    });
+
+    actionsEl.appendChild(resetButtonEl);
+    popoverEl.appendChild(actionsEl);
+    document.body.appendChild(popoverEl);
+
+    const anchorRect = anchorEl.getBoundingClientRect();
+    const popoverRect = popoverEl.getBoundingClientRect();
+    const left = Math.max(8, Math.min(
+        window.innerWidth - popoverRect.width - 8,
+        anchorRect.right - popoverRect.width
+    ));
+    const top = Math.max(8, Math.min(
+        window.innerHeight - popoverRect.height - 8,
+        anchorRect.bottom + 8
+    ));
     popoverEl.style.left = left + 'px';
     popoverEl.style.top = top + 'px';
 }
