@@ -1639,6 +1639,31 @@ html {
     gap: 1px;
 }
 
+.practice-note-symbol.is-flam {
+    position: relative;
+    width: 17px;
+    min-width: 17px;
+    height: 15px;
+    min-height: 15px;
+    gap: 0;
+}
+
+.practice-note-symbol.is-flam .practice-symbol-part-wrap {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 12px;
+    height: 15px;
+}
+
+.practice-note-symbol.is-flam .practice-symbol-part-wrap:first-child {
+    transform: translate(-72%, -50%);
+}
+
+.practice-note-symbol.is-flam .practice-symbol-part-wrap:last-child {
+    transform: translate(-28%, -50%);
+}
+
 .practice-note-symbol.is-dreierbass-stack,
 .practice-note-symbol.is-bass-stack {
     position: relative;

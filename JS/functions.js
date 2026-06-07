@@ -296,6 +296,14 @@ function bindChooserInteraction(chooserGruppe, chooserText, menuGruppe, onSelect
     }
   }
 
+  function isChooserInActiveSelection() {
+    return typeof selections !== "undefined" &&
+      selections &&
+      selections.node &&
+      chooserGruppe.node &&
+      selections.node.contains(chooserGruppe.node);
+  }
+
   function stopChooserEvent(event) {
     if (event && typeof event.preventDefault === "function") {
       event.preventDefault();
@@ -443,9 +451,20 @@ function bindChooserInteraction(chooserGruppe, chooserText, menuGruppe, onSelect
   }
 
   function toggleChooserMenu(event) {
+    let eventType = event && event.type ? event.type : "";
+
+    if (isChooserInActiveSelection()) {
+      chooserGruppe.data("warDrag", true);
+      chooserGruppe.data("chooserDragMoved", false);
+      chooserGruppe.data("suppressChooserToggleUntil", Date.now() + toggleSuppressDuration);
+      if (eventType === "click") {
+        stopChooserEvent(event);
+      }
+      return;
+    }
+
     ungroupSelectionBeforeChooserAction();
 
-    let eventType = event && event.type ? event.type : "";
     let now = Date.now();
     let suppressToggleUntil = chooserGruppe.data("suppressChooserToggleUntil");
     if (suppressToggleUntil && now < suppressToggleUntil) {
@@ -548,6 +567,9 @@ function bindChooserInteraction(chooserGruppe, chooserText, menuGruppe, onSelect
   });
 
   function chooser_sel_start(x, y, event) {
+    if (isChooserInActiveSelection()) {
+      return;
+    }
     if (chooserGruppe.data("suppressChooserDrag") || isChooserMenuVisible(menuGruppe) || isEventInsideChooserMenu(event, menuGruppe)) {
       stopChooserEvent(event);
       return;
@@ -630,6 +652,12 @@ function bindChooserInteraction(chooserGruppe, chooserText, menuGruppe, onSelect
   }
 
   function nativeChooserDragStart(event) {
+    if (isChooserInActiveSelection()) {
+      chooserGruppe.data("warDrag", true);
+      chooserGruppe.data("chooserDragMoved", false);
+      chooserGruppe.data("suppressChooserToggleUntil", Date.now() + toggleSuppressDuration);
+      return;
+    }
     if (chooserGruppe.data("suppressChooserDrag") || isChooserMenuVisible(menuGruppe) || isEventInsideChooserMenu(event, menuGruppe)) {
       stopChooserEvent(event);
       return;

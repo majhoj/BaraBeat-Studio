@@ -2735,7 +2735,10 @@ function getElementReadPosition(element) {
 }
 
 function getControlLineSlotIndex(centerX, readConfig, controlType) {
-    if (controlType === 'shortbar' || controlType === 'in' || controlType === 'out') {
+    if (controlType === 'in' || controlType === 'out') {
+        return readConfig.getLineSlotIndex(centerX);
+    }
+    if (controlType === 'shortbar') {
         if (rhythm == 'binaer') {
             return Math.ceil(((centerX - 25) / 12.5) - 7);
         }

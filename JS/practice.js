@@ -94,6 +94,14 @@ function getPracticeScrollerVisualLoopCopies() {
     return practiceScrollerState.visualLoopCopies;
 }
 
+function getPracticeScrollerSectionVisualRepeatCopies(sections, baseVisualLoopCopies) {
+    const safeSections = Array.isArray(sections) ? sections : [];
+    return safeSections.reduce(function (maxRepeatCount, section) {
+        const repeatCount = normalizePracticeCount(section && section.repeatCount, 1, 1, 32);
+        return Math.max(maxRepeatCount, repeatCount);
+    }, Math.max(1, Number(baseVisualLoopCopies) || 1));
+}
+
 function getPracticeScrollerTailSteps(visualLoopLength) {
     if (!isPracticeScrollerCompactViewport()) {
         return 0;
@@ -2309,12 +2317,21 @@ function createPracticeScrollerNoteSymbol(noteValue) {
     }
 
     const symbolEl = document.createElement('span');
+    const isFlamSymbol = noteValue === 'tone_flam' ||
+        noteValue === 'Flam' ||
+        noteValue === 'T-Flam' ||
+        noteValue === 'slap_flam' ||
+        noteValue === 'S-Flam' ||
+        noteValue === 'bass_slap_flam';
     const usesVerticalLanes = parts.some(function (partConfig) {
         return Boolean(partConfig.lane);
     });
     symbolEl.className = parts.length > 1
         ? 'practice-note-symbol is-combo'
         : 'practice-note-symbol';
+    if (isFlamSymbol) {
+        symbolEl.classList.add('is-flam');
+    }
     if (usesVerticalLanes) {
         const usesMiddleLane = parts.some(function (partConfig) {
             return partConfig.lane === 'middle';
@@ -2330,6 +2347,7 @@ function createPracticeScrollerNoteSymbol(noteValue) {
 function flattenPracticeScrollerSections(sections) {
     const safeSections = Array.isArray(sections) ? sections : [];
     const visualLoopCopies = getPracticeScrollerVisualLoopCopies();
+    const sectionVisualRepeatCopies = getPracticeScrollerSectionVisualRepeatCopies(safeSections, visualLoopCopies);
     const hasOuterPracticeLoop = practiceState.repeatCount > 1 || practiceState.timerMinutes > 0;
     const extraVisualLoopCopies = hasOuterPracticeLoop ? visualLoopCopies : 0;
     const trackNotes = createEmptyPracticeTrackNotes();
@@ -2355,7 +2373,7 @@ function flattenPracticeScrollerSections(sections) {
             return;
         }
         const repeatCount = normalizePracticeCount(section.repeatCount, 1, 1, 32);
-        const renderRepeatCount = Math.min(repeatCount, visualLoopCopies);
+        const renderRepeatCount = Math.min(repeatCount, sectionVisualRepeatCopies);
         const isLeadIn = Boolean(section.isLeadIn);
         const finalRepeatOutSteps = section && section.finalRepeatOutSteps ? section.finalRepeatOutSteps : {};
         if (!isLeadIn && loopStartStep === null) {

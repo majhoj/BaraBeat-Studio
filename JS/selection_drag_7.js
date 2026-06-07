@@ -229,6 +229,17 @@ function bindElementDrag(element, dragMoveHandler) {
   return element;
 }
 
+function unbindChooserDragForSelection(element) {
+  if (!element || typeof element.undrag !== "function") {
+    return;
+  }
+  if (isChooserNode(element) && element.node && element.node.__nativeChooserDragStart) {
+    element.node.removeEventListener("mousedown", element.node.__nativeChooserDragStart, true);
+    element.node.removeEventListener("touchstart", element.node.__nativeChooserDragStart, true);
+  }
+  element.undrag();
+}
+
 function appendUngroupedElement(element) {
   bindElementDrag(element, move);
   s.append(element);
@@ -288,7 +299,7 @@ function getSnappedTranslateForSelectionElement(element, groupTranslate) {
   } else if (element.attr("id") === "wiederholung") {
     nextDx = snapRepeatMarkerTranslateX(element, nextDx, childTranslate.x);
     nextDy = snapElementTranslateYToVerticalTargets(element, nextDy, childTranslate.y);
-  } else if (isNoteSymbolElement(element)) {
+  } else if (isNoteSymbolElement(element) || isNoteLineControlElement(element)) {
     nextDx = snapNoteSymbolTranslateX(element, nextDx, childTranslate.x);
     nextDy = snapElementTranslateYToVerticalTargets(element, nextDy, childTranslate.y);
   } else {
@@ -433,7 +444,7 @@ function shadow_end(event) {
   if (matchedElements.length > 0) {
     selections = s.g();
     matchedElements.forEach(function (el) {
-      el.undrag();
+      unbindChooserDragForSelection(el);
     });
     selections.add(matchedElements);
     selections.drag(sel_move, sel_start, stop_m);
@@ -482,6 +493,14 @@ function isNoteSymbolElement(element) {
     elementId === "slap_flam" ||
     elementId === "bass_slap_flam"
   );
+}
+
+function isNoteLineControlElement(element) {
+  if (!element || typeof element.attr !== "function") {
+    return false;
+  }
+  var elementId = element.attr("id");
+  return elementId === "in" || elementId === "out";
 }
 
 function getElementTranslateY(element) {
@@ -637,7 +656,7 @@ function snapNoteSymbolDeltaX(startX, deltaX) {
 }
 
 function getElementSnapReferenceX(element, bbox) {
-  if (isNoteSymbolElement(element)) {
+  if (isNoteSymbolElement(element) || isNoteLineControlElement(element)) {
     return bbox.cx;
   }
   if (element && typeof element.attr === "function" && element.attr("id") === "wiederholung") {
@@ -832,7 +851,7 @@ function getSnappedDragDx(element, deltaX) {
   if (element && typeof element.attr === "function" && element.attr("id") === "wiederholung") {
     return snapRepeatMarkerDeltaX(Number(element.data("startSnapX")), rawDeltaX);
   }
-  if (isNoteSymbolElement(element)) {
+  if (isNoteSymbolElement(element) || isNoteLineControlElement(element)) {
     return snapNoteSymbolDeltaX(Number(element.data("startSnapX")), rawDeltaX);
   }
 
@@ -955,7 +974,7 @@ function selectPastedElements(pastedSelectableElements) {
 
   selections = s.g();
   pastedSelectableElements.forEach(function (ele) {
-    ele.undrag();
+    unbindChooserDragForSelection(ele);
   });
   selections.add(pastedSelectableElements);
   selections.drag(sel_move, sel_start, stop_m);
@@ -1184,7 +1203,7 @@ function sel_start(x, y, event) {
   var startReferenceY = getElementSnapReferenceY(this, bbox);
   var isSelectionGroup = this === selections;
   this.data("startSnapY", isSelectionGroup ? snapToVerticalTargets(startReferenceY, this) : startReferenceY);
-  if (this.attr("id") === "wiederholung" || isNoteSymbolElement(this)) {
+  if (this.attr("id") === "wiederholung" || isNoteSymbolElement(this) || isNoteLineControlElement(this)) {
     this.data("startSnapX", getElementSnapReferenceX(this, bbox));
   }
 }
