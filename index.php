@@ -3409,7 +3409,11 @@ function buildAudioTestPayload(forcePracticeMode) {
         syncPracticeSelectionsWithPatternLibrary();
         playerPayload = buildPracticePlayerPayload();
         if (typeof renderPracticeScrollerFromPayload === 'function') {
-            renderPracticeScrollerFromPayload(playerPayload);
+            try {
+                renderPracticeScrollerFromPayload(playerPayload);
+            } catch (scrollerError) {
+                console.warn('Laufende Noten konnten nicht aufgebaut werden', scrollerError);
+            }
         }
     } else {
         playerPayload = buildTimelinePlayerPayload(timelineState.sourcePatterns, timelineState.entries);
@@ -3790,7 +3794,7 @@ function handleEmbeddedAudioPlayerMessage(event) {
         }
         practiceAudioPlaybackState = message.state || 'stopped';
         if (isPracticeFrame && typeof updatePracticeScrollerState === 'function') {
-            updatePracticeScrollerState(message.state, message.leadInMs);
+            updatePracticeScrollerState(message.state, message.leadInMs, message.delayMs);
         }
     }
 }

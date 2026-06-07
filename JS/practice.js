@@ -68,6 +68,7 @@ const practiceScrollerState = {
     visualTotalSteps: 0,
     visualTailSteps: 0,
     visualLoopCopies: 4,
+    recycleVisualLoop: false,
     stepsPerBar: 32,
     stepWidth: 18,
     playheadRatio: 0.3,
@@ -2526,12 +2527,16 @@ function flattenPracticeScrollerSections(sections) {
     const safeSections = Array.isArray(sections) ? sections : [];
     const visualLoopCopies = getPracticeScrollerVisualLoopCopies();
     const sectionVisualRepeatCopies = getPracticeScrollerSectionVisualRepeatCopies(safeSections, visualLoopCopies);
-    const hasOuterPracticeLoop = practiceState.repeatCount > 1 || practiceState.timerMinutes > 0;
-    const extraVisualLoopCopies = hasOuterPracticeLoop ? visualLoopCopies : 0;
+    const hasTimerLoop = practiceState.timerMinutes > 0;
+    const configuredPracticeRepeats = normalizePracticeCount(practiceState.repeatCount, 1, 1, practiceRepeatCountMax);
+    const actualOuterLoopCopies = hasTimerLoop ? visualLoopCopies : Math.max(0, configuredPracticeRepeats - 1);
+    const hasOuterPracticeLoop = hasTimerLoop || actualOuterLoopCopies > 0;
+    const extraVisualLoopCopies = Math.min(visualLoopCopies, actualOuterLoopCopies);
     const trackNotes = createEmptyPracticeTrackNotes();
     const targetSteps = createEmptyPracticeTrackFlags();
     const sectionBoundaries = [];
     const barStartSteps = [];
+    const finalOuterMuteRanges = [];
     const loopSegments = [];
     const playbackSegments = [];
     let stepOffset = 0;
@@ -2558,6 +2563,9 @@ function flattenPracticeScrollerSections(sections) {
             loopStartStep = stepOffset;
             playbackLoopStart = playbackOffset;
         }
+        const loopRelativeSectionStart = !isLeadIn && loopStartStep !== null
+            ? stepOffset - loopStartStep
+            : null;
 
         sectionBoundaries.push({
             step: stepOffset,
@@ -2604,6 +2612,13 @@ function flattenPracticeScrollerSections(sections) {
             const safeOutStep = outStep === null || outStep === undefined
                 ? null
                 : Math.max(0, Number(outStep) || 0);
+            if (!hasTimerLoop && !isLeadIn && loopRelativeSectionStart !== null && safeOutStep !== null) {
+                finalOuterMuteRanges.push({
+                    instrumentName: instrumentName,
+                    start: loopRelativeSectionStart + ((renderRepeatCount - 1) * sectionLength) + safeOutStep + 1,
+                    end: loopRelativeSectionStart + (renderRepeatCount * sectionLength)
+                });
+            }
             const forceFinalOutAtSectionEnd = Boolean(section && section.forceFinalOutAtSectionEnd);
             for (let repeatIndex = 0; repeatIndex < renderRepeatCount; repeatIndex += 1) {
                 for (let stepIndex = 0; stepIndex < sectionLength; stepIndex += 1) {
@@ -2655,7 +2670,7 @@ function flattenPracticeScrollerSections(sections) {
             targetSteps[instrumentName] = targetSteps[instrumentName].concat(baseTargetSteps[instrumentName]);
         });
     }
-    const visualTailSteps = extraVisualLoopCopies > 0
+    const visualTailSteps = extraVisualLoopCopies > 0 && hasTimerLoop
         ? getPracticeScrollerTailSteps(visualLoopLength)
         : 0;
     if (visualTailSteps > 0) {
@@ -2672,6 +2687,23 @@ function flattenPracticeScrollerSections(sections) {
             targetSteps[instrumentName] = targetSteps[instrumentName].concat(
                 baseTargetSteps[instrumentName].slice(0, visualTailSteps)
             );
+        });
+    }
+    if (!hasTimerLoop && extraVisualLoopCopies > 0 && finalOuterMuteRanges.length > 0) {
+        const finalOuterCopyStartStep = visualCycleSteps + ((extraVisualLoopCopies - 1) * visualLoopLength);
+        finalOuterMuteRanges.forEach(function (range) {
+            const instrumentName = range.instrumentName;
+            if (!Array.isArray(trackNotes[instrumentName])) {
+                return;
+            }
+            const startStep = Math.max(0, finalOuterCopyStartStep + range.start);
+            const endStep = Math.min(trackNotes[instrumentName].length, finalOuterCopyStartStep + range.end);
+            for (let stepIndex = startStep; stepIndex < endStep; stepIndex += 1) {
+                trackNotes[instrumentName][stepIndex] = 'f';
+                if (Array.isArray(targetSteps[instrumentName])) {
+                    targetSteps[instrumentName][stepIndex] = false;
+                }
+            }
         });
     }
 
@@ -2693,6 +2725,7 @@ function flattenPracticeScrollerSections(sections) {
         visualCycleSteps: visualCycleSteps,
         visualLoopCopies: extraVisualLoopCopies,
         visualTailSteps: visualTailSteps,
+        recycleVisualLoop: hasTimerLoop || actualOuterLoopCopies > extraVisualLoopCopies,
         totalSteps: visualCycleSteps + (visualLoopLength * extraVisualLoopCopies) + visualTailSteps
     };
 }
@@ -3026,6 +3059,7 @@ function renderPracticeScrollerFromPayload(playerPayload) {
     practiceScrollerState.visualCycleSteps = flattened.visualCycleSteps;
     practiceScrollerState.visualTotalSteps = flattened.totalSteps;
     practiceScrollerState.visualTailSteps = flattened.visualTailSteps;
+    practiceScrollerState.recycleVisualLoop = Boolean(flattened.recycleVisualLoop);
     practiceScrollerState.stepsPerBar = stepsPerBar;
     practiceScrollerState.currentStep = 0;
     practiceScrollerState.activeStep = -1;
@@ -3166,8 +3200,13 @@ function getRenderedPracticeScrollerStep(visualStep) {
     const rawStep = Number(visualStep) || 0;
     const visualLoopLength = practiceScrollerState.visualLoopLength || 0;
     const visualCycleSteps = practiceScrollerState.visualCycleSteps || 0;
+    const visualTotalSteps = practiceScrollerState.visualTotalSteps || practiceScrollerState.totalSteps || 0;
 
     if (visualLoopLength <= 0 || rawStep < visualCycleSteps) {
+        return rawStep;
+    }
+
+    if (!practiceScrollerState.recycleVisualLoop && rawStep < visualTotalSteps) {
         return rawStep;
     }
 
@@ -3354,7 +3393,7 @@ function startPracticeScrollerLeadIn(leadInMs) {
     practiceScrollerState.animationFrameId = window.requestAnimationFrame(runPracticeScrollerAnimation);
 }
 
-function updatePracticeScrollerState(nextState, leadInMs) {
+function updatePracticeScrollerState(nextState, leadInMs, endDelayMs) {
     const scrollerEl = document.getElementById('practiceScroller');
     if (!scrollerEl) {
         return;
@@ -3366,10 +3405,12 @@ function updatePracticeScrollerState(nextState, leadInMs) {
     }
 
     if (nextState === 'ended') {
-        if (practiceScrollerState.playbackEvents.length > 0 &&
-                practiceScrollerState.animationFrameId === null) {
-            practiceScrollerState.animationFrameId = window.requestAnimationFrame(runPracticeScrollerAnimation);
-        }
+        const safeEndDelayMs = Math.max(0, Number(endDelayMs) || 0);
+        window.setTimeout(function () {
+            stopPracticeScrollerAnimation();
+            practiceScrollerState.playbackEvents = [];
+            practiceScrollerState.playbackAnchor = null;
+        }, safeEndDelayMs + 30);
         return;
     }
 

@@ -127,6 +127,15 @@ function notifyEmbeddedPlaybackStep(playbackStep, scheduledTime) {
   }, window.location.origin);
 }
 
+function notifyEmbeddedPlaybackEndedAt(scheduledTime) {
+  const delayMs = instr && instr._audioCtx
+    ? Math.max(0, (scheduledTime - instr._audioCtx.currentTime) * 1000)
+    : 0;
+  notifyEmbeddedPlaybackState('ended', {
+    delayMs: delayMs
+  });
+}
+
 function updateLoadingStatus(message) {
   console.log(message);
   if (loadingEl) {
@@ -3405,7 +3414,7 @@ function scheduler() {
       timerID = null;
       practiceStopAudioTime = 0;
       practiceTimerFinalLoopStartStep = null;
-      notifyEmbeddedPlaybackState('ended');
+      notifyEmbeddedPlaybackEndedAt(nextNoteTime);
       return;
     }
     if (timelineLoopCount && timelineLoopCount !== 'loop' && timelinePlaybackLength > 0 && globalPlaybackStep >= timelinePlaybackLength) {
@@ -3414,7 +3423,7 @@ function scheduler() {
       timerID = null;
       practiceStopAudioTime = 0;
       practiceTimerFinalLoopStartStep = null;
-      notifyEmbeddedPlaybackState('ended');
+      notifyEmbeddedPlaybackEndedAt(nextNoteTime);
       return;
     }
     if (shouldStopTimelineAtOneShotEnd()) {
@@ -3423,7 +3432,7 @@ function scheduler() {
       timerID = null;
       practiceStopAudioTime = 0;
       practiceTimerFinalLoopStartStep = null;
-      notifyEmbeddedPlaybackState('ended');
+      notifyEmbeddedPlaybackEndedAt(nextNoteTime);
       return;
     }
     if (!timelineLoopCount && !isTimelineMode && hasOutroSection && globalPlaybackStep >= oneShotLength) {
@@ -3432,7 +3441,7 @@ function scheduler() {
       timerID = null;
       practiceStopAudioTime = 0;
       practiceTimerFinalLoopStartStep = null;
-      notifyEmbeddedPlaybackState('ended');
+      notifyEmbeddedPlaybackEndedAt(nextNoteTime);
       return;
     }
     scheduleCurrentStep(nextNoteTime);
