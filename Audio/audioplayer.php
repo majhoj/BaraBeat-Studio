@@ -836,12 +836,6 @@ function mergeTimelinePickupIntoHostSection(hostSection, pickupSection) {
     if (!Array.isArray(pickupNotes) || pickupNotes.length === 0) {
       return;
     }
-    const hostSectionTargets = Array.isArray(hostSection.sectionTargets)
-      ? hostSection.sectionTargets
-      : [];
-    if (hostSectionTargets.indexOf(instrumentName) !== -1) {
-      return;
-    }
     hostSection.trackNotes[instrumentName] = mergeNotesIntoTrack(
       hostSection.trackNotes[instrumentName],
       pickupNotes,

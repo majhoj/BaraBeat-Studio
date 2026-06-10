@@ -2750,11 +2750,10 @@ body.is-timeline-dragging .timeline-dropzone-inline {
 
     #myRect1 {
         display: block;
-        width: auto !important;
-        height: calc(100vh - 54px - env(safe-area-inset-top)) !important;
-        height: calc(100dvh - 54px - env(safe-area-inset-top)) !important;
+        width: calc(100vw + 42px) !important;
+        height: auto !important;
         max-width: none;
-        margin: 4px 0 0 -24px;
+        margin: 4px 0 18px -24px;
         opacity: 0.72;
         pointer-events: none;
         touch-action: pan-y;
