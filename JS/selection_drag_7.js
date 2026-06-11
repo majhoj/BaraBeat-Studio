@@ -10,6 +10,9 @@ var selectionDragReleaseHandler = null;
 var editorClipboardMarkup = "";
 var editorClipboardSourceAction = "";
 var editorClipboardStorageKey = "barabeat.editorClipboard";
+var editorClipboardPayloadStorageKey = "barabeat.editorClipboardPayload";
+var editorClipboardSystemType = "barabeat.editorSelection";
+var editorClipboardTabId = "tab-" + Date.now() + "-" + Math.random().toString(36).slice(2);
 var selectionDragState = {
   currentDx: undefined,
   currentDy: undefined,
@@ -932,14 +935,23 @@ function getSelectedElementMarkup() {
 function writeEditorClipboard(markup, sourceAction) {
   editorClipboardMarkup = markup || "";
   editorClipboardSourceAction = sourceAction || "";
+  var payload = createEditorClipboardPayload(editorClipboardMarkup, editorClipboardSourceAction);
   try {
     window.localStorage.setItem(editorClipboardStorageKey, editorClipboardMarkup);
+    window.localStorage.setItem(editorClipboardPayloadStorageKey, JSON.stringify(payload));
   } catch (error) {
     // localStorage can be unavailable in private or restricted browser contexts.
   }
+  writeEditorClipboardToSystemClipboard(payload);
 }
 
 function readEditorClipboard() {
+  var storedPayload = readStoredEditorClipboardPayload();
+  if (storedPayload && storedPayload.markup) {
+    editorClipboardMarkup = storedPayload.markup;
+    editorClipboardSourceAction = storedPayload.sourceAction || "copy";
+    return editorClipboardMarkup;
+  }
   if (editorClipboardMarkup) {
     return editorClipboardMarkup;
   }
@@ -949,6 +961,89 @@ function readEditorClipboard() {
     editorClipboardMarkup = "";
   }
   return editorClipboardMarkup;
+}
+
+function createEditorClipboardPayload(markup, sourceAction) {
+  return {
+    app: "BaraBeat-Studio",
+    type: editorClipboardSystemType,
+    version: 1,
+    createdAt: Date.now(),
+    sourceTabId: editorClipboardTabId,
+    sourceAction: sourceAction || "copy",
+    markup: markup || "",
+  };
+}
+
+function parseEditorClipboardPayload(text) {
+  if (!text || typeof text !== "string") {
+    return null;
+  }
+  try {
+    var payload = JSON.parse(text);
+    if (
+      payload &&
+      payload.type === editorClipboardSystemType &&
+      typeof payload.markup === "string" &&
+      payload.markup
+    ) {
+      return payload;
+    }
+  } catch (error) {
+    return null;
+  }
+  return null;
+}
+
+function readStoredEditorClipboardPayload() {
+  try {
+    var payloadText = window.localStorage.getItem(editorClipboardPayloadStorageKey) || "";
+    var payload = parseEditorClipboardPayload(payloadText);
+    if (payload) {
+      return payload;
+    }
+
+    var legacyMarkup = window.localStorage.getItem(editorClipboardStorageKey) || "";
+    if (legacyMarkup) {
+      return createEditorClipboardPayload(legacyMarkup, editorClipboardSourceAction || "copy");
+    }
+  } catch (error) {
+    return null;
+  }
+  return null;
+}
+
+function writeEditorClipboardToSystemClipboard(payload) {
+  if (
+    !payload ||
+    !payload.markup ||
+    typeof navigator === "undefined" ||
+    !navigator.clipboard ||
+    typeof navigator.clipboard.writeText !== "function"
+  ) {
+    return;
+  }
+
+  var payloadText = JSON.stringify(payload);
+  navigator.clipboard.writeText(payloadText).catch(function () {
+    // The local editor clipboard is still available when browser permissions block this.
+  });
+}
+
+function readEditorClipboardFromSystemClipboard() {
+  if (
+    typeof navigator === "undefined" ||
+    !navigator.clipboard ||
+    typeof navigator.clipboard.readText !== "function"
+  ) {
+    return Promise.resolve(null);
+  }
+
+  return navigator.clipboard.readText()
+    .then(parseEditorClipboardPayload)
+    .catch(function () {
+      return null;
+    });
 }
 
 function copySelectedElementsToEditorClipboard() {
@@ -1019,10 +1114,11 @@ function pasteActiveCopiedSelection() {
 }
 
 function cutSelectedElementsToEditorClipboard() {
-  if (!copySelectedElementsToEditorClipboard()) {
+  var markup = getSelectedElementMarkup();
+  if (!markup) {
     return false;
   }
-  editorClipboardSourceAction = "cut";
+  writeEditorClipboard(markup, "cut");
   if (typeof recordHistorySnapshot === "function") {
     recordHistorySnapshot();
   }
@@ -1035,12 +1131,14 @@ function cutSelectedElementsToEditorClipboard() {
   return true;
 }
 
-function pasteEditorClipboardElements() {
-  var markup = readEditorClipboard();
+function pasteEditorClipboardElements(markupOverride, options) {
+  var pasteOptions = options || {};
+  var markup = typeof markupOverride === "string" ? markupOverride : readEditorClipboard();
+  var sourceAction = pasteOptions.sourceAction || editorClipboardSourceAction;
   if (!markup || typeof Snap === "undefined" || !s) {
     return false;
   }
-  if (editorClipboardSourceAction === "copy" && pasteActiveCopiedSelection()) {
+  if (!pasteOptions.skipActiveSelection && sourceAction === "copy" && pasteActiveCopiedSelection()) {
     return true;
   }
 
@@ -1056,7 +1154,7 @@ function pasteEditorClipboardElements() {
       pastedSelectableElements.push(ele);
     });
   }
-  var shouldOffsetPaste = editorClipboardSourceAction === "copy" && selections && pastedSelectableElements.length;
+  var shouldOffsetPaste = sourceAction === "copy" && selections && pastedSelectableElements.length;
   if (typeof recordHistorySnapshot === "function") {
     recordHistorySnapshot();
   }
@@ -1072,6 +1170,33 @@ function pasteEditorClipboardElements() {
   }
   selectPastedElements(pastedSelectableElements);
   return true;
+}
+
+function pasteEditorClipboardElementsFromSystemOrLocal() {
+  readEditorClipboardFromSystemClipboard().then(function (payload) {
+    if (payload && payload.markup) {
+      editorClipboardMarkup = payload.markup;
+      editorClipboardSourceAction = payload.sourceAction || "copy";
+      pasteEditorClipboardElements(payload.markup, {
+        sourceAction: editorClipboardSourceAction,
+        skipActiveSelection: payload.sourceTabId !== editorClipboardTabId,
+      });
+      return;
+    }
+
+    var storedPayload = readStoredEditorClipboardPayload();
+    if (storedPayload && storedPayload.markup) {
+      editorClipboardMarkup = storedPayload.markup;
+      editorClipboardSourceAction = storedPayload.sourceAction || "copy";
+      pasteEditorClipboardElements(storedPayload.markup, {
+        sourceAction: editorClipboardSourceAction,
+        skipActiveSelection: storedPayload.sourceTabId !== editorClipboardTabId,
+      });
+      return;
+    }
+
+    pasteEditorClipboardElements();
+  });
 }
 
 function captureHistoryForEditorDrag(dragElement) {
@@ -1097,7 +1222,8 @@ function entfernen(event) {
   } else if (shortcutAction === "cut") {
     handledClipboardAction = cutSelectedElementsToEditorClipboard();
   } else if (shortcutAction === "paste") {
-    handledClipboardAction = pasteEditorClipboardElements();
+    pasteEditorClipboardElementsFromSystemOrLocal();
+    handledClipboardAction = true;
   }
 
   if (handledClipboardAction) {

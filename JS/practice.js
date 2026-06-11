@@ -1818,26 +1818,37 @@ function mergePracticePickupIntoHostSection(hostSection, pickupSection) {
     const hostLength = getPracticeSectionLength(hostSection);
     const stepsPerBar = getPracticeStepsPerBar();
     const pickupLength = getPracticeSectionLength(pickupSection);
-    const pickupOffset = Math.max(0, hostLength - Math.max(stepsPerBar, pickupLength));
+    const pickupSpan = Math.max(stepsPerBar, pickupLength);
+    const pickupOffset = Math.max(0, hostLength - pickupSpan);
+    const pickupTrimStart = Math.max(0, pickupSpan - hostLength);
 
     practiceTrackInstrumentNames.forEach(function (instrumentName) {
         const pickupNotes = pickupSection.trackNotes[instrumentName];
         if (!Array.isArray(pickupNotes) || pickupNotes.length === 0) {
             return;
         }
+        const alignedPickupNotes = pickupTrimStart > 0
+            ? pickupNotes.slice(pickupTrimStart)
+            : pickupNotes;
+        if (alignedPickupNotes.length === 0) {
+            return;
+        }
 
         hostSection.trackNotes[instrumentName] = mergePracticeNotesIntoTrackAtOffset(
             hostSection.trackNotes[instrumentName],
-            pickupNotes,
+            alignedPickupNotes,
             pickupOffset
         );
         if (pickupSection.trackHandModes[instrumentName]) {
             hostSection.trackHandModes[instrumentName] = pickupSection.trackHandModes[instrumentName];
         }
         if (pickupSection.trackTargetFlags && Array.isArray(pickupSection.trackTargetFlags[instrumentName])) {
+            const alignedPickupFlags = pickupTrimStart > 0
+                ? pickupSection.trackTargetFlags[instrumentName].slice(pickupTrimStart)
+                : pickupSection.trackTargetFlags[instrumentName];
             hostSection.trackTargetFlags[instrumentName] = mergePracticeFlagsIntoTrackAtOffset(
                 hostSection.trackTargetFlags[instrumentName],
-                pickupSection.trackTargetFlags[instrumentName],
+                alignedPickupFlags,
                 pickupOffset
             );
         }

@@ -2117,7 +2117,7 @@ function renderLegend(initialChooserX) {
     slap_g_c = addLegendEntry(slap_g, "gedämpfter Slap / Klick", 240, 1058, 48, 319, legendOffsetX, legendOffsetY);
     In_c = addLegendEntry(In, "In", 428, 1034, 44, 343, legendOffsetX, legendOffsetY);
     Out_c = addLegendEntry(Out, "Out", 470, 1011, 44, 366, legendOffsetX, legendOffsetY);
-    ShortBar_c = addLegendEntry(ShortBar, "ShortBar", 521, 943, 44, 434, legendOffsetX, legendOffsetY);
+    ShortBar_c = addLegendEntry(ShortBar, "ShortBar", 521, 938, 44, 439, legendOffsetX, legendOffsetY);
     repeatMarkerLegendClone = addLegendEntry(repeatMarkerGroup, "Wiederholung", 605, 968, 44, 409, legendOffsetX, legendOffsetY);
 }
 

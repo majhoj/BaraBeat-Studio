@@ -829,16 +829,24 @@ function mergeTimelinePickupIntoHostSection(hostSection, pickupSection) {
   const pickupLength = Math.max.apply(null, trackInstrumentNames.map(function (instrumentName) {
     return getSectionLength(pickupSection.trackNotes[instrumentName]);
   }).concat(0));
-  const pickupOffset = Math.max(0, hostLength - Math.max(stepsPerBar, pickupLength));
+  const pickupSpan = Math.max(stepsPerBar, pickupLength);
+  const pickupOffset = Math.max(0, hostLength - pickupSpan);
+  const pickupTrimStart = Math.max(0, pickupSpan - hostLength);
 
   trackInstrumentNames.forEach(function (instrumentName) {
     const pickupNotes = pickupSection.trackNotes[instrumentName];
     if (!Array.isArray(pickupNotes) || pickupNotes.length === 0) {
       return;
     }
+    const alignedPickupNotes = pickupTrimStart > 0
+      ? pickupNotes.slice(pickupTrimStart)
+      : pickupNotes;
+    if (alignedPickupNotes.length === 0) {
+      return;
+    }
     hostSection.trackNotes[instrumentName] = mergeNotesIntoTrack(
       hostSection.trackNotes[instrumentName],
-      pickupNotes,
+      alignedPickupNotes,
       pickupOffset
     );
     if (pickupSection.trackHandModes[instrumentName]) {
