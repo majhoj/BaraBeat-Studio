@@ -1463,7 +1463,7 @@ html {
 }
 
 .practice-volume-popover-wide {
-    width: min(360px, calc(100vw - 24px));
+    width: min(430px, calc(100vw - 24px));
 }
 
 .practice-volume-title {
@@ -1486,6 +1486,18 @@ html {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.practice-volume-row-name[role="button"] {
+    cursor: pointer;
+}
+
+.practice-volume-row-name[role="button"]:hover {
+    color: #0f7b4a;
+}
+
+.practice-volume-tone-row .practice-volume-row-name {
+    white-space: normal;
 }
 
 .practice-volume-row-value {
@@ -2172,6 +2184,9 @@ html {
 }
 
 .timeline-section-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     width: auto;
     margin-top: 0;
 }
@@ -2179,6 +2194,22 @@ html {
 .timeline-section-header .timeline-entry-repeat-count {
     padding: 4px 6px;
     background: var(--ui-panel-bg);
+}
+
+.timeline-section-tempo-control input {
+    width: 54px;
+}
+
+.timeline-section-move-actions {
+    display: flex;
+    gap: 3px;
+}
+
+.timeline-section-move-button {
+    min-width: 24px;
+    min-height: 24px;
+    padding: 0 5px;
+    line-height: 1;
 }
 
 .timeline-chip-head {

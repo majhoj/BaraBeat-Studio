@@ -13,6 +13,7 @@ const practiceState = {
     audioLatencyMs: 30,
     h2hRestMute: false,
     instrumentVolumes: {},
+    instrumentToneVolumes: {},
     patternHandModes: {},
     patternSwingFactors: {},
     patternRepeatCounts: {},
@@ -51,6 +52,66 @@ const practiceScrollerNoteLabels = {
     Bell_Open: 'B+O',
     Bell_Muffled: 'B+M',
     Bell_Klick: 'B+K'
+};
+
+const practiceInstrumentToneVolumeLabels = {
+    Kenkeni: [
+        { key: 'open', label: 'Open' },
+        { key: 'muffled', label: 'Gedämpft' },
+        { key: 'bell', label: 'Glocke' },
+        { key: 'klick', label: 'Klick' }
+    ],
+    Sangban: [
+        { key: 'open', label: 'Open' },
+        { key: 'muffled', label: 'Gedämpft' },
+        { key: 'bell', label: 'Glocke' },
+        { key: 'klick', label: 'Klick' }
+    ],
+    Doundoun: [
+        { key: 'open', label: 'Open' },
+        { key: 'muffled', label: 'Gedämpft' },
+        { key: 'bell', label: 'Glocke' },
+        { key: 'klick', label: 'Klick' }
+    ],
+    Dreierbass: [
+        { key: 'kenkeni', label: 'Kenkeni' },
+        { key: 'kenkeni_muffled', label: 'Kenkeni gedämpft' },
+        { key: 'sangban', label: 'Sangban' },
+        { key: 'sangban_muffled', label: 'Sangban gedämpft' },
+        { key: 'doundoun', label: 'Doundoun' }
+    ],
+    Djembe_1: [
+        { key: 'tone', label: 'Tone' },
+        { key: 'bass', label: 'Bass' },
+        { key: 'slap', label: 'Slap' },
+        { key: 'tone_muffled', label: 'Gedämpfter Tone' },
+        { key: 'slap_muffled', label: 'Gedämpfter Slap' },
+        { key: 'tone_flam', label: 'Flam mit Tone' },
+        { key: 'slap_flam', label: 'Flam mit Slap' },
+        { key: 'bass_slap_flam', label: 'Flam Bass + Slap' },
+        { key: 'mute', label: 'H2H Leer/Mute' }
+    ],
+    Djembe_2: [
+        { key: 'tone', label: 'Tone' },
+        { key: 'bass', label: 'Bass' },
+        { key: 'slap', label: 'Slap' },
+        { key: 'tone_muffled', label: 'Gedämpfter Tone' },
+        { key: 'slap_muffled', label: 'Gedämpfter Slap' },
+        { key: 'tone_flam', label: 'Flam mit Tone' },
+        { key: 'slap_flam', label: 'Flam mit Slap' },
+        { key: 'bass_slap_flam', label: 'Flam Bass + Slap' },
+        { key: 'mute', label: 'H2H Leer/Mute' }
+    ],
+    Djembe_3: [
+        { key: 'tone', label: 'Tone' },
+        { key: 'bass', label: 'Bass' },
+        { key: 'slap', label: 'Slap' },
+        { key: 'slap_muffled', label: 'Gedämpfter Slap' },
+        { key: 'tone_flam', label: 'Flam mit Tone' },
+        { key: 'slap_flam', label: 'Flam mit Slap' },
+        { key: 'bass_slap_flam', label: 'Flam Bass + Slap' },
+        { key: 'mute', label: 'H2H Leer/Mute' }
+    ]
 };
 const practiceScrollerState = {
     totalSteps: 0,
@@ -160,6 +221,36 @@ function normalizePracticeInstrumentVolumes(rawVolumes) {
 function getPracticeInstrumentVolume(instrumentName) {
     if (Object.prototype.hasOwnProperty.call(practiceState.instrumentVolumes, instrumentName)) {
         return normalizePracticeInstrumentVolume(practiceState.instrumentVolumes[instrumentName]);
+    }
+    return 1;
+}
+
+function normalizePracticeInstrumentToneVolumes(rawVolumes) {
+    const sourceVolumes = rawVolumes && typeof rawVolumes === 'object' ? rawVolumes : {};
+    return practiceTrackInstrumentNames.reduce(function (allVolumes, instrumentName) {
+        const toneDefinitions = practiceInstrumentToneVolumeLabels[instrumentName] || [];
+        const sourceToneVolumes = sourceVolumes[instrumentName] && typeof sourceVolumes[instrumentName] === 'object'
+            ? sourceVolumes[instrumentName]
+            : {};
+        const normalizedToneVolumes = {};
+        toneDefinitions.forEach(function (toneDefinition) {
+            const normalizedVolume = normalizePracticeInstrumentVolume(sourceToneVolumes[toneDefinition.key]);
+            if (normalizedVolume !== 1) {
+                normalizedToneVolumes[toneDefinition.key] = normalizedVolume;
+            }
+        });
+        if (Object.keys(normalizedToneVolumes).length > 0) {
+            allVolumes[instrumentName] = normalizedToneVolumes;
+        }
+        return allVolumes;
+    }, {});
+}
+
+function getPracticeInstrumentToneVolume(instrumentName, toneKey) {
+    const instrumentVolumes = practiceState.instrumentToneVolumes &&
+        practiceState.instrumentToneVolumes[instrumentName];
+    if (instrumentVolumes && Object.prototype.hasOwnProperty.call(instrumentVolumes, toneKey)) {
+        return normalizePracticeInstrumentVolume(instrumentVolumes[toneKey]);
     }
     return 1;
 }
@@ -396,6 +487,7 @@ function buildPracticeMetadata() {
         audioLatencyMs: practiceState.audioLatencyMs,
         h2hRestMute: practiceState.h2hRestMute,
         instrumentVolumes: normalizePracticeInstrumentVolumes(practiceState.instrumentVolumes),
+        instrumentToneVolumes: normalizePracticeInstrumentToneVolumes(practiceState.instrumentToneVolumes),
         loopsWithoutSolo: practiceState.loopsWithoutSolo,
         loopsWithSolo: practiceState.loopsWithSolo,
         repeatCount: practiceState.repeatCount,
@@ -422,6 +514,7 @@ function resetPracticeForSource(sourceHash) {
     practiceState.patternSwingFactors = {};
     practiceState.patternRepeatCounts = {};
     practiceState.instrumentVolumes = {};
+    practiceState.instrumentToneVolumes = {};
     practiceState.defaultsApplied = false;
     practiceState.defaultSelectionSourceHash = sourceHash || timelineState.sourceHash || '';
 }
@@ -438,6 +531,7 @@ function applyPracticeMetadata(metadata, patternLibrary, sourceHash) {
     practiceState.audioLatencyMs = normalizePracticeAudioLatency(metadata.audioLatencyMs);
     practiceState.h2hRestMute = Boolean(metadata.h2hRestMute);
     practiceState.instrumentVolumes = normalizePracticeInstrumentVolumes(metadata.instrumentVolumes);
+    practiceState.instrumentToneVolumes = normalizePracticeInstrumentToneVolumes(metadata.instrumentToneVolumes);
     practiceState.loopsWithoutSolo = normalizePracticeCount(metadata.loopsWithoutSolo, 1, 0, 32);
     practiceState.loopsWithSolo = normalizePracticeCount(metadata.loopsWithSolo, 1, 1, 32);
     practiceState.repeatCount = normalizePracticeCount(metadata.repeatCount, 4, 1, practiceRepeatCountMax);
@@ -2345,7 +2439,8 @@ function notifyPracticeInstrumentVolumesChanged() {
 
     const volumeMessage = {
         type: 'barabeat-practice-instrument-volumes',
-        volumes: normalizePracticeInstrumentVolumes(practiceState.instrumentVolumes)
+        volumes: normalizePracticeInstrumentVolumes(practiceState.instrumentVolumes),
+        toneVolumes: normalizePracticeInstrumentToneVolumes(practiceState.instrumentToneVolumes)
     };
 
     if (typeof sendTimelineAudioMessage === 'function') {
@@ -2379,6 +2474,7 @@ function buildPracticePlayerPayload() {
         payload[0].PracticeSections = buildPracticeSectionsFromEntries(entries);
         payload[0].PracticeH2HRestMute = Boolean(practiceState.h2hRestMute);
         payload[0].PracticeInstrumentVolumes = normalizePracticeInstrumentVolumes(practiceState.instrumentVolumes);
+        payload[0].PracticeInstrumentToneVolumes = normalizePracticeInstrumentToneVolumes(practiceState.instrumentToneVolumes);
         payload[0].TimelineLoop = false;
         payload[0].TimelineLoopCount = practiceState.timerMinutes > 0
             ? 'loop'
@@ -2833,6 +2929,155 @@ function closePracticeInstrumentVolumePopover() {
     }
 }
 
+function positionPracticeVolumePopover(popoverEl, anchorEl, options) {
+    if (!popoverEl || !anchorEl) {
+        return;
+    }
+    positionPracticeVolumePopoverAtRect(popoverEl, anchorEl.getBoundingClientRect(), options);
+}
+
+function positionPracticeVolumePopoverAtRect(popoverEl, anchorRect, options) {
+    if (!popoverEl || !anchorRect) {
+        return;
+    }
+    const placement = options && options.placement ? options.placement : 'below-right';
+    const popoverRect = popoverEl.getBoundingClientRect();
+    const left = placement === 'above-center'
+        ? Math.max(8, Math.min(
+            window.innerWidth - popoverRect.width - 8,
+            anchorRect.left + (anchorRect.width / 2) - (popoverRect.width / 2)
+        ))
+        : Math.max(8, Math.min(
+            window.innerWidth - popoverRect.width - 8,
+            anchorRect.right - popoverRect.width
+        ));
+    const top = placement === 'above-center'
+        ? Math.max(8, anchorRect.top - popoverRect.height - 8)
+        : Math.max(8, Math.min(
+            window.innerHeight - popoverRect.height - 8,
+            anchorRect.bottom + 8
+        ));
+    popoverEl.style.left = left + 'px';
+    popoverEl.style.top = top + 'px';
+}
+
+function setPracticeInstrumentToneVolume(instrumentName, toneKey, normalizedVolume) {
+    if (!practiceState.instrumentToneVolumes[instrumentName]) {
+        practiceState.instrumentToneVolumes[instrumentName] = {};
+    }
+    if (normalizedVolume === 1) {
+        delete practiceState.instrumentToneVolumes[instrumentName][toneKey];
+        if (Object.keys(practiceState.instrumentToneVolumes[instrumentName]).length === 0) {
+            delete practiceState.instrumentToneVolumes[instrumentName];
+        }
+    } else {
+        practiceState.instrumentToneVolumes[instrumentName][toneKey] = normalizedVolume;
+    }
+}
+
+function openPracticeInstrumentToneVolumePopover(instrumentName, anchorEl, returnHandler) {
+    if (practiceTrackInstrumentNames.indexOf(instrumentName) === -1 || !anchorEl) {
+        return;
+    }
+    const toneDefinitions = practiceInstrumentToneVolumeLabels[instrumentName] || [];
+    if (toneDefinitions.length === 0) {
+        return;
+    }
+
+    const anchorRect = anchorEl.getBoundingClientRect();
+    closePracticeInstrumentVolumePopover();
+
+    const labelText = practiceScrollerInstrumentLabels[instrumentName] || instrumentName.replace('_', ' ');
+    const popoverEl = document.createElement('div');
+    popoverEl.id = 'practiceInstrumentVolumePopover';
+    popoverEl.className = 'practice-volume-popover practice-volume-popover-wide';
+
+    const titleEl = document.createElement('div');
+    titleEl.className = 'practice-volume-title';
+    titleEl.textContent = 'Tonlautstärken: ' + labelText;
+    popoverEl.appendChild(titleEl);
+
+    toneDefinitions.forEach(function (toneDefinition) {
+        const rowEl = document.createElement('div');
+        rowEl.className = 'practice-volume-row practice-volume-tone-row';
+
+        const nameEl = document.createElement('span');
+        nameEl.className = 'practice-volume-row-name';
+        nameEl.textContent = toneDefinition.label;
+
+        const rangeEl = document.createElement('input');
+        rangeEl.type = 'range';
+        rangeEl.min = '0';
+        rangeEl.max = '200';
+        rangeEl.step = '5';
+        rangeEl.value = Math.round(getPracticeInstrumentToneVolume(instrumentName, toneDefinition.key) * 100);
+        rangeEl.setAttribute('aria-label', toneDefinition.label + ' Lautstärke');
+
+        const valueEl = document.createElement('output');
+        valueEl.className = 'practice-volume-row-value';
+        valueEl.value = rangeEl.value + '%';
+        valueEl.textContent = valueEl.value;
+
+        rangeEl.addEventListener('input', function (event) {
+            const normalizedVolume = normalizePracticeInstrumentVolume(Number(event.target.value) / 100);
+            const previousVolume = getPracticeInstrumentToneVolume(instrumentName, toneDefinition.key);
+            if (previousVolume !== normalizedVolume && typeof recordArrangementHistorySnapshot === 'function') {
+                recordArrangementHistorySnapshot();
+            }
+            setPracticeInstrumentToneVolume(instrumentName, toneDefinition.key, normalizedVolume);
+            valueEl.value = Math.round(normalizedVolume * 100) + '%';
+            valueEl.textContent = valueEl.value;
+            notifyPracticeInstrumentVolumesChanged();
+        });
+
+        rowEl.append(nameEl, rangeEl, valueEl);
+        popoverEl.appendChild(rowEl);
+    });
+
+    const actionsEl = document.createElement('div');
+    actionsEl.className = 'practice-volume-actions';
+
+    const resetButtonEl = document.createElement('button');
+    resetButtonEl.type = 'button';
+    resetButtonEl.textContent = 'Alle 100%';
+    resetButtonEl.addEventListener('click', function () {
+        if (practiceState.instrumentToneVolumes[instrumentName] &&
+                Object.keys(practiceState.instrumentToneVolumes[instrumentName]).length > 0 &&
+                typeof recordArrangementHistorySnapshot === 'function') {
+            recordArrangementHistorySnapshot();
+        }
+        delete practiceState.instrumentToneVolumes[instrumentName];
+        notifyPracticeInstrumentVolumesChanged();
+        popoverEl.querySelectorAll('.practice-volume-tone-row').forEach(function (rowEl) {
+            const rangeEl = rowEl.querySelector('input[type="range"]');
+            const valueEl = rowEl.querySelector('output');
+            if (rangeEl) {
+                rangeEl.value = '100';
+            }
+            if (valueEl) {
+                valueEl.value = '100%';
+                valueEl.textContent = '100%';
+            }
+        });
+    });
+
+    const backButtonEl = document.createElement('button');
+    backButtonEl.type = 'button';
+    backButtonEl.textContent = 'Zurück';
+    backButtonEl.addEventListener('click', function () {
+        if (typeof returnHandler === 'function') {
+            returnHandler();
+            return;
+        }
+        closePracticeInstrumentVolumePopover();
+    });
+
+    actionsEl.append(resetButtonEl, backButtonEl);
+    popoverEl.appendChild(actionsEl);
+    document.body.appendChild(popoverEl);
+    positionPracticeVolumePopoverAtRect(popoverEl, anchorRect, { placement: 'below-right' });
+}
+
 function openPracticeInstrumentVolumePopover(instrumentNames, anchorEl, labelText) {
     const targetInstruments = (Array.isArray(instrumentNames) ? instrumentNames : [instrumentNames])
         .filter(function (instrumentName) {
@@ -2881,6 +3126,11 @@ function openPracticeInstrumentVolumePopover(instrumentNames, anchorEl, labelTex
     resetButtonEl.type = 'button';
     resetButtonEl.textContent = '100%';
 
+    const toneButtonEl = document.createElement('button');
+    toneButtonEl.type = 'button';
+    toneButtonEl.textContent = 'Töne';
+    toneButtonEl.disabled = targetInstruments.length !== 1;
+
     function applyVolume(percentValue) {
         const normalizedVolume = normalizePracticeInstrumentVolume(Number(percentValue) / 100);
         const previousVolumes = normalizePracticeInstrumentVolumes(practiceState.instrumentVolumes);
@@ -2914,20 +3164,19 @@ function openPracticeInstrumentVolumePopover(instrumentNames, anchorEl, labelTex
     resetButtonEl.addEventListener('click', function () {
         applyVolume(100);
     });
+    toneButtonEl.addEventListener('click', function (event) {
+        event.stopPropagation();
+        if (targetInstruments.length === 1) {
+            openPracticeInstrumentToneVolumePopover(targetInstruments[0], anchorEl, function () {
+                openPracticeInstrumentVolumePopover(targetInstruments, anchorEl, labelText);
+            });
+        }
+    });
 
-    actionsEl.append(muteButtonEl, resetButtonEl);
+    actionsEl.append(muteButtonEl, resetButtonEl, toneButtonEl);
     popoverEl.append(titleEl, rangeEl, valueEl, actionsEl);
     document.body.appendChild(popoverEl);
-
-    const anchorRect = anchorEl.getBoundingClientRect();
-    const popoverRect = popoverEl.getBoundingClientRect();
-    const left = Math.max(8, Math.min(
-        window.innerWidth - popoverRect.width - 8,
-        anchorRect.left + (anchorRect.width / 2) - (popoverRect.width / 2)
-    ));
-    const top = Math.max(8, anchorRect.top - popoverRect.height - 8);
-    popoverEl.style.left = left + 'px';
-    popoverEl.style.top = top + 'px';
+    positionPracticeVolumePopover(popoverEl, anchorEl, { placement: 'above-center' });
 }
 
 function openTimelineInstrumentVolumesPopover(anchorEl) {
@@ -2948,12 +3197,30 @@ function openTimelineInstrumentVolumesPopover(anchorEl) {
 
     practiceTrackInstrumentNames.forEach(function (instrumentName) {
         const labelText = practiceScrollerInstrumentLabels[instrumentName] || instrumentName.replace('_', ' ');
-        const rowEl = document.createElement('label');
+        const rowEl = document.createElement('div');
         rowEl.className = 'practice-volume-row';
 
         const nameEl = document.createElement('span');
         nameEl.className = 'practice-volume-row-name';
         nameEl.textContent = labelText;
+        nameEl.setAttribute('role', 'button');
+        nameEl.setAttribute('tabindex', '0');
+        nameEl.title = 'Tonlautstärken öffnen';
+        function openToneVolumes(event) {
+            if (event && typeof event.stopPropagation === 'function') {
+                event.stopPropagation();
+            }
+            openPracticeInstrumentToneVolumePopover(instrumentName, nameEl, function () {
+                openTimelineInstrumentVolumesPopover(anchorEl);
+            });
+        }
+        nameEl.addEventListener('click', openToneVolumes);
+        nameEl.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                openToneVolumes(event);
+            }
+        });
 
         const rangeEl = document.createElement('input');
         rangeEl.type = 'range';
@@ -3007,19 +3274,7 @@ function openTimelineInstrumentVolumesPopover(anchorEl) {
     actionsEl.appendChild(resetButtonEl);
     popoverEl.appendChild(actionsEl);
     document.body.appendChild(popoverEl);
-
-    const anchorRect = anchorEl.getBoundingClientRect();
-    const popoverRect = popoverEl.getBoundingClientRect();
-    const left = Math.max(8, Math.min(
-        window.innerWidth - popoverRect.width - 8,
-        anchorRect.right - popoverRect.width
-    ));
-    const top = Math.max(8, Math.min(
-        window.innerHeight - popoverRect.height - 8,
-        anchorRect.bottom + 8
-    ));
-    popoverEl.style.left = left + 'px';
-    popoverEl.style.top = top + 'px';
+    positionPracticeVolumePopover(popoverEl, anchorEl, { placement: 'below-right' });
 }
 
 document.addEventListener('click', function (event) {
@@ -3028,7 +3283,10 @@ document.addEventListener('click', function (event) {
         return;
     }
     if (popoverEl.contains(event.target) ||
-            (event.target && event.target.closest && event.target.closest('.practice-scroller-label'))) {
+            (event.target && event.target.closest && (
+                event.target.closest('.practice-scroller-label') ||
+                event.target.closest('#timelineVolumeButton')
+            ))) {
         return;
     }
     closePracticeInstrumentVolumePopover();

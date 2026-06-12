@@ -159,6 +159,15 @@ updateLoadingStatus('Player startet...');
 const playerConfig = Array.isArray(obj) && obj.length > 0 ? obj[0] : {};
 const isPracticeMode = Boolean(playerConfig.PracticeMode);
 const allPracticeTrackNames = ['Kenkeni', 'Sangban', 'Doundoun', 'Dreierbass', 'Djembe_1', 'Djembe_2', 'Djembe_3'];
+const practiceInstrumentToneVolumeKeys = {
+  Kenkeni: ['open', 'muffled', 'bell', 'klick'],
+  Sangban: ['open', 'muffled', 'bell', 'klick'],
+  Doundoun: ['open', 'muffled', 'bell', 'klick'],
+  Dreierbass: ['kenkeni', 'kenkeni_muffled', 'sangban', 'sangban_muffled', 'doundoun'],
+  Djembe_1: ['tone', 'bass', 'slap', 'tone_muffled', 'slap_muffled', 'tone_flam', 'slap_flam', 'bass_slap_flam', 'mute'],
+  Djembe_2: ['tone', 'bass', 'slap', 'tone_muffled', 'slap_muffled', 'tone_flam', 'slap_flam', 'bass_slap_flam', 'mute'],
+  Djembe_3: ['tone', 'bass', 'slap', 'slap_muffled', 'tone_flam', 'slap_flam', 'bass_slap_flam', 'mute']
+};
 
 function normalizeInstrumentVolume(rawValue) {
   const numericValue = Number(rawValue);
@@ -182,6 +191,30 @@ function getPracticeInstrumentVolume(trackName) {
   return practiceInstrumentVolumes[trackName] === undefined
     ? 1
     : normalizeInstrumentVolume(practiceInstrumentVolumes[trackName]);
+}
+
+function normalizeInstrumentToneVolumes(rawVolumes) {
+  const sourceVolumes = rawVolumes && typeof rawVolumes === 'object' ? rawVolumes : {};
+  return allPracticeTrackNames.reduce(function (allVolumes, instrumentName) {
+    const sourceToneVolumes = sourceVolumes[instrumentName] && typeof sourceVolumes[instrumentName] === 'object'
+      ? sourceVolumes[instrumentName]
+      : {};
+    const toneVolumes = {};
+    (practiceInstrumentToneVolumeKeys[instrumentName] || []).forEach(function (toneKey) {
+      toneVolumes[toneKey] = normalizeInstrumentVolume(sourceToneVolumes[toneKey]);
+    });
+    allVolumes[instrumentName] = toneVolumes;
+    return allVolumes;
+  }, {});
+}
+
+let practiceInstrumentToneVolumes = normalizeInstrumentToneVolumes(playerConfig.PracticeInstrumentToneVolumes);
+
+function getPracticeInstrumentToneVolume(trackName, toneKey) {
+  const toneVolumes = practiceInstrumentToneVolumes[trackName];
+  return toneVolumes && toneVolumes[toneKey] !== undefined
+    ? normalizeInstrumentVolume(toneVolumes[toneKey])
+    : 1;
 }
 
 function hasPlayablePracticeNotes(notes) {
@@ -463,6 +496,7 @@ let timelineLoopCount = normalizeTimelineLoopCountValue(
 );
 let timelineLoop = timelineLoopCount === 'loop';
 const initialTempo = Math.max(30, Math.min(180, Number(playerConfig.Tempo) || 100));
+let currentBaseTempo = initialTempo;
 const swingFactor = Math.max(0, Math.min(100, Number(playerConfig.SwingFactor) || 0));
 const rhythmType = String(playerConfig.Rhythmus || '');
 const swingProfile = playerConfig.SwingProfile || {};
@@ -490,6 +524,7 @@ window.addEventListener('message', function (event) {
   }
   if (message.type === 'barabeat-practice-instrument-volumes') {
     practiceInstrumentVolumes = normalizeInstrumentVolumes(message.volumes);
+    practiceInstrumentToneVolumes = normalizeInstrumentToneVolumes(message.toneVolumes);
     return;
   }
   if (message.type === 'barabeat-practice-hand-modes-update') {
@@ -636,6 +671,10 @@ function createOrderedSection(label) {
     label: label,
     labelName: label,
     swingFactor: null,
+    sectionTempo: null,
+    tempoStart: null,
+    tempoTarget: null,
+    tempoRampSteps: 0,
     runtimeKey: '',
     trackNotes: createEmptyTrackNoteMap(),
     trackHandModes: createEmptyTrackHandModeMap(),
@@ -884,6 +923,7 @@ function mergeTimelineEntryPickupsIntoPreviousSection(sections, entryDataList) {
     if (pickupSection.swingFactor === null && entryData.swingFactor !== null && entryData.swingFactor !== undefined) {
       pickupSection.swingFactor = entryData.swingFactor;
     }
+    applyEntryTempoToSection(pickupSection, entryData);
   });
 
   if (!sectionHasTimelineNotes(pickupSection)) {
@@ -1329,6 +1369,17 @@ function normalizeSectionRepeatCount(rawValue) {
   return Math.max(1, Math.min(100, Math.round(numericValue)));
 }
 
+function normalizeSectionTempo(rawValue) {
+  if (rawValue === null || rawValue === undefined || rawValue === '') {
+    return null;
+  }
+  const numericValue = Number(rawValue);
+  if (!Number.isFinite(numericValue)) {
+    return null;
+  }
+  return Math.max(30, Math.min(180, Math.round(numericValue)));
+}
+
 function normalizeSectionOutStep(rawValue) {
   if (rawValue === null || rawValue === undefined || rawValue === '') {
     return null;
@@ -1362,6 +1413,7 @@ function createSectionFromEntry(label, labelName, entryData) {
   section.swingFactor = entryData.swingFactor === null || entryData.swingFactor === undefined
     ? null
     : Math.max(0, Math.min(100, Number(entryData.swingFactor) || 0));
+  section.sectionTempo = normalizeSectionTempo(entryData.sectionTempo);
   section.entrySignatures = [entryData.entrySignature];
   section.sectionTargets = entryData.targetInstruments.slice();
   appendEntryToSection(section, entryData);
@@ -1371,6 +1423,16 @@ function createSectionFromEntry(label, labelName, entryData) {
     });
   }
   return section;
+}
+
+function applyEntryTempoToSection(section, entryData) {
+  if (!section || !entryData) {
+    return;
+  }
+  const entryTempo = normalizeSectionTempo(entryData.sectionTempo);
+  if (section.sectionTempo === null || section.sectionTempo === undefined) {
+    section.sectionTempo = entryTempo;
+  }
 }
 
 function applyContinuingAccompanimentsToSections(sections) {
@@ -1423,6 +1485,21 @@ function finalizeSectionLengths(sections) {
     }).concat(0));
     section.repeatCount = normalizeSectionRepeatCount(section.repeatCount);
     section.playbackLength = section.length * section.repeatCount;
+  });
+}
+
+function applyOrderedSectionTempoTargets(sections) {
+  let activeTempo = Math.max(30, Math.min(180, Number(currentBaseTempo) || initialTempo || 100));
+  const tempoRampSteps = Math.max(1, getTimelineStepsPerBar() * 2);
+  (Array.isArray(sections) ? sections : []).forEach(function (section) {
+    const nextTempo = normalizeSectionTempo(section && section.sectionTempo);
+    const targetTempo = nextTempo === null ? activeTempo : nextTempo;
+    section.tempoStart = activeTempo;
+    section.tempoTarget = targetTempo;
+    section.tempoRampSteps = nextTempo === null || targetTempo === activeTempo
+      ? 0
+      : Math.min(tempoRampSteps, Math.max(1, section.playbackLength || section.length || tempoRampSteps));
+    activeTempo = targetTempo;
   });
 }
 
@@ -1667,6 +1744,7 @@ function buildTimelineSections(config) {
       swingFactor: entry.swingFactor === null || entry.swingFactor === undefined
         ? null
         : Math.max(0, Math.min(100, Number(entry.swingFactor) || 0)),
+      sectionTempo: normalizeSectionTempo(entry.sectionTempo),
       startsContinuingAccompaniment: startsContinuingAccompaniment,
       patternNotes: patternNotes,
       patternInStep: patternInStep,
@@ -1684,6 +1762,7 @@ function buildTimelineSections(config) {
     const blockLabel = playbackEntries[blockStartIndex].label;
     const blockId = playbackEntries[blockStartIndex].blockId;
     const parallelGroupId = playbackEntries[blockStartIndex].parallelGroupId;
+    const blockSectionTempo = normalizeSectionTempo(playbackEntries[blockStartIndex].sectionTempo);
     const isPracticeBlock = isPracticeMode && blockId;
     let blockEndIndex = blockStartIndex + 1;
     while (blockEndIndex < playbackEntries.length) {
@@ -1692,7 +1771,9 @@ function buildTimelineSections(config) {
         ? nextEntry.blockId === blockId
         : (parallelGroupId
             ? nextEntry.parallelGroupId === parallelGroupId
-            : nextEntry.label === blockLabel && nextEntry.blockId === blockId);
+            : nextEntry.label === blockLabel &&
+              nextEntry.blockId === blockId &&
+              normalizeSectionTempo(nextEntry.sectionTempo) === blockSectionTempo);
       if (!belongsToCurrentBlock) {
         break;
       }
@@ -1811,6 +1892,7 @@ function buildTimelineSections(config) {
             if (repeatedSection.swingFactor === null && entryData.swingFactor !== null && entryData.swingFactor !== undefined) {
               repeatedSection.swingFactor = entryData.swingFactor;
             }
+            applyEntryTempoToSection(repeatedSection, entryData);
             if (entryData.startsContinuingAccompaniment) {
               entryData.targetInstruments.forEach(function (instrumentName) {
                 repeatedSection.continuingAccompaniments[instrumentName] = entryData.patternNotes.slice();
@@ -1889,6 +1971,7 @@ function buildTimelineSections(config) {
         if (mergedSection.swingFactor === null && entryData.swingFactor !== null && entryData.swingFactor !== undefined) {
           mergedSection.swingFactor = entryData.swingFactor;
         }
+        applyEntryTempoToSection(mergedSection, entryData);
         if (entryData.startsContinuingAccompaniment) {
           entryData.targetInstruments.forEach(function (instrumentName) {
             mergedSection.continuingAccompaniments[instrumentName] = entryData.patternNotes.slice();
@@ -1940,6 +2023,7 @@ function buildTimelineSections(config) {
         if (currentCycleSection.swingFactor === null && occurrenceEntry.swingFactor !== null && occurrenceEntry.swingFactor !== undefined) {
           currentCycleSection.swingFactor = occurrenceEntry.swingFactor;
         }
+        applyEntryTempoToSection(currentCycleSection, occurrenceEntry);
         currentCycleSection.entrySignatures.push(occurrenceEntry.entrySignature);
         currentCycleSection.sectionTargets = currentCycleSection.sectionTargets.concat(
           occurrenceEntry.targetInstruments.filter(function (instrumentName) {
@@ -2390,6 +2474,8 @@ bpmValEl.innerText = String(initialTempo);
 
 bpmControl.addEventListener('input', ev => {
   tempo = Number(ev.target.value);
+  currentBaseTempo = Math.max(30, Math.min(180, Number(tempo) || initialTempo || 100));
+  recalculateOrderedSectionTiming();
   bpmValEl.innerText = tempo;
   notifyEmbeddedTempoChange(tempo);
 }, false);
@@ -2475,6 +2561,7 @@ function recalculateOrderedSectionTiming() {
     section.startStep = sectionIndex === 0 ? 0 : orderedSections[sectionIndex - 1].endStep;
     section.endStep = section.startStep + section.playbackLength;
   });
+  applyOrderedSectionTempoTargets(orderedSections);
 
   oneShotLength = orderedSections.length > 0
     ? orderedSections[orderedSections.length - 1].endStep
@@ -2675,8 +2762,25 @@ function getBaseStepDuration(tempoValue) {
   return 60 / safeTempo / getStepsPerBeatForRhythm();
 }
 
+function getEffectiveTempoForStep(playbackStep) {
+  const sectionContext = getPlaybackSectionContext(playbackStep);
+  if (!sectionContext || !sectionContext.section) {
+    return Math.max(1, Number(currentBaseTempo) || Number(tempo) || initialTempo || 100);
+  }
+  const section = sectionContext.section;
+  const startTempo = normalizeSectionTempo(section.tempoStart) || Math.max(1, Number(currentBaseTempo) || Number(tempo) || initialTempo || 100);
+  const targetTempo = normalizeSectionTempo(section.tempoTarget) || startTempo;
+  const rampSteps = Math.max(0, Math.round(Number(section.tempoRampSteps) || 0));
+  if (rampSteps <= 0 || startTempo === targetTempo) {
+    return targetTempo;
+  }
+  const progress = Math.max(0, Math.min(1, sectionContext.sectionStep / rampSteps));
+  return startTempo + ((targetTempo - startTempo) * progress);
+}
+
 function nextNote() {
-  const stepDuration = getBaseStepDuration(tempo);
+  const stepTempo = getEffectiveTempoForStep(globalPlaybackStep);
+  const stepDuration = getBaseStepDuration(stepTempo);
   let intervalToNextStep = stepDuration;
   let activeSwingFactor = swingFactor;
   const sectionContext = getPlaybackSectionContext(globalPlaybackStep);
@@ -2747,8 +2851,9 @@ function getAccentMultiplier(playbackStep) {
   return 1.14;
 }
 
-function scheduleNote(kenkeniNote, sangbanNote, doundounNote, dreierbassNote, djembe1Playback, djembe2Playback, djembe3Playback, time, accentMultiplier) {
+function scheduleNote(kenkeniNote, sangbanNote, doundounNote, dreierbassNote, djembe1Playback, djembe2Playback, djembe3Playback, time, accentMultiplier, stepTempo) {
   const noteGain = Math.max(0, Number(accentMultiplier) || 1);
+  const strokeTempo = Math.max(1, Number(stepTempo) || Number(tempo) || initialTempo || 100);
   const kenkeniGain = noteGain * getPracticeInstrumentVolume('Kenkeni');
   const sangbanGain = noteGain * getPracticeInstrumentVolume('Sangban');
   const doundounGain = noteGain * getPracticeInstrumentVolume('Doundoun');
@@ -2772,6 +2877,9 @@ function scheduleNote(kenkeniNote, sangbanNote, doundounNote, dreierbassNote, dj
   const djembe1Time = Math.max(0, time + getFeelOffsetSeconds('Djembe_1'));
   const djembe2Time = Math.max(0, time + getFeelOffsetSeconds('Djembe_2'));
   const djembe3Time = Math.max(0, time + getFeelOffsetSeconds('Djembe_3'));
+  function applyToneGain(trackName, toneKey, baseGain) {
+    return baseGain * getPracticeInstrumentToneVolume(trackName, toneKey);
+  }
 
   function playKenkeni() {
     switch (kenkeniNote) {
@@ -2780,28 +2888,28 @@ function scheduleNote(kenkeniNote, sangbanNote, doundounNote, dreierbassNote, dj
       case undefined:
         break;
       case "Bell":
-        kenkeni.play('Kenkeni_Bell_Open', kenkeniTime, kenkeniGain);
+        kenkeni.play('Kenkeni_Bell_Open', kenkeniTime, applyToneGain('Kenkeni', 'bell', kenkeniGain));
         break;
       case "Open":
-        kenkeni.play('Kenkeni_Open', kenkeniTime, kenkeniGain);
+        kenkeni.play('Kenkeni_Open', kenkeniTime, applyToneGain('Kenkeni', 'open', kenkeniGain));
         break;
       case "Muffled":
-        kenkeni.play('Kenkeni_Muffled', kenkeniTime, kenkeniMuffledGain);
+        kenkeni.play('Kenkeni_Muffled', kenkeniTime, applyToneGain('Kenkeni', 'muffled', kenkeniMuffledGain));
         break;
       case "Klick":
-        kenkeni.play('Kenkeni_Klick', kenkeniTime, kenkeniKlickGain);
+        kenkeni.play('Kenkeni_Klick', kenkeniTime, applyToneGain('Kenkeni', 'klick', kenkeniKlickGain));
         break;
       case "Bell_Open":
-        kenkeni.play('Kenkeni_Bell_Open', kenkeniTime, kenkeniGain);
-        kenkeni.play('Kenkeni_Open', kenkeniTime, kenkeniGain);
+        kenkeni.play('Kenkeni_Bell_Open', kenkeniTime, applyToneGain('Kenkeni', 'bell', kenkeniGain));
+        kenkeni.play('Kenkeni_Open', kenkeniTime, applyToneGain('Kenkeni', 'open', kenkeniGain));
         break;
       case "Bell_Muffled":
-        kenkeni.play('Kenkeni_Bell_Open', kenkeniTime, kenkeniGain);
-        kenkeni.play('Kenkeni_Muffled', kenkeniTime, kenkeniMuffledGain);
+        kenkeni.play('Kenkeni_Bell_Open', kenkeniTime, applyToneGain('Kenkeni', 'bell', kenkeniGain));
+        kenkeni.play('Kenkeni_Muffled', kenkeniTime, applyToneGain('Kenkeni', 'muffled', kenkeniMuffledGain));
         break;
       case "Bell_Klick":
-        kenkeni.play('Kenkeni_Bell_Open', kenkeniTime, kenkeniGain);
-        kenkeni.play('Kenkeni_Klick', kenkeniTime, kenkeniKlickGain);
+        kenkeni.play('Kenkeni_Bell_Open', kenkeniTime, applyToneGain('Kenkeni', 'bell', kenkeniGain));
+        kenkeni.play('Kenkeni_Klick', kenkeniTime, applyToneGain('Kenkeni', 'klick', kenkeniKlickGain));
         break;
     }
   }
@@ -2813,28 +2921,28 @@ function scheduleNote(kenkeniNote, sangbanNote, doundounNote, dreierbassNote, dj
       case undefined:
         break;
       case "Bell":
-        sangban.play('Sangban_Bell_Open', sangbanTime, sangbanBellGain);
+        sangban.play('Sangban_Bell_Open', sangbanTime, applyToneGain('Sangban', 'bell', sangbanBellGain));
         break;
       case "Open":
-        sangban.play('Sangban_Open', sangbanTime, sangbanStrokeGain);
+        sangban.play('Sangban_Open', sangbanTime, applyToneGain('Sangban', 'open', sangbanStrokeGain));
         break;
       case "Muffled":
-        sangban.play('Sangban_Muffled', sangbanTime, sangbanMuffledGain);
+        sangban.play('Sangban_Muffled', sangbanTime, applyToneGain('Sangban', 'muffled', sangbanMuffledGain));
         break;
       case "Klick":
-        sangban.play('Sangban_Klick', sangbanTime, sangbanKlickGain);
+        sangban.play('Sangban_Klick', sangbanTime, applyToneGain('Sangban', 'klick', sangbanKlickGain));
         break;
       case "Bell_Open":
-        sangban.play('Sangban_Bell_Open', sangbanTime, sangbanBellGain);
-        sangban.play('Sangban_Open', sangbanTime, sangbanStrokeGain);
+        sangban.play('Sangban_Bell_Open', sangbanTime, applyToneGain('Sangban', 'bell', sangbanBellGain));
+        sangban.play('Sangban_Open', sangbanTime, applyToneGain('Sangban', 'open', sangbanStrokeGain));
         break;
       case "Bell_Muffled":
-        sangban.play('Sangban_Bell_Open', sangbanTime, sangbanBellGain);
-        sangban.play('Sangban_Muffled', sangbanTime, sangbanMuffledGain);
+        sangban.play('Sangban_Bell_Open', sangbanTime, applyToneGain('Sangban', 'bell', sangbanBellGain));
+        sangban.play('Sangban_Muffled', sangbanTime, applyToneGain('Sangban', 'muffled', sangbanMuffledGain));
         break;
       case "Bell_Klick":
-        sangban.play('Sangban_Bell_Open', sangbanTime, sangbanBellGain);
-        sangban.play('Sangban_Klick', sangbanTime, sangbanKlickGain);
+        sangban.play('Sangban_Bell_Open', sangbanTime, applyToneGain('Sangban', 'bell', sangbanBellGain));
+        sangban.play('Sangban_Klick', sangbanTime, applyToneGain('Sangban', 'klick', sangbanKlickGain));
         break;
     }
   }
@@ -2846,28 +2954,28 @@ function scheduleNote(kenkeniNote, sangbanNote, doundounNote, dreierbassNote, dj
       case undefined:
         break;
       case "Bell":
-        doundoun.play('Doundoun_Bell_Open', doundounTime, doundounBellGain);
+        doundoun.play('Doundoun_Bell_Open', doundounTime, applyToneGain('Doundoun', 'bell', doundounBellGain));
         break;
       case "Open":
-        doundoun.play('Doundoun_Open', doundounTime, doundounGain);
+        doundoun.play('Doundoun_Open', doundounTime, applyToneGain('Doundoun', 'open', doundounGain));
         break;
       case "Muffled":
-        doundoun.play('Doundoun_Muffled', doundounTime, doundounMuffledGain);
+        doundoun.play('Doundoun_Muffled', doundounTime, applyToneGain('Doundoun', 'muffled', doundounMuffledGain));
         break;
       case "Klick":
-        doundoun.play('Doundoun_Klick', doundounTime, doundounKlickGain);
+        doundoun.play('Doundoun_Klick', doundounTime, applyToneGain('Doundoun', 'klick', doundounKlickGain));
         break;
       case "Bell_Open":
-        doundoun.play('Doundoun_Bell_Open', doundounTime, doundounBellGain);
-        doundoun.play('Doundoun_Open', doundounTime, doundounGain);
+        doundoun.play('Doundoun_Bell_Open', doundounTime, applyToneGain('Doundoun', 'bell', doundounBellGain));
+        doundoun.play('Doundoun_Open', doundounTime, applyToneGain('Doundoun', 'open', doundounGain));
         break;
       case "Bell_Muffled":
-        doundoun.play('Doundoun_Bell_Open', doundounTime, doundounBellGain);
-        doundoun.play('Doundoun_Muffled', doundounTime, doundounMuffledGain);
+        doundoun.play('Doundoun_Bell_Open', doundounTime, applyToneGain('Doundoun', 'bell', doundounBellGain));
+        doundoun.play('Doundoun_Muffled', doundounTime, applyToneGain('Doundoun', 'muffled', doundounMuffledGain));
         break;
       case "Bell_Klick":
-        doundoun.play('Doundoun_Bell_Open', doundounTime, doundounBellGain);
-        doundoun.play('Doundoun_Klick', doundounTime, doundounKlickGain);
+        doundoun.play('Doundoun_Bell_Open', doundounTime, applyToneGain('Doundoun', 'bell', doundounBellGain));
+        doundoun.play('Doundoun_Klick', doundounTime, applyToneGain('Doundoun', 'klick', doundounKlickGain));
         break;
     }
   }
@@ -2879,47 +2987,47 @@ function scheduleNote(kenkeniNote, sangbanNote, doundounNote, dreierbassNote, dj
       case undefined:
         break;
       case "sangban":
-        dreierbass.play('Sangban_Open', dreierbassTime, dreierbassGain);
+        dreierbass.play('Sangban_Open', dreierbassTime, applyToneGain('Dreierbass', 'sangban', dreierbassGain));
         break;
       case "doundoun":
-        dreierbass.play('Doundoun_Open', dreierbassTime, dreierbassGain);
+        dreierbass.play('Doundoun_Open', dreierbassTime, applyToneGain('Dreierbass', 'doundoun', dreierbassGain));
         break;
       case "kenkeni":
-        dreierbass.play('Kenkeni_Open', dreierbassTime, dreierbassGain);
+        dreierbass.play('Kenkeni_Open', dreierbassTime, applyToneGain('Dreierbass', 'kenkeni', dreierbassGain));
         break;
       case "kenkeni_muffled":
-        dreierbass.play('Kenkeni_Muffled', dreierbassTime, dreierbassGain);
+        dreierbass.play('Kenkeni_Muffled', dreierbassTime, applyToneGain('Dreierbass', 'kenkeni_muffled', dreierbassGain));
         break;
       case "sangban_muffled":
-        dreierbass.play('Sangban_Muffled', dreierbassTime, dreierbassGain);
+        dreierbass.play('Sangban_Muffled', dreierbassTime, applyToneGain('Dreierbass', 'sangban_muffled', dreierbassGain));
         break;
       case "kenkeni_sangban":
-        dreierbass.play('Kenkeni_Open', dreierbassTime, dreierbassGain);
-        dreierbass.play('Sangban_Open', dreierbassTime + 0.5 / tempo, dreierbassGain);
+        dreierbass.play('Kenkeni_Open', dreierbassTime, applyToneGain('Dreierbass', 'kenkeni', dreierbassGain));
+        dreierbass.play('Sangban_Open', dreierbassTime + 0.5 / strokeTempo, applyToneGain('Dreierbass', 'sangban', dreierbassGain));
         break;
       case "kenkeni_doundoun":
-        dreierbass.play('Kenkeni_Open', dreierbassTime, dreierbassGain);
-        dreierbass.play('Doundoun_Open', dreierbassTime + 0.5 / tempo, dreierbassGain);
+        dreierbass.play('Kenkeni_Open', dreierbassTime, applyToneGain('Dreierbass', 'kenkeni', dreierbassGain));
+        dreierbass.play('Doundoun_Open', dreierbassTime + 0.5 / strokeTempo, applyToneGain('Dreierbass', 'doundoun', dreierbassGain));
         break;
       case "sangban_doundoun":
-        dreierbass.play('Sangban_Open', dreierbassTime, dreierbassGain);
-        dreierbass.play('Doundoun_Open', dreierbassTime + 0.5 / tempo, dreierbassGain);
+        dreierbass.play('Sangban_Open', dreierbassTime, applyToneGain('Dreierbass', 'sangban', dreierbassGain));
+        dreierbass.play('Doundoun_Open', dreierbassTime + 0.5 / strokeTempo, applyToneGain('Dreierbass', 'doundoun', dreierbassGain));
         break;
       case "kenkeni_sangban_muffled":
-        dreierbass.play('Kenkeni_Open', dreierbassTime, dreierbassGain);
-        dreierbass.play('Sangban_Muffled', dreierbassTime + 0.5 / tempo, dreierbassGain);
+        dreierbass.play('Kenkeni_Open', dreierbassTime, applyToneGain('Dreierbass', 'kenkeni', dreierbassGain));
+        dreierbass.play('Sangban_Muffled', dreierbassTime + 0.5 / strokeTempo, applyToneGain('Dreierbass', 'sangban_muffled', dreierbassGain));
         break;
       case "kenkeni_muffled_sangban":
-        dreierbass.play('Kenkeni_Muffled', dreierbassTime, dreierbassGain);
-        dreierbass.play('Sangban_Open', dreierbassTime + 0.5 / tempo, dreierbassGain);
+        dreierbass.play('Kenkeni_Muffled', dreierbassTime, applyToneGain('Dreierbass', 'kenkeni_muffled', dreierbassGain));
+        dreierbass.play('Sangban_Open', dreierbassTime + 0.5 / strokeTempo, applyToneGain('Dreierbass', 'sangban', dreierbassGain));
         break;
       case "kenkeni_muffled_doundoun":
-        dreierbass.play('Kenkeni_Muffled', dreierbassTime, dreierbassGain);
-        dreierbass.play('Doundoun_Open', dreierbassTime + 1 / tempo, dreierbassGain);
+        dreierbass.play('Kenkeni_Muffled', dreierbassTime, applyToneGain('Dreierbass', 'kenkeni_muffled', dreierbassGain));
+        dreierbass.play('Doundoun_Open', dreierbassTime + 1 / strokeTempo, applyToneGain('Dreierbass', 'doundoun', dreierbassGain));
         break;
       case "sangban_muffled_doundoun":
-        dreierbass.play('Sangban_Muffled', dreierbassTime, dreierbassGain);
-        dreierbass.play('Doundoun_Open', dreierbassTime + 1 / tempo, dreierbassGain);
+        dreierbass.play('Sangban_Muffled', dreierbassTime, applyToneGain('Dreierbass', 'sangban_muffled', dreierbassGain));
+        dreierbass.play('Doundoun_Open', dreierbassTime + 1 / strokeTempo, applyToneGain('Dreierbass', 'doundoun', dreierbassGain));
         break;
     }
   }
@@ -2932,31 +3040,31 @@ function scheduleNote(kenkeniNote, sangbanNote, doundounNote, dreierbassNote, dj
       case undefined:
         break;
       case "tone":
-        playDjembeStroke(djembe_1, 'DjembeOne_Open', djembe1Time, djembe1Playback, djembeHandStates.Djembe_1, djembe1Gain);
+        playDjembeStroke(djembe_1, 'DjembeOne_Open', djembe1Time, djembe1Playback, djembeHandStates.Djembe_1, applyToneGain('Djembe_1', 'tone', djembe1Gain));
         break;
       case "bass":
-        playDjembeStroke(djembe_1, 'DjembeOne_Bass', djembe1Time, djembe1Playback, djembeHandStates.Djembe_1, djembe1Gain);
+        playDjembeStroke(djembe_1, 'DjembeOne_Bass', djembe1Time, djembe1Playback, djembeHandStates.Djembe_1, applyToneGain('Djembe_1', 'bass', djembe1Gain));
         break;
       case "slap":
-        playDjembeStroke(djembe_1, 'DjembeOne_Slap', djembe1Time, djembe1Playback, djembeHandStates.Djembe_1, djembe1Gain);
+        playDjembeStroke(djembe_1, 'DjembeOne_Slap', djembe1Time, djembe1Playback, djembeHandStates.Djembe_1, applyToneGain('Djembe_1', 'slap', djembe1Gain));
         break;
       case "tone_muffled":
-        playDjembeStroke(djembe_1, 'DjembeOne_Muffled_Open', djembe1Time, djembe1Playback, djembeHandStates.Djembe_1, djembe1Gain);
+        playDjembeStroke(djembe_1, 'DjembeOne_Muffled_Open', djembe1Time, djembe1Playback, djembeHandStates.Djembe_1, applyToneGain('Djembe_1', 'tone_muffled', djembe1Gain));
         break;
       case "slap_muffled":
-        playDjembeStroke(djembe_1, 'DjembeOne_Muffled_Slap', djembe1Time, djembe1Playback, djembeHandStates.Djembe_1, djembe1Gain);
+        playDjembeStroke(djembe_1, 'DjembeOne_Muffled_Slap', djembe1Time, djembe1Playback, djembeHandStates.Djembe_1, applyToneGain('Djembe_1', 'slap_muffled', djembe1Gain));
         break;
       case "tone_flam":
-        playDjembeStroke(djembe_1, 'DjembeOne_Open', djembe1Time, djembe1Playback, djembeHandStates.Djembe_1, djembe1Gain, { isGrace: true });
-        playDjembeStroke(djembe_1, 'DjembeOne_Open', djembe1Time + 5 / tempo, djembe1Playback, djembeHandStates.Djembe_1, djembe1Gain);
+        playDjembeStroke(djembe_1, 'DjembeOne_Open', djembe1Time, djembe1Playback, djembeHandStates.Djembe_1, applyToneGain('Djembe_1', 'tone_flam', djembe1Gain), { isGrace: true });
+        playDjembeStroke(djembe_1, 'DjembeOne_Open', djembe1Time + 5 / strokeTempo, djembe1Playback, djembeHandStates.Djembe_1, applyToneGain('Djembe_1', 'tone_flam', djembe1Gain));
         break;
       case "slap_flam":
-        playDjembeStroke(djembe_1, 'DjembeOne_Slap', djembe1Time, djembe1Playback, djembeHandStates.Djembe_1, djembe1Gain, { isGrace: true });
-        playDjembeStroke(djembe_1, 'DjembeOne_Slap', djembe1Time + 5 / tempo, djembe1Playback, djembeHandStates.Djembe_1, djembe1Gain);
+        playDjembeStroke(djembe_1, 'DjembeOne_Slap', djembe1Time, djembe1Playback, djembeHandStates.Djembe_1, applyToneGain('Djembe_1', 'slap_flam', djembe1Gain), { isGrace: true });
+        playDjembeStroke(djembe_1, 'DjembeOne_Slap', djembe1Time + 5 / strokeTempo, djembe1Playback, djembeHandStates.Djembe_1, applyToneGain('Djembe_1', 'slap_flam', djembe1Gain));
         break;
       case "bass_slap_flam":
-        playDjembeStroke(djembe_1, 'DjembeOne_Bass', djembe1Time, djembe1Playback, djembeHandStates.Djembe_1, djembe1Gain, { isGrace: true });
-        playDjembeStroke(djembe_1, 'DjembeOne_Slap', djembe1Time + 5 / tempo, djembe1Playback, djembeHandStates.Djembe_1, djembe1Gain);
+        playDjembeStroke(djembe_1, 'DjembeOne_Bass', djembe1Time, djembe1Playback, djembeHandStates.Djembe_1, applyToneGain('Djembe_1', 'bass_slap_flam', djembe1Gain), { isGrace: true });
+        playDjembeStroke(djembe_1, 'DjembeOne_Slap', djembe1Time + 5 / strokeTempo, djembe1Playback, djembeHandStates.Djembe_1, applyToneGain('Djembe_1', 'bass_slap_flam', djembe1Gain));
         break;
     }
   }
@@ -2969,31 +3077,31 @@ function scheduleNote(kenkeniNote, sangbanNote, doundounNote, dreierbassNote, dj
       case undefined:
         break;
       case "tone":
-        playDjembeStroke(djembe_2, 'DjembeTwo_Open', djembe2Time, djembe2Playback, djembeHandStates.Djembe_2, djembe2Gain);
+        playDjembeStroke(djembe_2, 'DjembeTwo_Open', djembe2Time, djembe2Playback, djembeHandStates.Djembe_2, applyToneGain('Djembe_2', 'tone', djembe2Gain));
         break;
       case "tone_muffled":
-        playDjembeStroke(djembe_2, 'DjembeTwo_Muffled_Open', djembe2Time, djembe2Playback, djembeHandStates.Djembe_2, djembe2Gain);
+        playDjembeStroke(djembe_2, 'DjembeTwo_Muffled_Open', djembe2Time, djembe2Playback, djembeHandStates.Djembe_2, applyToneGain('Djembe_2', 'tone_muffled', djembe2Gain));
         break;
       case "bass":
-        playDjembeStroke(djembe_2, 'DjembeTwo_Bass', djembe2Time, djembe2Playback, djembeHandStates.Djembe_2, djembe2Gain);
+        playDjembeStroke(djembe_2, 'DjembeTwo_Bass', djembe2Time, djembe2Playback, djembeHandStates.Djembe_2, applyToneGain('Djembe_2', 'bass', djembe2Gain));
         break;
       case "slap":
-        playDjembeStroke(djembe_2, 'DjembeTwo_Slap', djembe2Time, djembe2Playback, djembeHandStates.Djembe_2, djembe2Gain);
+        playDjembeStroke(djembe_2, 'DjembeTwo_Slap', djembe2Time, djembe2Playback, djembeHandStates.Djembe_2, applyToneGain('Djembe_2', 'slap', djembe2Gain));
         break;
       case "slap_muffled":
-        playDjembeStroke(djembe_2, 'DjembeTwo_Muffled_Slap', djembe2Time, djembe2Playback, djembeHandStates.Djembe_2, djembe2Gain);
+        playDjembeStroke(djembe_2, 'DjembeTwo_Muffled_Slap', djembe2Time, djembe2Playback, djembeHandStates.Djembe_2, applyToneGain('Djembe_2', 'slap_muffled', djembe2Gain));
         break;
       case "tone_flam":
-        playDjembeStroke(djembe_2, 'DjembeTwo_Open', djembe2Time, djembe2Playback, djembeHandStates.Djembe_2, djembe2Gain, { isGrace: true });
-        playDjembeStroke(djembe_2, 'DjembeTwo_Open', djembe2Time + 5 / tempo, djembe2Playback, djembeHandStates.Djembe_2, djembe2Gain);
+        playDjembeStroke(djembe_2, 'DjembeTwo_Open', djembe2Time, djembe2Playback, djembeHandStates.Djembe_2, applyToneGain('Djembe_2', 'tone_flam', djembe2Gain), { isGrace: true });
+        playDjembeStroke(djembe_2, 'DjembeTwo_Open', djembe2Time + 5 / strokeTempo, djembe2Playback, djembeHandStates.Djembe_2, applyToneGain('Djembe_2', 'tone_flam', djembe2Gain));
         break;
       case "slap_flam":
-        playDjembeStroke(djembe_2, 'DjembeTwo_Slap', djembe2Time, djembe2Playback, djembeHandStates.Djembe_2, djembe2Gain, { isGrace: true });
-        playDjembeStroke(djembe_2, 'DjembeTwo_Slap', djembe2Time + 5 / tempo, djembe2Playback, djembeHandStates.Djembe_2, djembe2Gain);
+        playDjembeStroke(djembe_2, 'DjembeTwo_Slap', djembe2Time, djembe2Playback, djembeHandStates.Djembe_2, applyToneGain('Djembe_2', 'slap_flam', djembe2Gain), { isGrace: true });
+        playDjembeStroke(djembe_2, 'DjembeTwo_Slap', djembe2Time + 5 / strokeTempo, djembe2Playback, djembeHandStates.Djembe_2, applyToneGain('Djembe_2', 'slap_flam', djembe2Gain));
         break;
       case "bass_slap_flam":
-        playDjembeStroke(djembe_2, 'DjembeTwo_Bass', djembe2Time, djembe2Playback, djembeHandStates.Djembe_2, djembe2Gain, { isGrace: true });
-        playDjembeStroke(djembe_2, 'DjembeTwo_Slap', djembe2Time + 5 / tempo, djembe2Playback, djembeHandStates.Djembe_2, djembe2Gain);
+        playDjembeStroke(djembe_2, 'DjembeTwo_Bass', djembe2Time, djembe2Playback, djembeHandStates.Djembe_2, applyToneGain('Djembe_2', 'bass_slap_flam', djembe2Gain), { isGrace: true });
+        playDjembeStroke(djembe_2, 'DjembeTwo_Slap', djembe2Time + 5 / strokeTempo, djembe2Playback, djembeHandStates.Djembe_2, applyToneGain('Djembe_2', 'bass_slap_flam', djembe2Gain));
         break;
     }
   }
@@ -3006,28 +3114,28 @@ function scheduleNote(kenkeniNote, sangbanNote, doundounNote, dreierbassNote, dj
       case undefined:
         break;
       case "tone":
-        playDjembeStroke(djembe_3, 'DjembeThree_Open', djembe3Time, djembe3Playback, djembeHandStates.Djembe_3, djembe3Gain);
+        playDjembeStroke(djembe_3, 'DjembeThree_Open', djembe3Time, djembe3Playback, djembeHandStates.Djembe_3, applyToneGain('Djembe_3', 'tone', djembe3Gain));
         break;
       case "bass":
-        playDjembeStroke(djembe_3, 'DjembeThree_Bass', djembe3Time, djembe3Playback, djembeHandStates.Djembe_3, djembe3Gain);
+        playDjembeStroke(djembe_3, 'DjembeThree_Bass', djembe3Time, djembe3Playback, djembeHandStates.Djembe_3, applyToneGain('Djembe_3', 'bass', djembe3Gain));
         break;
       case "slap":
-        playDjembeStroke(djembe_3, 'DjembeThree_Slap', djembe3Time, djembe3Playback, djembeHandStates.Djembe_3, djembe3Gain);
+        playDjembeStroke(djembe_3, 'DjembeThree_Slap', djembe3Time, djembe3Playback, djembeHandStates.Djembe_3, applyToneGain('Djembe_3', 'slap', djembe3Gain));
         break;
       case "slap_muffled":
-        playDjembeStroke(djembe_3, 'DjembeThree_Mute', djembe3Time, djembe3Playback, djembeHandStates.Djembe_3, djembe3Gain);
+        playDjembeStroke(djembe_3, 'DjembeThree_Mute', djembe3Time, djembe3Playback, djembeHandStates.Djembe_3, applyToneGain('Djembe_3', 'slap_muffled', djembe3Gain));
         break;
       case "tone_flam":
-        playDjembeStroke(djembe_3, 'DjembeThree_Open', djembe3Time, djembe3Playback, djembeHandStates.Djembe_3, djembe3Gain, { isGrace: true });
-        playDjembeStroke(djembe_3, 'DjembeThree_Open', djembe3Time + 5 / tempo, djembe3Playback, djembeHandStates.Djembe_3, djembe3Gain);
+        playDjembeStroke(djembe_3, 'DjembeThree_Open', djembe3Time, djembe3Playback, djembeHandStates.Djembe_3, applyToneGain('Djembe_3', 'tone_flam', djembe3Gain), { isGrace: true });
+        playDjembeStroke(djembe_3, 'DjembeThree_Open', djembe3Time + 5 / strokeTempo, djembe3Playback, djembeHandStates.Djembe_3, applyToneGain('Djembe_3', 'tone_flam', djembe3Gain));
         break;
       case "slap_flam":
-        playDjembeStroke(djembe_3, 'DjembeThree_Slap', djembe3Time, djembe3Playback, djembeHandStates.Djembe_3, djembe3Gain, { isGrace: true });
-        playDjembeStroke(djembe_3, 'DjembeThree_Slap', djembe3Time + 5 / tempo, djembe3Playback, djembeHandStates.Djembe_3, djembe3Gain);
+        playDjembeStroke(djembe_3, 'DjembeThree_Slap', djembe3Time, djembe3Playback, djembeHandStates.Djembe_3, applyToneGain('Djembe_3', 'slap_flam', djembe3Gain), { isGrace: true });
+        playDjembeStroke(djembe_3, 'DjembeThree_Slap', djembe3Time + 5 / strokeTempo, djembe3Playback, djembeHandStates.Djembe_3, applyToneGain('Djembe_3', 'slap_flam', djembe3Gain));
         break;
       case "bass_slap_flam":
-        playDjembeStroke(djembe_3, 'DjembeThree_Bass', djembe3Time, djembe3Playback, djembeHandStates.Djembe_3, djembe3Gain, { isGrace: true });
-        playDjembeStroke(djembe_3, 'DjembeThree_Slap', djembe3Time + 5 / tempo, djembe3Playback, djembeHandStates.Djembe_3, djembe3Gain);
+        playDjembeStroke(djembe_3, 'DjembeThree_Bass', djembe3Time, djembe3Playback, djembeHandStates.Djembe_3, applyToneGain('Djembe_3', 'bass_slap_flam', djembe3Gain), { isGrace: true });
+        playDjembeStroke(djembe_3, 'DjembeThree_Slap', djembe3Time + 5 / strokeTempo, djembe3Playback, djembeHandStates.Djembe_3, applyToneGain('Djembe_3', 'bass_slap_flam', djembe3Gain));
         break;
     }
   }
@@ -3471,24 +3579,31 @@ function scheduleCurrentStep(time) {
   const djembe2Playback = maybeTrackBeat('Djembe_2', trackStates.Djembe_2);
   const djembe3Playback = maybeTrackBeat('Djembe_3', trackStates.Djembe_3);
   const accentMultiplier = getAccentMultiplier(globalPlaybackStep);
+  const stepTempo = getEffectiveTempoForStep(globalPlaybackStep);
 
   advanceSilentH2HStep(djembe1Playback, djembeHandStates.Djembe_1, {
     instrumentInstance: djembe_1,
     baseSampleName: getH2HRestMuteSampleName('Djembe_1'),
     time: Math.max(0, time + getFeelOffsetSeconds('Djembe_1')),
-    gainMultiplier: accentMultiplier * h2hRestMuteGainMultipliers.Djembe_1 * getPracticeInstrumentVolume('Djembe_1')
+    gainMultiplier: accentMultiplier * h2hRestMuteGainMultipliers.Djembe_1 *
+      getPracticeInstrumentVolume('Djembe_1') *
+      getPracticeInstrumentToneVolume('Djembe_1', 'mute')
   });
   advanceSilentH2HStep(djembe2Playback, djembeHandStates.Djembe_2, {
     instrumentInstance: djembe_2,
     baseSampleName: getH2HRestMuteSampleName('Djembe_2'),
     time: Math.max(0, time + getFeelOffsetSeconds('Djembe_2')),
-    gainMultiplier: accentMultiplier * h2hRestMuteGainMultipliers.Djembe_2 * getPracticeInstrumentVolume('Djembe_2')
+    gainMultiplier: accentMultiplier * h2hRestMuteGainMultipliers.Djembe_2 *
+      getPracticeInstrumentVolume('Djembe_2') *
+      getPracticeInstrumentToneVolume('Djembe_2', 'mute')
   });
   advanceSilentH2HStep(djembe3Playback, djembeHandStates.Djembe_3, {
     instrumentInstance: djembe_3,
     baseSampleName: getH2HRestMuteSampleName('Djembe_3'),
     time: Math.max(0, time + getFeelOffsetSeconds('Djembe_3')),
-    gainMultiplier: accentMultiplier * h2hRestMuteGainMultipliers.Djembe_3 * getPracticeInstrumentVolume('Djembe_3')
+    gainMultiplier: accentMultiplier * h2hRestMuteGainMultipliers.Djembe_3 *
+      getPracticeInstrumentVolume('Djembe_3') *
+      getPracticeInstrumentToneVolume('Djembe_3', 'mute')
   });
 
   scheduleNote(
@@ -3500,12 +3615,14 @@ function scheduleCurrentStep(time) {
     djembe2Playback,
     djembe3Playback,
     time,
-    accentMultiplier
+    accentMultiplier,
+    stepTempo
   );
 }
 
 function getStepInterval(playbackStep, tempoValue) {
-  const stepDuration = getBaseStepDuration(tempoValue);
+  const stepTempo = getEffectiveTempoForStep(playbackStep);
+  const stepDuration = getBaseStepDuration(stepTempo);
   let intervalToNextStep = stepDuration;
   let activeSwingFactor = swingFactor;
   const sectionContext = getPlaybackSectionContext(playbackStep);
@@ -3593,131 +3710,134 @@ function scheduleNoteToDestination(kenkeniNote, sangbanNote, doundounNote, dreie
     Djembe_2: Math.max(0, time + getFeelOffsetSeconds('Djembe_2')),
     Djembe_3: Math.max(0, time + getFeelOffsetSeconds('Djembe_3'))
   };
+  function applyExportToneGain(trackName, toneKey, baseGain) {
+    return baseGain * getPracticeInstrumentToneVolume(trackName, toneKey);
+  }
 
   switch (kenkeniNote) {
     case "Bell":
-      playSampleToDestination(kenkeni, 'Kenkeni_Bell_Open', kenkeniTime, noteGain, audioContext, destinationNode);
+      playSampleToDestination(kenkeni, 'Kenkeni_Bell_Open', kenkeniTime, applyExportToneGain('Kenkeni', 'bell', noteGain), audioContext, destinationNode);
       break;
     case "Open":
-      playSampleToDestination(kenkeni, 'Kenkeni_Open', kenkeniTime, noteGain, audioContext, destinationNode);
+      playSampleToDestination(kenkeni, 'Kenkeni_Open', kenkeniTime, applyExportToneGain('Kenkeni', 'open', noteGain), audioContext, destinationNode);
       break;
     case "Muffled":
-      playSampleToDestination(kenkeni, 'Kenkeni_Muffled', kenkeniTime, bassMuffledGain, audioContext, destinationNode);
+      playSampleToDestination(kenkeni, 'Kenkeni_Muffled', kenkeniTime, applyExportToneGain('Kenkeni', 'muffled', bassMuffledGain), audioContext, destinationNode);
       break;
     case "Klick":
-      playSampleToDestination(kenkeni, 'Kenkeni_Klick', kenkeniTime, klickGain, audioContext, destinationNode);
+      playSampleToDestination(kenkeni, 'Kenkeni_Klick', kenkeniTime, applyExportToneGain('Kenkeni', 'klick', klickGain), audioContext, destinationNode);
       break;
     case "Bell_Open":
-      playSampleToDestination(kenkeni, 'Kenkeni_Bell_Open', kenkeniTime, noteGain, audioContext, destinationNode);
-      playSampleToDestination(kenkeni, 'Kenkeni_Open', kenkeniTime, noteGain, audioContext, destinationNode);
+      playSampleToDestination(kenkeni, 'Kenkeni_Bell_Open', kenkeniTime, applyExportToneGain('Kenkeni', 'bell', noteGain), audioContext, destinationNode);
+      playSampleToDestination(kenkeni, 'Kenkeni_Open', kenkeniTime, applyExportToneGain('Kenkeni', 'open', noteGain), audioContext, destinationNode);
       break;
     case "Bell_Muffled":
-      playSampleToDestination(kenkeni, 'Kenkeni_Bell_Open', kenkeniTime, noteGain, audioContext, destinationNode);
-      playSampleToDestination(kenkeni, 'Kenkeni_Muffled', kenkeniTime, bassMuffledGain, audioContext, destinationNode);
+      playSampleToDestination(kenkeni, 'Kenkeni_Bell_Open', kenkeniTime, applyExportToneGain('Kenkeni', 'bell', noteGain), audioContext, destinationNode);
+      playSampleToDestination(kenkeni, 'Kenkeni_Muffled', kenkeniTime, applyExportToneGain('Kenkeni', 'muffled', bassMuffledGain), audioContext, destinationNode);
       break;
     case "Bell_Klick":
-      playSampleToDestination(kenkeni, 'Kenkeni_Bell_Open', kenkeniTime, noteGain, audioContext, destinationNode);
-      playSampleToDestination(kenkeni, 'Kenkeni_Klick', kenkeniTime, klickGain, audioContext, destinationNode);
+      playSampleToDestination(kenkeni, 'Kenkeni_Bell_Open', kenkeniTime, applyExportToneGain('Kenkeni', 'bell', noteGain), audioContext, destinationNode);
+      playSampleToDestination(kenkeni, 'Kenkeni_Klick', kenkeniTime, applyExportToneGain('Kenkeni', 'klick', klickGain), audioContext, destinationNode);
       break;
   }
 
   switch (sangbanNote) {
     case "Bell":
-      playSampleToDestination(sangban, 'Sangban_Bell_Open', sangbanTime, sangbanBellGain, audioContext, destinationNode);
+      playSampleToDestination(sangban, 'Sangban_Bell_Open', sangbanTime, applyExportToneGain('Sangban', 'bell', sangbanBellGain), audioContext, destinationNode);
       break;
     case "Open":
-      playSampleToDestination(sangban, 'Sangban_Open', sangbanTime, sangbanStrokeGain, audioContext, destinationNode);
+      playSampleToDestination(sangban, 'Sangban_Open', sangbanTime, applyExportToneGain('Sangban', 'open', sangbanStrokeGain), audioContext, destinationNode);
       break;
     case "Muffled":
-      playSampleToDestination(sangban, 'Sangban_Muffled', sangbanTime, sangbanMuffledGain, audioContext, destinationNode);
+      playSampleToDestination(sangban, 'Sangban_Muffled', sangbanTime, applyExportToneGain('Sangban', 'muffled', sangbanMuffledGain), audioContext, destinationNode);
       break;
     case "Klick":
-      playSampleToDestination(sangban, 'Sangban_Klick', sangbanTime, sangbanKlickGain, audioContext, destinationNode);
+      playSampleToDestination(sangban, 'Sangban_Klick', sangbanTime, applyExportToneGain('Sangban', 'klick', sangbanKlickGain), audioContext, destinationNode);
       break;
     case "Bell_Open":
-      playSampleToDestination(sangban, 'Sangban_Bell_Open', sangbanTime, sangbanBellGain, audioContext, destinationNode);
-      playSampleToDestination(sangban, 'Sangban_Open', sangbanTime, sangbanStrokeGain, audioContext, destinationNode);
+      playSampleToDestination(sangban, 'Sangban_Bell_Open', sangbanTime, applyExportToneGain('Sangban', 'bell', sangbanBellGain), audioContext, destinationNode);
+      playSampleToDestination(sangban, 'Sangban_Open', sangbanTime, applyExportToneGain('Sangban', 'open', sangbanStrokeGain), audioContext, destinationNode);
       break;
     case "Bell_Muffled":
-      playSampleToDestination(sangban, 'Sangban_Bell_Open', sangbanTime, sangbanBellGain, audioContext, destinationNode);
-      playSampleToDestination(sangban, 'Sangban_Muffled', sangbanTime, sangbanMuffledGain, audioContext, destinationNode);
+      playSampleToDestination(sangban, 'Sangban_Bell_Open', sangbanTime, applyExportToneGain('Sangban', 'bell', sangbanBellGain), audioContext, destinationNode);
+      playSampleToDestination(sangban, 'Sangban_Muffled', sangbanTime, applyExportToneGain('Sangban', 'muffled', sangbanMuffledGain), audioContext, destinationNode);
       break;
     case "Bell_Klick":
-      playSampleToDestination(sangban, 'Sangban_Bell_Open', sangbanTime, sangbanBellGain, audioContext, destinationNode);
-      playSampleToDestination(sangban, 'Sangban_Klick', sangbanTime, sangbanKlickGain, audioContext, destinationNode);
+      playSampleToDestination(sangban, 'Sangban_Bell_Open', sangbanTime, applyExportToneGain('Sangban', 'bell', sangbanBellGain), audioContext, destinationNode);
+      playSampleToDestination(sangban, 'Sangban_Klick', sangbanTime, applyExportToneGain('Sangban', 'klick', sangbanKlickGain), audioContext, destinationNode);
       break;
   }
 
   switch (doundounNote) {
     case "Bell":
-      playSampleToDestination(doundoun, 'Doundoun_Bell_Open', doundounTime, doundounBellGain, audioContext, destinationNode);
+      playSampleToDestination(doundoun, 'Doundoun_Bell_Open', doundounTime, applyExportToneGain('Doundoun', 'bell', doundounBellGain), audioContext, destinationNode);
       break;
     case "Open":
-      playSampleToDestination(doundoun, 'Doundoun_Open', doundounTime, noteGain, audioContext, destinationNode);
+      playSampleToDestination(doundoun, 'Doundoun_Open', doundounTime, applyExportToneGain('Doundoun', 'open', noteGain), audioContext, destinationNode);
       break;
     case "Muffled":
-      playSampleToDestination(doundoun, 'Doundoun_Muffled', doundounTime, bassMuffledGain, audioContext, destinationNode);
+      playSampleToDestination(doundoun, 'Doundoun_Muffled', doundounTime, applyExportToneGain('Doundoun', 'muffled', bassMuffledGain), audioContext, destinationNode);
       break;
     case "Klick":
-      playSampleToDestination(doundoun, 'Doundoun_Klick', doundounTime, klickGain, audioContext, destinationNode);
+      playSampleToDestination(doundoun, 'Doundoun_Klick', doundounTime, applyExportToneGain('Doundoun', 'klick', klickGain), audioContext, destinationNode);
       break;
     case "Bell_Open":
-      playSampleToDestination(doundoun, 'Doundoun_Bell_Open', doundounTime, doundounBellGain, audioContext, destinationNode);
-      playSampleToDestination(doundoun, 'Doundoun_Open', doundounTime, noteGain, audioContext, destinationNode);
+      playSampleToDestination(doundoun, 'Doundoun_Bell_Open', doundounTime, applyExportToneGain('Doundoun', 'bell', doundounBellGain), audioContext, destinationNode);
+      playSampleToDestination(doundoun, 'Doundoun_Open', doundounTime, applyExportToneGain('Doundoun', 'open', noteGain), audioContext, destinationNode);
       break;
     case "Bell_Muffled":
-      playSampleToDestination(doundoun, 'Doundoun_Bell_Open', doundounTime, doundounBellGain, audioContext, destinationNode);
-      playSampleToDestination(doundoun, 'Doundoun_Muffled', doundounTime, bassMuffledGain, audioContext, destinationNode);
+      playSampleToDestination(doundoun, 'Doundoun_Bell_Open', doundounTime, applyExportToneGain('Doundoun', 'bell', doundounBellGain), audioContext, destinationNode);
+      playSampleToDestination(doundoun, 'Doundoun_Muffled', doundounTime, applyExportToneGain('Doundoun', 'muffled', bassMuffledGain), audioContext, destinationNode);
       break;
     case "Bell_Klick":
-      playSampleToDestination(doundoun, 'Doundoun_Bell_Open', doundounTime, doundounBellGain, audioContext, destinationNode);
-      playSampleToDestination(doundoun, 'Doundoun_Klick', doundounTime, klickGain, audioContext, destinationNode);
+      playSampleToDestination(doundoun, 'Doundoun_Bell_Open', doundounTime, applyExportToneGain('Doundoun', 'bell', doundounBellGain), audioContext, destinationNode);
+      playSampleToDestination(doundoun, 'Doundoun_Klick', doundounTime, applyExportToneGain('Doundoun', 'klick', klickGain), audioContext, destinationNode);
       break;
   }
 
   switch (dreierbassNote) {
     case "sangban":
-      playSampleToDestination(dreierbass, 'Sangban_Open', dreierbassTime, noteGain, audioContext, destinationNode);
+      playSampleToDestination(dreierbass, 'Sangban_Open', dreierbassTime, applyExportToneGain('Dreierbass', 'sangban', noteGain), audioContext, destinationNode);
       break;
     case "doundoun":
-      playSampleToDestination(dreierbass, 'Doundoun_Open', dreierbassTime, noteGain, audioContext, destinationNode);
+      playSampleToDestination(dreierbass, 'Doundoun_Open', dreierbassTime, applyExportToneGain('Dreierbass', 'doundoun', noteGain), audioContext, destinationNode);
       break;
     case "kenkeni":
-      playSampleToDestination(dreierbass, 'Kenkeni_Open', dreierbassTime, noteGain, audioContext, destinationNode);
+      playSampleToDestination(dreierbass, 'Kenkeni_Open', dreierbassTime, applyExportToneGain('Dreierbass', 'kenkeni', noteGain), audioContext, destinationNode);
       break;
     case "kenkeni_muffled":
-      playSampleToDestination(dreierbass, 'Kenkeni_Muffled', dreierbassTime, noteGain, audioContext, destinationNode);
+      playSampleToDestination(dreierbass, 'Kenkeni_Muffled', dreierbassTime, applyExportToneGain('Dreierbass', 'kenkeni_muffled', noteGain), audioContext, destinationNode);
       break;
     case "sangban_muffled":
-      playSampleToDestination(dreierbass, 'Sangban_Muffled', dreierbassTime, noteGain, audioContext, destinationNode);
+      playSampleToDestination(dreierbass, 'Sangban_Muffled', dreierbassTime, applyExportToneGain('Dreierbass', 'sangban_muffled', noteGain), audioContext, destinationNode);
       break;
     case "kenkeni_sangban":
-      playSampleToDestination(dreierbass, 'Kenkeni_Open', dreierbassTime, noteGain, audioContext, destinationNode);
-      playSampleToDestination(dreierbass, 'Sangban_Open', dreierbassTime + 0.5 / exportTempo, noteGain, audioContext, destinationNode);
+      playSampleToDestination(dreierbass, 'Kenkeni_Open', dreierbassTime, applyExportToneGain('Dreierbass', 'kenkeni', noteGain), audioContext, destinationNode);
+      playSampleToDestination(dreierbass, 'Sangban_Open', dreierbassTime + 0.5 / exportTempo, applyExportToneGain('Dreierbass', 'sangban', noteGain), audioContext, destinationNode);
       break;
     case "kenkeni_doundoun":
-      playSampleToDestination(dreierbass, 'Kenkeni_Open', dreierbassTime, noteGain, audioContext, destinationNode);
-      playSampleToDestination(dreierbass, 'Doundoun_Open', dreierbassTime + 0.5 / exportTempo, noteGain, audioContext, destinationNode);
+      playSampleToDestination(dreierbass, 'Kenkeni_Open', dreierbassTime, applyExportToneGain('Dreierbass', 'kenkeni', noteGain), audioContext, destinationNode);
+      playSampleToDestination(dreierbass, 'Doundoun_Open', dreierbassTime + 0.5 / exportTempo, applyExportToneGain('Dreierbass', 'doundoun', noteGain), audioContext, destinationNode);
       break;
     case "sangban_doundoun":
-      playSampleToDestination(dreierbass, 'Sangban_Open', dreierbassTime, noteGain, audioContext, destinationNode);
-      playSampleToDestination(dreierbass, 'Doundoun_Open', dreierbassTime + 0.5 / exportTempo, noteGain, audioContext, destinationNode);
+      playSampleToDestination(dreierbass, 'Sangban_Open', dreierbassTime, applyExportToneGain('Dreierbass', 'sangban', noteGain), audioContext, destinationNode);
+      playSampleToDestination(dreierbass, 'Doundoun_Open', dreierbassTime + 0.5 / exportTempo, applyExportToneGain('Dreierbass', 'doundoun', noteGain), audioContext, destinationNode);
       break;
     case "kenkeni_sangban_muffled":
-      playSampleToDestination(dreierbass, 'Kenkeni_Open', dreierbassTime, noteGain, audioContext, destinationNode);
-      playSampleToDestination(dreierbass, 'Sangban_Muffled', dreierbassTime + 0.5 / exportTempo, noteGain, audioContext, destinationNode);
+      playSampleToDestination(dreierbass, 'Kenkeni_Open', dreierbassTime, applyExportToneGain('Dreierbass', 'kenkeni', noteGain), audioContext, destinationNode);
+      playSampleToDestination(dreierbass, 'Sangban_Muffled', dreierbassTime + 0.5 / exportTempo, applyExportToneGain('Dreierbass', 'sangban_muffled', noteGain), audioContext, destinationNode);
       break;
     case "kenkeni_muffled_sangban":
-      playSampleToDestination(dreierbass, 'Kenkeni_Muffled', dreierbassTime, noteGain, audioContext, destinationNode);
-      playSampleToDestination(dreierbass, 'Sangban_Open', dreierbassTime + 0.5 / exportTempo, noteGain, audioContext, destinationNode);
+      playSampleToDestination(dreierbass, 'Kenkeni_Muffled', dreierbassTime, applyExportToneGain('Dreierbass', 'kenkeni_muffled', noteGain), audioContext, destinationNode);
+      playSampleToDestination(dreierbass, 'Sangban_Open', dreierbassTime + 0.5 / exportTempo, applyExportToneGain('Dreierbass', 'sangban', noteGain), audioContext, destinationNode);
       break;
     case "kenkeni_muffled_doundoun":
-      playSampleToDestination(dreierbass, 'Kenkeni_Muffled', dreierbassTime, noteGain, audioContext, destinationNode);
-      playSampleToDestination(dreierbass, 'Doundoun_Open', dreierbassTime + 1 / exportTempo, noteGain, audioContext, destinationNode);
+      playSampleToDestination(dreierbass, 'Kenkeni_Muffled', dreierbassTime, applyExportToneGain('Dreierbass', 'kenkeni_muffled', noteGain), audioContext, destinationNode);
+      playSampleToDestination(dreierbass, 'Doundoun_Open', dreierbassTime + 1 / exportTempo, applyExportToneGain('Dreierbass', 'doundoun', noteGain), audioContext, destinationNode);
       break;
     case "sangban_muffled_doundoun":
-      playSampleToDestination(dreierbass, 'Sangban_Muffled', dreierbassTime, noteGain, audioContext, destinationNode);
-      playSampleToDestination(dreierbass, 'Doundoun_Open', dreierbassTime + 1 / exportTempo, noteGain, audioContext, destinationNode);
+      playSampleToDestination(dreierbass, 'Sangban_Muffled', dreierbassTime, applyExportToneGain('Dreierbass', 'sangban_muffled', noteGain), audioContext, destinationNode);
+      playSampleToDestination(dreierbass, 'Doundoun_Open', dreierbassTime + 1 / exportTempo, applyExportToneGain('Dreierbass', 'doundoun', noteGain), audioContext, destinationNode);
       break;
   }
 
@@ -3738,20 +3858,20 @@ function scheduleNoteToDestination(kenkeniNote, sangbanNote, doundounNote, dreie
       case "tone_muffled":
       case "slap_muffled":
         if (djembeData.baseNames[noteValue]) {
-          playDjembeStrokeToDestination(djembeData.instrument, djembeData.baseNames[noteValue], djembeTime, playback, djembeData.handState, noteGain, audioContext, destinationNode);
+          playDjembeStrokeToDestination(djembeData.instrument, djembeData.baseNames[noteValue], djembeTime, playback, djembeData.handState, applyExportToneGain(djembeData.trackName, noteValue, noteGain), audioContext, destinationNode);
         }
         break;
       case "tone_flam":
-        playDjembeStrokeToDestination(djembeData.instrument, djembeData.baseNames.tone, djembeTime, playback, djembeData.handState, noteGain, audioContext, destinationNode, { isGrace: true });
-        playDjembeStrokeToDestination(djembeData.instrument, djembeData.baseNames.tone, djembeTime + 5 / exportTempo, playback, djembeData.handState, noteGain, audioContext, destinationNode);
+        playDjembeStrokeToDestination(djembeData.instrument, djembeData.baseNames.tone, djembeTime, playback, djembeData.handState, applyExportToneGain(djembeData.trackName, 'tone_flam', noteGain), audioContext, destinationNode, { isGrace: true });
+        playDjembeStrokeToDestination(djembeData.instrument, djembeData.baseNames.tone, djembeTime + 5 / exportTempo, playback, djembeData.handState, applyExportToneGain(djembeData.trackName, 'tone_flam', noteGain), audioContext, destinationNode);
         break;
       case "slap_flam":
-        playDjembeStrokeToDestination(djembeData.instrument, djembeData.baseNames.slap, djembeTime, playback, djembeData.handState, noteGain, audioContext, destinationNode, { isGrace: true });
-        playDjembeStrokeToDestination(djembeData.instrument, djembeData.baseNames.slap, djembeTime + 5 / exportTempo, playback, djembeData.handState, noteGain, audioContext, destinationNode);
+        playDjembeStrokeToDestination(djembeData.instrument, djembeData.baseNames.slap, djembeTime, playback, djembeData.handState, applyExportToneGain(djembeData.trackName, 'slap_flam', noteGain), audioContext, destinationNode, { isGrace: true });
+        playDjembeStrokeToDestination(djembeData.instrument, djembeData.baseNames.slap, djembeTime + 5 / exportTempo, playback, djembeData.handState, applyExportToneGain(djembeData.trackName, 'slap_flam', noteGain), audioContext, destinationNode);
         break;
       case "bass_slap_flam":
-        playDjembeStrokeToDestination(djembeData.instrument, djembeData.baseNames.bass, djembeTime, playback, djembeData.handState, noteGain, audioContext, destinationNode, { isGrace: true });
-        playDjembeStrokeToDestination(djembeData.instrument, djembeData.baseNames.slap, djembeTime + 5 / exportTempo, playback, djembeData.handState, noteGain, audioContext, destinationNode);
+        playDjembeStrokeToDestination(djembeData.instrument, djembeData.baseNames.bass, djembeTime, playback, djembeData.handState, applyExportToneGain(djembeData.trackName, 'bass_slap_flam', noteGain), audioContext, destinationNode, { isGrace: true });
+        playDjembeStrokeToDestination(djembeData.instrument, djembeData.baseNames.slap, djembeTime + 5 / exportTempo, playback, djembeData.handState, applyExportToneGain(djembeData.trackName, 'bass_slap_flam', noteGain), audioContext, destinationNode);
         break;
     }
   });
@@ -3875,12 +3995,14 @@ async function exportCurrentArrangementAsWav() {
       const djembe2Playback = maybeTrackBeatForExport('Djembe_2', trackStates.Djembe_2);
       const djembe3Playback = maybeTrackBeatForExport('Djembe_3', trackStates.Djembe_3);
       const accentMultiplier = getAccentMultiplier(stepIndex);
+      const exportStepTempo = getEffectiveTempoForStep(stepIndex);
 
       advanceSilentH2HStep(djembe1Playback, exportHandStates.Djembe_1, {
         instrumentInstance: djembe_1,
         baseSampleName: getH2HRestMuteSampleName('Djembe_1'),
         time: Math.max(0, currentTime + getFeelOffsetSeconds('Djembe_1')),
-        gainMultiplier: accentMultiplier * h2hRestMuteGainMultipliers.Djembe_1,
+        gainMultiplier: accentMultiplier * h2hRestMuteGainMultipliers.Djembe_1 *
+          getPracticeInstrumentToneVolume('Djembe_1', 'mute'),
         audioContext: offlineContext,
         destinationNode: offlineContext.destination
       });
@@ -3888,7 +4010,8 @@ async function exportCurrentArrangementAsWav() {
         instrumentInstance: djembe_2,
         baseSampleName: getH2HRestMuteSampleName('Djembe_2'),
         time: Math.max(0, currentTime + getFeelOffsetSeconds('Djembe_2')),
-        gainMultiplier: accentMultiplier * h2hRestMuteGainMultipliers.Djembe_2,
+        gainMultiplier: accentMultiplier * h2hRestMuteGainMultipliers.Djembe_2 *
+          getPracticeInstrumentToneVolume('Djembe_2', 'mute'),
         audioContext: offlineContext,
         destinationNode: offlineContext.destination
       });
@@ -3896,7 +4019,8 @@ async function exportCurrentArrangementAsWav() {
         instrumentInstance: djembe_3,
         baseSampleName: getH2HRestMuteSampleName('Djembe_3'),
         time: Math.max(0, currentTime + getFeelOffsetSeconds('Djembe_3')),
-        gainMultiplier: accentMultiplier * h2hRestMuteGainMultipliers.Djembe_3,
+        gainMultiplier: accentMultiplier * h2hRestMuteGainMultipliers.Djembe_3 *
+          getPracticeInstrumentToneVolume('Djembe_3', 'mute'),
         audioContext: offlineContext,
         destinationNode: offlineContext.destination
       });
@@ -3914,7 +4038,7 @@ async function exportCurrentArrangementAsWav() {
         offlineContext,
         offlineContext.destination,
         exportHandStates,
-        exportTempo
+        exportStepTempo
       );
 
       currentTime += getStepInterval(stepIndex, exportTempo);

@@ -3682,6 +3682,7 @@ function getAudioPayloadRefreshSignature(playerPayload) {
         }
         const signatureConfig = Object.assign({}, config);
         delete signatureConfig.PracticeInstrumentVolumes;
+        delete signatureConfig.PracticeInstrumentToneVolumes;
         return signatureConfig;
     });
 }
@@ -4921,6 +4922,9 @@ document.addEventListener('DOMContentLoaded', function () {
     window.syncTimingControlValues = syncTimingControlValues;
     function notifyTimingControlsChanged() {
         syncTimingControlValues();
+        if (timelineState.visible && typeof renderTimelineSequence === 'function') {
+            renderTimelineSequence();
+        }
         renderPracticeSwingProfilePreview();
         updateTimelineMetadataNode();
         if (isPracticeAudioModeActive() && practiceAudioPlaybackState !== 'playing') {
