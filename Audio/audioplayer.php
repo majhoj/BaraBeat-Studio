@@ -826,21 +826,28 @@ function getTimelineStepsPerBar() {
   return 32;
 }
 
-function buildTimelinePickupNotes(notes, inStep) {
+function buildTimelinePickupNotes(notes, inStep, options) {
   const safeNotes = Array.isArray(notes) ? notes : [];
   if (safeNotes.length === 0 || inStep === null || inStep === undefined) {
     return [];
   }
 
+  const settings = options && typeof options === 'object' ? options : {};
+  const limitToPickupBar = Boolean(settings.limitToPickupBar);
   const stepsPerBar = getTimelineStepsPerBar();
   const safeInStep = Math.max(0, Math.min(safeNotes.length - 1, Number(inStep) || 0));
   const pickupStartStep = stepsPerBar > 0
     ? Math.floor(safeInStep / stepsPerBar) * stepsPerBar
     : 0;
-  const pickupLength = Math.max(stepsPerBar, safeNotes.length - pickupStartStep);
+  const pickupEndStep = limitToPickupBar && stepsPerBar > 0
+    ? Math.min(safeNotes.length, pickupStartStep + stepsPerBar)
+    : safeNotes.length;
+  const pickupLength = limitToPickupBar && stepsPerBar > 0
+    ? stepsPerBar
+    : Math.max(stepsPerBar, safeNotes.length - pickupStartStep);
   const pickupNotes = new Array(pickupLength).fill('f');
 
-  for (let sourceStep = safeInStep; sourceStep < safeNotes.length; sourceStep++) {
+  for (let sourceStep = safeInStep; sourceStep < pickupEndStep; sourceStep++) {
     pickupNotes[sourceStep - pickupStartStep] = safeNotes[sourceStep] || 'f';
   }
 
@@ -894,8 +901,10 @@ function mergeTimelinePickupIntoHostSection(hostSection, pickupSection) {
   });
 }
 
-function mergeTimelineEntryPickupsIntoPreviousSection(sections, entryDataList) {
+function mergeTimelineEntryPickupsIntoPreviousSection(sections, entryDataList, options) {
   const entries = Array.isArray(entryDataList) ? entryDataList : [];
+  const settings = options && typeof options === 'object' ? options : {};
+  const allowStandalonePickup = settings.allowStandalonePickup !== false;
   const pickupSection = createOrderedSection('Auftakt');
   const pickupLabelNames = [];
 
@@ -903,7 +912,9 @@ function mergeTimelineEntryPickupsIntoPreviousSection(sections, entryDataList) {
     if (!entryData || entryData.patternInStep === null || entryData.patternInStep === undefined) {
       return;
     }
-    const pickupNotes = buildTimelinePickupNotes(entryData.patternNotes, entryData.patternInStep);
+    const pickupNotes = buildTimelinePickupNotes(entryData.patternNotes, entryData.patternInStep, {
+      limitToPickupBar: Boolean(settings.limitOverlayPickupToBar && isTimelineOverlayEntryData(entryData))
+    });
     if (pickupNotes.length === 0) {
       return;
     }
@@ -939,6 +950,10 @@ function mergeTimelineEntryPickupsIntoPreviousSection(sections, entryDataList) {
       mergeTimelinePickupIntoHostSection(sections[sectionIndex], pickupSection);
       return;
     }
+  }
+
+  if (!allowStandalonePickup) {
+    return;
   }
 
   sections.push(pickupSection);
@@ -1064,10 +1079,92 @@ function silenceTrackRange(targetNotes, offset, length) {
   return silencedNotes;
 }
 
+function silenceNotesBeforeStep(notes, stepIndex) {
+  const safeNotes = Array.isArray(notes) ? notes.slice() : [];
+  const safeStepIndex = Math.max(0, Math.round(Number(stepIndex) || 0));
+  for (let noteIndex = 0; noteIndex < safeStepIndex && noteIndex < safeNotes.length; noteIndex++) {
+    safeNotes[noteIndex] = 'f';
+  }
+  return safeNotes;
+}
+
 function isTimelineOverlayEntryData(entryData) {
   return entryData &&
     entryData.overlayRepeatIndex !== null &&
     entryData.overlayRepeatIndex !== undefined;
+}
+
+function hasTimelineOverlayForEntryTargets(entryDataList, baseEntryData) {
+  if (!baseEntryData || baseEntryData.label !== 'Begleitung') {
+    return false;
+  }
+
+  const targetInstruments = Array.isArray(baseEntryData.targetInstruments)
+    ? baseEntryData.targetInstruments
+    : [];
+  if (targetInstruments.length === 0) {
+    return false;
+  }
+
+  return (Array.isArray(entryDataList) ? entryDataList : []).some(function (entryData) {
+    return isTimelineOverlayEntryData(entryData) &&
+      doInstrumentSetsOverlap(targetInstruments, entryData.targetInstruments);
+  });
+}
+
+function hasTimelinePickupOverlayForEntryTargets(entryDataList, baseEntryData) {
+  if (!baseEntryData || baseEntryData.label !== 'Begleitung') {
+    return false;
+  }
+
+  const targetInstruments = Array.isArray(baseEntryData.targetInstruments)
+    ? baseEntryData.targetInstruments
+    : [];
+  if (targetInstruments.length === 0) {
+    return false;
+  }
+
+  return (Array.isArray(entryDataList) ? entryDataList : []).some(function (entryData) {
+    return isTimelineOverlayEntryData(entryData) &&
+      entryData.patternInStep !== null &&
+      entryData.patternInStep !== undefined &&
+      doInstrumentSetsOverlap(targetInstruments, entryData.targetInstruments);
+  });
+}
+
+function getTimelineOverlayReplacementStart(entryDataList, overlayEntryData) {
+  if (!isTimelineOverlayEntryData(overlayEntryData)) {
+    return 0;
+  }
+
+  if (overlayEntryData.patternInStep !== null && overlayEntryData.patternInStep !== undefined) {
+    return 0;
+  }
+
+  const overlayTargets = Array.isArray(overlayEntryData.targetInstruments)
+    ? overlayEntryData.targetInstruments
+    : [];
+  if (overlayTargets.length === 0) {
+    return 0;
+  }
+
+  const matchingOutSteps = (Array.isArray(entryDataList) ? entryDataList : [])
+    .filter(function (entryData) {
+      return entryData &&
+        entryData.label === 'Begleitung' &&
+        entryData.patternOutStep !== null &&
+        entryData.patternOutStep !== undefined &&
+        doInstrumentSetsOverlap(overlayTargets, entryData.targetInstruments);
+    })
+    .map(function (entryData) {
+      return Math.max(0, Math.round(Number(entryData.patternOutStep) || 0)) + 1;
+    });
+
+  if (matchingOutSteps.length === 0) {
+    return 0;
+  }
+
+  return Math.min.apply(null, matchingOutSteps);
 }
 
 function getTimelineOverlayReplacementLength(entryData) {
@@ -1854,16 +1951,30 @@ function buildTimelineSections(config) {
           repeatedSection.padTracksToLongest = !repeatContainsEchauffement && !repeatContainsOnlyAccompaniment;
           const repeatedSectionLabelNames = [];
           const isLastRepeatedParallelUnit = repeatIndex === repeatedParallelUnits.length - 1;
+          const nextRepeatEntries = repeatIndex + 1 < repeatedParallelUnits.length
+            ? repeatedParallelUnits[repeatIndex + 1]
+            : [];
 
           repeatEntries.forEach(function (entryData) {
+            const shouldApplyOutBeforeOverlay = !isPracticeMode &&
+              entryData &&
+              entryData.patternOutStep !== null &&
+              (hasTimelineOverlayForEntryTargets(repeatEntries, entryData) ||
+                hasTimelinePickupOverlayForEntryTargets(nextRepeatEntries, entryData));
             const shouldApplyOut = !isPracticeMode &&
-              isLastRepeatedParallelUnit &&
-              shouldApplyOutToTimelineEntry(entryData);
+              ((isLastRepeatedParallelUnit && shouldApplyOutToTimelineEntry(entryData)) ||
+                shouldApplyOutBeforeOverlay);
             const effectiveNotes = getTimelineEntryEffectiveNotes(
               entryData,
               shouldApplyOut,
               repeatShouldPadToLongest ? repeatTargetLength : 0
             );
+            const overlayReplacementStart = isTimelineOverlayEntryData(entryData)
+              ? getTimelineOverlayReplacementStart(repeatEntries, entryData)
+              : 0;
+            const notesToMerge = overlayReplacementStart > 0
+              ? silenceNotesBeforeStep(effectiveNotes, overlayReplacementStart)
+              : effectiveNotes;
 
             entryData.targetInstruments.forEach(function (instrumentName) {
               if (repeatedSection.sectionTargets.indexOf(instrumentName) === -1) {
@@ -1872,13 +1983,13 @@ function buildTimelineSections(config) {
               if (isTimelineOverlayEntryData(entryData)) {
                 repeatedSection.trackNotes[instrumentName] = silenceTrackRange(
                   repeatedSection.trackNotes[instrumentName],
-                  0,
-                  getTimelineOverlayReplacementLength(entryData)
+                  overlayReplacementStart,
+                  Math.max(0, getTimelineOverlayReplacementLength(entryData) - overlayReplacementStart)
                 );
               }
               repeatedSection.trackNotes[instrumentName] = mergeNotesIntoTrack(
                 repeatedSection.trackNotes[instrumentName],
-                effectiveNotes,
+                notesToMerge,
                 0
               );
               if (instrumentName.indexOf('Djembe_') === 0) {
@@ -1908,7 +2019,10 @@ function buildTimelineSections(config) {
             repeatedSection.labelName
           ].join('::');
           normalizeSectionTrackLoops(repeatedSection);
-          mergeTimelineEntryPickupsIntoPreviousSection(sections, repeatEntries);
+          mergeTimelineEntryPickupsIntoPreviousSection(sections, repeatEntries, {
+            allowStandalonePickup: true,
+            limitOverlayPickupToBar: repeatContainsOverlay
+          });
           sections.push(repeatedSection);
         });
         blockStartIndex = blockEndIndex;
@@ -1937,12 +2051,22 @@ function buildTimelineSections(config) {
       const sectionLabelNames = [];
 
       blockEntries.forEach(function (entryData) {
-        const shouldApplyOut = shouldApplyOutToTimelineEntry(entryData);
+        const shouldApplyOutBeforeOverlay = !isPracticeMode &&
+          entryData &&
+          entryData.patternOutStep !== null &&
+          hasTimelineOverlayForEntryTargets(blockEntries, entryData);
+        const shouldApplyOut = shouldApplyOutToTimelineEntry(entryData) || shouldApplyOutBeforeOverlay;
         const effectiveNotes = getTimelineEntryEffectiveNotes(
           entryData,
           shouldApplyOut,
           currentBlockShouldPadToLongest ? blockTargetLength : 0
         );
+        const overlayReplacementStart = isTimelineOverlayEntryData(entryData)
+          ? getTimelineOverlayReplacementStart(blockEntries, entryData)
+          : 0;
+        const notesToMerge = overlayReplacementStart > 0
+          ? silenceNotesBeforeStep(effectiveNotes, overlayReplacementStart)
+          : effectiveNotes;
 
         entryData.targetInstruments.forEach(function (instrumentName) {
           if (mergedSection.sectionTargets.indexOf(instrumentName) === -1) {
@@ -1951,13 +2075,13 @@ function buildTimelineSections(config) {
           if (isTimelineOverlayEntryData(entryData)) {
             mergedSection.trackNotes[instrumentName] = silenceTrackRange(
               mergedSection.trackNotes[instrumentName],
-              0,
-              getTimelineOverlayReplacementLength(entryData)
+              overlayReplacementStart,
+              Math.max(0, getTimelineOverlayReplacementLength(entryData) - overlayReplacementStart)
             );
           }
           mergedSection.trackNotes[instrumentName] = mergeNotesIntoTrack(
             mergedSection.trackNotes[instrumentName],
-            effectiveNotes,
+            notesToMerge,
             0
           );
           if (instrumentName.indexOf('Djembe_') === 0) {
@@ -1986,7 +2110,10 @@ function buildTimelineSections(config) {
         mergedSection.labelName
       ].join('::');
       normalizeSectionTrackLoops(mergedSection);
-      mergeTimelineEntryPickupsIntoPreviousSection(sections, blockEntries);
+      mergeTimelineEntryPickupsIntoPreviousSection(sections, blockEntries, {
+        allowStandalonePickup: true,
+        limitOverlayPickupToBar: currentBlockContainsOverlay
+      });
       sections.push(mergedSection);
       blockStartIndex = blockEndIndex;
       continue;
