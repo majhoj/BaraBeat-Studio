@@ -1,0 +1,698 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BaraBeat-Studio Bedienungsanleitung</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --page: #f4ead8;
+      --paper: #fffaf1;
+      --ink: #2b241b;
+      --muted: #6d6254;
+      --line: #d7bd92;
+      --accent: #8b4f22;
+      --accent-soft: #f0dcc0;
+      --green: #1f7a55;
+      --note: #f8f1e4;
+      --warn: #fff4d3;
+      --code: #f7efe2;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.6;
+      color: var(--ink);
+      background: var(--page);
+    }
+
+    header {
+      padding: 44px 24px 34px;
+      color: #fff;
+      background: #6f4a2b;
+      border-bottom: 5px solid #c9873a;
+    }
+
+    header .wrap,
+    main {
+      width: min(1100px, calc(100% - 36px));
+      margin: 0 auto;
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: clamp(2rem, 4vw, 3.4rem);
+      line-height: 1.05;
+    }
+
+    header p {
+      max-width: 780px;
+      margin: 0;
+      color: #f5e7d3;
+      font-size: 1.1rem;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: 270px minmax(0, 1fr);
+      gap: 28px;
+      padding: 28px 0 56px;
+    }
+
+    nav {
+      position: sticky;
+      top: 18px;
+      align-self: start;
+      padding: 18px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      box-shadow: 0 12px 30px rgba(65, 42, 20, 0.12);
+    }
+
+    nav h2 {
+      margin: 0 0 10px;
+      font-size: 1rem;
+    }
+
+    nav a {
+      display: block;
+      padding: 6px 0;
+      color: #4d2f16;
+      text-decoration: none;
+      border-bottom: 1px solid rgba(215, 189, 146, 0.45);
+    }
+
+    nav a:hover {
+      color: var(--accent);
+    }
+
+    article {
+      min-width: 0;
+    }
+
+    section {
+      margin: 0 0 26px;
+      padding: 26px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: 0 12px 30px rgba(65, 42, 20, 0.08);
+    }
+
+    h2 {
+      margin: 0 0 14px;
+      font-size: 1.55rem;
+      line-height: 1.2;
+    }
+
+    h3 {
+      margin: 24px 0 8px;
+      font-size: 1.08rem;
+    }
+
+    p {
+      margin: 0 0 12px;
+    }
+
+    ul,
+    ol {
+      margin: 0 0 14px 1.2rem;
+      padding: 0;
+    }
+
+    li {
+      margin: 5px 0;
+    }
+
+    code,
+    kbd {
+      padding: 0.1em 0.35em;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.92em;
+      background: var(--code);
+      border: 1px solid #e4cfaa;
+      border-radius: 5px;
+    }
+
+    table {
+      width: 100%;
+      margin: 12px 0 18px;
+      border-collapse: collapse;
+      background: #fffdf7;
+    }
+
+    th,
+    td {
+      padding: 9px 10px;
+      text-align: left;
+      vertical-align: top;
+      border: 1px solid #dfc9a6;
+    }
+
+    th {
+      background: var(--accent-soft);
+    }
+
+    .hint,
+    .warning,
+    .workflow {
+      margin: 16px 0;
+      padding: 14px 16px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+    }
+
+    .hint {
+      background: var(--note);
+    }
+
+    .warning {
+      background: var(--warn);
+    }
+
+    .workflow {
+      background: #eef8f2;
+      border-color: #b8d8c5;
+    }
+
+    .tag {
+      display: inline-block;
+      margin: 0 4px 4px 0;
+      padding: 2px 7px;
+      font-size: 0.86rem;
+      color: #184a35;
+      background: #e4f3ea;
+      border: 1px solid #b8d8c5;
+      border-radius: 999px;
+    }
+
+    .toc-note {
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .footer-note {
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    @media (max-width: 860px) {
+      main {
+        display: block;
+      }
+
+      nav {
+        position: static;
+        margin-bottom: 24px;
+      }
+
+      section {
+        padding: 20px;
+      }
+    }
+
+    @media print {
+      body {
+        background: #fff;
+      }
+
+      header {
+        color: #000;
+        background: #fff;
+        border-bottom: 2px solid #000;
+      }
+
+      main {
+        display: block;
+      }
+
+      nav {
+        display: none;
+      }
+
+      section {
+        break-inside: avoid;
+        box-shadow: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>BaraBeat-Studio</h1>
+      <p>Bedienungsanleitung für Noteneditor, Übungsmodus, Audioplayer und Arrangement-Timeline.</p>
+    </div>
+  </header>
+
+  <main>
+    <nav aria-label="Inhalt">
+      <h2>Inhalt</h2>
+      <a href="#kurzstart">Kurzstart</a>
+      <a href="#oberflaeche">Oberfläche</a>
+      <a href="#dateien">Dateien</a>
+      <a href="#notenblatt">Notenblatt bearbeiten</a>
+      <a href="#zeichen">Zeichen und Sonderzeichen</a>
+      <a href="#auswahl">Auswahl, Kopieren, Undo</a>
+      <a href="#audioplayer">Audioplayer</a>
+      <a href="#uebungsmodus">Übungsmodus</a>
+      <a href="#arrangement">Arrangement</a>
+      <a href="#klang">Klang, Swing und Feel</a>
+      <a href="#mobil">Smartphone-Nutzung</a>
+      <a href="#tipps">Typische Abläufe</a>
+      <a href="#probleme">Fehlersuche</a>
+      <p class="toc-note">Diese Anleitung beschreibt den aktuellen Arbeitsstand des BaraBeat-Studio.</p>
+    </nav>
+
+    <article>
+      <section id="kurzstart">
+        <h2>1. Kurzstart</h2>
+        <p>BaraBeat-Studio ist ein Editor und Player für Djembe- und Doundoun-Notationen. Du erstellst ein Notenblatt, markierst darauf Pattern wie Call, Intro, Begleitpattern, Solo oder Echauffement und kannst diese Pattern anschließend im Übungsmodus oder im Arrangement abspielen.</p>
+
+        <div class="workflow">
+          <h3>Schneller Arbeitsablauf</h3>
+          <ol>
+            <li>Über <strong>Datei</strong> ein vorhandenes Notenblatt öffnen oder über <strong>Notenblatt</strong> ein neues Blatt anlegen.</li>
+            <li>Mit den Choosern Instrument und Patternart setzen, zum Beispiel <em>Djembe 1</em> und <em>Begleitpattern</em>.</li>
+            <li>Noten aus der Palette auf das Notenblatt ziehen.</li>
+            <li>Über <strong>Werkzeuge → Üben</strong> den Übungsmodus öffnen oder über <strong>Werkzeuge → Arrangieren</strong> eine Timeline bauen.</li>
+            <li>Mit dem Audioplayer abspielen, Tempo einstellen und bei Bedarf WAV exportieren.</li>
+          </ol>
+        </div>
+
+        <p>Auf Smartphones ist die Oberfläche bewusst stärker auf Öffnen, Abspielen und Üben ausgerichtet. Die eigentliche Notenbearbeitung ist dort nicht der Schwerpunkt.</p>
+      </section>
+
+      <section id="oberflaeche">
+        <h2>2. Oberfläche</h2>
+        <p>Die Anwendung besteht aus dem Notenblatt, einer verschiebbaren Palette, dem Hauptmenü und optionalen Arbeitsansichten für Übungsmodus und Arrangement.</p>
+
+        <h3>Hauptmenü</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Menü</th>
+              <th>Wofür es gedacht ist</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Datei</strong></td>
+              <td>Notenblätter öffnen, speichern, lokal verwalten und exportieren.</td>
+            </tr>
+            <tr>
+              <td><strong>Notenblatt</strong></td>
+              <td>Binäres, tenäres oder 9/8-Blatt anlegen sowie Blätter hinzufügen oder löschen.</td>
+            </tr>
+            <tr>
+              <td><strong>Einfügen</strong></td>
+              <td>Zusätzliche Elemente oder Vorlagen einsetzen.</td>
+            </tr>
+            <tr>
+              <td><strong>Werkzeuge</strong></td>
+              <td>Übungsmodus, Arrangement und Template-Auswahl öffnen.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Templates</h3>
+        <p>Über <strong>Werkzeuge → Template</strong> kannst du zwischen visuellen Presets wechseln. Vorhanden sind unter anderem <strong>Klar</strong>, <strong>Verspielt</strong> und <strong>Erdig</strong>. Die Templates ändern die optische Stimmung der Oberfläche, nicht die musikalischen Daten.</p>
+      </section>
+
+      <section id="dateien">
+        <h2>3. Dateien öffnen und speichern</h2>
+        <p>Notenblätter werden im Projekt als <code>.bbs</code>-Dateien gespeichert. Ältere <code>.txt</code>-Notenblätter können weiterhin geöffnet werden.</p>
+
+        <h3>Öffnen</h3>
+        <ul>
+          <li><strong>Lokal</strong> zeigt Dateien, die im Browser gespeichert wurden.</li>
+          <li><strong>Server</strong> zeigt Notenblätter aus dem Ordner <code>Noten/</code>.</li>
+          <li>Auf Smartphones ist die Dateiansicht vereinfacht, damit Öffnen und Löschen lokaler Dateien gut erreichbar bleiben.</li>
+        </ul>
+
+        <h3>Speichern</h3>
+        <ul>
+          <li><strong>Speichern</strong> überschreibt das aktuell geöffnete Notenblatt.</li>
+          <li><strong>Speichern als</strong> ist für neue Namen oder Kopien gedacht.</li>
+          <li>Bei erfolgreichem Speichern erscheint nur eine kurze Statusmeldung. Fehlermeldungen bleiben sichtbar.</li>
+        </ul>
+
+        <div class="hint">
+          <strong>Hinweis:</strong> Im Notenblatt werden nicht nur die gezeichneten Noten gespeichert, sondern auch Übungseinstellungen, Patternauswahl, Arrangement-Timeline, Lautstärken, Swing, Feel und weitere Metadaten.
+        </div>
+      </section>
+
+      <section id="notenblatt">
+        <h2>4. Notenblatt bearbeiten</h2>
+        <p>Das Notenblatt ist die Grundlage für alle weiteren Funktionen. Pattern entstehen aus Abschnitten, die durch Instrumenten-Chooser und Funktions-Chooser beschriftet werden.</p>
+
+        <h3>Blatttypen</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Typ</th>
+              <th>Raster</th>
+              <th>Typische Verwendung</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Binär</td>
+              <td>Vier Unterteilungen pro Puls</td>
+              <td>Viele gerade Djembe- und Doundoun-Rhythmen</td>
+            </tr>
+            <tr>
+              <td>Tenär</td>
+              <td>Drei Unterteilungen pro Puls</td>
+              <td>Triolische Rhythmen</td>
+            </tr>
+            <tr>
+              <td>9/8</td>
+              <td>Drei Dreiergruppen</td>
+              <td>Spezielle 9/8-Rhythmen wie Koreduga</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Mehrseitige Notenblätter</h3>
+        <p>Ein Notenblatt kann mehrere Seiten haben. Pro Seite werden zehn Zeilen angezeigt. Wenn mehr Zeilen benötigt werden, kannst du über <strong>Blatt hinzufügen</strong> eine weitere Seite anlegen. Die Legende steht auf dem letzten Blatt, rechts unten erscheinen Seitenzahlen wie <code>1/2</code> und <code>2/2</code>.</p>
+
+        <h3>Palette</h3>
+        <p>Die Palette enthält Notensymbole, Chooser und Steuerzeichen. Sie bleibt beim Scrollen sichtbar und kann bei Bedarf verschoben werden. Falls sie ungünstig steht, kann sie innerhalb des Blattes wieder erreichbar positioniert werden.</p>
+
+        <h3>Rhythmusname</h3>
+        <p>Der Rhythmusname steht oben im Notenblatt. Er kann direkt im Feld geändert werden. Beim ersten Öffnen wird der zuletzt geladene Titel wiederhergestellt, wenn der Browser diese Information noch kennt.</p>
+      </section>
+
+      <section id="zeichen">
+        <h2>5. Zeichen und Sonderzeichen</h2>
+        <p>Die wichtigsten Zeichen entsprechen der Legende im Notenblatt.</p>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Zeichen</th>
+              <th>Bedeutung</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Tone</td>
+              <td>Offener Djembe-Ton.</td>
+            </tr>
+            <tr>
+              <td>Bass</td>
+              <td>Bassschlag der Djembe oder Doundoun-Schlag, je nach Instrumentenspur.</td>
+            </tr>
+            <tr>
+              <td>Slap / Glocke</td>
+              <td>Slap bei Djembe, Glocke bei Doundoun-Spuren.</td>
+            </tr>
+            <tr>
+              <td>Flam</td>
+              <td>Zwei eng zusammenliegende Schläge. In den laufenden Noten werden Flams überlagert dargestellt.</td>
+            </tr>
+            <tr>
+              <td>Gedämpfter Tone / gedämpfter Slap</td>
+              <td>Gedämpfte Schläge, im Notenblatt durch Unterstrich markiert.</td>
+            </tr>
+            <tr>
+              <td>In</td>
+              <td>Auftakt oder Einstiegspunkt. Der Ton unter dem In kann vor dem eigentlichen Pattern liegen.</td>
+            </tr>
+            <tr>
+              <td>Out</td>
+              <td>Ausstiegspunkt. Der Ton über dem Out wird noch gespielt, danach endet die Stimme.</td>
+            </tr>
+            <tr>
+              <td>Wiederholung</td>
+              <td>Interne Wiederholung im Pattern. Die Zahl am Zeichen gibt die Wiederholungsanzahl an.</td>
+            </tr>
+            <tr>
+              <td>ShortBar</td>
+              <td>Verkürzt einen Takt, ohne ihn optisch schmaler darzustellen. Die weggelassenen Einheiten werden gestrichelt markiert.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="warning">
+          <strong>ShortBar:</strong> Bei binären Rhythmen verkürzt ShortBar die letzten vier Einheiten, bei tenären und 9/8-Rhythmen die letzten drei Einheiten. Dadurch bleibt die optische Struktur stabil, während Audio und laufende Noten die verkürzte Länge beachten.
+        </div>
+      </section>
+
+      <section id="auswahl">
+        <h2>6. Auswahl, Kopieren und Rückgängig</h2>
+        <p>Elemente können einzeln verschoben oder über einen Auswahlrahmen gemeinsam markiert werden. Nach dem Verschieben bleibt die Auswahl bestehen, bis du neben die Auswahl klickst.</p>
+
+        <h3>Tastatur</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Taste</th>
+              <th>Funktion</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><kbd>Alt</kbd> beim Ziehen</td>
+              <td>Element klonen.</td>
+            </tr>
+            <tr>
+              <td><kbd>Cmd</kbd> + <kbd>Z</kbd></td>
+              <td>Rückgängig.</td>
+            </tr>
+            <tr>
+              <td><kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd></td>
+              <td>Wiederherstellen.</td>
+            </tr>
+            <tr>
+              <td><kbd>Cmd</kbd> + <kbd>C</kbd></td>
+              <td>Auswahl kopieren.</td>
+            </tr>
+            <tr>
+              <td><kbd>Cmd</kbd> + <kbd>X</kbd></td>
+              <td>Auswahl ausschneiden.</td>
+            </tr>
+            <tr>
+              <td><kbd>Cmd</kbd> + <kbd>V</kbd></td>
+              <td>Einfügen. Eingefügte Elemente bleiben ausgewählt und können sofort verschoben werden.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Tab-übergreifendes Kopieren</h3>
+        <p>Ausgewählte Notenelemente können über die Zwischenablage auch zwischen zwei Browser-Tabs oder Fenstern kopiert werden. Wenn der Browser den Zugriff auf die System-Zwischenablage verhindert, verwendet BaraBeat-Studio zusätzlich eine lokale Zwischenablage im geöffneten Tab.</p>
+
+        <h3>Raster beim Verschieben</h3>
+        <p>Während des Ziehens folgt ein Element flüssig der Maus. Beim Loslassen rastet es an der nächstgelegenen sinnvollen Position ein. Das gilt für Noten, Wiederholungszeichen, In/Out, ShortBar und Chooser.</p>
+      </section>
+
+      <section id="audioplayer">
+        <h2>7. Audioplayer</h2>
+        <p>Der Audioplayer spielt entweder die Übung oder das Arrangement ab. Er bietet Tempo, Start/Stopp und WAV-Export.</p>
+
+        <h3>Bedienelemente</h3>
+        <ul>
+          <li><strong>BPM</strong> steuert das Tempo in Beats pro Minute.</li>
+          <li><strong>Play</strong> startet oder stoppt die Wiedergabe.</li>
+          <li><strong>Export WAV</strong> rendert die aktuelle Übung oder das Arrangement als WAV-Datei. Auf Smartphones kann der Export ausgeblendet sein, weil mobile Browser Downloads unterschiedlich behandeln.</li>
+        </ul>
+
+        <h3>Bluetooth-Latenz</h3>
+        <p>Im Übungsmodus gibt es den Regler <strong>Latenz für Bluetooth ms</strong>. Damit kann die Anzeige gegenüber dem Ton verschoben werden, damit rote Linie und hörbarer Schlag auch bei Bluetooth-Kopfhörern zusammenpassen.</p>
+
+        <h3>Laufende Noten</h3>
+        <p>Unter dem Player laufen die gerade gespielten Noten von rechts nach links unter einer festen roten Linie hindurch. Der Schlag erklingt, wenn das Symbol die rote Linie erreicht. Taktlinien und Patternhinterlegung helfen bei der Orientierung.</p>
+      </section>
+
+      <section id="uebungsmodus">
+        <h2>8. Übungsmodus</h2>
+        <p>Der Übungsmodus ist für das wiederholte Trainieren einzelner Pattern gedacht. Er liest die Pattern aus dem Notenblatt und baut daraus einen Übungsloop.</p>
+
+        <h3>Patternauswahl</h3>
+        <p>Die Patternauswahl kann geöffnet oder geschlossen werden. Sie enthält drei Hauptbereiche:</p>
+        <ul>
+          <li><strong>Einstellungen</strong> für Start der Begleitung, Wiederholungen, Timer, Swing, Feel, Mute und Latenz.</li>
+          <li><strong>Begleitung auswählen</strong> für Pattern, die parallel als Grundrhythmus laufen.</li>
+          <li><strong>Übungsteile auswählen</strong> für Calls, Intros, Soli, Echauffements, Pausen und Begleitpattern, die geübt werden sollen.</li>
+        </ul>
+
+        <h3>Begleitung startet</h3>
+        <p>Die Begleitung kann sofort, nach Call, nach Intro oder nach Call und Intro starten. Wenn Call oder Intro bereits im Übungsteil ausgewählt sind, werden sie nicht doppelt hinzugefügt. Pausen und ShortBars werden berücksichtigt, damit die Begleitungen danach wieder gemeinsam starten.</p>
+
+        <h3>Begleitung stoppt bei Call/Intro</h3>
+        <p>Diese Option ist für Rhythmen gedacht, bei denen die Begleitung bei einem Call oder Intro aussetzt und danach wieder einsetzt.</p>
+
+        <h3>Übungsteile und Reihenfolge</h3>
+        <p>Mehrere Übungsteile können ausgewählt und in die gewünschte Reihenfolge gezogen werden. Optional kann zwischen Übungsteilen wieder die Begleitung allein gespielt werden.</p>
+
+        <h3>Wiederholungen und Timer</h3>
+        <ul>
+          <li><strong>Wiederholungen</strong> gibt an, wie oft der Übungsloop gespielt wird.</li>
+          <li><strong>Timer</strong> kann stattdessen eine Übungsdauer in Minuten festlegen.</li>
+          <li>Wenn der Timer aktiv ist, läuft der aktuelle Übungsloop noch bis zum Ende, statt mitten im Pattern abzubrechen.</li>
+        </ul>
+
+        <h3>Handsatz und H2H Leer = Mute</h3>
+        <p>Für Djembe-Pattern kann der Handsatz pro Pattern gewählt werden, zum Beispiel <strong>Auto</strong>, <strong>H2H</strong> oder andere Modi. Bei <strong>H2H Leer = Mute</strong> werden Leernoten als leise Mute-Schläge hörbar. Die Lautstärke dieser Mute-Töne kann instrumentabhängig eingestellt sein.</p>
+
+        <h3>Lautstärke im Übungsmodus</h3>
+        <p>Ein Klick auf den Instrumentennamen bei den laufenden Noten öffnet die Lautstärke für dieses Instrument. Dort kann auch ein weiteres Overlay für einzelne Tonarten geöffnet werden, damit zum Beispiel Bass, Tone, Slap oder Mute relativ zueinander angepasst werden können.</p>
+      </section>
+
+      <section id="arrangement">
+        <h2>9. Arrangement</h2>
+        <p>Das Arrangement ist die Timeline für vollständige Abläufe. Pattern aus der Pattern-Bibliothek werden in Abschnitte gezogen und dort nacheinander oder parallel abgespielt.</p>
+
+        <h3>Pattern-Bibliothek</h3>
+        <p>Links stehen alle im Notenblatt gefundenen Pattern. Ein Pattern kann per Drag-and-drop in die Timeline gezogen oder über den Plus-Button ans Ende angefügt werden.</p>
+
+        <h3>Abschnitte</h3>
+        <p>Ein Abschnitt enthält ein oder mehrere Pattern. Mehrere Pattern in derselben Zeile laufen parallel. Die Wiederholungszahl links bestimmt, wie oft der Abschnitt läuft. Kürzere Begleitungen können mitgeführt werden, wenn eine längere Begleitung die Anzahl der Durchläufe vorgibt.</p>
+
+        <h3>Parallel einfügen</h3>
+        <p>Wenn du ein Pattern in einen bestehenden Abschnitt ziehst, erscheint eine parallele Dropzone nur dann, wenn das Pattern dort musikalisch sinnvoll eingesetzt werden kann. Ein Instrument kann nicht gleichzeitig zwei unterschiedliche Hauptpattern derselben Art spielen, außer ein Solo ersetzt gezielt eine Begleitung.</p>
+
+        <h3>Solo-Zellen</h3>
+        <p>Bei Begleitabschnitten mit mehreren Wiederholungen erscheint ein Solo-Raster. Jede Zelle entspricht einem Durchlauf. Ziehst du ein Solo in eine Zelle, wird dieses Solo nur in diesem Durchlauf parallel zur Begleitung gespielt.</p>
+
+        <ul>
+          <li>Ist das Solo kürzer als der Begleitdurchlauf, läuft der Rest als Stille.</li>
+          <li>Ist das Solo länger, wird der Abschnitt entsprechend mitgeführt.</li>
+          <li>Spielt dasselbe Instrument Begleitung und Solo, setzt die Begleitung während des Solos aus und danach wieder ein.</li>
+          <li><strong>In</strong> und <strong>Out</strong> werden auch bei Soli berücksichtigt.</li>
+        </ul>
+
+        <h3>Abschnitte verschieben</h3>
+        <p>Abschnitte können in der Timeline nach oben oder unten verschoben werden. So lässt sich ein Arrangement schrittweise umstellen, ohne die Pattern neu aufzubauen.</p>
+
+        <h3>Tempo im Arrangement</h3>
+        <p>Jeder Abschnitt kann ein eigenes Tempo erhalten. Ein Tempowechsel gleitet über etwa zwei Takte in das neue Tempo und bleibt für die folgenden Abschnitte gültig, bis ein weiterer Tempowechsel gesetzt wird.</p>
+      </section>
+
+      <section id="klang">
+        <h2>10. Klang, Swing und Feel</h2>
+        <p>BaraBeat-Studio bietet mehrere Ebenen zur klanglichen Anpassung.</p>
+
+        <h3>Instrumentenlautstärke</h3>
+        <p>Die Gesamtlautstärke einzelner Instrumente kann im Übungsmodus über die laufenden Noten eingestellt werden. Diese Werte werden mit dem Notenblatt gespeichert.</p>
+
+        <h3>Tonlautstärke pro Instrument</h3>
+        <p>Zusätzlich können die verschiedenen Schläge eines Instruments relativ zueinander eingestellt werden, zum Beispiel Bass, Tone, Slap, Mute oder gedämpfte Schläge. Das ist hilfreich, wenn Samples unterschiedlich laut aufgenommen wurden.</p>
+
+        <h3>Swing</h3>
+        <p>Der Swing-Faktor bestimmt, wie stark das ausgewählte Swing-Profil wirkt. Über <strong>Swing-Profil</strong> öffnet sich ein Overlay, in dem die Verschiebung der Unterteilungen sichtbar gemacht und eingestellt werden kann.</p>
+
+        <h3>Feel</h3>
+        <p>Das Feel-Overlay verschiebt einzelne Instrumente in Millisekunden nach vorne oder hinten. Die Instrumentennamen werden ausgeschrieben, damit klar ist, welche Spur angepasst wird.</p>
+
+        <div class="hint">
+          <strong>Praxis:</strong> Swing verändert die innere Verteilung innerhalb eines Pulses. Feel verschiebt ganze Instrumente minimal gegeneinander. Beides zusammen kann einen Rhythmus lebendiger machen, sollte aber vorsichtig eingesetzt werden.
+        </div>
+      </section>
+
+      <section id="mobil">
+        <h2>11. Nutzung auf Smartphones</h2>
+        <p>Auf Smartphones ist BaraBeat-Studio vor allem zum Öffnen, Anzeigen, Üben und Abspielen gedacht. Die Notenbearbeitung und die Abschnittstimeline sind auf kleinen Displays nur eingeschränkt sinnvoll.</p>
+
+        <h3>Portrait und Landscape</h3>
+        <p>Im Portrait-Modus steht die Übungsoberfläche im Vordergrund. Im Landscape-Modus kann das Notenblatt breiter dargestellt werden, damit es besser lesbar ist.</p>
+
+        <h3>Mobile Notenblattansicht</h3>
+        <p>Mehrseitige Notenblätter werden seitenweise skaliert, nicht als gesamter Stapel auf eine Displayhöhe gedrückt. Dadurch bleiben mehrseitige Blätter lesbar.</p>
+
+        <h3>Leistung und Speicher</h3>
+        <p>iOS Safari ist bei Audio und vielen DOM-Elementen empfindlich. Der Player arbeitet deshalb speicherschonend: Wiederholungen werden nicht unnötig vollständig vorgerendert, laufende Noten werden begrenzt aufgebaut und Samples werden möglichst nicht mehrfach gehalten.</p>
+      </section>
+
+      <section id="tipps">
+        <h2>12. Typische Abläufe</h2>
+
+        <h3>Ein neues Pattern notieren</h3>
+        <ol>
+          <li>Instrumenten-Chooser setzen, zum Beispiel <em>Djembe 1</em>.</li>
+          <li>Funktions-Chooser setzen, zum Beispiel <em>Begleitpattern</em>, <em>Call</em> oder <em>Solo 1</em>.</li>
+          <li>Noten aus der Palette auf die Notenlinien ziehen.</li>
+          <li>Bei Bedarf <strong>In</strong>, <strong>Out</strong>, <strong>Wiederholung</strong> oder <strong>ShortBar</strong> ergänzen.</li>
+          <li>Speichern.</li>
+        </ol>
+
+        <h3>Ein Pattern üben</h3>
+        <ol>
+          <li>Übungsmodus öffnen.</li>
+          <li>Patternauswahl öffnen.</li>
+          <li>Eine Begleitung auswählen.</li>
+          <li>Ein oder mehrere Übungsteile auswählen und sortieren.</li>
+          <li>Wiederholungen oder Timer einstellen.</li>
+          <li>Play drücken.</li>
+        </ol>
+
+        <h3>Ein Arrangement bauen</h3>
+        <ol>
+          <li>Arrangement öffnen.</li>
+          <li>Pattern aus der Pattern-Bibliothek in die Timeline ziehen.</li>
+          <li>Pattern parallel in denselben Abschnitt ziehen, wenn sie zusammen laufen sollen.</li>
+          <li>Wiederholungen einstellen.</li>
+          <li>Soli in Solo-Zellen ablegen.</li>
+          <li>Tempo, Swing, Feel und Lautstärken prüfen.</li>
+          <li>Abspielen oder als WAV exportieren.</li>
+        </ol>
+      </section>
+
+      <section id="probleme">
+        <h2>13. Fehlersuche</h2>
+
+        <h3>Ein Pattern wird nicht erkannt</h3>
+        <ul>
+          <li>Prüfen, ob Instrumenten-Chooser und Funktions-Chooser korrekt über dem Pattern stehen.</li>
+          <li>Prüfen, ob die Noten wirklich auf dem Raster sitzen.</li>
+          <li>Bei 9/8-Rhythmen darauf achten, dass In, Out und ShortBar auf passenden Rasterpositionen stehen.</li>
+        </ul>
+
+        <h3>Die Wiedergabe klingt verschoben</h3>
+        <ul>
+          <li>Bluetooth-Latenz prüfen.</li>
+          <li>Feel-Werte kontrollieren.</li>
+          <li>Bei Patternübergängen In/Out und ShortBar prüfen.</li>
+        </ul>
+
+        <h3>Die laufenden Noten zeigen Lücken</h3>
+        <ul>
+          <li>Prüfen, ob sehr lange Wiederholungen oder viele Pattern gleichzeitig aktiv sind.</li>
+          <li>Auf iPhone/Safari möglichst mit realistischen Wiederholungen testen.</li>
+          <li>Bei neu gebauten Dateien speichern und neu öffnen, damit Metadaten sauber aktualisiert werden.</li>
+        </ul>
+
+        <h3>Die Timeline zeigt "gemischt"</h3>
+        <p>Das kann erscheinen, wenn parallele Pattern in einer Zeile unterschiedliche Wiederholungsstrukturen haben. Einmalige Begleitgruppen, die in einem längeren Abschnitt mitgeführt werden, sollten inzwischen nicht mehr als "gemischt" angezeigt werden.</p>
+
+        <h3>Ein Sample fehlt</h3>
+        <p>Wenn ein Sample fehlt oder nicht geladen werden kann, sollte der Player den Fehler anzeigen. Prüfe in diesem Fall die Schreibweise der Datei im Sound-Ordner und ob die Datei auf dem Server vorhanden ist.</p>
+      </section>
+
+      <section>
+        <h2>14. Begriffe</h2>
+        <p><span class="tag">Pattern</span> Ein im Notenblatt markierter musikalischer Abschnitt.</p>
+        <p><span class="tag">Begleitung</span> Ein Pattern, das als Grundrhythmus läuft.</p>
+        <p><span class="tag">Übungsteil</span> Ein Pattern, das gezielt trainiert wird.</p>
+        <p><span class="tag">Arrangement</span> Eine Reihenfolge aus Abschnitten in der Timeline.</p>
+        <p><span class="tag">Overlay</span> Ein Solo, das in einem bestimmten Durchlauf über eine Begleitung gelegt wird.</p>
+        <p><span class="tag">ShortBar</span> Ein verkürzter Takt mit optisch markierten Leerstellen.</p>
+        <p class="footer-note">Stand: Juni 2026. Diese Anleitung kann direkt im Browser geöffnet oder ausgedruckt werden.</p>
+      </section>
+    </article>
+  </main>
+</body>
+</html>

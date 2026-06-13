@@ -833,7 +833,7 @@ function buildTimelinePickupNotes(notes, inStep, options) {
   }
 
   const settings = options && typeof options === 'object' ? options : {};
-  const limitToPickupBar = Boolean(settings.limitToPickupBar);
+  const limitToPickupBar = settings.limitToPickupBar !== false;
   const stepsPerBar = getTimelineStepsPerBar();
   const safeInStep = Math.max(0, Math.min(safeNotes.length - 1, Number(inStep) || 0));
   const pickupStartStep = stepsPerBar > 0
@@ -860,6 +860,85 @@ function sectionHasTimelineNotes(section) {
       section.trackNotes[instrumentName].some(function (noteValue) {
         return noteValue && noteValue !== 'f';
       });
+  });
+}
+
+function getTimelineSectionMaxLength(section) {
+  if (!section || !section.trackNotes) {
+    return 0;
+  }
+  return Math.max.apply(null, trackInstrumentNames.map(function (instrumentName) {
+    return getSectionLength(section.trackNotes[instrumentName]);
+  }).concat(0));
+}
+
+function mergeTimelineEntriesIntoPreviousSectionAtStart(sections, entryDataList) {
+  const entries = Array.isArray(entryDataList) ? entryDataList : [];
+  const consumedByInstrument = {};
+  let hostSection = null;
+
+  for (let sectionIndex = sections.length - 1; sectionIndex >= 0; sectionIndex--) {
+    if (sectionHasTimelineNotes(sections[sectionIndex])) {
+      hostSection = sections[sectionIndex];
+      break;
+    }
+  }
+
+  if (!hostSection) {
+    return consumedByInstrument;
+  }
+
+  const hostLength = getTimelineSectionMaxLength(hostSection);
+  if (hostLength <= 0) {
+    return consumedByInstrument;
+  }
+
+  entries.forEach(function (entryData) {
+    if (!entryData || entryData.patternInStep === null || entryData.patternInStep === undefined) {
+      return;
+    }
+    const sourceNotes = Array.isArray(entryData.patternNotes) ? entryData.patternNotes : [];
+    if (sourceNotes.length === 0) {
+      return;
+    }
+    const safeInStep = Math.max(0, Math.min(sourceNotes.length - 1, Number(entryData.patternInStep) || 0));
+    const overlapLength = Math.min(hostLength, sourceNotes.length);
+    const overlapNotes = silenceNotesBeforeStep(sourceNotes.slice(0, overlapLength), safeInStep);
+
+    entryData.targetInstruments.forEach(function (instrumentName) {
+      hostSection.trackNotes[instrumentName] = silenceTrackRange(
+        hostSection.trackNotes[instrumentName],
+        safeInStep,
+        Math.max(0, overlapLength - safeInStep)
+      );
+      hostSection.trackNotes[instrumentName] = mergeNotesIntoTrack(
+        hostSection.trackNotes[instrumentName],
+        overlapNotes,
+        0
+      );
+      consumedByInstrument[instrumentName] = Math.max(
+        consumedByInstrument[instrumentName] || 0,
+        getTimelineEntryPickupEndStep(entryData)
+      );
+      if (instrumentName.indexOf('Djembe_') === 0) {
+        hostSection.trackHandModes[instrumentName] = String(entryData.handMode || '');
+      }
+    });
+  });
+
+  return consumedByInstrument;
+}
+
+function trimTimelineSectionConsumedStarts(section, consumedByInstrument) {
+  if (!section || !consumedByInstrument) {
+    return;
+  }
+  trackInstrumentNames.forEach(function (instrumentName) {
+    const consumedLength = Math.max(0, Math.round(Number(consumedByInstrument[instrumentName]) || 0));
+    if (consumedLength <= 0 || !Array.isArray(section.trackNotes[instrumentName])) {
+      return;
+    }
+    section.trackNotes[instrumentName] = section.trackNotes[instrumentName].slice(consumedLength);
   });
 }
 
@@ -905,6 +984,9 @@ function mergeTimelineEntryPickupsIntoPreviousSection(sections, entryDataList, o
   const entries = Array.isArray(entryDataList) ? entryDataList : [];
   const settings = options && typeof options === 'object' ? options : {};
   const allowStandalonePickup = settings.allowStandalonePickup !== false;
+  if (settings.alignFullPatternToPreviousSectionStart) {
+    return mergeTimelineEntriesIntoPreviousSectionAtStart(sections, entries);
+  }
   const pickupSection = createOrderedSection('Auftakt');
   const pickupLabelNames = [];
 
@@ -938,7 +1020,7 @@ function mergeTimelineEntryPickupsIntoPreviousSection(sections, entryDataList, o
   });
 
   if (!sectionHasTimelineNotes(pickupSection)) {
-    return;
+    return {};
   }
 
   pickupSection.labelName = pickupLabelNames.length > 0
@@ -948,15 +1030,16 @@ function mergeTimelineEntryPickupsIntoPreviousSection(sections, entryDataList, o
   for (let sectionIndex = sections.length - 1; sectionIndex >= 0; sectionIndex--) {
     if (sectionHasTimelineNotes(sections[sectionIndex])) {
       mergeTimelinePickupIntoHostSection(sections[sectionIndex], pickupSection);
-      return;
+      return {};
     }
   }
 
   if (!allowStandalonePickup) {
-    return;
+    return {};
   }
 
   sections.push(pickupSection);
+  return {};
 }
 
 function applyOutToPatternNotes(patternNotes, outStep) {
@@ -977,9 +1060,20 @@ function getPatternNotesLength(entryData) {
   return Array.isArray(entryData && entryData.patternNotes) ? entryData.patternNotes.length : 0;
 }
 
+function getTimelineEntryPlaybackLength(entryData) {
+  const patternLength = getPatternNotesLength(entryData);
+  if (patternLength <= 0) {
+    return 0;
+  }
+  const pickupEndStep = entryData && entryData.label !== 'Begleitung'
+    ? getTimelineEntryPickupEndStep(entryData)
+    : 0;
+  return Math.max(0, patternLength - pickupEndStep);
+}
+
 function getMaxPatternNotesLength(entryDataList) {
   return (Array.isArray(entryDataList) ? entryDataList : []).reduce(function (maxLength, entryData) {
-    return Math.max(maxLength, getPatternNotesLength(entryData));
+    return Math.max(maxLength, getTimelineEntryPlaybackLength(entryData));
   }, 0);
 }
 
@@ -1008,18 +1102,47 @@ function getTimelineEntryOutStep(entryData, effectiveNotesLength) {
     return null;
   }
 
-  const sourceLength = getPatternNotesLength(entryData);
+  const pickupEndStep = entryData && entryData.label !== 'Begleitung'
+    ? getTimelineEntryPickupEndStep(entryData)
+    : 0;
+  const sourceLength = Math.max(0, getPatternNotesLength(entryData) - pickupEndStep);
   const safeEffectiveLength = Math.max(0, Number(effectiveNotesLength) || 0);
+  const normalizedPatternOutStep = Math.max(0, Math.round(Number(entryData.patternOutStep) || 0) - pickupEndStep);
   let outStep = safeEffectiveLength > sourceLength && sourceLength > 0
-    ? safeEffectiveLength - sourceLength + entryData.patternOutStep
-    : entryData.patternOutStep;
+    ? safeEffectiveLength - sourceLength + normalizedPatternOutStep
+    : normalizedPatternOutStep;
 
   return outStep;
+}
+
+function getTimelineEntryPickupEndStep(entryData) {
+  if (!entryData || entryData.patternInStep === null || entryData.patternInStep === undefined) {
+    return 0;
+  }
+
+  const sourceLength = getPatternNotesLength(entryData);
+  if (sourceLength <= 0) {
+    return 0;
+  }
+
+  const stepsPerBar = getTimelineStepsPerBar();
+  if (stepsPerBar <= 0) {
+    return 0;
+  }
+
+  const safeInStep = Math.max(0, Math.min(sourceLength - 1, Number(entryData.patternInStep) || 0));
+  return Math.min(sourceLength, (Math.floor(safeInStep / stepsPerBar) + 1) * stepsPerBar);
 }
 
 function getTimelineEntryEffectiveNotes(entryData, shouldApplyOut, loopToLength) {
   const sourceNotes = Array.isArray(entryData && entryData.patternNotes) ? entryData.patternNotes : [];
   let effectiveNotes = sourceNotes.slice();
+  const pickupEndStep = entryData && entryData.label !== 'Begleitung'
+    ? getTimelineEntryPickupEndStep(entryData)
+    : 0;
+  if (pickupEndStep > 0) {
+    effectiveNotes = effectiveNotes.slice(pickupEndStep);
+  }
   const safeLoopToLength = Math.max(0, Number(loopToLength) || 0);
 
   if (safeLoopToLength > 0) {
@@ -1168,7 +1291,7 @@ function getTimelineOverlayReplacementStart(entryDataList, overlayEntryData) {
 }
 
 function getTimelineOverlayReplacementLength(entryData) {
-  return Math.max(0, getPatternNotesLength(entryData));
+  return Math.max(0, getTimelineEntryPlaybackLength(entryData));
 }
 
 function doInstrumentSetsOverlap(instrumentNamesA, instrumentNamesB) {
@@ -1388,6 +1511,26 @@ function buildRepeatedParallelEntryUnits(entryDataList) {
   });
 
   if (!canZipRuns) {
+    const maxRunLength = runs.reduce(function (maxLength, run) {
+      return Math.max(maxLength, Array.isArray(run.entries) ? run.entries.length : 0);
+    }, 0);
+    const canCarryShortRuns = maxRunLength > 1 && runs.every(function (run) {
+      const currentRunLength = Array.isArray(run.entries) ? run.entries.length : 0;
+      return currentRunLength === maxRunLength || currentRunLength === 1;
+    });
+
+    if (canCarryShortRuns) {
+      const carriedUnits = [];
+      for (let repeatIndex = 0; repeatIndex < maxRunLength; repeatIndex++) {
+        carriedUnits.push(runs.map(function (run) {
+          return run.entries.length === 1
+            ? run.entries[0]
+            : run.entries[repeatIndex];
+        }).filter(Boolean));
+      }
+      return attachOverlayEntries(carriedUnits);
+    }
+
     return attachOverlayEntries([baseEntries]);
   }
 
@@ -1400,9 +1543,58 @@ function buildRepeatedParallelEntryUnits(entryDataList) {
   return attachOverlayEntries(zippedUnits);
 }
 
+function filterOrphanTimelineOverlayEntries(entryDataList) {
+  const entries = Array.isArray(entryDataList) ? entryDataList : [];
+  const filteredEntries = [];
+  let entryIndex = 0;
+
+  while (entryIndex < entries.length) {
+    const entryData = entries[entryIndex];
+    const parallelGroupId = String(entryData && entryData.parallelGroupId || '');
+
+    if (!parallelGroupId) {
+      if (!isTimelineOverlayEntryData(entryData)) {
+        filteredEntries.push(entryData);
+      }
+      entryIndex += 1;
+      continue;
+    }
+
+    let blockEndIndex = entryIndex + 1;
+    while (blockEndIndex < entries.length &&
+      String(entries[blockEndIndex] && entries[blockEndIndex].parallelGroupId || '') === parallelGroupId) {
+      blockEndIndex += 1;
+    }
+
+    const blockEntries = entries.slice(entryIndex, blockEndIndex);
+    const hasBaseEntry = blockEntries.some(function (blockEntry) {
+      return blockEntry && !isTimelineOverlayEntryData(blockEntry);
+    });
+
+    blockEntries.forEach(function (blockEntry) {
+      if (!isTimelineOverlayEntryData(blockEntry) || hasBaseEntry) {
+        filteredEntries.push(blockEntry);
+      }
+    });
+
+    entryIndex = blockEndIndex;
+  }
+
+  return filteredEntries;
+}
+
 function hasTimelineEntryLabel(entryDataList, labelName) {
   return (Array.isArray(entryDataList) ? entryDataList : []).some(function (entryData) {
     return entryData && entryData.label === labelName;
+  });
+}
+
+function hasNonOverlayTimelineInEntry(entryDataList) {
+  return (Array.isArray(entryDataList) ? entryDataList : []).some(function (entryData) {
+    return entryData &&
+      !isTimelineOverlayEntryData(entryData) &&
+      entryData.patternInStep !== null &&
+      entryData.patternInStep !== undefined;
   });
 }
 
@@ -1849,10 +2041,10 @@ function buildTimelineSections(config) {
     });
   });
 
-  const continuingAccompanimentEntries = expandedEntries.filter(function (entryData) {
+  const playbackEntries = filterOrphanTimelineOverlayEntries(expandedEntries);
+  const continuingAccompanimentEntries = playbackEntries.filter(function (entryData) {
     return entryData.startsContinuingAccompaniment;
   });
-  const playbackEntries = expandedEntries.slice();
 
   let blockStartIndex = 0;
   while (blockStartIndex < playbackEntries.length) {
@@ -1972,9 +2164,7 @@ function buildTimelineSections(config) {
             const overlayReplacementStart = isTimelineOverlayEntryData(entryData)
               ? getTimelineOverlayReplacementStart(repeatEntries, entryData)
               : 0;
-            const notesToMerge = overlayReplacementStart > 0
-              ? silenceNotesBeforeStep(effectiveNotes, overlayReplacementStart)
-              : effectiveNotes;
+            const notesToMerge = effectiveNotes;
 
             entryData.targetInstruments.forEach(function (instrumentName) {
               if (repeatedSection.sectionTargets.indexOf(instrumentName) === -1) {
@@ -2019,10 +2209,17 @@ function buildTimelineSections(config) {
             repeatedSection.labelName
           ].join('::');
           normalizeSectionTrackLoops(repeatedSection);
-          mergeTimelineEntryPickupsIntoPreviousSection(sections, repeatEntries, {
-            allowStandalonePickup: true,
-            limitOverlayPickupToBar: repeatContainsOverlay
-          });
+          if (repeatIndex === 0 && hasNonOverlayTimelineInEntry(repeatEntries)) {
+            mergeTimelineEntryPickupsIntoPreviousSection(sections, repeatEntries, {
+              alignFullPatternToPreviousSectionStart: true,
+              allowStandalonePickup: true
+            });
+          } else {
+            mergeTimelineEntryPickupsIntoPreviousSection(sections, repeatEntries, {
+              allowStandalonePickup: true,
+              limitOverlayPickupToBar: repeatContainsOverlay
+            });
+          }
           sections.push(repeatedSection);
         });
         blockStartIndex = blockEndIndex;
@@ -2064,9 +2261,7 @@ function buildTimelineSections(config) {
         const overlayReplacementStart = isTimelineOverlayEntryData(entryData)
           ? getTimelineOverlayReplacementStart(blockEntries, entryData)
           : 0;
-        const notesToMerge = overlayReplacementStart > 0
-          ? silenceNotesBeforeStep(effectiveNotes, overlayReplacementStart)
-          : effectiveNotes;
+        const notesToMerge = effectiveNotes;
 
         entryData.targetInstruments.forEach(function (instrumentName) {
           if (mergedSection.sectionTargets.indexOf(instrumentName) === -1) {
@@ -2110,10 +2305,12 @@ function buildTimelineSections(config) {
         mergedSection.labelName
       ].join('::');
       normalizeSectionTrackLoops(mergedSection);
-      mergeTimelineEntryPickupsIntoPreviousSection(sections, blockEntries, {
+      const consumedByInstrument = mergeTimelineEntryPickupsIntoPreviousSection(sections, blockEntries, {
+        alignFullPatternToPreviousSectionStart: !isPracticeBlock && !currentBlockContainsOverlay,
         allowStandalonePickup: true,
         limitOverlayPickupToBar: currentBlockContainsOverlay
       });
+      trimTimelineSectionConsumedStarts(mergedSection, consumedByInstrument);
       sections.push(mergedSection);
       blockStartIndex = blockEndIndex;
       continue;
@@ -2172,7 +2369,10 @@ function buildTimelineSections(config) {
             return laneData.entries[occurrenceIndex];
           })
           .filter(Boolean);
-        mergeTimelineEntryPickupsIntoPreviousSection(sections, cycleEntries);
+        const consumedByInstrument = mergeTimelineEntryPickupsIntoPreviousSection(sections, cycleEntries, {
+          alignFullPatternToPreviousSectionStart: true
+        });
+        trimTimelineSectionConsumedStarts(currentCycleSection, consumedByInstrument);
         sections.push(currentCycleSection);
       }
     }

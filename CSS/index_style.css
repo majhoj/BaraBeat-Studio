@@ -40,6 +40,7 @@ body[data-ui-theme="playful"] .app-menu summary:hover {
 }
 
 body[data-ui-theme="playful"] .app-menu-panel button:hover,
+body[data-ui-theme="playful"] .app-menu-panel .app-menu-link:hover,
 body[data-ui-theme="playful"] #practicePanel button:hover,
 body[data-ui-theme="playful"] #timelinePanel button:hover {
     background: #e7f7ed;
@@ -112,7 +113,8 @@ body[data-ui-theme="earth"] #appMenuBar {
 }
 
 body[data-ui-theme="earth"] #appMenuBar summary,
-body[data-ui-theme="earth"] #appMenuBar button {
+body[data-ui-theme="earth"] #appMenuBar button,
+body[data-ui-theme="earth"] #appMenuBar .app-menu-link {
     color: #fff7e8;
     font-size: 15px;
 }
@@ -123,6 +125,7 @@ body[data-ui-theme="earth"] .app-menu-panel {
 }
 
 body[data-ui-theme="earth"] .app-menu-panel button,
+body[data-ui-theme="earth"] .app-menu-panel .app-menu-link,
 body[data-ui-theme="earth"] .app-submenu summary {
     background: #7a5635;
     border-color: #9d7649;
@@ -138,6 +141,7 @@ body[data-ui-theme="earth"] .app-submenu summary:hover {
 }
 
 body[data-ui-theme="earth"] .app-menu-panel button:hover,
+body[data-ui-theme="earth"] .app-menu-panel .app-menu-link:hover,
 body[data-ui-theme="earth"] #practicePanel button:hover,
 body[data-ui-theme="earth"] #timelinePanel button:hover {
     background: #8f6b43;
@@ -414,12 +418,16 @@ html {
 
 .app-menu-panel button,
 .app-menu-panel .menu-file-picker,
+.app-menu-panel .app-menu-link,
 .app-submenu {
     width: 100%;
+    box-sizing: border-box;
 }
 
 .app-menu-panel button,
+.app-menu-panel .app-menu-link,
 .app-submenu summary {
+    display: block;
     text-align: left;
     border: 1px solid var(--ui-border);
     border-radius: var(--ui-radius-small);
@@ -428,6 +436,7 @@ html {
     font-size: 14px;
     color: var(--ui-text);
     cursor: pointer;
+    text-decoration: none;
     transition: background 120ms ease, border-color 120ms ease;
 }
 
@@ -441,6 +450,7 @@ html {
 }
 
 .app-menu-panel button:hover,
+.app-menu-panel .app-menu-link:hover,
 .app-submenu[open] summary,
 .app-submenu summary:hover {
     background: var(--ui-soft-bg-2);

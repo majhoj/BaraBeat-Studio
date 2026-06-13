@@ -1027,6 +1027,11 @@ function updateTimelineMetadataNode() {
         existingMetadataNode.remove();
     }
 
+    const metadataEntries = pruneTimelineOrphanOverlayEntries(timelineState.entries);
+    if (metadataEntries.length !== timelineState.entries.length) {
+        timelineState.entries = metadataEntries;
+    }
+
     const metadataPayload = JSON.stringify({
         version: timelineMetadataVersion,
         sourceHash: timelineState.sourceHash,
@@ -1037,7 +1042,7 @@ function updateTimelineMetadataNode() {
         swingProfile: normalizeAllTimelineSwingProfiles(timelineState.swingProfile),
         feelOffsets: normalizeTimelineFeelOffsets(timelineState.feelOffsets),
         practice: typeof buildPracticeMetadata === 'function' ? buildPracticeMetadata() : null,
-        entries: timelineState.entries.map(function (entry) {
+        entries: metadataEntries.map(function (entry) {
             return {
                 id: entry.id,
                 blockId: entry.blockId || '',
@@ -1519,14 +1524,15 @@ function getTimelineRowRepeatInfo(rowGroups) {
     const repeatCounts = groupRepeatInfos.map(function (info) {
         return normalizeTimelineGroupRepeatCount(info.repeatInfo.repeatCount);
     });
-    const firstRepeatCount = repeatCounts[0];
+    const displayedRepeatCount = Math.max.apply(null, repeatCounts.concat(1));
+    const mixed = repeatCounts.some(function (repeatCount) {
+        return repeatCount !== displayedRepeatCount && repeatCount !== 1;
+    });
 
     return {
         groupRepeatInfos: groupRepeatInfos,
-        repeatCount: firstRepeatCount,
-        mixed: repeatCounts.some(function (repeatCount) {
-            return repeatCount !== firstRepeatCount;
-        }),
+        repeatCount: displayedRepeatCount,
+        mixed: mixed,
         startIndex: Math.min.apply(null, groupRepeatInfos.map(function (info) {
             return info.group.startIndex;
         })),
@@ -1970,6 +1976,46 @@ function getTimelineGroupKey(group) {
 
 function isTimelineOverlayEntry(entry) {
     return entry && entry.overlayRepeatIndex !== null && entry.overlayRepeatIndex !== undefined;
+}
+
+function pruneTimelineOrphanOverlayEntries(entries) {
+    const sourceEntries = Array.isArray(entries) ? entries : [];
+    const prunedEntries = [];
+    let entryIndex = 0;
+
+    while (entryIndex < sourceEntries.length) {
+        const entry = sourceEntries[entryIndex];
+        const parallelGroupId = String(entry && entry.parallelGroupId || '');
+
+        if (!parallelGroupId) {
+            if (!isTimelineOverlayEntry(entry)) {
+                prunedEntries.push(entry);
+            }
+            entryIndex += 1;
+            continue;
+        }
+
+        let blockEndIndex = entryIndex + 1;
+        while (blockEndIndex < sourceEntries.length &&
+            String(sourceEntries[blockEndIndex] && sourceEntries[blockEndIndex].parallelGroupId || '') === parallelGroupId) {
+            blockEndIndex += 1;
+        }
+
+        const blockEntries = sourceEntries.slice(entryIndex, blockEndIndex);
+        const hasBaseEntry = blockEntries.some(function (blockEntry) {
+            return blockEntry && !isTimelineOverlayEntry(blockEntry);
+        });
+
+        blockEntries.forEach(function (blockEntry) {
+            if (!isTimelineOverlayEntry(blockEntry) || hasBaseEntry) {
+                prunedEntries.push(blockEntry);
+            }
+        });
+
+        entryIndex = blockEndIndex;
+    }
+
+    return prunedEntries;
 }
 
 function isTimelineOverlayGroup(group) {

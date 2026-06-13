@@ -97,6 +97,7 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
                 <button type="button" id="button10" hidden>Audiotest</button>
                 <button type="button" id="practiceButton">Üben</button>
                 <button type="button" id="button11">Arrangieren</button>
+                <a class="app-menu-link" href="Bedienungsanleitung.html" target="_blank" rel="noopener">Bedienungsanleitung</a>
                 <details class="app-submenu">
                     <summary>Template</summary>
                     <div class="app-submenu-panel">
