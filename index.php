@@ -249,91 +249,109 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
             </div>
         </div>
         <div id="practicePatternChooser" class="timeline-panel-body practice-panel-body" hidden>
-            <section class="practice-settings-column">
-                <h3 class="practice-options-title">Einstellungen</h3>
-                <div class="practice-timing-options">
-                    <label class="timeline-tempo-control" for="practiceTempo">
-                        Tempo
-                        <input type="number" id="practiceTempo" min="30" max="180" step="1" value="100" />
-                    </label>
-                    <label class="timeline-swing-control" for="practiceSwingFactor">
-                        Swing
-                        <input type="number" id="practiceSwingFactor" min="0" max="100" step="1" value="0" />
-                    </label>
-                    <button type="button" id="practiceSwingProfileButton">Swing-Profil</button>
-                    <button type="button" id="practiceFeelProfileButton">Feel</button>
-                </div>
-                <div class="practice-pattern-options">
-                    <label class="timeline-tempo-control" for="practiceAccompanimentStart">
-                        Begleitung startet
-                        <select id="practiceAccompanimentStart">
-                            <option value="immediate">Sofort</option>
-                            <option value="afterCall">Nach Call</option>
-                            <option value="afterIntro">Nach Intro</option>
-                            <option value="afterCallIntro">Nach Call + Intro</option>
-                        </select>
-                    </label>
-                    <label class="timeline-tempo-control" for="practiceWithoutSoloLoops">
-                        Ohne Übungsteil
-                        <span class="practice-stepper">
-                            <button type="button" class="practice-stepper-button" data-practice-step-target="practiceWithoutSoloLoops" data-practice-step-delta="-1" aria-label="Ohne Übungsteil verringern">-</button>
-                            <input type="number" id="practiceWithoutSoloLoops" min="0" max="32" step="1" value="1" />
-                            <button type="button" class="practice-stepper-button" data-practice-step-target="practiceWithoutSoloLoops" data-practice-step-delta="1" aria-label="Ohne Übungsteil erhöhen">+</button>
-                        </span>
-                    </label>
-                    <label class="timeline-tempo-control" for="practiceWithSoloLoops">
-                        Mit Übungsteil
-                        <span class="practice-stepper">
-                            <button type="button" class="practice-stepper-button" data-practice-step-target="practiceWithSoloLoops" data-practice-step-delta="-1" aria-label="Mit Übungsteil verringern">-</button>
-                            <input type="number" id="practiceWithSoloLoops" min="1" max="32" step="1" value="1" />
-                            <button type="button" class="practice-stepper-button" data-practice-step-target="practiceWithSoloLoops" data-practice-step-delta="1" aria-label="Mit Übungsteil erhöhen">+</button>
-                        </span>
-                    </label>
-                    <label class="timeline-tempo-control" for="practiceAccompanimentBetweenPatterns">
-                        Zwischen Übungsteilen
-                        <input type="checkbox" id="practiceAccompanimentBetweenPatterns" />
-                    </label>
-                    <label class="timeline-tempo-control" for="practicePauseAccompanimentForLeadInPatterns">
-                        Begleitung stoppt bei Call/Intro
-                        <input type="checkbox" id="practicePauseAccompanimentForLeadInPatterns" />
-                    </label>
-                    <label class="timeline-tempo-control" for="practiceRepeatCount" id="practiceRepeatCountControl">
-                        Wiederholen
-                        <span class="practice-stepper">
-                            <button type="button" class="practice-stepper-button" data-practice-step-target="practiceRepeatCount" data-practice-step-delta="-1" aria-label="Wiederholungen verringern">-</button>
-                            <input type="number" id="practiceRepeatCount" min="1" max="999" step="1" value="4" />
-                            <button type="button" class="practice-stepper-button" data-practice-step-target="practiceRepeatCount" data-practice-step-delta="1" aria-label="Wiederholungen erhöhen">+</button>
-                        </span>
-                    </label>
-                    <label class="timeline-tempo-control" for="practiceTimerMinutes">
-                        Timer min
-                        <span class="practice-stepper">
-                            <button type="button" class="practice-stepper-button" data-practice-step-target="practiceTimerMinutes" data-practice-step-delta="-1" aria-label="Timer verringern">-</button>
-                            <input type="number" id="practiceTimerMinutes" min="0" max="240" step="1" value="0" />
-                            <button type="button" class="practice-stepper-button" data-practice-step-target="practiceTimerMinutes" data-practice-step-delta="1" aria-label="Timer erhöhen">+</button>
-                        </span>
-                    </label>
-                    <label class="timeline-tempo-control" for="practiceAudioLatency">
-                        Latenz für Bluetooth ms
-                        <input type="range" id="practiceAudioLatencyRange" min="0" max="1000" step="10" value="30" />
-                        <input type="number" id="practiceAudioLatency" min="0" max="1000" step="10" value="30" />
-                    </label>
-                    <label class="timeline-tempo-control" for="practiceH2HRestMute">
-                        H2H Leer = Mute
-                        <input type="checkbox" id="practiceH2HRestMute" />
-                    </label>
-                    <button type="button" id="practiceRefreshButton">Aus Blatt aktualisieren</button>
+            <section class="practice-settings-column is-collapsed">
+                <h3 class="practice-column-heading practice-options-title">
+                    <button type="button" class="practice-column-toggle" aria-expanded="false" aria-controls="practiceSettingsContent">
+                        Einstellungen
+                    </button>
+                </h3>
+                <div id="practiceSettingsContent" class="practice-column-content">
+                    <div class="practice-timing-options">
+                        <label class="timeline-tempo-control" for="practiceTempo">
+                            Tempo
+                            <input type="number" id="practiceTempo" min="30" max="180" step="1" value="100" />
+                        </label>
+                        <label class="timeline-swing-control" for="practiceSwingFactor">
+                            Swing
+                            <input type="number" id="practiceSwingFactor" min="0" max="100" step="1" value="0" />
+                        </label>
+                        <button type="button" id="practiceSwingProfileButton">Swing-Profil</button>
+                        <button type="button" id="practiceFeelProfileButton">Feel</button>
+                    </div>
+                    <div class="practice-pattern-options">
+                        <label class="timeline-tempo-control" for="practiceAccompanimentStart">
+                            Begleitung startet
+                            <select id="practiceAccompanimentStart">
+                                <option value="immediate">Sofort</option>
+                                <option value="afterCall">Nach Call</option>
+                                <option value="afterIntro">Nach Intro</option>
+                                <option value="afterCallIntro">Nach Call + Intro</option>
+                            </select>
+                        </label>
+                        <label class="timeline-tempo-control" for="practiceWithoutSoloLoops">
+                            Ohne Übungsteil
+                            <span class="practice-stepper">
+                                <button type="button" class="practice-stepper-button" data-practice-step-target="practiceWithoutSoloLoops" data-practice-step-delta="-1" aria-label="Ohne Übungsteil verringern">-</button>
+                                <input type="number" id="practiceWithoutSoloLoops" min="0" max="32" step="1" value="1" />
+                                <button type="button" class="practice-stepper-button" data-practice-step-target="practiceWithoutSoloLoops" data-practice-step-delta="1" aria-label="Ohne Übungsteil erhöhen">+</button>
+                            </span>
+                        </label>
+                        <label class="timeline-tempo-control" for="practiceWithSoloLoops">
+                            Mit Übungsteil
+                            <span class="practice-stepper">
+                                <button type="button" class="practice-stepper-button" data-practice-step-target="practiceWithSoloLoops" data-practice-step-delta="-1" aria-label="Mit Übungsteil verringern">-</button>
+                                <input type="number" id="practiceWithSoloLoops" min="1" max="32" step="1" value="1" />
+                                <button type="button" class="practice-stepper-button" data-practice-step-target="practiceWithSoloLoops" data-practice-step-delta="1" aria-label="Mit Übungsteil erhöhen">+</button>
+                            </span>
+                        </label>
+                        <label class="timeline-tempo-control" for="practiceAccompanimentBetweenPatterns">
+                            Zwischen Übungsteilen
+                            <input type="checkbox" id="practiceAccompanimentBetweenPatterns" />
+                        </label>
+                        <label class="timeline-tempo-control" for="practicePauseAccompanimentForLeadInPatterns">
+                            Begleitung stoppt bei Call/Intro
+                            <input type="checkbox" id="practicePauseAccompanimentForLeadInPatterns" />
+                        </label>
+                        <label class="timeline-tempo-control" for="practiceRepeatCount" id="practiceRepeatCountControl">
+                            Wiederholen
+                            <span class="practice-stepper">
+                                <button type="button" class="practice-stepper-button" data-practice-step-target="practiceRepeatCount" data-practice-step-delta="-1" aria-label="Wiederholungen verringern">-</button>
+                                <input type="number" id="practiceRepeatCount" min="1" max="999" step="1" value="4" />
+                                <button type="button" class="practice-stepper-button" data-practice-step-target="practiceRepeatCount" data-practice-step-delta="1" aria-label="Wiederholungen erhöhen">+</button>
+                            </span>
+                        </label>
+                        <label class="timeline-tempo-control" for="practiceTimerMinutes">
+                            Timer min
+                            <span class="practice-stepper">
+                                <button type="button" class="practice-stepper-button" data-practice-step-target="practiceTimerMinutes" data-practice-step-delta="-1" aria-label="Timer verringern">-</button>
+                                <input type="number" id="practiceTimerMinutes" min="0" max="240" step="1" value="0" />
+                                <button type="button" class="practice-stepper-button" data-practice-step-target="practiceTimerMinutes" data-practice-step-delta="1" aria-label="Timer erhöhen">+</button>
+                            </span>
+                        </label>
+                        <label class="timeline-tempo-control" for="practiceAudioLatency">
+                            Latenz für Bluetooth ms
+                            <input type="range" id="practiceAudioLatencyRange" min="0" max="1000" step="10" value="30" />
+                            <input type="number" id="practiceAudioLatency" min="0" max="1000" step="10" value="30" />
+                        </label>
+                        <label class="timeline-tempo-control" for="practiceH2HRestMute">
+                            H2H Leer = Mute
+                            <input type="checkbox" id="practiceH2HRestMute" />
+                        </label>
+                        <button type="button" id="practiceRefreshButton">Aus Blatt aktualisieren</button>
+                    </div>
                 </div>
             </section>
-            <section class="timeline-column practice-column practice-accompaniment-column">
-                <h3>Begleitung auswählen</h3>
-                <p class="timeline-column-note">Diese Pattern laufen parallel als Loop.</p>
-                <div id="practiceAccompanimentList" class="timeline-pattern-list"></div>
+            <section class="timeline-column practice-column practice-accompaniment-column is-collapsed">
+                <h3 class="practice-column-heading">
+                    <button type="button" class="practice-column-toggle" aria-expanded="false" aria-controls="practiceAccompanimentListWrap">
+                        Begleitung auswählen
+                    </button>
+                </h3>
+                <div id="practiceAccompanimentListWrap" class="practice-column-content">
+                    <p class="timeline-column-note">Diese Pattern laufen parallel als Loop.</p>
+                    <div id="practiceAccompanimentList" class="timeline-pattern-list"></div>
+                </div>
             </section>
-            <section class="timeline-column practice-column practice-solo-column">
-                <h3>Übungsteile auswählen</h3>
-                <p class="timeline-column-note">Diese Pattern werden in fester Reihenfolge zugeschaltet.</p>
-                <div id="practiceSoloList" class="timeline-pattern-list"></div>
+            <section class="timeline-column practice-column practice-solo-column is-collapsed">
+                <h3 class="practice-column-heading">
+                    <button type="button" class="practice-column-toggle" aria-expanded="false" aria-controls="practiceSoloListWrap">
+                        Übungsteile auswählen
+                    </button>
+                </h3>
+                <div id="practiceSoloListWrap" class="practice-column-content">
+                    <p class="timeline-column-note">Diese Pattern werden in fester Reihenfolge zugeschaltet.</p>
+                    <div id="practiceSoloList" class="timeline-pattern-list"></div>
+                </div>
             </section>
         </div>
         <section class="practice-player-panel">
@@ -4569,6 +4587,26 @@ document.addEventListener('DOMContentLoaded', function () {
     document.querySelector('#mobilePatternChooserButton').addEventListener('click', function () {
         practiceState.patternChooserExpanded = !practiceState.patternChooserExpanded;
         renderPracticePanel();
+        if (practiceState.patternChooserExpanded && isMobilePracticeViewport()) {
+            const panelEl = document.getElementById('practicePanel');
+            const chooserEl = document.getElementById('practicePatternChooser');
+            if (panelEl && chooserEl) {
+                window.setTimeout(function () {
+                    panelEl.scrollTo({ top: Math.max(0, chooserEl.offsetTop - 8), behavior: 'smooth' });
+                }, 0);
+            }
+        }
+    });
+    document.querySelectorAll('.practice-column-toggle').forEach(function (toggleEl) {
+        toggleEl.addEventListener('click', function () {
+            const columnEl = toggleEl.closest('.practice-column, .practice-settings-column');
+            if (!columnEl) {
+                return;
+            }
+            const nextCollapsed = !columnEl.classList.contains('is-collapsed');
+            columnEl.classList.toggle('is-collapsed', nextCollapsed);
+            toggleEl.setAttribute('aria-expanded', nextCollapsed ? 'false' : 'true');
+        });
     });
     document.querySelector('#practiceWithoutSoloLoops').addEventListener('input', function (event) {
         const nextValue = normalizePracticeCount(event.target.value, 1, 0, 32);

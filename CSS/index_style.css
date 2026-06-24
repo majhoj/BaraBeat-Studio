@@ -1127,6 +1127,37 @@ html {
     border-color: #b9dbc7;
 }
 
+.practice-column-heading {
+    margin: 0 0 10px;
+}
+
+.practice-column-toggle {
+    position: relative;
+    width: 100%;
+    text-align: left;
+    padding-right: 34px;
+}
+
+.practice-column-toggle::after {
+    content: "−";
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    transform: translateY(-50%);
+    font-size: 20px;
+    line-height: 1;
+}
+
+.practice-column.is-collapsed .practice-column-toggle::after,
+.practice-settings-column.is-collapsed .practice-column-toggle::after {
+    content: "+";
+}
+
+.practice-column.is-collapsed .practice-column-content,
+.practice-settings-column.is-collapsed .practice-column-content {
+    display: none;
+}
+
 .practice-accompaniment-column {
     box-shadow: inset 4px 0 0 #2f9b62, var(--ui-shadow-soft);
 }
@@ -2877,6 +2908,27 @@ body.is-timeline-dragging .timeline-dropzone-inline {
         gap: 10px;
     }
 
+    .practice-panel-body {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        grid-template-columns: none;
+        height: auto;
+        min-height: 0;
+        max-height: min(58vh, calc(100dvh - 250px));
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        padding: 0 2px 8px;
+    }
+
+    #practicePatternChooser > .practice-settings-column,
+    #practicePatternChooser > .practice-column {
+        position: static;
+        grid-column: auto;
+        grid-row: auto;
+        flex: 0 0 auto;
+    }
+
     .practice-pattern-options {
         display: grid;
         grid-template-columns: 1fr;
@@ -2924,9 +2976,25 @@ body.is-timeline-dragging .timeline-dropzone-inline {
     .practice-column,
     .timeline-column {
         min-height: 0;
-        max-height: 34vh;
+        height: auto;
+        max-height: none;
         padding: 10px;
         border-radius: 9px;
+        overflow: visible;
+    }
+
+    .practice-column {
+        display: block;
+        width: 100%;
+    }
+
+    .practice-column .timeline-pattern-list {
+        display: grid;
+        grid-template-columns: 1fr;
+        max-height: 42vh;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        padding-right: 3px;
     }
 
     .timeline-pattern-list,
