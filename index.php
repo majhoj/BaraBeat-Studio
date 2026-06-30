@@ -442,10 +442,10 @@ var paletteOriginX,
     paletteOffsetY = 0;
 
 // Paletten-Elemente
-var ton, bass, slap, flam_ton, flam_slap, flam_bass_slap, ton_g, slap_g, In, Out, ShortBar, text_z_g, repeatMarkerGroup;
+var ton, bass, slap, flam_ton, flam_slap, flam_bass_slap, ton_g, slap_g, In, Out, ShortBar, Triplet, text_z_g, repeatMarkerGroup;
 
 // Geklonte Paletten-Elemente
-var ton_c, bass_c, slap_c, flam_ton_c, flam_slap_c, flam_bass_slap_c, ton_g_c, slap_g_c, In_c, Out_c, ShortBar_c, repeatMarkerLegendClone;
+var ton_c, bass_c, slap_c, flam_ton_c, flam_slap_c, flam_bass_slap_c, ton_g_c, slap_g_c, In_c, Out_c, ShortBar_c, Triplet_c, repeatMarkerLegendClone;
 
 // Touch-Status und geladener Titel
 var textTouchStartX,
@@ -487,13 +487,14 @@ var insertTone,
     insertInMarker,
     insertOutMarker,
     insertShortBarMarker,
+    insertTripletMarker,
     captureTextTouchStart,
     handleTextTouchEnd,
     insertTextField,
     cycleRepeatCount,
     insertRepeatMarker;
 
-const canvasElementSelector = "#edit, #tone, #bass, #slap, #tone_muffled, #slap_muffled, #tone_flam, #slap_flam, #bass_slap_flam, #in, #out, #shortbar, #edit_text, #wiederholung";
+const canvasElementSelector = "#edit, #tone, #bass, #slap, #tone_muffled, #slap_muffled, #tone_flam, #slap_flam, #bass_slap_flam, #in, #out, #shortbar, #triplet, #edit_text, #wiederholung";
 const instrumentChooserSelector = ".instrument-chooser, #instrumentChooser";
 const functionChooserSelector = ".function-chooser, #functionChooser";
 const chooserSelector = instrumentChooserSelector + ", " + functionChooserSelector;
@@ -1959,8 +1960,66 @@ function neunerNotenOhneStartChooser() {
 paletteOriginX = 33;
 paletteOriginY = paletteBaseY - 30;
 
+function createTripletPaletteSymbol(paper, centerX, centerY) {
+    const dotY = centerY;
+    const groupParts = [
+        paper.circle(centerX - 6, dotY, 2.5),
+        paper.circle(centerX, dotY, 2.5),
+        paper.circle(centerX + 6, dotY, 2.5),
+        paper.text(centerX, dotY + 15, "T").attr({
+            'font-size': 11,
+            'font-family': 'sans-serif',
+            'font-weight': 'bold',
+            'text-anchor': 'middle'
+        }),
+        paper.rect(centerX - 10, dotY - 6, 20, 26).attr({ opacity: 0.001 })
+    ];
+
+    return paper.g.apply(paper, groupParts).attr({
+        id: "triplet",
+        'data-tuplet': "triplet",
+        'data-notes': "tone,tone,slap"
+    });
+}
+
+function createTripletSymbol(paper, centerX, centerY, options) {
+    const settings = options || {};
+    const spacing = Number(settings.spacing) || 24;
+    const labelText = settings.label === false ? "" : "Triole";
+    const groupParts = [];
+    const leftX = centerX - spacing;
+    const middleX = centerX;
+    const rightX = centerX + spacing;
+    const noteY = centerY;
+
+    groupParts.push(paper.circle(leftX, noteY, 7));
+    groupParts.push(paper.circle(middleX, noteY, 7));
+
+    const slapHitbox = paper.rect(rightX - 6, noteY - 6, 12, 12).attr({ opacity: 0.001 });
+    const slapLineA = paper.line(rightX - 6, noteY + 6, rightX + 6, noteY - 6).attr({ stroke: "black", strokeWidth: 2 });
+    const slapLineB = paper.line(rightX - 6, noteY - 6, rightX + 6, noteY + 6).attr({ stroke: "black", strokeWidth: 2 });
+    groupParts.push(slapHitbox, slapLineA, slapLineB);
+
+    if (labelText) {
+        groupParts.push(paper.text(centerX, noteY + 24, labelText).attr({
+            'font-size': 10,
+            'font-family': 'sans-serif',
+            'text-anchor': 'middle'
+        }));
+    }
+
+    const hitbox = paper.rect(leftX - 10, noteY - 13, spacing * 2 + 20, 43).attr({ opacity: 0.001 });
+    groupParts.push(hitbox);
+
+    return paper.g.apply(paper, groupParts).attr({
+        id: "triplet",
+        'data-tuplet': "triplet",
+        'data-notes': "tone,tone,slap"
+    });
+}
+
 // Kartusche
-paletteFrame = s.rect(paletteOriginX - 12, paletteOriginY - 14, 26, 300, 3, 3).attr({ fill: "lightgrey", stroke: "black", strokeWidth: 0.5 });
+paletteFrame = s.rect(paletteOriginX - 12, paletteOriginY - 14, 26, 330, 3, 3).attr({ fill: "lightgrey", stroke: "black", strokeWidth: 0.5 });
 
 // Tone
 ton = s.circle(paletteOriginX + 1, paletteOriginY + 1, 7);
@@ -2101,6 +2160,11 @@ ShortBar = s.g(shortbar_a, shortbar_b, shortbar_v1, shortbar_v2, shortbar_c).att
     'data-shortbar-anchor-y': y + 7
 });
 
+// Triole
+x = paletteOriginX + 1;
+y = paletteOriginY + 292;
+Triplet = createTripletPaletteSymbol(s, x, y);
+
 // Legende schreiben
 function addLegendEntry(symbol, label, symbolX, symbolY, labelOffsetX, labelOffsetY, legendOffsetX, legendOffsetY) {
     const shiftedSymbolX = symbolX + legendOffsetX;
@@ -2109,12 +2173,14 @@ function addLegendEntry(symbol, label, symbolX, symbolY, labelOffsetX, labelOffs
     s.append(legendClone);
     legendClone.attr({ id: "basis", transform: "t" + shiftedSymbolX + "," + shiftedSymbolY });
     legendClone.addClass("legend-entry");
-    s.text(shiftedSymbolX + labelOffsetX, shiftedSymbolY + labelOffsetY, label).attr({
-        id: "basis",
-        class: "legend-entry",
-        'font-size': 15,
-        'font-family': 'sans-serif'
-    });
+    if (label) {
+        s.text(shiftedSymbolX + labelOffsetX, shiftedSymbolY + labelOffsetY, label).attr({
+            id: "basis",
+            class: "legend-entry",
+            'font-size': 15,
+            'font-family': 'sans-serif'
+        });
+    }
     return legendClone;
 }
 
@@ -2138,6 +2204,7 @@ function renderLegend(initialChooserX) {
     Out_c = addLegendEntry(Out, "Out", 470, 1011, 44, 366, legendOffsetX, legendOffsetY);
     ShortBar_c = addLegendEntry(ShortBar, "ShortBar", 521, 938, 44, 439, legendOffsetX, legendOffsetY);
     repeatMarkerLegendClone = addLegendEntry(repeatMarkerGroup, "Wiederholung", 605, 968, 44, 409, legendOffsetX, legendOffsetY);
+    Triplet_c = addLegendEntry(Triplet, "Triole", 730, 900, 46, 477, legendOffsetX, legendOffsetY);
 }
 
 renderLegend(125);
@@ -2149,9 +2216,9 @@ function getPaletteBoundsForOffset(offsetX, offsetY) {
         x: paletteOriginX - 14,
         y: paletteOriginY - 16,
         x2: paletteOriginX + 48,
-        y2: paletteOriginY + 286,
+        y2: paletteOriginY + 318,
         width: 62,
-        height: 302
+        height: 334
     };
     const bounds = paletteBaseBounds || fallbackBounds;
     return {
@@ -2289,7 +2356,7 @@ function schedulePaletteViewportFollow() {
 }
 
 // Kartusche zeichnen
-paletteGroup = s.g(paletteFrame, ton, bass, slap, ton_g, slap_g, flam_ton, flam_slap, flam_bass_slap, In, Out, ShortBar, text_z_g, repeatMarkerGroup);
+paletteGroup = s.g(paletteFrame, ton, bass, slap, ton_g, slap_g, flam_ton, flam_slap, flam_bass_slap, In, Out, ShortBar, Triplet, text_z_g, repeatMarkerGroup);
 paletteBaseBounds = paletteGroup.getBBox();
 paletteGroup.drag(move1, sel_start, stop1);
 
@@ -2308,6 +2375,7 @@ insertShortBarMarker = bindPaletteInsert(ShortBar, function () { return ShortBar
     updateShortBarMarkerVisual(shortBarElement);
     snapElementToVerticalTarget(shortBarElement);
 });
+insertTripletMarker = bindPaletteInsert(Triplet, function () { return Triplet_c; }, "triplet", function () { return gridSizeX; }, 0);
 
 captureTextTouchStart = function () {
     textTouchStartX = this.getBBox().x;
