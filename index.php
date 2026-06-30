@@ -494,7 +494,7 @@ var insertTone,
     cycleRepeatCount,
     insertRepeatMarker;
 
-const canvasElementSelector = "#edit, #tone, #bass, #slap, #tone_muffled, #slap_muffled, #tone_flam, #slap_flam, #bass_slap_flam, #in, #out, #shortbar, #triplet, #edit_text, #wiederholung";
+const canvasElementSelector = "#edit, #tone, #bass, #slap, #tone_muffled, #slap_muffled, #tone_flam, #slap_flam, #bass_slap_flam, #in, #out, #shortbar, #triplet, #quartuplet, #edit_text, #wiederholung";
 const instrumentChooserSelector = ".instrument-chooser, #instrumentChooser";
 const functionChooserSelector = ".function-chooser, #functionChooser";
 const chooserSelector = instrumentChooserSelector + ", " + functionChooserSelector;
@@ -1466,8 +1466,9 @@ function bindPaletteInsert(sourceElement, templateElement, elementId, offsetX, o
         if (!resolvedTemplateElement) {
             return;
         }
+        const resolvedElementId = typeof elementId === "function" ? elementId() : elementId;
         recordHistorySnapshot();
-        insertedElement = createPaletteClone(resolvedTemplateElement, elementId, offsetX, offsetY);
+        insertedElement = createPaletteClone(resolvedTemplateElement, resolvedElementId, offsetX, offsetY);
         if (afterCreate) {
             afterCreate(insertedElement);
         }
@@ -1960,13 +1961,33 @@ function neunerNotenOhneStartChooser() {
 paletteOriginX = 33;
 paletteOriginY = paletteBaseY - 30;
 
+function getCurrentTupletDisplay() {
+    return rhythm === "binaer"
+        ? { letter: "T", label: "Triole", type: "triplet" }
+        : { letter: "Q", label: "Quartole", type: "quartuplet" };
+}
+
+function updateTupletPaletteSymbol(symbol) {
+    if (!symbol || typeof symbol.select !== "function") {
+        return;
+    }
+    const display = getCurrentTupletDisplay();
+    const label = symbol.select(".tuplet-palette-letter");
+    if (label) {
+        label.attr({ text: display.letter });
+    }
+    symbol.attr({ "data-tuplet": display.type });
+}
+
 function createTripletPaletteSymbol(paper, centerX, centerY) {
     const dotY = centerY;
+    const display = getCurrentTupletDisplay();
     const groupParts = [
         paper.circle(centerX - 6, dotY, 2.5),
         paper.circle(centerX, dotY, 2.5),
         paper.circle(centerX + 6, dotY, 2.5),
-        paper.text(centerX, dotY + 15, "T").attr({
+        paper.text(centerX, dotY + 15, display.letter).attr({
+            class: "tuplet-palette-letter",
             'font-size': 11,
             'font-family': 'sans-serif',
             'font-weight': 'bold',
@@ -1977,7 +1998,7 @@ function createTripletPaletteSymbol(paper, centerX, centerY) {
 
     return paper.g.apply(paper, groupParts).attr({
         id: "triplet_palette",
-        'data-tuplet': "triplet",
+        'data-tuplet': display.type,
         'data-notes': "tone,tone,slap"
     });
 }
@@ -2189,8 +2210,10 @@ function renderLegend(initialChooserX) {
     const toneLegendReferenceLeft = 92 + ton.getBBox().x;
     const legendOffsetX = legendAnchorX - toneLegendReferenceLeft;
     const legendOffsetY = getSheetPageOffsetY(getSheetPageCount(zeilenAnzahl) - 1);
+    const tupletDisplay = getCurrentTupletDisplay();
 
     removeCanvasElements(".legend-entry");
+    updateTupletPaletteSymbol(Triplet);
 
     ton_c = addLegendEntry(ton, "Tone", 92, 1166, 45, 178, legendOffsetX, legendOffsetY);
     bass_c = addLegendEntry(bass, "Bass", 157, 1146, 46, 198, legendOffsetX, legendOffsetY);
@@ -2204,7 +2227,7 @@ function renderLegend(initialChooserX) {
     Out_c = addLegendEntry(Out, "Out", 470, 1011, 44, 366, legendOffsetX, legendOffsetY);
     ShortBar_c = addLegendEntry(ShortBar, "ShortBar", 521, 938, 44, 439, legendOffsetX, legendOffsetY);
     repeatMarkerLegendClone = addLegendEntry(repeatMarkerGroup, "Wiederholung", 605, 968, 44, 409, legendOffsetX, legendOffsetY);
-    Triplet_c = addLegendEntry(Triplet, "Triole", 730, 900, 46, 477, legendOffsetX, legendOffsetY);
+    Triplet_c = addLegendEntry(Triplet, tupletDisplay.label, 730, 900, 46, 477, legendOffsetX, legendOffsetY);
 }
 
 renderLegend(125);
@@ -2375,7 +2398,7 @@ insertShortBarMarker = bindPaletteInsert(ShortBar, function () { return ShortBar
     updateShortBarMarkerVisual(shortBarElement);
     snapElementToVerticalTarget(shortBarElement);
 });
-insertTripletMarker = bindPaletteInsert(Triplet, function () { return Triplet_c; }, "triplet", function () { return gridSizeX; }, 0);
+insertTripletMarker = bindPaletteInsert(Triplet, function () { return Triplet_c; }, function () { return getCurrentTupletDisplay().type; }, function () { return gridSizeX; }, 0);
 
 captureTextTouchStart = function () {
     textTouchStartX = this.getBBox().x;
