@@ -1976,7 +1976,7 @@ function createTripletPaletteSymbol(paper, centerX, centerY) {
     ];
 
     return paper.g.apply(paper, groupParts).attr({
-        id: "triplet",
+        id: "triplet_palette",
         'data-tuplet': "triplet",
         'data-notes': "tone,tone,slap"
     });
