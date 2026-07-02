@@ -494,7 +494,9 @@ function isNoteSymbolElement(element) {
     elementId === "slap_muffled" ||
     elementId === "tone_flam" ||
     elementId === "slap_flam" ||
-    elementId === "bass_slap_flam"
+    elementId === "bass_slap_flam" ||
+    elementId === "triplet" ||
+    elementId === "quartuplet"
   );
 }
 
@@ -659,6 +661,12 @@ function snapNoteSymbolDeltaX(startX, deltaX) {
 }
 
 function getElementSnapReferenceX(element, bbox) {
+  if (element && typeof element.attr === "function") {
+    var elementId = element.attr("id");
+    if (elementId === "triplet" || elementId === "quartuplet") {
+      return bbox.x + 11;
+    }
+  }
   if (isNoteSymbolElement(element) || isNoteLineControlElement(element)) {
     return bbox.cx;
   }

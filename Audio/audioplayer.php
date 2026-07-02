@@ -3089,6 +3089,48 @@ function getBaseStepDuration(tempoValue) {
   return 60 / safeTempo / getStepsPerBeatForRhythm();
 }
 
+function parseTupletNoteValue(noteValue) {
+  if (typeof noteValue !== 'string' || noteValue.indexOf('tuplet:') !== 0) {
+    return null;
+  }
+
+  const parts = noteValue.split(':');
+  const tupletType = parts[1] || 'triplet';
+  const notePart = parts.slice(2).join(':');
+  const notes = notePart.split('|').map(function (note) {
+    return note.trim();
+  }).filter(function (note) {
+    return note && note !== 'f';
+  });
+
+  if (notes.length === 0) {
+    return null;
+  }
+
+  return {
+    type: tupletType,
+    notes: notes
+  };
+}
+
+function getTupletBeatDurationSeconds(tempoValue) {
+  return getBaseStepDuration(tempoValue) * getStepsPerBeatForRhythm();
+}
+
+function getTupletNoteOffsets(tuplet, tempoValue) {
+  const beatDuration = getTupletBeatDurationSeconds(tempoValue);
+  const subdivisionCount = tuplet && tuplet.type === 'quartuplet' ? 4 : 3;
+  return (tuplet && Array.isArray(tuplet.notes) ? tuplet.notes : []).map(function (_, noteIndex) {
+    return beatDuration * (noteIndex / subdivisionCount);
+  });
+}
+
+function clonePlaybackWithNote(playback, noteValue) {
+  const clonedPlayback = Object.assign({}, playback || {});
+  clonedPlayback.note = noteValue;
+  return clonedPlayback;
+}
+
 function getEffectiveTempoForStep(playbackStep) {
   const sectionContext = getPlaybackSectionContext(playbackStep);
   if (!sectionContext || !sectionContext.section) {
@@ -3179,6 +3221,50 @@ function getAccentMultiplier(playbackStep) {
 }
 
 function scheduleNote(kenkeniNote, sangbanNote, doundounNote, dreierbassNote, djembe1Playback, djembe2Playback, djembe3Playback, time, accentMultiplier, stepTempo) {
+  const kenkeniTuplet = parseTupletNoteValue(kenkeniNote);
+  const sangbanTuplet = parseTupletNoteValue(sangbanNote);
+  const doundounTuplet = parseTupletNoteValue(doundounNote);
+  const dreierbassTuplet = parseTupletNoteValue(dreierbassNote);
+  const djembe1Tuplet = parseTupletNoteValue(djembe1Playback ? djembe1Playback.note : null);
+  const djembe2Tuplet = parseTupletNoteValue(djembe2Playback ? djembe2Playback.note : null);
+  const djembe3Tuplet = parseTupletNoteValue(djembe3Playback ? djembe3Playback.note : null);
+
+  if (kenkeniTuplet || sangbanTuplet || doundounTuplet || dreierbassTuplet || djembe1Tuplet || djembe2Tuplet || djembe3Tuplet) {
+    const tuplets = [
+      { tuplet: kenkeniTuplet, schedule: function (note, noteTime) { scheduleNote(note, null, null, null, null, null, null, noteTime, accentMultiplier, stepTempo); } },
+      { tuplet: sangbanTuplet, schedule: function (note, noteTime) { scheduleNote(null, note, null, null, null, null, null, noteTime, accentMultiplier, stepTempo); } },
+      { tuplet: doundounTuplet, schedule: function (note, noteTime) { scheduleNote(null, null, note, null, null, null, null, noteTime, accentMultiplier, stepTempo); } },
+      { tuplet: dreierbassTuplet, schedule: function (note, noteTime) { scheduleNote(null, null, null, note, null, null, null, noteTime, accentMultiplier, stepTempo); } },
+      { tuplet: djembe1Tuplet, schedule: function (note, noteTime) { scheduleNote(null, null, null, null, clonePlaybackWithNote(djembe1Playback, note), null, null, noteTime, accentMultiplier, stepTempo); } },
+      { tuplet: djembe2Tuplet, schedule: function (note, noteTime) { scheduleNote(null, null, null, null, null, clonePlaybackWithNote(djembe2Playback, note), null, noteTime, accentMultiplier, stepTempo); } },
+      { tuplet: djembe3Tuplet, schedule: function (note, noteTime) { scheduleNote(null, null, null, null, null, null, clonePlaybackWithNote(djembe3Playback, note), noteTime, accentMultiplier, stepTempo); } }
+    ];
+
+    tuplets.forEach(function (tupletData) {
+      if (!tupletData.tuplet) {
+        return;
+      }
+      const noteOffsets = getTupletNoteOffsets(tupletData.tuplet, stepTempo);
+      tupletData.tuplet.notes.forEach(function (noteValue, noteIndex) {
+        tupletData.schedule(noteValue, time + (noteOffsets[noteIndex] || 0));
+      });
+    });
+
+    scheduleNote(
+      kenkeniTuplet ? null : kenkeniNote,
+      sangbanTuplet ? null : sangbanNote,
+      doundounTuplet ? null : doundounNote,
+      dreierbassTuplet ? null : dreierbassNote,
+      djembe1Tuplet ? null : djembe1Playback,
+      djembe2Tuplet ? null : djembe2Playback,
+      djembe3Tuplet ? null : djembe3Playback,
+      time,
+      accentMultiplier,
+      stepTempo
+    );
+    return;
+  }
+
   const noteGain = Math.max(0, Number(accentMultiplier) || 1);
   const strokeTempo = Math.max(1, Number(stepTempo) || Number(tempo) || initialTempo || 100);
   const kenkeniGain = noteGain * getPracticeInstrumentVolume('Kenkeni');
@@ -4020,6 +4106,53 @@ function getExportStepCount() {
 }
 
 function scheduleNoteToDestination(kenkeniNote, sangbanNote, doundounNote, dreierbassNote, djembe1Playback, djembe2Playback, djembe3Playback, time, accentMultiplier, audioContext, destinationNode, exportHandStates, exportTempo) {
+  const kenkeniTuplet = parseTupletNoteValue(kenkeniNote);
+  const sangbanTuplet = parseTupletNoteValue(sangbanNote);
+  const doundounTuplet = parseTupletNoteValue(doundounNote);
+  const dreierbassTuplet = parseTupletNoteValue(dreierbassNote);
+  const djembe1Tuplet = parseTupletNoteValue(djembe1Playback ? djembe1Playback.note : null);
+  const djembe2Tuplet = parseTupletNoteValue(djembe2Playback ? djembe2Playback.note : null);
+  const djembe3Tuplet = parseTupletNoteValue(djembe3Playback ? djembe3Playback.note : null);
+
+  if (kenkeniTuplet || sangbanTuplet || doundounTuplet || dreierbassTuplet || djembe1Tuplet || djembe2Tuplet || djembe3Tuplet) {
+    const tuplets = [
+      { tuplet: kenkeniTuplet, schedule: function (note, noteTime) { scheduleNoteToDestination(note, null, null, null, null, null, null, noteTime, accentMultiplier, audioContext, destinationNode, exportHandStates, exportTempo); } },
+      { tuplet: sangbanTuplet, schedule: function (note, noteTime) { scheduleNoteToDestination(null, note, null, null, null, null, null, noteTime, accentMultiplier, audioContext, destinationNode, exportHandStates, exportTempo); } },
+      { tuplet: doundounTuplet, schedule: function (note, noteTime) { scheduleNoteToDestination(null, null, note, null, null, null, null, noteTime, accentMultiplier, audioContext, destinationNode, exportHandStates, exportTempo); } },
+      { tuplet: dreierbassTuplet, schedule: function (note, noteTime) { scheduleNoteToDestination(null, null, null, note, null, null, null, noteTime, accentMultiplier, audioContext, destinationNode, exportHandStates, exportTempo); } },
+      { tuplet: djembe1Tuplet, schedule: function (note, noteTime) { scheduleNoteToDestination(null, null, null, null, clonePlaybackWithNote(djembe1Playback, note), null, null, noteTime, accentMultiplier, audioContext, destinationNode, exportHandStates, exportTempo); } },
+      { tuplet: djembe2Tuplet, schedule: function (note, noteTime) { scheduleNoteToDestination(null, null, null, null, null, clonePlaybackWithNote(djembe2Playback, note), null, noteTime, accentMultiplier, audioContext, destinationNode, exportHandStates, exportTempo); } },
+      { tuplet: djembe3Tuplet, schedule: function (note, noteTime) { scheduleNoteToDestination(null, null, null, null, null, null, clonePlaybackWithNote(djembe3Playback, note), noteTime, accentMultiplier, audioContext, destinationNode, exportHandStates, exportTempo); } }
+    ];
+
+    tuplets.forEach(function (tupletData) {
+      if (!tupletData.tuplet) {
+        return;
+      }
+      const noteOffsets = getTupletNoteOffsets(tupletData.tuplet, exportTempo);
+      tupletData.tuplet.notes.forEach(function (noteValue, noteIndex) {
+        tupletData.schedule(noteValue, time + (noteOffsets[noteIndex] || 0));
+      });
+    });
+
+    scheduleNoteToDestination(
+      kenkeniTuplet ? null : kenkeniNote,
+      sangbanTuplet ? null : sangbanNote,
+      doundounTuplet ? null : doundounNote,
+      dreierbassTuplet ? null : dreierbassNote,
+      djembe1Tuplet ? null : djembe1Playback,
+      djembe2Tuplet ? null : djembe2Playback,
+      djembe3Tuplet ? null : djembe3Playback,
+      time,
+      accentMultiplier,
+      audioContext,
+      destinationNode,
+      exportHandStates,
+      exportTempo
+    );
+    return;
+  }
+
   const noteGain = Math.max(0, Number(accentMultiplier) || 1);
   const bassMuffledGain = noteGain * 1.4;
   const klickGain = noteGain * 0.75;

@@ -2523,9 +2523,34 @@ function getPracticeScrollerLeadInSteps(leadInMs) {
     return Math.max(1, safeLeadInMs / getPracticeScrollerBaseStepMs());
 }
 
+function parsePracticeScrollerTuplet(noteValue) {
+    if (typeof noteValue !== 'string' || noteValue.indexOf('tuplet:') !== 0) {
+        return null;
+    }
+    const parts = noteValue.split(':');
+    const tupletType = parts[1] || 'triplet';
+    const notePart = parts.slice(2).join(':');
+    const notes = notePart.split('|').map(function (note) {
+        return note.trim();
+    }).filter(function (note) {
+        return note && note !== 'f';
+    });
+    if (notes.length === 0) {
+        return null;
+    }
+    return {
+        type: tupletType,
+        notes: notes
+    };
+}
+
 function getPracticeScrollerNoteLabel(noteValue) {
     if (!noteValue || noteValue === 'f') {
         return '';
+    }
+    const tuplet = parsePracticeScrollerTuplet(noteValue);
+    if (tuplet) {
+        return tuplet.type === 'quartuplet' ? 'Q' : 'T';
     }
     return practiceScrollerNoteLabels[noteValue] || String(noteValue).slice(0, 3);
 }
@@ -2533,6 +2558,9 @@ function getPracticeScrollerNoteLabel(noteValue) {
 function getPracticeScrollerNoteClass(noteValue) {
     if (!noteValue || noteValue === 'f') {
         return 'is-rest';
+    }
+    if (parsePracticeScrollerTuplet(noteValue)) {
+        return 'is-note note-tuplet';
     }
     return 'is-note note-' + String(noteValue).replace(/[^a-z0-9_-]/gi, '-').toLowerCase();
 }
@@ -2596,7 +2624,57 @@ function createPracticeScrollerSymbolPart(partConfig) {
     return partWrapEl;
 }
 
+function createPracticeScrollerSingleNoteSymbol(noteValue) {
+    const parts = getPracticeScrollerSymbolParts(noteValue);
+    if (parts.length === 0) {
+        return null;
+    }
+
+    const symbolEl = document.createElement('span');
+    const usesVerticalLanes = parts.some(function (partConfig) {
+        return Boolean(partConfig.lane);
+    });
+    symbolEl.className = parts.length > 1
+        ? 'practice-note-symbol is-combo'
+        : 'practice-note-symbol';
+    if (usesVerticalLanes) {
+        const usesMiddleLane = parts.some(function (partConfig) {
+            return partConfig.lane === 'middle';
+        });
+        symbolEl.classList.add(usesMiddleLane ? 'is-dreierbass-stack' : 'is-bass-stack');
+    }
+    parts.forEach(function (partConfig) {
+        symbolEl.appendChild(createPracticeScrollerSymbolPart(partConfig));
+    });
+    return symbolEl;
+}
+
+function createPracticeScrollerTupletSymbol(tuplet) {
+    const symbolEl = document.createElement('span');
+    symbolEl.className = 'practice-note-symbol is-tuplet is-' + (tuplet.type === 'quartuplet' ? 'quartuplet' : 'triplet');
+
+    const subdivisionCount = tuplet.type === 'quartuplet' ? 4 : 3;
+    tuplet.notes.forEach(function (noteValue, noteIndex) {
+        const noteWrapEl = document.createElement('span');
+        noteWrapEl.className = 'practice-tuplet-note';
+        noteWrapEl.style.setProperty('--practice-tuplet-note-ratio', String(noteIndex / subdivisionCount));
+        const noteSymbolEl = createPracticeScrollerSingleNoteSymbol(noteValue);
+        if (noteSymbolEl) {
+            noteWrapEl.appendChild(noteSymbolEl);
+        } else {
+            noteWrapEl.textContent = getPracticeScrollerNoteLabel(noteValue);
+        }
+        symbolEl.appendChild(noteWrapEl);
+    });
+    return symbolEl;
+}
+
 function createPracticeScrollerNoteSymbol(noteValue) {
+    const tuplet = parsePracticeScrollerTuplet(noteValue);
+    if (tuplet) {
+        return createPracticeScrollerTupletSymbol(tuplet);
+    }
+
     const parts = getPracticeScrollerSymbolParts(noteValue);
     if (parts.length === 0) {
         return null;
@@ -2840,7 +2918,13 @@ function flattenPracticeScrollerSections(sections) {
 function createPracticeScrollerCell(noteValue, stepIndex, stepsPerBar, isPracticeTarget, barStartInfo) {
     const cellEl = document.createElement('span');
     const safeBarStartInfo = barStartInfo || {};
+    const tuplet = parsePracticeScrollerTuplet(noteValue);
     cellEl.className = 'practice-scroller-cell ' + getPracticeScrollerNoteClass(noteValue);
+    if (tuplet) {
+        const displayStepWidth = isPracticeScrollerCompactViewport() ? 22 : 18;
+        cellEl.classList.add('has-tuplet');
+        cellEl.style.setProperty('--practice-tuplet-span', (getPracticeScrollerStepsPerBeat() * displayStepWidth) + 'px');
+    }
     if (isPracticeTarget) {
         cellEl.classList.add('is-practice-target');
     }

@@ -937,6 +937,107 @@ html {
     color: white;
 }
 
+.tuplet-dialog-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 95;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.18);
+    font-family: var(--ui-font);
+}
+
+.tuplet-dialog-backdrop[hidden] {
+    display: none;
+}
+
+.tuplet-dialog {
+    width: min(460px, calc(100vw - 28px));
+    background: rgba(248, 248, 248, 0.98);
+    border: 1px solid var(--ui-border);
+    border-radius: 12px;
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
+    overflow: hidden;
+}
+
+.tuplet-dialog-header,
+.tuplet-dialog-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 14px;
+    border-bottom: 1px solid #dedede;
+}
+
+.tuplet-dialog-footer {
+    justify-content: flex-end;
+    border-top: 1px solid #dedede;
+    border-bottom: 0;
+}
+
+.tuplet-dialog-header h2 {
+    margin: 0;
+    font-size: 16px;
+    color: var(--ui-text);
+}
+
+.tuplet-dialog button {
+    border: 1px solid var(--ui-border);
+    border-radius: var(--ui-radius-small);
+    background: #fbfbfb;
+    padding: 7px 12px;
+    font-size: 13px;
+    color: var(--ui-text);
+    cursor: pointer;
+}
+
+.tuplet-dialog button.primary {
+    border-color: #007aff;
+    background: #007aff;
+    color: white;
+}
+
+.tuplet-dialog-controls {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+    gap: 10px;
+    padding: 14px;
+}
+
+.tuplet-dialog-controls label {
+    display: grid;
+    gap: 5px;
+    position: relative;
+    font-size: 13px;
+    color: var(--ui-text);
+}
+
+.tuplet-dialog-controls label::after {
+    content: "";
+    position: absolute;
+    right: 10px;
+    bottom: 11px;
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid var(--ui-text);
+    pointer-events: none;
+}
+
+.tuplet-dialog-controls select {
+    appearance: none;
+    -webkit-appearance: none;
+    min-height: 34px;
+    border: 1px solid var(--ui-border);
+    border-radius: var(--ui-radius-small);
+    background-color: white;
+    padding: 5px 32px 5px 7px;
+    font-size: 14px;
+}
+
 .swing-profile-preview {
     padding: 16px 18px 8px;
     min-height: 150px;
@@ -1066,6 +1167,8 @@ html {
 
 .practice-panel-body {
     grid-template-columns: minmax(330px, 0.9fr) minmax(0, 1.1fr);
+    height: auto;
+    min-height: 0;
 }
 
 .practice-panel-body[hidden] {
@@ -1125,6 +1228,9 @@ html {
 .practice-column {
     background: #fbfefc;
     border-color: #b9dbc7;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
 }
 
 .practice-column-heading {
@@ -1692,6 +1798,49 @@ html {
     gap: 1px;
 }
 
+.practice-note-symbol.is-tuplet {
+    position: relative;
+    display: block;
+    width: var(--practice-tuplet-span, 144px);
+    min-width: var(--practice-tuplet-span, 144px);
+    min-height: 24px;
+    transform: none;
+}
+
+.practice-note-symbol.is-tuplet.is-quartuplet {
+    min-width: var(--practice-tuplet-span, 108px);
+}
+
+.practice-tuplet-note {
+    position: absolute;
+    top: 50%;
+    left: calc(var(--practice-tuplet-note-ratio, 0) * 100%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 10px;
+    min-width: 10px;
+    height: 15px;
+    transform: translate(-50%, -50%);
+}
+
+.practice-tuplet-note .practice-note-symbol {
+    transform: scale(1.5);
+    min-width: 10px;
+}
+
+.practice-scroller-cell.has-tuplet {
+    overflow: visible;
+    z-index: 2;
+}
+
+.practice-scroller-cell.has-tuplet > .practice-note-symbol.is-tuplet {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translateY(-50%);
+}
+
 .practice-note-symbol.is-flam {
     position: relative;
     width: 17px;
@@ -1876,6 +2025,10 @@ html {
     filter: drop-shadow(0 0 4px rgba(210, 36, 36, 0.28));
 }
 
+.practice-scroller-cell.is-current .practice-note-symbol.is-tuplet {
+    transform: translateY(-50%);
+}
+
 .practice-scroller-cell.is-current .practice-note-symbol.is-dreierbass-stack,
 .practice-scroller-cell.is-current .practice-note-symbol.is-bass-stack {
     transform: scale(1.5);
@@ -2027,6 +2180,19 @@ html {
     margin: 0 0 10px;
     font-size: 16px;
     color: var(--ui-text);
+}
+
+#practicePatternChooser.practice-panel-body {
+    height: auto;
+    min-height: 0;
+}
+
+#practicePatternChooser > .practice-column,
+#practicePatternChooser > .practice-settings-column {
+    height: auto;
+    min-height: 0;
+    max-height: none;
+    overflow: visible;
 }
 
 .timeline-pattern-list,
@@ -3078,6 +3244,10 @@ body.is-timeline-dragging .timeline-dropzone-inline {
     .practice-scroller-cell.is-current .practice-note-symbol.is-dreierbass-stack,
     .practice-scroller-cell.is-current .practice-note-symbol.is-bass-stack {
         transform: scale(1.5);
+    }
+
+    .practice-scroller-cell.is-current .practice-note-symbol.is-tuplet {
+        transform: translateY(-50%);
     }
 
     .practice-scroller-row {

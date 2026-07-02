@@ -411,6 +411,19 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
         </section>
     </div>
 
+    <div id="tupletDialog" class="tuplet-dialog-backdrop" hidden>
+        <section class="tuplet-dialog" role="dialog" aria-modal="true" aria-labelledby="tupletDialogTitle">
+            <header class="tuplet-dialog-header">
+                <h2 id="tupletDialogTitle">Triole</h2>
+            </header>
+            <div id="tupletDialogControls" class="tuplet-dialog-controls"></div>
+            <footer class="tuplet-dialog-footer">
+                <button type="button" id="tupletDialogCancelButton">Abbrechen</button>
+                <button type="button" id="tupletDialogInsertButton" class="primary">Einfügen</button>
+            </footer>
+        </section>
+    </div>
+
     <script>
 // Bearbeitungsfunktionen
 var edit_title, edit_text;
@@ -1478,6 +1491,85 @@ function bindPaletteInsert(sourceElement, templateElement, elementId, offsetX, o
     return insertElement;
 }
 
+const tupletNoteOptions = [
+    { value: "tone", label: "Tone" },
+    { value: "bass", label: "Bass" },
+    { value: "slap", label: "Slap / Glocke" },
+    { value: "tone_muffled", label: "gedämpfter Tone" },
+    { value: "slap_muffled", label: "gedämpfter Slap / Klick" }
+];
+
+function closeTupletDialog() {
+    const dialogEl = document.querySelector("#tupletDialog");
+    if (dialogEl) {
+        dialogEl.hidden = true;
+    }
+}
+
+function renderTupletDialogControls(display) {
+    const controlsEl = document.querySelector("#tupletDialogControls");
+    if (!controlsEl) {
+        return;
+    }
+    const count = display.type === "quartuplet" ? 4 : 3;
+    const defaultValues = Array.from({ length: count }, function () { return "tone"; });
+    controlsEl.innerHTML = "";
+
+    for (let index = 0; index < count; index += 1) {
+        const labelEl = document.createElement("label");
+        labelEl.textContent = "Ton " + String(index + 1);
+        const selectEl = document.createElement("select");
+        selectEl.className = "tuplet-note-select";
+        selectEl.setAttribute("data-note-index", String(index));
+        tupletNoteOptions.forEach(function (option) {
+            const optionEl = document.createElement("option");
+            optionEl.value = option.value;
+            optionEl.textContent = option.label;
+            if (option.value === defaultValues[index]) {
+                optionEl.selected = true;
+            }
+            selectEl.appendChild(optionEl);
+        });
+        labelEl.appendChild(selectEl);
+        controlsEl.appendChild(labelEl);
+    }
+}
+
+function openTupletDialog(event) {
+    if (event && typeof event.preventDefault === "function") {
+        event.preventDefault();
+    }
+    const display = getCurrentTupletDisplay();
+    const dialogEl = document.querySelector("#tupletDialog");
+    const titleEl = document.querySelector("#tupletDialogTitle");
+    if (!dialogEl) {
+        return;
+    }
+    if (titleEl) {
+        titleEl.textContent = display.label + " einfügen";
+    }
+    dialogEl.setAttribute("data-tuplet-type", display.type);
+    renderTupletDialogControls(display);
+    dialogEl.hidden = false;
+}
+
+function insertTupletFromDialog() {
+    const dialogEl = document.querySelector("#tupletDialog");
+    const type = dialogEl ? (dialogEl.getAttribute("data-tuplet-type") || getCurrentTupletDisplay().type) : getCurrentTupletDisplay().type;
+    const noteTypes = Array.prototype.map.call(
+        document.querySelectorAll("#tupletDialogControls .tuplet-note-select"),
+        function (selectEl) {
+            return selectEl.value || "tone";
+        }
+    );
+    if (!noteTypes.length) {
+        return;
+    }
+    recordHistorySnapshot();
+    insertedElement = createTupletElementFromPalette(noteTypes, type);
+    closeTupletDialog();
+}
+
 function bindEditableTextElement(textElement) {
     textElement.drag(move, sel_start, stop_m);
     textElement.dblclick(edit_text);
@@ -2003,40 +2095,122 @@ function createTripletPaletteSymbol(paper, centerX, centerY) {
     });
 }
 
+function createTupletNoteShape(paper, noteType, centerX, centerY) {
+    const parts = [];
+    const type = noteType || "tone";
+
+    if (type === "bass") {
+        parts.push(paper.rect(centerX - 6, centerY - 6, 12, 12));
+    } else if (type === "slap" || type === "slap_muffled") {
+        parts.push(paper.rect(centerX - 7, centerY - 7, 14, 14).attr({ opacity: 0.001 }));
+        parts.push(paper.line(centerX - 7, centerY + 7, centerX + 7, centerY - 7).attr({ stroke: "black", strokeWidth: 2 }));
+        parts.push(paper.line(centerX - 7, centerY - 7, centerX + 7, centerY + 7).attr({ stroke: "black", strokeWidth: 2 }));
+        if (type === "slap_muffled") {
+            parts.push(paper.line(centerX - 8, centerY + 11, centerX + 8, centerY + 11).attr({ stroke: "black", strokeWidth: 2 }));
+        }
+    } else {
+        parts.push(paper.circle(centerX, centerY, 7));
+        if (type === "tone_muffled") {
+            parts.push(paper.line(centerX - 8, centerY + 11, centerX + 8, centerY + 11).attr({ stroke: "black", strokeWidth: 2 }));
+        }
+    }
+
+    return paper.g.apply(paper, parts);
+}
+
 function createTripletSymbol(paper, centerX, centerY, options) {
     const settings = options || {};
     const spacing = Number(settings.spacing) || 24;
-    const labelText = settings.label === false ? "" : "Triole";
+    const tupletType = settings.type || "triplet";
+    const noteTypes = Array.isArray(settings.notes) && settings.notes.length
+        ? settings.notes
+        : ["tone", "tone", "slap"];
+    const labelText = settings.label === false ? "" : (settings.label || (tupletType === "quartuplet" ? "Quartole" : "Triole"));
     const groupParts = [];
-    const leftX = centerX - spacing;
-    const middleX = centerX;
-    const rightX = centerX + spacing;
     const noteY = centerY;
+    const positionOffsets = Array.isArray(settings.positionOffsets) && settings.positionOffsets.length
+        ? settings.positionOffsets
+        : noteTypes.map(function (_, index) { return spacing * index; });
+    const firstX = settings.anchor === "start"
+        ? centerX
+        : centerX - ((noteTypes.length - 1) * spacing) / 2;
+    const lastOffset = positionOffsets[positionOffsets.length - 1] || 0;
+    const labelX = firstX + lastOffset / 2;
 
-    groupParts.push(paper.circle(leftX, noteY, 7));
-    groupParts.push(paper.circle(middleX, noteY, 7));
-
-    const slapHitbox = paper.rect(rightX - 6, noteY - 6, 12, 12).attr({ opacity: 0.001 });
-    const slapLineA = paper.line(rightX - 6, noteY + 6, rightX + 6, noteY - 6).attr({ stroke: "black", strokeWidth: 2 });
-    const slapLineB = paper.line(rightX - 6, noteY - 6, rightX + 6, noteY + 6).attr({ stroke: "black", strokeWidth: 2 });
-    groupParts.push(slapHitbox, slapLineA, slapLineB);
+    noteTypes.forEach(function (noteType, index) {
+        groupParts.push(createTupletNoteShape(paper, noteType, firstX + (positionOffsets[index] || 0), noteY));
+    });
 
     if (labelText) {
-        groupParts.push(paper.text(centerX, noteY + 24, labelText).attr({
+        groupParts.push(paper.text(labelX, noteY + 24, labelText).attr({
             'font-size': 10,
             'font-family': 'sans-serif',
             'text-anchor': 'middle'
         }));
     }
 
-    const hitbox = paper.rect(leftX - 10, noteY - 13, spacing * 2 + 20, 43).attr({ opacity: 0.001 });
+    const hitbox = paper.rect(firstX - 11, noteY - 14, Math.max(20, lastOffset + 22), 44).attr({ opacity: 0.001 });
     groupParts.push(hitbox);
 
     return paper.g.apply(paper, groupParts).attr({
-        id: "triplet",
-        'data-tuplet': "triplet",
-        'data-notes': "tone,tone,slap"
+        id: tupletType,
+        'data-tuplet': tupletType,
+        'data-notes': noteTypes.join(",")
     });
+}
+
+function getTupletSymbolSpacing(tupletType) {
+    const lineStep = getTupletNotationStepX();
+    const snapStep = Number(gridSizeX) || lineStep || 24;
+    if (tupletType === "quartuplet") {
+        return lineStep * 0.75;
+    }
+    return lineStep * (4 / 3);
+}
+
+function getTupletNotationStepX() {
+    if (rhythm === "binaer") {
+        return 850 / 34;
+    }
+    if (rhythm === "neunaer") {
+        return 850 / 20;
+    }
+    return 850 / 26;
+}
+
+function getTupletPositionOffsets(tupletType, noteCount, spacing) {
+    const count = Math.max(1, Number(noteCount) || 1);
+    if (tupletType === "quartuplet") {
+        const step = getTupletNotationStepX() || spacing || 24;
+        return Array.from({ length: count }, function (_, index) {
+            return (step * 0.75) * index;
+        });
+    }
+    return Array.from({ length: count }, function (_, index) {
+        return spacing * index;
+    });
+}
+
+function createTupletElementFromPalette(noteTypes, tupletType) {
+    const type = tupletType || getCurrentTupletDisplay().type;
+    const display = type === "quartuplet"
+        ? { label: "Quartole", spacing: getTupletSymbolSpacing(type) }
+        : { label: "Triole", spacing: getTupletSymbolSpacing(type) };
+    const insertX = getPaletteInsertReferenceX();
+    const insertY = paletteOriginY + 292 + paletteOffsetY;
+    const element = createTripletSymbol(s, insertX, insertY, {
+        type: type,
+        notes: noteTypes,
+        label: display.label,
+        spacing: display.spacing,
+        positionOffsets: getTupletPositionOffsets(type, noteTypes.length, display.spacing),
+        anchor: "start"
+    }).attr({
+        class: "shp",
+        id: type
+    });
+    element.drag(move, sel_start, stop_m);
+    return element;
 }
 
 // Kartusche
@@ -2398,7 +2572,17 @@ insertShortBarMarker = bindPaletteInsert(ShortBar, function () { return ShortBar
     updateShortBarMarkerVisual(shortBarElement);
     snapElementToVerticalTarget(shortBarElement);
 });
-insertTripletMarker = bindPaletteInsert(Triplet, function () { return Triplet_c; }, function () { return getCurrentTupletDisplay().type; }, function () { return gridSizeX; }, 0);
+insertTripletMarker = openTupletDialog;
+Triplet.click(openTupletDialog);
+Triplet.touchstart(openTupletDialog);
+
+document.querySelector("#tupletDialogCancelButton").addEventListener("click", closeTupletDialog);
+document.querySelector("#tupletDialogInsertButton").addEventListener("click", insertTupletFromDialog);
+document.querySelector("#tupletDialog").addEventListener("click", function (event) {
+    if (event.target && event.target.id === "tupletDialog") {
+        closeTupletDialog();
+    }
+});
 
 captureTextTouchStart = function () {
     textTouchStartX = this.getBBox().x;
@@ -2737,6 +2921,7 @@ async function exportCurrentSheetAsPdf() {
 
 const noteElementIds = ['tone', 'bass', 'slap', 'tone_muffled', 'slap_muffled', 'slap_muffled', 'tone_flam', 'slap_flam', 'bass_slap_flam'];
 const controlElementIds = ['in', 'out', 'shortbar', 'wiederholung'];
+const tupletElementIds = ['triplet', 'quartuplet'];
 
 let notenText = "eee";
 
@@ -2836,6 +3021,13 @@ function getElementReadPosition(element) {
         return {
             x: shortBarBounds.cx,
             y: shortBarBounds.cy
+        };
+    }
+    if (tupletElementIds.includes(element.attr('id'))) {
+        const tupletBounds = element.getBBox();
+        return {
+            x: tupletBounds.x + 11,
+            y: tupletBounds.cy
         };
     }
     return {
@@ -3180,6 +3372,22 @@ function mergePercussionNote(currentSymbol, noteId, instrumentName) {
         return noteId;
     }
     return currentSymbol;
+}
+
+function createTupletNoteValue(elementId, noteIds, instrumentName) {
+    const mappedNotes = (Array.isArray(noteIds) ? noteIds : [])
+        .map(function (noteId) {
+            return mergePercussionNote('f', noteId, instrumentName);
+        })
+        .filter(function (noteValue) {
+            return noteValue && noteValue !== 'f';
+        });
+
+    if (mappedNotes.length === 0) {
+        return 'f';
+    }
+
+    return 'tuplet:' + elementId + ':' + mappedNotes.join('|');
 }
 
 function propagateBarInstruments(rhythmBars) {
@@ -3633,7 +3841,7 @@ function callPHPScript_lesen(anzahl, options) {
     const playableElements = s.selectAll("." + "shp");
     playableElements.forEach(function (el) {
         const elementId = el.attr('id');
-        if (!noteElementIds.includes(elementId) && !controlElementIds.includes(elementId)) {
+        if (!noteElementIds.includes(elementId) && !controlElementIds.includes(elementId) && !tupletElementIds.includes(elementId)) {
             return;
         }
 
@@ -3662,6 +3870,15 @@ function callPHPScript_lesen(anzahl, options) {
         if (noteElementIds.includes(elementId)) {
             const currentSymbol = rhythmBar.notes[stepIndex];
             rhythmBar.notes[stepIndex] = mergePercussionNote(currentSymbol, elementId, rhythmBar.effectiveInstrument);
+            return;
+        }
+
+        if (tupletElementIds.includes(elementId)) {
+            const tupletNotes = String(el.attr('data-notes') || '')
+                .split(',')
+                .map(function (noteId) { return noteId.trim(); })
+                .filter(Boolean);
+            rhythmBar.notes[stepIndex] = createTupletNoteValue(elementId, tupletNotes, rhythmBar.effectiveInstrument);
             return;
         }
 
@@ -4671,13 +4888,30 @@ document.addEventListener('DOMContentLoaded', function () {
         clearPracticeAudioPlayer();
         renderPracticePanel();
     });
-    document.querySelector('#practicePatternChooserToggle').addEventListener('click', function () {
-        practiceState.patternChooserExpanded = !practiceState.patternChooserExpanded;
+    function setPracticePatternColumnsCollapsed(collapsed) {
+        document.querySelectorAll('#practicePatternChooser .practice-column, #practicePatternChooser .practice-settings-column').forEach(function (columnEl) {
+            const toggleEl = columnEl.querySelector('.practice-column-toggle');
+            columnEl.classList.toggle('is-collapsed', collapsed);
+            if (toggleEl) {
+                toggleEl.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+            }
+        });
+    }
+
+    function togglePracticePatternChooser() {
+        const nextExpanded = !practiceState.patternChooserExpanded;
+        practiceState.patternChooserExpanded = nextExpanded;
+        if (nextExpanded) {
+            setPracticePatternColumnsCollapsed(isMobilePracticeViewport());
+        }
         renderPracticePanel();
+    }
+
+    document.querySelector('#practicePatternChooserToggle').addEventListener('click', function () {
+        togglePracticePatternChooser();
     });
     document.querySelector('#mobilePatternChooserButton').addEventListener('click', function () {
-        practiceState.patternChooserExpanded = !practiceState.patternChooserExpanded;
-        renderPracticePanel();
+        togglePracticePatternChooser();
         if (practiceState.patternChooserExpanded && isMobilePracticeViewport()) {
             const panelEl = document.getElementById('practicePanel');
             const chooserEl = document.getElementById('practicePatternChooser');
