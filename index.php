@@ -4174,6 +4174,49 @@ function appendMobileSheetRepeatMarker(svgEl, x, y, repeatText) {
     }
 }
 
+function appendMobileSheetControlMarker(svgEl, control, x, staffTopY, noteY) {
+    const controlType = control && control.type;
+    if (controlType === 'shortbar') {
+        const shortBarTopY = staffTopY - 2;
+        const shortBarBottomY = noteY + 24;
+        svgEl.appendChild(createMobileSheetSvgElement('line', {
+            x1: x,
+            y1: shortBarTopY,
+            x2: x,
+            y2: shortBarBottomY,
+            stroke: '#111',
+            'stroke-width': 2,
+            'stroke-dasharray': '2 3',
+            'stroke-linecap': 'round'
+        }));
+        return;
+    }
+
+    if (controlType !== 'in' && controlType !== 'out') {
+        return;
+    }
+
+    const points = controlType === 'in'
+        ? (x - 6) + ',' + (noteY + 23) + ' ' + (x + 6) + ',' + (noteY + 23) + ' ' + x + ',' + (noteY + 33)
+        : (x - 6) + ',' + (noteY + 29) + ' ' + (x + 6) + ',' + (noteY + 29) + ' ' + x + ',' + (noteY + 19);
+    const stemY1 = controlType === 'in' ? noteY + 12 : noteY + 35;
+    const stemY2 = controlType === 'in' ? noteY + 25 : noteY + 27;
+
+    svgEl.appendChild(createMobileSheetSvgElement('line', {
+        x1: x,
+        y1: stemY1,
+        x2: x,
+        y2: stemY2,
+        stroke: '#111',
+        'stroke-width': 4,
+        'stroke-linecap': 'round'
+    }));
+    svgEl.appendChild(createMobileSheetSvgElement('polygon', {
+        points: points,
+        fill: '#111'
+    }));
+}
+
 function hasMobileSheetBarContent(bar) {
     if (!bar) {
         return false;
@@ -4245,7 +4288,7 @@ function createMobileSheetBarElement(bar, barIndex, previousBar, nextBar) {
     }
 
     const svgEl = createMobileSheetSvgElement('svg', {
-        viewBox: isContinuationBar ? '-20 6 400 88' : '-20 -8 400 108',
+        viewBox: isContinuationBar ? '-20 6 400 112' : '-20 -8 400 120',
         role: 'img',
         'aria-label': titleEl.textContent
     });
@@ -4327,14 +4370,7 @@ function createMobileSheetBarElement(bar, barIndex, previousBar, nextBar) {
             rightX,
             layoutConfig.noteStartRel + (Number(control.stepIndex) || 0) * layoutConfig.noteStepRel
         ) + noteCenterOffsetX;
-        const arrowText = control.type === 'in' ? '↓' : (control.type === 'out' ? '↑' : '⋮');
-        svgEl.appendChild(createMobileSheetSvgElement('text', {
-            x: controlX - 5,
-            y: 88,
-            'font-size': control.type === 'shortbar' ? 18 : 22,
-            'font-weight': 'bold',
-            fill: '#111'
-        })).textContent = arrowText;
+        appendMobileSheetControlMarker(svgEl, control, controlX, topY, noteY);
     });
 
     cardEl.appendChild(svgEl);
