@@ -66,17 +66,24 @@
       const doc = parser.parseFromString(html, "text/html");
       return Array.prototype.slice.call(doc.querySelectorAll("option"))
         .map(function (option) {
-          return option.textContent.trim();
-        })
-        .filter(function (fileName) {
-          return fileName && fileName !== "Datei laden:";
-        })
-        .map(function (fileName) {
+          const fileName = option.textContent.trim();
           return {
             fileName: fileName,
-            title: stripScoreExtension(fileName),
-            serverPath: fileName,
-            format: getScoreFormat(fileName)
+            serverUpdatedAt: option.getAttribute("data-modified") || "",
+            serverModifiedTs: Number(option.getAttribute("data-modified-ts")) || 0
+          };
+        })
+        .filter(function (score) {
+          return score.fileName && score.fileName !== "Datei laden:";
+        })
+        .map(function (score) {
+          return {
+            fileName: score.fileName,
+            title: stripScoreExtension(score.fileName),
+            serverPath: score.fileName,
+            format: getScoreFormat(score.fileName),
+            serverUpdatedAt: score.serverUpdatedAt,
+            serverModifiedTs: score.serverModifiedTs
           };
         });
     });
@@ -140,7 +147,9 @@
         fileName: fileName,
         serverPath: fileName,
         format: getScoreFormat(fileName),
-        content: content
+        content: content,
+        serverUpdatedAt: "",
+        serverModifiedTs: 0
       };
     });
   }

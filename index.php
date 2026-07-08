@@ -119,6 +119,8 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
         <p>Öffne ein Notenblatt und starte den Übungsmodus. Auf Smartphones ist die Ansicht zum Üben und Abspielen vorbereitet.</p>
     </section>
 
+    <section id="mobileSheetView" class="mobile-sheet-view" hidden aria-label="Mobile Notenblattansicht"></section>
+
     <section id="mobileOrientationNotice" class="mobile-orientation-notice" aria-live="polite" aria-hidden="true">
         <div>
             <h1>Bitte hochkant drehen</h1>
@@ -158,6 +160,10 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
                         <button type="button" id="fileDialogRefreshButton" title="Aktualisieren">↻</button>
                         <span id="fileDialogFolderName" class="file-dialog-folder-name">Lokal</span>
                         <input type="search" id="fileDialogSearch" placeholder="Suchen" />
+                    </div>
+                    <div id="fileDialogServerNotice" class="file-dialog-server-notice" hidden>
+                        <span></span>
+                        <button type="button">Serverversion laden</button>
                     </div>
                     <div class="file-dialog-table-wrap">
                         <table class="file-dialog-table">
@@ -534,7 +540,9 @@ const fileDialogState = {
     folderId: localLibrary.rootFolderId,
     folderName: 'Lokal',
     entries: [],
-    selectedId: null
+    selectedId: null,
+    serverNoticeRequest: 0,
+    serverNoticePath: ''
 };
 const bodyElement = document.body;
 bodyElement.addEventListener("keydown", shadow_end);
@@ -773,6 +781,9 @@ function getScoreStatusLabel(score) {
     if (!score) {
         return '';
     }
+    if (score.serverUpdateAvailable) {
+        return 'Server neuer';
+    }
     if (score.syncState === 'modified-local') {
         return 'Geändert';
     }
@@ -780,6 +791,205 @@ function getScoreStatusLabel(score) {
         return 'Veröffentlicht';
     }
     return 'Lokal';
+}
+
+function normalizeScoreContentForCompare(content) {
+    return String(content || '').replace(/\r\n?/g, '\n');
+}
+
+function normalizeServerModifiedTs(value) {
+    const numericValue = Number(value);
+    return Number.isFinite(numericValue) && numericValue > 0 ? numericValue : 0;
+}
+
+function getScoreServerModifiedTs(score) {
+    return normalizeServerModifiedTs(score && (score.serverModifiedTs || score.serverVersionTs));
+}
+
+function getServerInfoModifiedTs(serverInfo) {
+    return normalizeServerModifiedTs(serverInfo && serverInfo.serverModifiedTs);
+}
+
+function isServerInfoNewerThanLocal(serverInfo, localScore) {
+    const serverModifiedTs = getServerInfoModifiedTs(serverInfo);
+    const localServerModifiedTs = getScoreServerModifiedTs(localScore);
+    return serverModifiedTs > 0 && localServerModifiedTs > 0 && serverModifiedTs > localServerModifiedTs;
+}
+
+function formatServerVersionDate(serverInfo) {
+    const rawDate = serverInfo && serverInfo.serverUpdatedAt;
+    if (rawDate) {
+        return formatFileDialogDate(rawDate);
+    }
+    const modifiedTs = getServerInfoModifiedTs(serverInfo);
+    return modifiedTs > 0 ? formatFileDialogDate(new Date(modifiedTs * 1000).toISOString()) : '';
+}
+
+async function findServerScoreInfo(serverPath) {
+    const normalizedServerPath = String(serverPath || '').trim();
+    if (!normalizedServerPath) {
+        return null;
+    }
+    const serverScores = await serverLibrary.listScores();
+    return serverScores.find(function (score) {
+        return score.serverPath === normalizedServerPath || score.fileName === normalizedServerPath;
+    }) || null;
+}
+
+function createServerScoreInfoMap(serverScores) {
+    return (Array.isArray(serverScores) ? serverScores : []).reduce(function (scoreMap, serverScore) {
+        const key = serverScore && (serverScore.serverPath || serverScore.fileName);
+        if (key) {
+            scoreMap[key] = serverScore;
+        }
+        return scoreMap;
+    }, {});
+}
+
+function applyServerUpdateStateToLocalScore(score, serverScoreMap) {
+    if (!score || !score.serverPath || !serverScoreMap) {
+        return score;
+    }
+    const serverInfo = serverScoreMap[score.serverPath];
+    if (!serverInfo) {
+        return Object.assign({}, score, {
+            serverUpdateAvailable: false
+        });
+    }
+    return Object.assign({}, score, {
+        serverUpdateAvailable: isServerInfoNewerThanLocal(serverInfo, score),
+        latestServerUpdatedAt: serverInfo.serverUpdatedAt || '',
+        latestServerModifiedTs: getServerInfoModifiedTs(serverInfo)
+    });
+}
+
+function setFileDialogServerNotice(message, serverPath, actionLabel) {
+    const noticeEl = document.querySelector('#fileDialogServerNotice');
+    if (!noticeEl) {
+        return;
+    }
+    const textEl = noticeEl.querySelector('span');
+    const actionButton = noticeEl.querySelector('button');
+    if (!message) {
+        noticeEl.hidden = true;
+        fileDialogState.serverNoticePath = '';
+        return;
+    }
+    if (textEl) {
+        textEl.textContent = message;
+    }
+    fileDialogState.serverNoticePath = serverPath || '';
+    if (actionButton) {
+        actionButton.textContent = actionLabel || 'Serverversion laden';
+        actionButton.hidden = !serverPath;
+    }
+    noticeEl.hidden = false;
+}
+
+async function updateFileDialogServerNotice() {
+    const requestId = fileDialogState.serverNoticeRequest + 1;
+    fileDialogState.serverNoticeRequest = requestId;
+    setFileDialogServerNotice('', '');
+
+    try {
+        if (fileDialogState.mode !== 'open') {
+            return;
+        }
+
+        const entry = getSelectedFileDialogEntry();
+        if (!entry || entry.entryType !== 'score') {
+            return;
+        }
+
+        const serverPath = entry.serverPath || entry.fileName || '';
+        if (!serverPath) {
+            return;
+        }
+
+        if (fileDialogState.source === 'server') {
+            const localScore = await localLibrary.findScoreByServerPath(serverPath);
+            if (fileDialogState.serverNoticeRequest !== requestId) {
+                return;
+            }
+            if (!localScore) {
+                setFileDialogServerNotice('Diese Serverdatei wird beim Öffnen lokal importiert.', '');
+                return;
+            }
+            const serverDateText = formatServerVersionDate(entry);
+            const hasTimestampComparison = getServerInfoModifiedTs(entry) > 0 && getScoreServerModifiedTs(localScore) > 0;
+            let differs = isServerInfoNewerThanLocal(entry, localScore);
+            if (!hasTimestampComparison) {
+                setFileDialogServerNotice('Prüfe lokale Kopie gegen Serverversion ...', '');
+                const serverScore = await serverLibrary.importScore(serverPath);
+                if (fileDialogState.serverNoticeRequest !== requestId) {
+                    return;
+                }
+                differs = normalizeScoreContentForCompare(localScore.content || localScore.data) !==
+                    normalizeScoreContentForCompare(serverScore.content);
+            }
+            if (differs) {
+                setFileDialogServerNotice(
+                    'Auf dem Server liegt eine neuere Version' +
+                        (serverDateText ? ' vom ' + serverDateText : '') +
+                        '. Beim Öffnen wird die lokale Kopie aktualisiert.',
+                    ''
+                );
+            } else {
+                setFileDialogServerNotice('Die lokale Kopie entspricht der Serverversion.', '');
+            }
+            return;
+        }
+
+        if (!entry.serverPath) {
+            return;
+        }
+
+        setFileDialogServerNotice('Prüfe Serverversion ...', '');
+        const serverInfo = entry.latestServerModifiedTs
+            ? {
+                serverPath: entry.serverPath,
+                serverUpdatedAt: entry.latestServerUpdatedAt,
+                serverModifiedTs: entry.latestServerModifiedTs
+            }
+            : await findServerScoreInfo(entry.serverPath);
+        if (fileDialogState.serverNoticeRequest !== requestId) {
+            return;
+        }
+        const hasTimestampComparison = serverInfo &&
+            getServerInfoModifiedTs(serverInfo) > 0 &&
+            getScoreServerModifiedTs(entry) > 0;
+        let differs = Boolean(serverInfo && isServerInfoNewerThanLocal(serverInfo, entry));
+        if (!hasTimestampComparison) {
+            const serverScore = await serverLibrary.importScore(entry.serverPath);
+            if (fileDialogState.serverNoticeRequest !== requestId) {
+                return;
+            }
+            differs = normalizeScoreContentForCompare(entry.content || entry.data) !==
+                normalizeScoreContentForCompare(serverScore.content);
+        }
+        if (differs) {
+            entry.serverUpdateAvailable = true;
+            const selectedRow = document.querySelector('#fileDialogList tr.is-selected td:nth-child(2)');
+            if (selectedRow) {
+                selectedRow.textContent = getScoreStatusLabel(entry);
+            }
+            const serverDateText = formatServerVersionDate(serverInfo);
+            setFileDialogServerNotice(
+                'Auf dem Server liegt eine neuere Version' +
+                    (serverDateText ? ' vom ' + serverDateText : '') +
+                    ' dieser Datei.',
+                entry.serverPath,
+                'Serverversion laden'
+            );
+        } else {
+            setFileDialogServerNotice('Diese lokale Datei ist auf dem Stand der Serverversion.', '');
+        }
+    } catch (error) {
+        if (fileDialogState.serverNoticeRequest === requestId) {
+            console.warn('Serverversion konnte nicht geprüft werden', error);
+            setFileDialogServerNotice('Serverversion konnte im Moment nicht geprüft werden.', '');
+        }
+    }
 }
 
 function formatFileDialogDate(value) {
@@ -988,7 +1198,11 @@ function renderFileDialogList() {
             statusCell.textContent = fileDialogState.source === 'server' ? 'Server' : getScoreStatusLabel(entry);
         }
         const dateCell = document.createElement('td');
-        dateCell.textContent = formatFileDialogDate(entry.updatedAt || entry.localUpdatedAt || entry.publishedAt);
+        dateCell.textContent = formatFileDialogDate(
+            entry.serverUpdateAvailable && entry.latestServerUpdatedAt
+                ? entry.latestServerUpdatedAt
+                : (entry.updatedAt || entry.localUpdatedAt || entry.publishedAt || entry.serverUpdatedAt)
+        );
 
         rowEl.append(nameCell, statusCell, dateCell);
         rowEl.addEventListener('click', function () {
@@ -998,6 +1212,7 @@ function renderFileDialogList() {
             }
             updateFileDialogRowSelection();
             updateFileDialogControls();
+            updateFileDialogServerNotice();
         });
         rowEl.addEventListener('dblclick', function () {
             if (fileDialogState.source === 'local' && isFileDialogFolderEntry(entry)) {
@@ -1029,6 +1244,14 @@ async function refreshFileDialogEntries() {
                 fileDialogState.folderId = localLibrary.rootFolderId;
             }
             fileDialogState.folderName = currentFolder && currentFolder.name ? currentFolder.name : 'Lokal';
+            let serverScoreMap = {};
+            if (fileDialogState.mode === 'open') {
+                try {
+                    serverScoreMap = createServerScoreInfoMap(await serverLibrary.listScores());
+                } catch (serverError) {
+                    console.warn('Server-Zeitstempel konnten nicht geladen werden', serverError);
+                }
+            }
             const foldersInCurrentFolder = await localLibrary.listFolders(fileDialogState.folderId);
             const folders = await Promise.all(foldersInCurrentFolder.map(async function (folder) {
                 const childFolders = await localLibrary.listFolders(folder.id);
@@ -1040,7 +1263,7 @@ async function refreshFileDialogEntries() {
                 }, folder);
             }));
             const scores = (await localLibrary.listScores(fileDialogState.folderId)).map(function (score) {
-                return Object.assign({ entryType: 'score' }, score);
+                return applyServerUpdateStateToLocalScore(Object.assign({ entryType: 'score' }, score), serverScoreMap);
             });
             fileDialogState.entries = [];
             if (fileDialogState.folderId !== localLibrary.rootFolderId && currentFolder) {
@@ -1088,6 +1311,7 @@ function openFileDialog(mode) {
     document.querySelector('#fileDialogName').value = titel ? (titel.attr('text') || '') : '';
     document.querySelector('#fileDialogTags').value = '';
     document.querySelector('#fileDialogSearch').value = '';
+    setFileDialogServerNotice('', '');
     setSelectedFileSource('local');
     dialogEl.hidden = false;
     updateFileDialogControls();
@@ -3710,6 +3934,446 @@ function updateMobilePracticeModeAvailability() {
         clearTimelineAudioPlayer();
         renderTimelinePanel();
     }
+    renderMobileSheetView();
+}
+
+function getMobileSheetStepsPerBeat() {
+    if (rhythm === 'binaer') {
+        return 4;
+    }
+    return 3;
+}
+
+function getMobileSheetStepsPerBar() {
+    if (rhythm === 'binaer') {
+        return 32;
+    }
+    if (rhythm === 'neunaer') {
+        return 18;
+    }
+    return 24;
+}
+
+function getMobileSheetBeatCount() {
+    const stepsPerBar = getMobileSheetStepsPerBar();
+    const stepsPerBeat = rhythm === 'binaer' ? 8 : 6;
+    return Math.max(1, Math.round(stepsPerBar / stepsPerBeat));
+}
+
+function getMobileSheetLayoutConfig() {
+    if (rhythm === 'binaer') {
+        return {
+            subdivisionCount: 34,
+            centerDividerIndex: 17,
+            beatStartIndices: [1, 5, 9, 13],
+            beatNumberOffset: 4,
+            beatDivisor: 4,
+            beatWrapAt: 4,
+            noteStartRel: 25,
+            noteStepRel: 12.5,
+            syllables: ['Ja', 'Pi', 'Du', 'Pa']
+        };
+    }
+    if (rhythm === 'neunaer') {
+        return {
+            subdivisionCount: 20,
+            centerDividerIndex: 10,
+            beatStartIndices: [1, 4, 7],
+            beatNumberOffset: 3,
+            beatDivisor: 3,
+            beatWrapAt: 3,
+            noteStartRel: 21.25,
+            noteStepRel: 21.25,
+            syllables: ['Ja', 'Pi', 'Du']
+        };
+    }
+    return {
+        subdivisionCount: 26,
+        centerDividerIndex: 13,
+        beatStartIndices: [1, 4, 7, 10],
+        beatNumberOffset: 3,
+        beatDivisor: 3,
+        beatWrapAt: 4,
+        noteStartRel: 33,
+        noteStepRel: 16.5,
+        syllables: ['Ja', 'Pi', 'Du']
+    };
+}
+
+function getMobileSheetScaledX(leftX, rightX, desktopRelativeX) {
+    const desktopBarWidth = 425;
+    return leftX + ((rightX - leftX) * (desktopRelativeX / desktopBarWidth));
+}
+
+function parseMobileSheetTuplet(noteValue) {
+    if (typeof noteValue !== 'string' || noteValue.indexOf('tuplet:') !== 0) {
+        return null;
+    }
+    const parts = noteValue.split(':');
+    const tupletType = parts[1] || 'triplet';
+    const notePart = parts.slice(2).join(':');
+    const notes = notePart.split('|').map(function (note) {
+        return note.trim();
+    }).filter(function (note) {
+        return note && note !== 'f';
+    });
+    return notes.length ? { type: tupletType, notes: notes } : null;
+}
+
+function getMobileSheetNoteParts(noteValue) {
+    const symbolMap = {
+        tone: [{ type: 'circle' }],
+        Open: [{ type: 'circle', lane: 'bottom' }],
+        sangban: [{ type: 'circle', lane: 'middle' }],
+        bass: [{ type: 'square' }],
+        doundoun: [{ type: 'square', lane: 'bottom' }],
+        slap: [{ type: 'cross' }],
+        Bell: [{ type: 'cross', lane: 'top' }],
+        kenkeni: [{ type: 'cross', lane: 'top' }],
+        tone_muffled: [{ type: 'circle', muted: true }],
+        Muffled: [{ type: 'circle', muted: true, lane: 'bottom' }],
+        sangban_muffled: [{ type: 'circle', muted: true, lane: 'middle' }],
+        slap_muffled: [{ type: 'cross', muted: true }],
+        Klick: [{ type: 'cross', muted: true }],
+        kenkeni_muffled: [{ type: 'cross', muted: true, lane: 'top' }],
+        tone_flam: [{ type: 'circle', offset: -3 }, { type: 'circle', ghost: true, offset: 3 }],
+        Flam: [{ type: 'circle', offset: -3 }, { type: 'circle', ghost: true, offset: 3 }],
+        'T-Flam': [{ type: 'circle', offset: -3 }, { type: 'circle', ghost: true, offset: 3 }],
+        slap_flam: [{ type: 'cross' }, { type: 'cross' }],
+        'S-Flam': [{ type: 'cross' }, { type: 'cross' }],
+        bass_slap_flam: [{ type: 'square' }, { type: 'cross' }],
+        Bell_Open: [{ type: 'cross', lane: 'top', offset: 0 }, { type: 'circle', lane: 'bottom', offset: 0 }],
+        Bell_Muffled: [{ type: 'cross', lane: 'top', offset: 0 }, { type: 'circle', muted: true, lane: 'bottom', offset: 0 }],
+        Bell_Klick: [{ type: 'cross', lane: 'top', offset: 0 }, { type: 'cross', muted: true, lane: 'bottom', offset: 0 }],
+        kenkeni_sangban: [{ type: 'cross', lane: 'top', offset: 0 }, { type: 'circle', lane: 'middle', offset: 0 }],
+        kenkeni_doundoun: [{ type: 'cross', lane: 'top', offset: 0 }, { type: 'square', lane: 'bottom', offset: 0 }],
+        sangban_doundoun: [{ type: 'circle', lane: 'middle', offset: 0 }, { type: 'square', lane: 'bottom', offset: 0 }],
+        kenkeni_muffled_sangban: [{ type: 'cross', muted: true, lane: 'top', offset: 0 }, { type: 'circle', lane: 'middle', offset: 0 }],
+        kenkeni_sangban_muffled: [{ type: 'cross', lane: 'top', offset: 0 }, { type: 'circle', muted: true, lane: 'middle', offset: 0 }],
+        sangban_muffled_doundoun: [{ type: 'circle', muted: true, lane: 'middle', offset: 0 }, { type: 'square', lane: 'bottom', offset: 0 }],
+        kenkeni_muffled_doundoun: [{ type: 'cross', muted: true, lane: 'top', offset: 0 }, { type: 'square', lane: 'bottom', offset: 0 }]
+    };
+    return symbolMap[noteValue] || [];
+}
+
+function createMobileSheetSvgElement(name, attributes) {
+    const element = document.createElementNS('http://www.w3.org/2000/svg', name);
+    Object.keys(attributes || {}).forEach(function (attributeName) {
+        element.setAttribute(attributeName, String(attributes[attributeName]));
+    });
+    return element;
+}
+
+function appendMobileSheetNotePart(svgEl, part, x, y, index, count) {
+    const offset = Number.isFinite(Number(part.offset))
+        ? Number(part.offset)
+        : (count > 1 ? (index - (count - 1) / 2) * 5 : 0);
+    const noteX = x + offset;
+    const laneOffsetY = part.lane === 'top'
+        ? -28
+        : (part.lane === 'middle' ? -12 : 4);
+    const noteY = y + laneOffsetY;
+    if (part.type === 'square') {
+        svgEl.appendChild(createMobileSheetSvgElement('rect', {
+            x: noteX - 5,
+            y: noteY - 5,
+            width: 10,
+            height: 10,
+            fill: '#111'
+        }));
+    } else if (part.type === 'cross') {
+        svgEl.appendChild(createMobileSheetSvgElement('line', {
+            x1: noteX - 6,
+            y1: noteY + 6,
+            x2: noteX + 6,
+            y2: noteY - 6,
+            stroke: '#111',
+            'stroke-width': 2
+        }));
+        svgEl.appendChild(createMobileSheetSvgElement('line', {
+            x1: noteX - 6,
+            y1: noteY - 6,
+            x2: noteX + 6,
+            y2: noteY + 6,
+            stroke: '#111',
+            'stroke-width': 2
+        }));
+    } else {
+        svgEl.appendChild(createMobileSheetSvgElement('circle', {
+            cx: noteX,
+            cy: noteY,
+            r: 6,
+            fill: part.ghost ? '#fff' : '#111',
+            stroke: '#111',
+            'stroke-width': part.ghost ? 2 : 0
+        }));
+    }
+    if (part.muted) {
+        svgEl.appendChild(createMobileSheetSvgElement('line', {
+            x1: noteX - 7,
+            y1: noteY + 11,
+            x2: noteX + 7,
+            y2: noteY + 11,
+            stroke: '#111',
+            'stroke-width': 2
+        }));
+    }
+}
+
+function appendMobileSheetNote(svgEl, noteValue, x, y, beatWidth) {
+    const tuplet = parseMobileSheetTuplet(noteValue);
+    if (tuplet) {
+        const subdivisionCount = tuplet.type === 'quartuplet' ? 4 : 3;
+        tuplet.notes.forEach(function (subNoteValue, noteIndex) {
+            appendMobileSheetNote(svgEl, subNoteValue, x + beatWidth * (noteIndex / subdivisionCount), y, beatWidth);
+        });
+        return;
+    }
+
+    const parts = getMobileSheetNoteParts(noteValue);
+    parts.forEach(function (part, partIndex) {
+        appendMobileSheetNotePart(svgEl, part, x, y, partIndex, parts.length);
+    });
+}
+
+function getMobileSheetRepeatText(repeatValues) {
+    const values = Array.isArray(repeatValues) ? repeatValues : [repeatValues];
+    for (let valueIndex = 0; valueIndex < values.length; valueIndex += 1) {
+        const value = values[valueIndex];
+        if (value === true || value === 'continue' || value === '' || value == null) {
+            continue;
+        }
+        return String(value);
+    }
+    return '';
+}
+
+function appendMobileSheetRepeatMarker(svgEl, x, y, repeatText) {
+    svgEl.appendChild(createMobileSheetSvgElement('circle', {
+        cx: x,
+        cy: y - 6,
+        r: 2.2,
+        fill: '#111'
+    }));
+    svgEl.appendChild(createMobileSheetSvgElement('circle', {
+        cx: x,
+        cy: y + 6,
+        r: 2.2,
+        fill: '#111'
+    }));
+
+    if (repeatText !== '') {
+        svgEl.appendChild(createMobileSheetSvgElement('text', {
+            x: x,
+            y: y + 20,
+            'font-size': 12,
+            'font-weight': 'bold',
+            fill: '#111',
+            'text-anchor': 'middle'
+        })).textContent = String(repeatText);
+    }
+}
+
+function hasMobileSheetBarContent(bar) {
+    if (!bar) {
+        return false;
+    }
+    const instrumentText = bar.instrument || bar.effectiveInstrument || '';
+    const labelText = bar.label || bar.effectiveLabel || '';
+    const hasNamedBar = Boolean(
+        instrumentText &&
+        instrumentText !== 'Leer' &&
+        labelText &&
+        labelText !== 'Leer'
+    );
+    const hasNotes = Array.isArray(bar.notes) && bar.notes.some(function (noteValue) {
+        return noteValue && noteValue !== 'f';
+    });
+    const hasControls = Array.isArray(bar.controls) && bar.controls.length > 0;
+    const hasRepeat = Boolean(bar.repeat) && (
+        (Array.isArray(bar.repeat.start) && bar.repeat.start.length > 0) ||
+        (Array.isArray(bar.repeat.end) && bar.repeat.end.length > 0)
+    );
+    return hasNamedBar || hasNotes || hasControls || hasRepeat;
+}
+
+function trimMobileSheetBars(rhythmBars) {
+    const bars = Array.isArray(rhythmBars) ? rhythmBars : [];
+    let lastContentIndex = -1;
+    bars.forEach(function (bar, barIndex) {
+        if (hasMobileSheetBarContent(bar)) {
+            lastContentIndex = barIndex;
+        }
+    });
+    return lastContentIndex >= 0 ? bars.slice(0, lastContentIndex + 1) : [];
+}
+
+function createMobileSheetBarElement(bar, barIndex, previousBar, nextBar) {
+    const cardEl = document.createElement('article');
+    cardEl.className = 'mobile-sheet-bar';
+
+    const titleEl = document.createElement('div');
+    titleEl.className = 'mobile-sheet-bar-title';
+    const instrumentText = bar.effectiveInstrument || bar.instrument || 'Leer';
+    const labelText = bar.effectiveLabel || bar.label || '';
+    const isContinuationBar = previousBar &&
+        !bar.instrument &&
+        !bar.label &&
+        (bar.effectiveInstrument || '') === (previousBar.effectiveInstrument || '') &&
+        (bar.effectiveLabel || '') === (previousBar.effectiveLabel || '');
+    if (isContinuationBar) {
+        cardEl.classList.add('is-continuation-bar');
+        const isFirstContinuationBar = previousBar &&
+            (previousBar.instrument || previousBar.label);
+        if (isFirstContinuationBar) {
+            cardEl.classList.add('is-first-continuation-bar');
+        }
+        const isFollowedBySamePattern = nextBar &&
+            !nextBar.instrument &&
+            !nextBar.label &&
+            (nextBar.effectiveInstrument || '') === (bar.effectiveInstrument || '') &&
+            (nextBar.effectiveLabel || '') === (bar.effectiveLabel || '');
+        if (!isFollowedBySamePattern) {
+            cardEl.classList.add('is-last-continuation-bar');
+        }
+    }
+    titleEl.textContent = isContinuationBar
+        ? ''
+        : (instrumentText + (labelText ? ' / ' + labelText : ''));
+    if (titleEl.textContent) {
+        cardEl.appendChild(titleEl);
+    }
+
+    const svgEl = createMobileSheetSvgElement('svg', {
+        viewBox: isContinuationBar ? '-20 6 400 88' : '-20 -8 400 108',
+        role: 'img',
+        'aria-label': titleEl.textContent
+    });
+    const visualStaffStartX = 28;
+    const visualStaffEndX = 356;
+    const topY = 34;
+    const noteY = 75;
+    const layoutConfig = getMobileSheetLayoutConfig();
+    const gridLineStepRel = 850 / layoutConfig.subdivisionCount;
+    const firstStaffLineRel = gridLineStepRel;
+    const lastStaffLineRel = (layoutConfig.centerDividerIndex - 1) * gridLineStepRel;
+    const mobileStaffScale = (visualStaffEndX - visualStaffStartX) / (lastStaffLineRel - firstStaffLineRel);
+    const leftX = visualStaffStartX - mobileStaffScale * firstStaffLineRel;
+    const rightX = leftX + mobileStaffScale * 425;
+    const beatWidth = getMobileSheetScaledX(leftX, rightX, layoutConfig.noteStepRel * (rhythm === 'binaer' ? 8 : 6)) - leftX;
+    const noteCenterOffsetX = 0;
+    const syllables = layoutConfig.syllables;
+    const staffStartX = getMobileSheetScaledX(leftX, rightX, gridLineStepRel);
+    const staffEndX = getMobileSheetScaledX(leftX, rightX, (layoutConfig.centerDividerIndex - 1) * gridLineStepRel);
+    const lineColor = '#111';
+
+    svgEl.appendChild(createMobileSheetSvgElement('text', {
+        x: staffStartX - 22,
+        y: noteY - 4,
+        'font-size': 20,
+        'font-weight': 'bold',
+        fill: '#8b948d',
+        'text-anchor': 'end'
+    })).textContent = String(barIndex + 1);
+
+    svgEl.appendChild(createMobileSheetSvgElement('line', { x1: staffStartX, y1: topY, x2: staffEndX, y2: topY, stroke: lineColor, 'stroke-width': 2 }));
+    svgEl.appendChild(createMobileSheetSvgElement('line', { x1: staffStartX, y1: topY + 5, x2: staffEndX, y2: topY + 5, stroke: lineColor, 'stroke-width': 2 }));
+
+    for (let lineIndex = 1; lineIndex < layoutConfig.centerDividerIndex; lineIndex += 1) {
+        const syllableX = getMobileSheetScaledX(leftX, rightX, lineIndex * gridLineStepRel);
+        const syllable = syllables[(lineIndex - 1) % syllables.length];
+        svgEl.appendChild(createMobileSheetSvgElement('line', {
+            x1: syllableX,
+            y1: topY,
+            x2: syllableX,
+            y2: noteY + 12,
+            stroke: lineColor,
+            'stroke-width': layoutConfig.beatStartIndices.indexOf(lineIndex) !== -1 ? 2.2 : 1
+        }));
+        svgEl.appendChild(createMobileSheetSvgElement('text', { x: syllableX - 3, y: 28, 'font-size': 10, fill: lineColor })).textContent = syllable;
+    }
+    layoutConfig.beatStartIndices.forEach(function (beatStartIndex) {
+        const beatX = getMobileSheetScaledX(leftX, rightX, beatStartIndex * gridLineStepRel);
+        let beatNumber = Math.trunc((beatStartIndex + layoutConfig.beatNumberOffset) / layoutConfig.beatDivisor);
+        if (beatNumber > layoutConfig.beatWrapAt) {
+            beatNumber -= layoutConfig.beatWrapAt;
+        }
+        svgEl.appendChild(createMobileSheetSvgElement('text', { x: beatX - 3, y: 14, 'font-size': 10, fill: lineColor })).textContent = String(beatNumber);
+    });
+
+    if (bar.repeat && Array.isArray(bar.repeat.start) && bar.repeat.start.length > 0) {
+        appendMobileSheetRepeatMarker(svgEl, staffStartX - 11, noteY - 8, getMobileSheetRepeatText(bar.repeat.start));
+    }
+    if (bar.repeat && Array.isArray(bar.repeat.end) && bar.repeat.end.length > 0) {
+        appendMobileSheetRepeatMarker(svgEl, staffEndX + 11, noteY - 8, getMobileSheetRepeatText(bar.repeat.end));
+    }
+
+    const notes = Array.isArray(bar.notes) ? bar.notes : [];
+    notes.forEach(function (noteValue, stepIndex) {
+        if (!noteValue || noteValue === 'f') {
+            return;
+        }
+        const noteX = getMobileSheetScaledX(
+            leftX,
+            rightX,
+            layoutConfig.noteStartRel + stepIndex * layoutConfig.noteStepRel
+        );
+        appendMobileSheetNote(svgEl, noteValue, noteX + noteCenterOffsetX, noteY, beatWidth);
+    });
+
+    (Array.isArray(bar.controls) ? bar.controls : []).forEach(function (control) {
+        const controlX = getMobileSheetScaledX(
+            leftX,
+            rightX,
+            layoutConfig.noteStartRel + (Number(control.stepIndex) || 0) * layoutConfig.noteStepRel
+        ) + noteCenterOffsetX;
+        const arrowText = control.type === 'in' ? '↓' : (control.type === 'out' ? '↑' : '⋮');
+        svgEl.appendChild(createMobileSheetSvgElement('text', {
+            x: controlX - 5,
+            y: 88,
+            'font-size': control.type === 'shortbar' ? 18 : 22,
+            'font-weight': 'bold',
+            fill: '#111'
+        })).textContent = arrowText;
+    });
+
+    cardEl.appendChild(svgEl);
+    return cardEl;
+}
+
+function renderMobileSheetView(readResult) {
+    const viewEl = document.getElementById('mobileSheetView');
+    if (!viewEl) {
+        return;
+    }
+    if (!isMobilePracticeViewport() || !document.body.classList.contains('has-loaded-score')) {
+        document.body.classList.remove('has-mobile-sheet-view');
+        viewEl.hidden = true;
+        viewEl.innerHTML = '';
+        return;
+    }
+
+    const sourceReadResult = readResult || (window.lastReadRhythmBars ? { rhythmBars: window.lastReadRhythmBars } : null);
+    const rhythmBars = sourceReadResult && Array.isArray(sourceReadResult.rhythmBars)
+        ? trimMobileSheetBars(sourceReadResult.rhythmBars)
+        : [];
+    viewEl.innerHTML = '';
+    viewEl.hidden = rhythmBars.length === 0;
+    if (rhythmBars.length === 0) {
+        document.body.classList.remove('has-mobile-sheet-view');
+        return;
+    }
+    document.body.classList.add('has-mobile-sheet-view');
+
+    const headingEl = document.createElement('h2');
+    headingEl.textContent = titel && typeof titel.attr === 'function' ? titel.attr('text') : 'Notenblatt';
+    viewEl.appendChild(headingEl);
+    rhythmBars.forEach(function (bar, barIndex) {
+        if (!bar) {
+            return;
+        }
+        viewEl.appendChild(createMobileSheetBarElement(bar, barIndex, rhythmBars[barIndex - 1], rhythmBars[barIndex + 1]));
+    });
 }
 
 function isPracticeAudioModeActive() {
@@ -4371,11 +5035,54 @@ async function openLocalScore(scoreId) {
     return score;
 }
 
-async function importServerScore(serverPath) {
+async function importServerScore(serverPath, serverInfo) {
+    const resolvedServerInfo = serverInfo || await findServerScoreInfo(serverPath);
     const serverScore = await serverLibrary.importScore(serverPath);
+    const serverUpdatedAt = resolvedServerInfo && resolvedServerInfo.serverUpdatedAt
+        ? resolvedServerInfo.serverUpdatedAt
+        : serverScore.serverUpdatedAt;
+    const serverModifiedTs = getServerInfoModifiedTs(resolvedServerInfo || serverScore);
     const savedScore = await localLibrary.findScoreByServerPath(serverScore.serverPath).then(function (existingScore) {
         if (existingScore) {
-            return existingScore;
+            const contentDiffers = normalizeScoreContentForCompare(existingScore.content || existingScore.data) !==
+                normalizeScoreContentForCompare(serverScore.content);
+            const timestampIsNewer = serverModifiedTs > 0 &&
+                getScoreServerModifiedTs(existingScore) > 0 &&
+                serverModifiedTs > getScoreServerModifiedTs(existingScore);
+            if (!contentDiffers && !timestampIsNewer) {
+                if (serverModifiedTs > 0 && getScoreServerModifiedTs(existingScore) === 0) {
+                    return localLibrary.saveScore(Object.assign({}, existingScore, {
+                        serverUpdatedAt: serverUpdatedAt || existingScore.serverUpdatedAt || '',
+                        serverModifiedTs: serverModifiedTs,
+                        serverVersion: serverUpdatedAt || existingScore.serverVersion || ''
+                    }));
+                }
+                return existingScore;
+            }
+            if (existingScore.syncState === 'modified-local') {
+                const shouldReplace = confirm(
+                    '"' + existingScore.title + '" wurde lokal geändert.\n' +
+                    'Trotzdem die Serverversion laden und die lokale Kopie ersetzen?'
+                );
+                if (!shouldReplace) {
+                    const cancelError = new Error('Serverversion wurde nicht geladen.');
+                    cancelError.isUserCancel = true;
+                    throw cancelError;
+                }
+            }
+            return localLibrary.saveScore(Object.assign({}, existingScore, {
+                title: serverScore.title,
+                format: serverScore.format,
+                content: serverScore.content,
+                data: serverScore.content,
+                isPublished: true,
+                serverPath: serverScore.serverPath,
+                syncState: 'published',
+                serverUpdatedAt: serverUpdatedAt || '',
+                serverModifiedTs: serverModifiedTs,
+                serverVersion: serverUpdatedAt || '',
+                serverUpdateAvailable: false
+            }));
         }
 
         return localLibrary.saveScore({
@@ -4383,9 +5090,13 @@ async function importServerScore(serverPath) {
             folderId: localLibrary.rootFolderId,
             format: serverScore.format,
             content: serverScore.content,
+            data: serverScore.content,
             isPublished: true,
             serverPath: serverScore.serverPath,
-            syncState: 'published'
+            syncState: 'published',
+            serverUpdatedAt: serverUpdatedAt || '',
+            serverModifiedTs: serverModifiedTs,
+            serverVersion: serverUpdatedAt || ''
         });
     });
 
@@ -4393,6 +5104,25 @@ async function importServerScore(serverPath) {
     setSelectedFileSource('local');
     await refreshFileList();
     return savedScore;
+}
+
+async function loadFileDialogServerNoticeVersion() {
+    const serverPath = fileDialogState.serverNoticePath;
+    if (!serverPath) {
+        return;
+    }
+    try {
+        const serverInfo = await findServerScoreInfo(serverPath);
+        const savedScore = await importServerScore(serverPath, serverInfo);
+        closeFileDialog();
+        showAutoDismissMessage('"' + savedScore.title + '" wurde vom Server geladen.');
+    } catch (error) {
+        if (error && error.isUserCancel) {
+            return;
+        }
+        console.error('Serverversion konnte nicht geladen werden', error);
+        alert('Fehler beim Laden der Serverversion: ' + error.message);
+    }
 }
 
 async function confirmFileDialog() {
@@ -4407,7 +5137,7 @@ async function confirmFileDialog() {
                 return;
             }
             if (fileDialogState.source === 'server') {
-                await importServerScore(entry.serverPath || entry.fileName);
+                await importServerScore(entry.serverPath || entry.fileName, entry);
             } else {
                 await openLocalScore(entry.id);
             }
@@ -4448,6 +5178,9 @@ async function confirmFileDialog() {
         closeFileDialog();
         showAutoDismissMessage('"' + savedScore.title + '" wurde lokal gespeichert.');
     } catch (error) {
+        if (error && error.isUserCancel) {
+            return;
+        }
         console.error('Dateidialog-Aktion fehlgeschlagen', error);
         alert('Fehler: ' + error.message);
     }
@@ -4756,6 +5489,7 @@ document.addEventListener('DOMContentLoaded', function () {
     document.querySelector('#fileDialogCancelButton').addEventListener('click', closeFileDialog);
     document.querySelector('#fileDialogConfirmButton').addEventListener('click', confirmFileDialog);
     document.querySelector('#fileDialogRefreshButton').addEventListener('click', refreshFileDialogEntries);
+    document.querySelector('#fileDialogServerNotice button').addEventListener('click', loadFileDialogServerNoticeVersion);
     document.querySelector('#fileDialogNewFolderButton').addEventListener('click', createFileDialogFolder);
     document.querySelector('#fileDialogRenameButton').addEventListener('click', renameSelectedFileDialogScore);
     document.querySelector('#fileDialogDeleteButton').addEventListener('click', deleteSelectedFileDialogScore);
@@ -4775,6 +5509,7 @@ document.addEventListener('DOMContentLoaded', function () {
         sourceButton.addEventListener('click', function () {
             setSelectedFileSource(sourceButton.dataset.source);
             fileDialogState.selectedId = null;
+            setFileDialogServerNotice('', '');
             refreshFileDialogEntries();
         });
     });
@@ -5547,6 +6282,7 @@ function onSVGLoaded(data) {
             persistedVersion: persistedTimelineMetadata ? persistedTimelineMetadata.version : null,
             persistedSourceHash: persistedTimelineMetadata ? persistedTimelineMetadata.sourceHash : ''
         });
+        renderMobileSheetView(readResult);
         renderPracticePanel();
         if (practiceState.visible) {
             schedulePracticeAudioRefresh(0);

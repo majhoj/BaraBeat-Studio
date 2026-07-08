@@ -35,7 +35,14 @@ foreach($dat_array as $file) {
      // Link erstellen
      //echo "<a href=\"Noten/$file\">$file</a><br>\n";
 
-  echo  '<option value="p'.$i.'">' . htmlspecialchars($file, ENT_QUOTES, 'UTF-8') . '</option>';
+  $pfad = __DIR__ . "/../Noten/" . $file;
+  $geaendert = is_file($pfad) ? filemtime($pfad) : 0;
+  $geaendertIso = $geaendert > 0 ? date(DATE_ATOM, $geaendert) : "";
+
+  echo  '<option value="' . htmlspecialchars($file, ENT_QUOTES, 'UTF-8') . '"' .
+        ' data-modified="' . htmlspecialchars($geaendertIso, ENT_QUOTES, 'UTF-8') . '"' .
+        ' data-modified-ts="' . htmlspecialchars((string)$geaendert, ENT_QUOTES, 'UTF-8') . '">' .
+        htmlspecialchars($file, ENT_QUOTES, 'UTF-8') . '</option>';
 
  }
 }

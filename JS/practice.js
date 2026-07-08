@@ -1302,12 +1302,15 @@ function buildPracticeEntries(options) {
     const accompanimentPatterns = getPracticePatternsByIds(practiceState.accompanimentPatternIds);
     const soloPatterns = getPracticePatternsByIds(practiceState.soloPatternIds);
     const cycleSoloPatterns = getPracticeCyclePatterns(soloPatterns);
+    const accompanimentOnlyLoops = cycleSoloPatterns.length === 0 && accompanimentPatterns.length > 0
+        ? Math.max(1, practiceState.loopsWithoutSolo)
+        : practiceState.loopsWithoutSolo;
     const entries = [];
     let blockIndex = 1;
 
     for (let cycleIndex = 0; cycleIndex < repeatCycles; cycleIndex += 1) {
-        if (practiceState.loopsWithoutSolo > 0) {
-            addPracticeParallelGroup(entries, accompanimentPatterns, blockIndex, practiceState.loopsWithoutSolo);
+        if (accompanimentOnlyLoops > 0) {
+            addPracticeParallelGroup(entries, accompanimentPatterns, blockIndex, accompanimentOnlyLoops);
             blockIndex += 1;
         }
 
@@ -1412,6 +1415,23 @@ function createEmptyPracticeTrackStepMap() {
         trackMap[instrumentName] = null;
         return trackMap;
     }, {});
+}
+
+function createEmptyPracticeTrackLabelMap() {
+    return practiceTrackInstrumentNames.reduce(function (trackMap, instrumentName) {
+        trackMap[instrumentName] = [];
+        return trackMap;
+    }, {});
+}
+
+function addPracticeTrackPatternLabel(labelMap, instrumentName, labelName) {
+    const safeLabel = String(labelName || '').trim();
+    if (!labelMap || !Array.isArray(labelMap[instrumentName]) || !safeLabel) {
+        return;
+    }
+    if (labelMap[instrumentName].indexOf(safeLabel) === -1) {
+        labelMap[instrumentName].push(safeLabel);
+    }
 }
 
 function createEmptyPracticeTrackFlags() {
@@ -1828,6 +1848,7 @@ function createPracticeSection(block, blockIndex, sectionSuffix) {
             trackNotes: createEmptyPracticeTrackNotes(),
             trackHandModes: createEmptyPracticeTrackHandModes(),
             trackTargetFlags: createEmptyPracticeTrackFlags(),
+            trackPatternLabels: createEmptyPracticeTrackLabelMap(),
             finalRepeatOutSteps: createEmptyPracticeTrackStepMap(),
             forceFinalOutAtSectionEnd: false,
             barStartSteps: [],
@@ -1846,6 +1867,7 @@ function clonePracticeSection(section, sectionSuffix) {
         trackNotes: createEmptyPracticeTrackNotes(),
         trackHandModes: createEmptyPracticeTrackHandModes(),
         trackTargetFlags: createEmptyPracticeTrackFlags(),
+        trackPatternLabels: createEmptyPracticeTrackLabelMap(),
         finalRepeatOutSteps: createEmptyPracticeTrackStepMap(),
         forceFinalOutAtSectionEnd: Boolean(section.forceFinalOutAtSectionEnd),
         barStartSteps: Array.isArray(section.barStartSteps) ? section.barStartSteps.slice() : [],
@@ -1863,6 +1885,10 @@ function clonePracticeSection(section, sectionSuffix) {
         clonedSection.trackTargetFlags[instrumentName] = section.trackTargetFlags &&
             Array.isArray(section.trackTargetFlags[instrumentName])
             ? section.trackTargetFlags[instrumentName].slice()
+            : [];
+        clonedSection.trackPatternLabels[instrumentName] = section.trackPatternLabels &&
+            Array.isArray(section.trackPatternLabels[instrumentName])
+            ? section.trackPatternLabels[instrumentName].slice()
             : [];
         clonedSection.finalRepeatOutSteps[instrumentName] = section.finalRepeatOutSteps[instrumentName];
     });
@@ -2339,6 +2365,7 @@ function buildPracticeSectionsFromEntries(entries) {
                     if (instrumentName.indexOf('Djembe_') === 0) {
                         pickupSection.trackHandModes[instrumentName] = entry.handMode || '';
                     }
+                    addPracticeTrackPatternLabel(pickupSection.trackPatternLabels, instrumentName, labelName);
                 });
                 if (pickupSection.swingFactor === null && entry.swingFactor !== null && entry.swingFactor !== undefined) {
                     pickupSection.swingFactor = entry.swingFactor;
@@ -2357,6 +2384,7 @@ function buildPracticeSectionsFromEntries(entries) {
                 if (instrumentName.indexOf('Djembe_') === 0) {
                     section.trackHandModes[instrumentName] = entry.handMode || '';
                 }
+                addPracticeTrackPatternLabel(section.trackPatternLabels, instrumentName, labelName);
                 if (patternOutStep !== null && patternOutStep !== undefined) {
                     section.finalRepeatOutSteps[instrumentName] = patternOutStep;
                 }
@@ -2719,6 +2747,7 @@ function flattenPracticeScrollerSections(sections) {
     const extraVisualLoopCopies = Math.min(visualLoopCopies, actualOuterLoopCopies);
     const trackNotes = createEmptyPracticeTrackNotes();
     const targetSteps = createEmptyPracticeTrackFlags();
+    const trackPatternNames = createEmptyPracticeTrackLabelMap();
     const sectionBoundaries = [];
     const barStartSteps = [];
     const finalOuterMuteRanges = [];
@@ -2784,6 +2813,13 @@ function flattenPracticeScrollerSections(sections) {
             const rawNotes = section && section.trackNotes && Array.isArray(section.trackNotes[instrumentName])
                 ? section.trackNotes[instrumentName]
                 : [];
+            if (rawNotes.some(function (noteValue) {
+                return isPlayablePracticeNote(noteValue);
+            }) && section.trackPatternLabels && Array.isArray(section.trackPatternLabels[instrumentName])) {
+                section.trackPatternLabels[instrumentName].forEach(function (labelName) {
+                    addPracticeTrackPatternLabel(trackPatternNames, instrumentName, labelName);
+                });
+            }
             const notes = loopPracticeArrayToLength(rawNotes, sectionLength, 'f');
             const isPracticeTarget = section &&
                 Array.isArray(section.practiceTargetInstruments) &&
@@ -2895,6 +2931,7 @@ function flattenPracticeScrollerSections(sections) {
     return {
         trackNotes: trackNotes,
         targetSteps: targetSteps,
+        trackPatternNames: trackPatternNames,
         sectionBoundaries: sectionBoundaries,
         barStartSteps: barStartSteps,
         loopSegments: loopSegments,
@@ -3481,7 +3518,31 @@ function renderPracticeScrollerFromPayload(playerPayload) {
         const volumeInstruments = collapsedDjembeRows.labels[instrumentName] === 'Djembe'
             ? ['Djembe_1', 'Djembe_2', 'Djembe_3']
             : [instrumentName];
-        labelEl.textContent = displayLabel;
+        const patternLabels = volumeInstruments.reduce(function (labels, volumeInstrumentName) {
+            const sourceLabels = flattened.trackPatternNames &&
+                Array.isArray(flattened.trackPatternNames[volumeInstrumentName])
+                ? flattened.trackPatternNames[volumeInstrumentName]
+                : [];
+            sourceLabels.forEach(function (labelName) {
+                if (labels.indexOf(labelName) === -1) {
+                    labels.push(labelName);
+                }
+            });
+            return labels;
+        }, []);
+        const labelNameEl = document.createElement('span');
+        labelNameEl.className = 'practice-scroller-label-name';
+        labelNameEl.textContent = displayLabel;
+        labelEl.appendChild(labelNameEl);
+        if (patternLabels.length > 0) {
+            const labelMetaEl = document.createElement('span');
+            labelMetaEl.className = 'practice-scroller-label-pattern';
+            labelMetaEl.textContent = patternLabels.join(' + ');
+            labelEl.appendChild(labelMetaEl);
+            labelEl.title = displayLabel + ' - ' + labelMetaEl.textContent;
+        } else {
+            labelEl.title = displayLabel;
+        }
         labelEl.addEventListener('click', function (event) {
             event.stopPropagation();
             openPracticeInstrumentVolumePopover(volumeInstruments, labelEl, displayLabel);
