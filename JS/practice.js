@@ -26,7 +26,7 @@ const practiceState = {
 const practiceRepeatCountMax = 999;
 const practiceTimerMinutesMax = 240;
 
-const practiceTrackInstrumentNames = ['Kenkeni', 'Sangban', 'Doundoun', 'Dreierbass', 'Djembe_1', 'Djembe_2', 'Djembe_3'];
+const practiceTrackInstrumentNames = ['Kenkeni', 'Sangban', 'Doundoun', 'Dreierbass', 'Djembe_1', 'Djembe_2', 'Djembe_3', 'Shekere'];
 const practiceScrollerInstrumentLabels = {
     Kenkeni: 'Kenkeni',
     Sangban: 'Sangban',
@@ -34,7 +34,8 @@ const practiceScrollerInstrumentLabels = {
     Dreierbass: 'Dreierbass',
     Djembe_1: 'Djembe 1',
     Djembe_2: 'Djembe 2',
-    Djembe_3: 'Djembe 3'
+    Djembe_3: 'Djembe 3',
+    Shekere: 'Shekere'
 };
 const practiceScrollerNoteLabels = {
     tone: 'To',
@@ -3374,30 +3375,33 @@ function openTimelineInstrumentVolumesPopover(anchorEl) {
 
     practiceTrackInstrumentNames.forEach(function (instrumentName) {
         const labelText = practiceScrollerInstrumentLabels[instrumentName] || instrumentName.replace('_', ' ');
+        const toneDefinitions = practiceInstrumentToneVolumeLabels[instrumentName] || [];
         const rowEl = document.createElement('div');
         rowEl.className = 'practice-volume-row';
 
         const nameEl = document.createElement('span');
         nameEl.className = 'practice-volume-row-name';
         nameEl.textContent = labelText;
-        nameEl.setAttribute('role', 'button');
-        nameEl.setAttribute('tabindex', '0');
-        nameEl.title = 'Tonlautstärken öffnen';
-        function openToneVolumes(event) {
-            if (event && typeof event.stopPropagation === 'function') {
-                event.stopPropagation();
+        if (toneDefinitions.length > 0) {
+            nameEl.setAttribute('role', 'button');
+            nameEl.setAttribute('tabindex', '0');
+            nameEl.title = 'Tonlautstärken öffnen';
+            function openToneVolumes(event) {
+                if (event && typeof event.stopPropagation === 'function') {
+                    event.stopPropagation();
+                }
+                openPracticeInstrumentToneVolumePopover(instrumentName, nameEl, function () {
+                    openTimelineInstrumentVolumesPopover(anchorEl);
+                });
             }
-            openPracticeInstrumentToneVolumePopover(instrumentName, nameEl, function () {
-                openTimelineInstrumentVolumesPopover(anchorEl);
+            nameEl.addEventListener('click', openToneVolumes);
+            nameEl.addEventListener('keydown', function (event) {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    openToneVolumes(event);
+                }
             });
         }
-        nameEl.addEventListener('click', openToneVolumes);
-        nameEl.addEventListener('keydown', function (event) {
-            if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault();
-                openToneVolumes(event);
-            }
-        });
 
         const rangeEl = document.createElement('input');
         rangeEl.type = 'range';

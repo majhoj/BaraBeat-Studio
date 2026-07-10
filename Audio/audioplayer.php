@@ -158,7 +158,7 @@ updateLoadingStatus('Player startet...');
 
 const playerConfig = Array.isArray(obj) && obj.length > 0 ? obj[0] : {};
 const isPracticeMode = Boolean(playerConfig.PracticeMode);
-const allPracticeTrackNames = ['Kenkeni', 'Sangban', 'Doundoun', 'Dreierbass', 'Djembe_1', 'Djembe_2', 'Djembe_3'];
+const allPracticeTrackNames = ['Kenkeni', 'Sangban', 'Doundoun', 'Dreierbass', 'Djembe_1', 'Djembe_2', 'Djembe_3', 'Shekere'];
 const practiceInstrumentToneVolumeKeys = {
   Kenkeni: ['open', 'muffled', 'bell', 'klick'],
   Sangban: ['open', 'muffled', 'bell', 'klick'],
@@ -3159,7 +3159,7 @@ function scheduleShekereHit(scheduledTime, gainValue) {
   const sampleSource = audioCtx.createBufferSource();
   const gainNode = audioCtx.createGain();
   sampleSource.buffer = practiceCountInBuffer;
-  gainNode.gain.value = Math.max(0, Number(gainValue) || 0);
+  gainNode.gain.value = Math.max(0, Number(gainValue) || 0) * getPracticeInstrumentVolume('Shekere');
   sampleSource.connect(gainNode).connect(audioCtx.destination);
   sampleSource.onended = function () {
     activePracticeCountInSources = activePracticeCountInSources.filter(function (source) {
