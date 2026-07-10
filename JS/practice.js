@@ -1816,6 +1816,16 @@ function flattenPracticePatternNotes(pattern) {
     }, []);
 }
 
+function flattenPracticePatternNotesIgnoringShortBars(pattern) {
+    return expandPracticePatternBars(pattern).reduce(function (allNotes, bar) {
+        const notes = bar && Array.isArray(bar.notes) ? bar.notes : [];
+        if (notes.length > 0) {
+            return allNotes.concat(notes);
+        }
+        return allNotes;
+    }, []);
+}
+
 function getPracticeBarShortLength(bar) {
     const notes = bar && Array.isArray(bar.notes) ? bar.notes : [];
     const controls = bar && Array.isArray(bar.controls) ? bar.controls : [];
@@ -2192,6 +2202,7 @@ function createPracticeSection(block, blockIndex, sectionSuffix) {
             finalRepeatOutSteps: createEmptyPracticeTrackStepMap(),
             forceFinalOutAtSectionEnd: false,
             barStartSteps: [],
+            minLength: 0,
             practiceTargetInstruments: []
     };
 }
@@ -2214,6 +2225,7 @@ function clonePracticeSection(section, sectionSuffix) {
         finalRepeatOutSteps: createEmptyPracticeTrackStepMap(),
         forceFinalOutAtSectionEnd: Boolean(section.forceFinalOutAtSectionEnd),
         barStartSteps: Array.isArray(section.barStartSteps) ? section.barStartSteps.slice() : [],
+        minLength: Math.max(0, Math.round(Number(section.minLength) || 0)),
         practiceTargetInstruments: Array.isArray(section.practiceTargetInstruments)
             ? section.practiceTargetInstruments.slice()
             : []
@@ -2239,11 +2251,13 @@ function clonePracticeSection(section, sectionSuffix) {
 }
 
 function getPracticeSectionLength(section) {
-    return Math.max.apply(null, practiceTrackInstrumentNames.map(function (instrumentName) {
+    const trackLength = Math.max.apply(null, practiceTrackInstrumentNames.map(function (instrumentName) {
         return section && section.trackNotes && Array.isArray(section.trackNotes[instrumentName])
             ? section.trackNotes[instrumentName].length
             : 0;
     }).concat(0));
+    const minLength = section ? Math.max(0, Math.round(Number(section.minLength) || 0)) : 0;
+    return Math.max(trackLength, minLength);
 }
 
 function mergePracticeBarStartSteps(targetSteps, sourceSteps) {
@@ -2369,6 +2383,23 @@ function trimPracticeSectionToFinalOut(section) {
     });
 }
 
+function practiceSectionShouldUseOutAsSectionEnd(section) {
+    if (!section || !section.finalRepeatOutSteps) {
+        return false;
+    }
+    if (section.forceFinalOutAtSectionEnd) {
+        return true;
+    }
+    return practiceTrackInstrumentNames.some(function (instrumentName) {
+        const outStep = section.finalRepeatOutSteps[instrumentName];
+        return outStep !== null &&
+            outStep !== undefined &&
+            outStep !== '' &&
+            Array.isArray(section.practiceTargetInstruments) &&
+            section.practiceTargetInstruments.indexOf(instrumentName) !== -1;
+    });
+}
+
 function normalizePracticeSectionTrackLoops(section) {
     const sectionLength = getPracticeSectionLength(section);
     if (sectionLength <= 0) {
@@ -2450,7 +2481,8 @@ function loopPracticeArrayToLength(values, targetLength, fallbackValue) {
 }
 
 function appendPracticeSectionWithFinalOut(sections, section) {
-    if (getPracticeSectionFinalOutEndStep(section) !== null && section.repeatCount > 1) {
+    const shouldUseOutAsSectionEnd = practiceSectionShouldUseOutAsSectionEnd(section);
+    if (shouldUseOutAsSectionEnd && getPracticeSectionFinalOutEndStep(section) !== null && section.repeatCount > 1) {
         const repeatedSection = clonePracticeSection(section, '::before-final-out');
         repeatedSection.repeatCount = section.repeatCount - 1;
         clearPracticeSectionOutSteps(repeatedSection);
@@ -2459,7 +2491,9 @@ function appendPracticeSectionWithFinalOut(sections, section) {
         section.repeatCount = 1;
     }
     normalizePracticeSectionTrackLoops(section);
-    trimPracticeSectionToFinalOut(section);
+    if (shouldUseOutAsSectionEnd) {
+        trimPracticeSectionToFinalOut(section);
+    }
     sections.push(section);
 }
 
@@ -2507,7 +2541,9 @@ function appendPracticeSectionWithPickup(sections, section, pickupSection, hasPi
         sections.push(repeatedSection);
     }
     normalizePracticeSectionTrackLoops(section);
-    trimPracticeSectionToFinalOut(section);
+    if (practiceSectionShouldUseOutAsSectionEnd(section)) {
+        trimPracticeSectionToFinalOut(section);
+    }
     sections.push(section);
     return pickupWasPlacedInLeadIn ? pickupSection : null;
 }
@@ -2602,6 +2638,23 @@ function practiceBlockHasTargetPause(block) {
     }));
 }
 
+function practiceBlockHasRunningAccompaniment(block) {
+    return Boolean(block && Array.isArray(block.entries) && block.entries.some(function (entry) {
+        const pattern = findPatternById(entry && entry.patternId);
+        return entry &&
+            !entry.isPracticeTarget &&
+            !entry.suppressPlayback &&
+            pattern &&
+            pattern.labelType === 'Begleitung';
+    }));
+}
+
+function practiceBlockShouldIgnoreShortBarForRunningAccompaniment(block) {
+    return practiceBlockHasRunningAccompaniment(block) &&
+        !practiceBlockHasTargetPause(block) &&
+        !practiceBlockPausesAccompaniment(block);
+}
+
 function practiceEntryAllowsPickup(entry, block) {
     const pattern = findPatternById(entry && entry.patternId);
     if (!pattern || getPracticePatternInStep(pattern) === null) {
@@ -2633,6 +2686,7 @@ function buildPracticeSectionsFromEntries(entries) {
         pickupSection.isLeadIn = true;
         const labels = [];
         const labelNames = [];
+        const ignoreShortBarForRunningAccompaniment = practiceBlockShouldIgnoreShortBarForRunningAccompaniment(block);
         const blockHasPickup = !previousBlockEndedWithShortBar && block.entries.some(function (entry) {
             return practiceEntryAllowsPickup(entry, block);
         });
@@ -2641,9 +2695,14 @@ function buildPracticeSectionsFromEntries(entries) {
                 return maxLength;
             }
             const pattern = findPatternById(entry.patternId);
-            const patternNotes = flattenPracticePatternNotes(pattern);
+            const patternNotes = ignoreShortBarForRunningAccompaniment
+                ? flattenPracticePatternNotesIgnoringShortBars(pattern)
+                : flattenPracticePatternNotes(pattern);
             return Math.max(maxLength, patternNotes.length);
         }, 0);
+        if (ignoreShortBarForRunningAccompaniment && blockPracticeLength > 0) {
+            section.minLength = Math.max(section.minLength || 0, blockPracticeLength);
+        }
 
         block.entries.forEach(function (entry) {
             const pattern = findPatternById(entry.patternId);
@@ -2742,7 +2801,10 @@ function buildPracticeSectionsFromEntries(entries) {
                     section.trackHandModes[instrumentName] = entry.handMode || '';
                 }
                 addPracticeTrackPatternLabel(section.trackPatternLabels, instrumentName, labelName);
-                if (effectivePatternOutStep !== null && effectivePatternOutStep !== undefined) {
+                const shouldStoreFinalOutStep = effectivePatternOutStep !== null &&
+                    effectivePatternOutStep !== undefined &&
+                    (entry.isPracticeTarget || section.forceFinalOutAtSectionEnd);
+                if (shouldStoreFinalOutStep) {
                     section.finalRepeatOutSteps[instrumentName] = effectivePatternOutStep;
                 }
             });
@@ -2778,7 +2840,8 @@ function buildPracticeSectionsFromEntries(entries) {
                 accompanimentOffsets[offsetKey] = 0;
             });
         }
-        previousBlockEndedWithShortBar = practiceBlockEndsWithShortBar(block);
+        previousBlockEndedWithShortBar = practiceBlockEndsWithShortBar(block) &&
+            !ignoreShortBarForRunningAccompaniment;
     });
 
     if (loopStartPickupSection && (practiceState.repeatCount > 1 || practiceState.timerMinutes > 0)) {
@@ -3208,7 +3271,8 @@ function flattenPracticeScrollerSections(sections, options) {
             const safeOutStep = outStep === null || outStep === undefined
                 ? null
                 : Math.max(0, Number(outStep) || 0);
-            if (!hasTimerLoop && !isLeadIn && loopRelativeSectionStart !== null && safeOutStep !== null) {
+            const shouldUseOutAsSectionEnd = practiceSectionShouldUseOutAsSectionEnd(section);
+            if (!hasTimerLoop && shouldUseOutAsSectionEnd && !isLeadIn && loopRelativeSectionStart !== null && safeOutStep !== null) {
                 finalOuterMuteRanges.push({
                     instrumentName: instrumentName,
                     start: loopRelativeSectionStart + ((renderRepeatCount - 1) * sectionLength) + safeOutStep + 1,
@@ -3219,7 +3283,7 @@ function flattenPracticeScrollerSections(sections, options) {
             for (let repeatIndex = 0; repeatIndex < renderRepeatCount; repeatIndex += 1) {
                 for (let stepIndex = 0; stepIndex < sectionLength; stepIndex += 1) {
                     const shouldMuteForOut = safeOutStep !== null &&
-                        (isPracticeTarget || !hasOuterPracticeLoop || forceFinalOutAtSectionEnd) &&
+                        (shouldUseOutAsSectionEnd || forceFinalOutAtSectionEnd) &&
                         repeatIndex === repeatCount - 1 &&
                         stepIndex > safeOutStep;
                     trackNotes[instrumentName].push(shouldMuteForOut ? 'f' : (notes[stepIndex] || 'f'));

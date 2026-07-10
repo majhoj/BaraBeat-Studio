@@ -289,6 +289,7 @@ const doundoun = new Instrumente(getPracticeInstrumentFiles('Doundoun', doundoun
 const dreierbass = new Instrumente(getPracticeInstrumentFiles('Dreierbass', dreierbass_mp3Files), -1, 1.5);
 const allInstruments = [djembe_1, djembe_2, djembe_3, kenkeni, sangban, doundoun, dreierbass];
 const practiceCountInSoundFiles = ['snd/Shekere.mp3', 'snd alt/Shekere.mp3', 'snd/ShekereB.mp3', 'snd alt/ShekereB.mp3'];
+const shekereBeatAnticipationSeconds = 0.018;
 let practiceCountInBuffer = null;
 let activePracticeCountInSources = [];
 const practiceInstrumentSoundFiles = {
@@ -3193,7 +3194,7 @@ function scheduleShekereBeatIfNeeded(playbackStep, scheduledTime) {
     return;
   }
 
-  scheduleShekereHit(scheduledTime, 0.55);
+  scheduleShekereHit(scheduledTime - shekereBeatAnticipationSeconds, 0.55);
 }
 
 function parseTupletNoteValue(noteValue) {
