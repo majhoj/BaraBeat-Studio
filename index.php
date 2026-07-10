@@ -220,6 +220,7 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
                     <button type="button" id="timelineSwingProfileButton">Swing-Profil</button>
                     <button type="button" id="timelineFeelProfileButton">Feel</button>
                     <button type="button" id="timelineVolumeButton">Lautstärke</button>
+                    <button type="button" id="timelineShekereBeat" class="shekere-beat-toggle" aria-pressed="false">Shekere Beat</button>
                     <button type="button" id="timelineRefreshButton">Aus Blatt aktualisieren</button>
                     <button type="button" id="timelineCloseButton">Schließen</button>
                 </div>
@@ -273,6 +274,7 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
                         </label>
                         <button type="button" id="practiceSwingProfileButton">Swing-Profil</button>
                         <button type="button" id="practiceFeelProfileButton">Feel</button>
+                        <button type="button" id="practiceShekereBeat" class="shekere-beat-toggle" aria-pressed="false">Shekere Beat</button>
                     </div>
                     <div class="practice-pattern-options">
                         <label class="timeline-tempo-control" for="practiceAccompanimentStart">
@@ -1862,6 +1864,7 @@ function clear_all() {
     timelineState.sheetLoopCount = false;
     timelineState.tempo = 100;
     timelineState.swingFactor = 0;
+    timelineState.shekereBeatEnabled = false;
     timelineState.swingProfile = normalizeAllTimelineSwingProfiles();
     timelineState.feelOffsets = normalizeTimelineFeelOffsets();
     if (typeof resetPracticeForSource === 'function') {
@@ -6018,6 +6021,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 inputEl.value = normalizeTimelineSwingFactor(timelineState.swingFactor);
             }
         });
+        ['timelineShekereBeat', 'practiceShekereBeat'].forEach(function (inputId) {
+            const inputEl = document.querySelector('#' + inputId);
+            if (inputEl) {
+                inputEl.setAttribute('aria-pressed', timelineState.shekereBeatEnabled ? 'true' : 'false');
+                inputEl.classList.toggle('is-active', Boolean(timelineState.shekereBeatEnabled));
+            }
+        });
         const currentProfileKey = getCurrentTimelineSwingProfileKey();
         const currentProfile = normalizeTimelineSwingProfile(
             timelineState.swingProfile && timelineState.swingProfile[currentProfileKey],
@@ -6066,6 +6076,17 @@ document.addEventListener('DOMContentLoaded', function () {
             schedulePracticeAudioRefresh(250);
         }
     }
+    function notifyShekereBeatChanged() {
+        syncTimingControlValues();
+        window.suppressNextTimelineAudioRefresh = true;
+        updateTimelineMetadataNode();
+        const message = {
+            type: 'barabeat-shekere-beat',
+            enabled: Boolean(timelineState.shekereBeatEnabled)
+        };
+        sendPracticeAudioMessage(message);
+        sendTimelineAudioMessage(message);
+    }
     ['timelineTempo', 'practiceTempo'].forEach(function (inputId) {
         const inputEl = document.querySelector('#' + inputId);
         if (!inputEl) {
@@ -6092,6 +6113,20 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             timelineState.swingFactor = nextValue;
             notifyTimingControlsChanged();
+        });
+    });
+    ['timelineShekereBeat', 'practiceShekereBeat'].forEach(function (inputId) {
+        const inputEl = document.querySelector('#' + inputId);
+        if (!inputEl) {
+            return;
+        }
+        inputEl.addEventListener('click', function () {
+            const nextValue = !Boolean(timelineState.shekereBeatEnabled);
+            if (timelineState.shekereBeatEnabled !== nextValue) {
+                recordArrangementHistorySnapshot();
+            }
+            timelineState.shekereBeatEnabled = nextValue;
+            notifyShekereBeatChanged();
         });
     });
     [
@@ -6302,6 +6337,9 @@ function onSVGLoaded(data) {
         timelineState.swingFactor = normalizeTimelineSwingFactor(
             persistedTimelineMetadata ? persistedTimelineMetadata.swingFactor : 0
         );
+        timelineState.shekereBeatEnabled = Boolean(
+            persistedTimelineMetadata && persistedTimelineMetadata.shekereBeatEnabled
+        );
         timelineState.swingProfile = normalizeAllTimelineSwingProfiles(
             persistedTimelineMetadata ? persistedTimelineMetadata.swingProfile : null
         );
@@ -6311,6 +6349,7 @@ function onSVGLoaded(data) {
         syncTimelineStateFromReadResult(readResult, {
             tempo: timelineState.tempo,
             swingFactor: timelineState.swingFactor,
+            shekereBeatEnabled: timelineState.shekereBeatEnabled,
             swingProfile: timelineState.swingProfile,
             feelOffsets: timelineState.feelOffsets,
             persistedPractice: persistedTimelineMetadata ? persistedTimelineMetadata.practice : null,

@@ -30,6 +30,7 @@ const timelineState = {
     sheetLoopCount: false,
     tempo: 100,
     swingFactor: 0,
+    shekereBeatEnabled: false,
     swingProfile: {
         binaer: defaultTimelineSwingProfiles.binaer.slice(),
         tenaer: defaultTimelineSwingProfiles.tenaer.slice(),
@@ -955,6 +956,7 @@ function buildTimelinePlayerPayload(patternLibrary, timelineEntries) {
         TimelineLoopCount: timelineLoopCount,
         Tempo: normalizeTimelineTempo(timelineState.tempo),
         SwingFactor: normalizeTimelineSwingFactor(timelineState.swingFactor),
+        ShekereBeatEnabled: Boolean(timelineState.shekereBeatEnabled),
         SwingProfile: normalizeAllTimelineSwingProfiles(timelineState.swingProfile),
         FeelOffsets: normalizeTimelineFeelOffsets(timelineState.feelOffsets),
         PracticeInstrumentVolumes: typeof normalizePracticeInstrumentVolumes === 'function'
@@ -1039,6 +1041,7 @@ function updateTimelineMetadataNode() {
         sheetLoopCount: getResolvedTimelineLoopCount(),
         tempo: normalizeTimelineTempo(timelineState.tempo),
         swingFactor: normalizeTimelineSwingFactor(timelineState.swingFactor),
+        shekereBeatEnabled: Boolean(timelineState.shekereBeatEnabled),
         swingProfile: normalizeAllTimelineSwingProfiles(timelineState.swingProfile),
         feelOffsets: normalizeTimelineFeelOffsets(timelineState.feelOffsets),
         practice: typeof buildPracticeMetadata === 'function' ? buildPracticeMetadata() : null,
@@ -1137,6 +1140,7 @@ function syncTimelineStateFromReadResult(readResult, options) {
     syncTimelineBlockIdSequence(timelineState.entries);
     timelineState.tempo = normalizeTimelineTempo(syncOptions.tempo ?? timelineState.tempo);
     timelineState.swingFactor = normalizeTimelineSwingFactor(syncOptions.swingFactor ?? timelineState.swingFactor);
+    timelineState.shekereBeatEnabled = Boolean(syncOptions.shekereBeatEnabled);
     timelineState.swingProfile = normalizeAllTimelineSwingProfiles(syncOptions.swingProfile);
     timelineState.feelOffsets = normalizeTimelineFeelOffsets(syncOptions.feelOffsets);
 
@@ -1168,6 +1172,7 @@ function buildCurrentTimelineSyncOptions() {
     return {
         tempo: timelineState.tempo,
         swingFactor: timelineState.swingFactor,
+        shekereBeatEnabled: Boolean(timelineState.shekereBeatEnabled),
         swingProfile: normalizeAllTimelineSwingProfiles(timelineState.swingProfile),
         feelOffsets: normalizeTimelineFeelOffsets(timelineState.feelOffsets),
         persistedPractice: typeof buildPracticeMetadata === 'function' ? buildPracticeMetadata() : null,
@@ -3050,6 +3055,8 @@ function renderTimelinePanel() {
     const practiceTempoInputEl = document.getElementById('practiceTempo');
     const swingInputEl = document.getElementById('timelineSwingFactor');
     const practiceSwingInputEl = document.getElementById('practiceSwingFactor');
+    const shekereBeatEl = document.getElementById('timelineShekereBeat');
+    const practiceShekereBeatEl = document.getElementById('practiceShekereBeat');
     const feelInputMap = {
         Kenkeni: document.getElementById('timelineFeelKenkeni'),
         Sangban: document.getElementById('timelineFeelSangban'),
@@ -3109,6 +3116,14 @@ function renderTimelinePanel() {
     }
     if (practiceSwingInputEl) {
         practiceSwingInputEl.value = normalizeTimelineSwingFactor(timelineState.swingFactor);
+    }
+    if (shekereBeatEl) {
+        shekereBeatEl.setAttribute('aria-pressed', timelineState.shekereBeatEnabled ? 'true' : 'false');
+        shekereBeatEl.classList.toggle('is-active', Boolean(timelineState.shekereBeatEnabled));
+    }
+    if (practiceShekereBeatEl) {
+        practiceShekereBeatEl.setAttribute('aria-pressed', timelineState.shekereBeatEnabled ? 'true' : 'false');
+        practiceShekereBeatEl.classList.toggle('is-active', Boolean(timelineState.shekereBeatEnabled));
     }
     const currentFeelOffsets = normalizeTimelineFeelOffsets(timelineState.feelOffsets);
     Object.keys(feelInputMap).forEach(function (instrumentName) {

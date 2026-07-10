@@ -209,6 +209,7 @@ function normalizeInstrumentToneVolumes(rawVolumes) {
 }
 
 let practiceInstrumentToneVolumes = normalizeInstrumentToneVolumes(playerConfig.PracticeInstrumentToneVolumes);
+let shekereBeatEnabled = Boolean(playerConfig.ShekereBeatEnabled);
 
 function getPracticeInstrumentToneVolume(trackName, toneKey) {
   const toneVolumes = practiceInstrumentToneVolumes[trackName];
@@ -287,6 +288,9 @@ const sangban  = new Instrumente(getPracticeInstrumentFiles('Sangban', sangban_m
 const doundoun = new Instrumente(getPracticeInstrumentFiles('Doundoun', doundoun_mp3Files), -0.6, 1.5);
 const dreierbass = new Instrumente(getPracticeInstrumentFiles('Dreierbass', dreierbass_mp3Files), -1, 1.5);
 const allInstruments = [djembe_1, djembe_2, djembe_3, kenkeni, sangban, doundoun, dreierbass];
+const practiceCountInSoundFiles = ['snd/Shekere.mp3', 'snd alt/Shekere.mp3', 'snd/ShekereB.mp3', 'snd alt/ShekereB.mp3'];
+let practiceCountInBuffer = null;
+let activePracticeCountInSources = [];
 const practiceInstrumentSoundFiles = {
   Djembe_1: djembe_1_mp3Files,
   Djembe_2: djembe_2_mp3Files,
@@ -329,11 +333,34 @@ const allInstrumentReadyPromises = allInstruments.map(function (instrumentInstan
   return instrumentInstance.readyPromise;
 });
 
+async function loadPracticeCountInSound() {
+  if (!isPracticeMode && !Boolean(playerConfig.TimelineMode)) {
+    return null;
+  }
+
+  for (let fileIndex = 0; fileIndex < practiceCountInSoundFiles.length; fileIndex++) {
+    const soundFile = practiceCountInSoundFiles[fileIndex];
+    try {
+      const audioBuffer = await djembe_1.getFile(soundFile);
+      practiceCountInBuffer = audioBuffer;
+      console.log('Vorzähler geladen:', soundFile);
+      return audioBuffer;
+    } catch (error) {
+      console.warn('Vorzähler konnte nicht geladen werden:', soundFile, error.message || error);
+    }
+  }
+
+  console.warn('Kein Shekere-Sound für den Vorzähler gefunden.');
+  return null;
+}
+
+const practiceCountInReadyPromise = loadPracticeCountInSound();
+
 console.log("Name : " + obj[0].Name);
 console.log("Rhythmus : " + obj[0].Rhythmus);
 updateLoadingStatus('Audiodateien werden geladen...');
 
-Promise.all(allInstrumentReadyPromises)
+Promise.all(allInstrumentReadyPromises.concat([practiceCountInReadyPromise]))
   .then(function () {
     audioIsReady = true;
     playButton.disabled = false;
@@ -520,6 +547,10 @@ window.addEventListener('message', function (event) {
   }
   if (message.type === 'barabeat-practice-h2h-rest-mute') {
     practiceH2HRestMute = Boolean(message.enabled);
+    return;
+  }
+  if (message.type === 'barabeat-shekere-beat') {
+    shekereBeatEnabled = Boolean(message.enabled);
     return;
   }
   if (message.type === 'barabeat-practice-instrument-volumes') {
@@ -2818,6 +2849,7 @@ const lookahead = 25;          // ms
 const scheduleAheadTime = 0.25; // sec
 const playerStartDelay = 0.18; // sec
 const practiceLeadInDelay = isPracticeMode ? 3.0 : 0; // sec
+const practiceCountInBeats = 4;
 
 let nextNoteTime = 0.0;
 let timerID;
@@ -3087,6 +3119,68 @@ function getStepsPerBeatForRhythm() {
 function getBaseStepDuration(tempoValue) {
   const safeTempo = Math.max(1, Number(tempoValue) || initialTempo || 100);
   return 60 / safeTempo / getStepsPerBeatForRhythm();
+}
+
+function getPracticeCountInBeatDuration() {
+  return 60 / Math.max(1, Number(currentBaseTempo) || Number(tempo) || initialTempo || 100);
+}
+
+function getPracticeCountInDuration() {
+  return isPracticeMode && practiceCountInBuffer
+    ? getPracticeCountInBeatDuration() * practiceCountInBeats
+    : 0;
+}
+
+function schedulePracticeCountIn(firstPlaybackTime) {
+  if (!isPracticeMode || !practiceCountInBuffer || !instr || !instr._audioCtx) {
+    return;
+  }
+
+  const audioCtx = instr._audioCtx;
+  const beatDuration = getPracticeCountInBeatDuration();
+  const firstCountTime = firstPlaybackTime - (beatDuration * practiceCountInBeats);
+
+  for (let beatIndex = 0; beatIndex < practiceCountInBeats; beatIndex++) {
+    const scheduledTime = firstCountTime + (beatDuration * beatIndex);
+    scheduleShekereHit(scheduledTime, 0.85);
+  }
+}
+
+function scheduleShekereHit(scheduledTime, gainValue) {
+  if (!practiceCountInBuffer || !instr || !instr._audioCtx) {
+    return;
+  }
+
+  const audioCtx = instr._audioCtx;
+  if (scheduledTime < audioCtx.currentTime + 0.02) {
+    return;
+  }
+
+  const sampleSource = audioCtx.createBufferSource();
+  const gainNode = audioCtx.createGain();
+  sampleSource.buffer = practiceCountInBuffer;
+  gainNode.gain.value = Math.max(0, Number(gainValue) || 0);
+  sampleSource.connect(gainNode).connect(audioCtx.destination);
+  sampleSource.onended = function () {
+    activePracticeCountInSources = activePracticeCountInSources.filter(function (source) {
+      return source !== sampleSource;
+    });
+  };
+  activePracticeCountInSources.push(sampleSource);
+  sampleSource.start(scheduledTime);
+}
+
+function scheduleShekereBeatIfNeeded(playbackStep, scheduledTime) {
+  if (!shekereBeatEnabled || !practiceCountInBuffer) {
+    return;
+  }
+
+  const stepsPerBeat = getStepsPerBeatForRhythm();
+  if (stepsPerBeat <= 0 || playbackStep % stepsPerBeat !== 0) {
+    return;
+  }
+
+  scheduleShekereHit(scheduledTime, 0.55);
 }
 
 function parseTupletNoteValue(noteValue) {
@@ -3993,6 +4087,7 @@ function scheduleCurrentStep(time) {
   const djembe3Playback = maybeTrackBeat('Djembe_3', trackStates.Djembe_3);
   const accentMultiplier = getAccentMultiplier(globalPlaybackStep);
   const stepTempo = getEffectiveTempoForStep(globalPlaybackStep);
+  scheduleShekereBeatIfNeeded(globalPlaybackStep, time);
 
   advanceSilentH2HStep(djembe1Playback, djembeHandStates.Djembe_1, {
     instrumentInstance: djembe_1,
@@ -4518,6 +4613,15 @@ function stopAllActiveSources(stopTime) {
   allInstruments.forEach(function (instrumentInstance) {
     instrumentInstance.stopActiveSources(stopTime);
   });
+  activePracticeCountInSources.forEach(function (sampleSource) {
+    try {
+      const audioCtx = instr && instr._audioCtx ? instr._audioCtx : null;
+      sampleSource.stop(Math.max(stopTime, audioCtx ? audioCtx.currentTime : stopTime));
+    } catch (error) {
+      // The source may already be stopped; that is harmless here.
+    }
+  });
+  activePracticeCountInSources = [];
 }
 
 playButton.addEventListener('click', async (ev) => {
@@ -4547,7 +4651,11 @@ playButton.addEventListener('click', async (ev) => {
     resetDjembeHandStates();
 
     const dTime = instr._audioCtx.currentTime;
-    nextNoteTime = dTime + playerStartDelay + practiceLeadInDelay;
+    const effectivePracticeLeadInDelay = isPracticeMode
+      ? Math.max(practiceLeadInDelay, getPracticeCountInDuration())
+      : practiceLeadInDelay;
+    nextNoteTime = dTime + playerStartDelay + effectivePracticeLeadInDelay;
+    schedulePracticeCountIn(nextNoteTime);
     practiceStopAudioTime = practiceDurationSeconds > 0
       ? nextNoteTime + practiceDurationSeconds
       : 0;
@@ -4555,7 +4663,7 @@ playButton.addEventListener('click', async (ev) => {
 
     ev.target.dataset.playing = 'true';
     notifyEmbeddedPlaybackState('playing', {
-      leadInMs: Math.max(0, (playerStartDelay + practiceLeadInDelay) * 1000)
+      leadInMs: Math.max(0, (playerStartDelay + effectivePracticeLeadInDelay) * 1000)
     });
     scheduler();
   } else {

@@ -79,6 +79,7 @@ body[data-ui-theme="playful"] .timeline-entry.is-active {
 }
 
 body[data-ui-theme="playful"] #practicePanel button.is-active,
+body[data-ui-theme="playful"] #timelinePanel button.is-active,
 body[data-ui-theme="playful"] #themePlayfulButton.is-active {
     background: #ffe8c7;
     border-color: #e0a64a;
@@ -190,6 +191,7 @@ body[data-ui-theme="earth"] .timeline-entry.is-active {
 }
 
 body[data-ui-theme="earth"] #practicePanel button.is-active,
+body[data-ui-theme="earth"] #timelinePanel button.is-active,
 body[data-ui-theme="earth"] #themeEarthButton.is-active {
     background: #dfc7a2;
     border-color: #9d7649;
@@ -1250,7 +1252,8 @@ html {
     background: #e7f5ed;
 }
 
-#practicePanel button.is-active {
+#practicePanel button.is-active,
+#timelinePanel button.is-active {
     background: #e7f5ed;
     border-color: #6ebf8b;
 }
