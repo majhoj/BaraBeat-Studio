@@ -1749,6 +1749,7 @@ function buildPracticePickupNotes(notes, inStep, options) {
     }
 
     const buildOptions = options || {};
+    const limitToPickupBar = buildOptions.limitToPickupBar !== false;
     const stepsPerBar = getPracticeStepsPerBar();
     const safeInStep = Math.max(0, Math.min(safeNotes.length - 1, Number(inStep) || 0));
     const pickupStartStep = stepsPerBar > 0
@@ -1757,15 +1758,56 @@ function buildPracticePickupNotes(notes, inStep, options) {
     if (safeInStep === pickupStartStep) {
         return [];
     }
-    const pickupLength = Math.max(stepsPerBar, safeNotes.length - pickupStartStep);
+    const pickupLength = limitToPickupBar && stepsPerBar > 0
+        ? stepsPerBar
+        : Math.max(stepsPerBar, safeNotes.length - pickupStartStep);
     const pickupNotes = Array(pickupLength).fill('f');
     const pickupEndStep = buildOptions.singleNoteOnly
         ? safeInStep + 1
+        : limitToPickupBar && stepsPerBar > 0
+            ? Math.min(safeNotes.length, pickupStartStep + stepsPerBar)
         : safeNotes.length;
     for (let sourceStep = safeInStep; sourceStep < pickupEndStep; sourceStep += 1) {
         pickupNotes[sourceStep - pickupStartStep] = safeNotes[sourceStep] || 'f';
     }
     return pickupNotes;
+}
+
+function getPracticePatternPickupEndStep(pattern, notesLength) {
+    const patternInStep = getPracticePatternInStep(pattern);
+    const sourceLength = Math.max(0, Number(notesLength) || 0);
+    if (sourceLength <= 0 || patternInStep === null || patternInStep === undefined) {
+        return 0;
+    }
+
+    const stepsPerBar = getPracticeStepsPerBar();
+    if (stepsPerBar <= 0) {
+        return 0;
+    }
+
+    const safeInStep = Math.max(0, Math.min(sourceLength - 1, Number(patternInStep) || 0));
+    return Math.min(sourceLength, (Math.floor(safeInStep / stepsPerBar) + 1) * stepsPerBar);
+}
+
+function shiftPracticeBarStartStepsAfterOffset(sourceSteps, offset, notesLength) {
+    const safeOffset = Math.max(0, Math.round(Number(offset) || 0));
+    const safeLength = Math.max(0, Number(notesLength) || 0);
+    if (safeOffset <= 0) {
+        return Array.isArray(sourceSteps) ? sourceSteps.slice() : [];
+    }
+
+    const shiftedSteps = (Array.isArray(sourceSteps) ? sourceSteps : [])
+        .map(function (stepValue) {
+            return Math.max(0, Math.round(Number(stepValue) || 0)) - safeOffset;
+        })
+        .filter(function (stepValue) {
+            return stepValue >= 0 && (safeLength <= 0 || stepValue < safeLength);
+        });
+
+    if (safeLength > 0 && shiftedSteps.indexOf(0) === -1) {
+        shiftedSteps.unshift(0);
+    }
+    return shiftedSteps;
 }
 
 function mergePracticeNotesIntoTrack(targetNotes, sourceNotes) {
@@ -2313,12 +2355,18 @@ function buildPracticeSectionsFromEntries(entries) {
             const isAccompanimentEntry = pattern.labelType === 'Begleitung' && !entry.isPracticeTarget;
             const accompanimentOffsetKey = entry.patternSourceKey || entry.patternId;
             const accompanimentOffset = Number(accompanimentOffsets[accompanimentOffsetKey]) || 0;
+            const rawPatternPickupEndStep = pattern.labelType !== 'Begleitung'
+                ? getPracticePatternPickupEndStep(pattern, rawPatternNotes.length)
+                : 0;
             const shouldUseAccompanimentSegment = isAccompanimentEntry &&
                 blockPracticeLength > 0 &&
                 rawPatternNotes.length > blockPracticeLength;
             let patternNotes = shouldUseAccompanimentSegment
                 ? getPracticeLoopedSegment(rawPatternNotes, accompanimentOffset, blockPracticeLength, 'f')
                 : rawPatternNotes.slice();
+            if (!shouldUseAccompanimentSegment && rawPatternPickupEndStep > 0) {
+                patternNotes = patternNotes.slice(rawPatternPickupEndStep);
+            }
             if (entry.suppressPlayback) {
                 patternNotes = Array(patternNotes.length).fill('f');
             }
@@ -2331,7 +2379,14 @@ function buildPracticeSectionsFromEntries(entries) {
                     accompanimentOffset,
                     blockPracticeLength
                 )
-                : rawPatternBarStartSteps;
+                : shiftPracticeBarStartStepsAfterOffset(
+                    rawPatternBarStartSteps,
+                    rawPatternPickupEndStep,
+                    patternNotes.length
+                );
+            const effectivePatternOutStep = patternOutStep !== null && patternOutStep !== undefined
+                ? Math.max(0, Math.round(Number(patternOutStep) || 0) - rawPatternPickupEndStep)
+                : patternOutStep;
             const targetInstruments = normalizePracticeTargetInstruments(entry.targetInstruments);
             const label = pattern.labelType || pattern.label || '';
             const labelName = pattern.labelName || pattern.name || label;
@@ -2346,7 +2401,8 @@ function buildPracticeSectionsFromEntries(entries) {
             if (blockHasPickup && patternInStep !== null && practiceEntryAllowsPickup(entry, block)) {
                 const pickupSingleNoteOnly = label === 'Call' || label === 'Intro';
                 const pickupNotes = buildPracticePickupNotes(rawPatternNotes, patternInStep, {
-                    singleNoteOnly: pickupSingleNoteOnly
+                    singleNoteOnly: pickupSingleNoteOnly,
+                    limitToPickupBar: true
                 });
                 targetInstruments.forEach(function (instrumentName) {
                     pickupSection.trackNotes[instrumentName] = mergePracticeNotesIntoTrack(
@@ -2385,8 +2441,8 @@ function buildPracticeSectionsFromEntries(entries) {
                     section.trackHandModes[instrumentName] = entry.handMode || '';
                 }
                 addPracticeTrackPatternLabel(section.trackPatternLabels, instrumentName, labelName);
-                if (patternOutStep !== null && patternOutStep !== undefined) {
-                    section.finalRepeatOutSteps[instrumentName] = patternOutStep;
+                if (effectivePatternOutStep !== null && effectivePatternOutStep !== undefined) {
+                    section.finalRepeatOutSteps[instrumentName] = effectivePatternOutStep;
                 }
             });
 
