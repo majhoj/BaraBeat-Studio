@@ -1197,6 +1197,28 @@ html {
     color: #185f3d;
 }
 
+.practice-header-main {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+    flex-wrap: wrap;
+}
+
+.practice-header-scenario {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--ui-text-muted);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.practice-header-scenario select {
+    min-width: 180px;
+    max-width: min(260px, 38vw);
+}
+
 .practice-panel-body {
     grid-template-columns: minmax(330px, 0.9fr) minmax(0, 1.1fr);
     height: auto;
@@ -2253,6 +2275,28 @@ html {
     overflow: visible;
 }
 
+.practice-scenario-options {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.practice-scenario-options select {
+    min-width: 190px;
+}
+
+.practice-tempo-ramp-note {
+    margin: 8px 0 0;
+    color: var(--ui-text-muted);
+    font-size: 13px;
+}
+
+.practice-tempo-ramp-controls label {
+    min-width: 180px;
+}
+
 .timeline-pattern-list,
 .timeline-sequence-list {
     display: flex;
@@ -3178,6 +3222,21 @@ body.is-timeline-dragging .timeline-dropzone-inline {
     .practice-panel-title .practice-title-label,
     .practice-panel-title .practice-title-rhythm {
         display: block;
+    }
+
+    .practice-header-main {
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .practice-header-scenario {
+        width: 100%;
+    }
+
+    .practice-header-scenario select {
+        min-width: 0;
+        max-width: 100%;
+        flex: 1;
     }
 
     #practicePatternChooserToggle {

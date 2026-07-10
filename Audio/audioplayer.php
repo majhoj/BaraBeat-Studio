@@ -2518,6 +2518,7 @@ function buildConfiguredPracticeSections(config) {
       configuredSection.swingFactor !== undefined
         ? Math.max(0, Math.min(100, Number(configuredSection.swingFactor) || 0))
         : null;
+    section.sectionTempo = normalizeSectionTempo(configuredSection && configuredSection.sectionTempo);
     section.practiceTargetInstruments = Array.isArray(configuredSection && configuredSection.practiceTargetInstruments)
       ? configuredSection.practiceTargetInstruments.filter(function (instrumentName) {
           return trackInstrumentNames.indexOf(instrumentName) !== -1;
@@ -2547,6 +2548,7 @@ function buildConfiguredPracticeSections(config) {
   });
 
   finalizeSectionLengths(sections);
+  applyOrderedSectionTempoTargets(sections);
   return sections;
 }
 
@@ -2823,6 +2825,7 @@ for (const key in steuerung) {
 
 // Scheduling
 let tempo = initialTempo;
+let displayedTempo = initialTempo;
 const bpmControl = document.querySelector('#bpm');
 const bpmValEl = document.querySelector('#bpmval');
 let soloTrackName = '';
@@ -2830,11 +2833,21 @@ let soloTrackName = '';
 bpmControl.value = String(initialTempo);
 bpmValEl.innerText = String(initialTempo);
 
+function updateDisplayedTempo(nextTempo) {
+  const normalizedTempo = Math.max(30, Math.min(180, Math.round(Number(nextTempo) || initialTempo || 100)));
+  if (displayedTempo === normalizedTempo) {
+    return;
+  }
+  displayedTempo = normalizedTempo;
+  bpmControl.value = String(normalizedTempo);
+  bpmValEl.innerText = String(normalizedTempo);
+}
+
 bpmControl.addEventListener('input', ev => {
   tempo = Number(ev.target.value);
   currentBaseTempo = Math.max(30, Math.min(180, Number(tempo) || initialTempo || 100));
   recalculateOrderedSectionTiming();
-  bpmValEl.innerText = tempo;
+  updateDisplayedTempo(currentBaseTempo);
   notifyEmbeddedTempoChange(tempo);
 }, false);
 
@@ -3243,6 +3256,7 @@ function getEffectiveTempoForStep(playbackStep) {
 
 function nextNote() {
   const stepTempo = getEffectiveTempoForStep(globalPlaybackStep);
+  updateDisplayedTempo(stepTempo);
   const stepDuration = getBaseStepDuration(stepTempo);
   let intervalToNextStep = stepDuration;
   let activeSwingFactor = swingFactor;

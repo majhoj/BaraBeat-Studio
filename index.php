@@ -245,8 +245,14 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
 
     <div id="practicePanel" hidden>
         <div class="timeline-panel-header practice-panel-header">
-            <div>
+            <div class="practice-header-main">
                 <div id="practiceTitle" class="timeline-panel-title practice-panel-title">Übungsmodus</div>
+                <label class="practice-header-scenario" for="practiceScenarioHeaderSelect">
+                    <span>Szenario</span>
+                    <select id="practiceScenarioHeaderSelect">
+                        <option value="">Aktuelle Einstellungen</option>
+                    </select>
+                </label>
             </div>
             <div class="timeline-panel-actions">
                 <button type="button" id="practicePatternChooserToggle" aria-expanded="false" aria-controls="practicePatternChooser">
@@ -263,6 +269,17 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
                     </button>
                 </h3>
                 <div id="practiceSettingsContent" class="practice-column-content">
+                    <div class="practice-scenario-options">
+                        <label class="timeline-tempo-control" for="practiceScenarioSelect">
+                            Übungsszenario
+                            <select id="practiceScenarioSelect">
+                                <option value="">Aktuelle Einstellungen</option>
+                            </select>
+                        </label>
+                        <button type="button" id="practiceScenarioSaveButton">Speichern</button>
+                        <button type="button" id="practiceScenarioNewButton">Neu</button>
+                        <button type="button" id="practiceScenarioDeleteButton">Löschen</button>
+                    </div>
                     <div class="practice-timing-options">
                         <label class="timeline-tempo-control" for="practiceTempo">
                             Tempo
@@ -274,6 +291,8 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
                         </label>
                         <button type="button" id="practiceSwingProfileButton">Swing-Profil</button>
                         <button type="button" id="practiceFeelProfileButton">Feel</button>
+                        <button type="button" id="practiceTempoRampButton">Tempoaufbau</button>
+                        <button type="button" id="practiceVolumeButton">Lautstärke</button>
                         <button type="button" id="practiceShekereBeat" class="shekere-beat-toggle" aria-pressed="false">Shekere Beat</button>
                     </div>
                     <div class="practice-pattern-options">
@@ -415,6 +434,30 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
             <footer class="swing-profile-dialog-footer">
                 <button type="button" id="practiceFeelProfileResetButton">Zurücksetzen</button>
                 <button type="button" id="practiceFeelProfileDoneButton" class="primary">Fertig</button>
+            </footer>
+        </section>
+    </div>
+
+    <div id="practiceTempoRampDialog" class="swing-profile-dialog-backdrop" hidden>
+        <section class="swing-profile-dialog" role="dialog" aria-modal="true" aria-labelledby="practiceTempoRampTitle">
+            <header class="swing-profile-dialog-header">
+                <h2 id="practiceTempoRampTitle">Tempoaufbau</h2>
+                <button type="button" id="practiceTempoRampCloseButton" aria-label="Tempoaufbau schließen">Schließen</button>
+            </header>
+            <div class="swing-profile-controls practice-tempo-ramp-controls">
+                <label class="practice-tempo-ramp-enabled">
+                    Aktiv
+                    <input type="checkbox" id="practiceTempoRampEnabled" />
+                </label>
+                <label>Starttempo <input type="number" id="practiceTempoRampStart" min="30" max="180" step="1" value="80" /></label>
+                <label>Endtempo <input type="number" id="practiceTempoRampEnd" min="30" max="180" step="1" value="100" /></label>
+                <label>Alle x Wiederholungen <input type="number" id="practiceTempoRampEvery" min="1" max="64" step="1" value="2" /></label>
+                <label>Steigerung BPM <input type="number" id="practiceTempoRampStep" min="1" max="30" step="1" value="5" /></label>
+            </div>
+            <p class="practice-tempo-ramp-note">Nach dem Erreichen des Endtempos werden die normalen Wiederholungen im Zieltempo angehängt.</p>
+            <footer class="swing-profile-dialog-footer">
+                <button type="button" id="practiceTempoRampResetButton">Zurücksetzen</button>
+                <button type="button" id="practiceTempoRampDoneButton" class="primary">Fertig</button>
             </footer>
         </section>
     </div>
@@ -5707,6 +5750,46 @@ document.addEventListener('DOMContentLoaded', function () {
             toggleEl.setAttribute('aria-expanded', nextCollapsed ? 'false' : 'true');
         });
     });
+    const practiceScenarioSelectEl = document.querySelector('#practiceScenarioSelect');
+    if (practiceScenarioSelectEl) {
+        practiceScenarioSelectEl.addEventListener('change', function (event) {
+            if (typeof applyPracticeScenario === 'function') {
+                applyPracticeScenario(event.target.value);
+            }
+        });
+    }
+    const practiceScenarioHeaderSelectEl = document.querySelector('#practiceScenarioHeaderSelect');
+    if (practiceScenarioHeaderSelectEl) {
+        practiceScenarioHeaderSelectEl.addEventListener('change', function (event) {
+            if (typeof applyPracticeScenario === 'function') {
+                applyPracticeScenario(event.target.value);
+            }
+        });
+    }
+    const practiceScenarioSaveButtonEl = document.querySelector('#practiceScenarioSaveButton');
+    if (practiceScenarioSaveButtonEl) {
+        practiceScenarioSaveButtonEl.addEventListener('click', function () {
+            if (typeof saveActivePracticeScenario === 'function') {
+                saveActivePracticeScenario();
+            }
+        });
+    }
+    const practiceScenarioNewButtonEl = document.querySelector('#practiceScenarioNewButton');
+    if (practiceScenarioNewButtonEl) {
+        practiceScenarioNewButtonEl.addEventListener('click', function () {
+            if (typeof createPracticeScenarioFromCurrent === 'function') {
+                createPracticeScenarioFromCurrent();
+            }
+        });
+    }
+    const practiceScenarioDeleteButtonEl = document.querySelector('#practiceScenarioDeleteButton');
+    if (practiceScenarioDeleteButtonEl) {
+        practiceScenarioDeleteButtonEl.addEventListener('click', function () {
+            if (typeof deleteActivePracticeScenario === 'function') {
+                deleteActivePracticeScenario();
+            }
+        });
+    }
     document.querySelector('#practiceWithoutSoloLoops').addEventListener('input', function (event) {
         const nextValue = normalizePracticeCount(event.target.value, 1, 0, 32);
         if (practiceState.loopsWithoutSolo !== nextValue) {
@@ -6008,6 +6091,58 @@ document.addEventListener('DOMContentLoaded', function () {
             dialogEl.hidden = true;
         }
     }
+    function syncPracticeTempoRampControls() {
+        const enabledEl = document.querySelector('#practiceTempoRampEnabled');
+        const startEl = document.querySelector('#practiceTempoRampStart');
+        const endEl = document.querySelector('#practiceTempoRampEnd');
+        const everyEl = document.querySelector('#practiceTempoRampEvery');
+        const stepEl = document.querySelector('#practiceTempoRampStep');
+        if (enabledEl) {
+            enabledEl.checked = Boolean(practiceState.tempoRampEnabled);
+        }
+        if (startEl) {
+            startEl.value = normalizePracticeTempo(practiceState.tempoRampStart, timelineState.tempo);
+        }
+        if (endEl) {
+            endEl.value = normalizePracticeTempo(practiceState.tempoRampEnd, timelineState.tempo);
+        }
+        if (everyEl) {
+            everyEl.value = normalizePracticeTempoRampEvery(practiceState.tempoRampEvery);
+        }
+        if (stepEl) {
+            stepEl.value = normalizePracticeTempoRampStep(practiceState.tempoRampStep);
+        }
+        const rampButtonEl = document.querySelector('#practiceTempoRampButton');
+        if (rampButtonEl) {
+            const rampConfig = getPracticeTempoRampConfig();
+            rampButtonEl.classList.toggle('is-active', rampConfig.enabled);
+            rampButtonEl.textContent = rampConfig.enabled
+                ? 'Tempoaufbau ' + rampConfig.startTempo + '→' + rampConfig.endTempo
+                : 'Tempoaufbau';
+        }
+    }
+    function openPracticeTempoRampDialog() {
+        const dialogEl = document.querySelector('#practiceTempoRampDialog');
+        if (!dialogEl) {
+            return;
+        }
+        syncPracticeTempoRampControls();
+        dialogEl.hidden = false;
+    }
+    function closePracticeTempoRampDialog() {
+        const dialogEl = document.querySelector('#practiceTempoRampDialog');
+        if (dialogEl) {
+            dialogEl.hidden = true;
+        }
+    }
+    function notifyPracticeTempoRampChanged() {
+        syncPracticeTempoRampControls();
+        if (typeof updatePracticeInputs === 'function') {
+            updatePracticeInputs();
+        }
+        updateTimelineMetadataNode();
+        notifyPracticeSelectionChanged();
+    }
     function syncTimingControlValues() {
         ['timelineTempo', 'practiceTempo'].forEach(function (inputId) {
             const inputEl = document.querySelector('#' + inputId);
@@ -6028,6 +6163,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 inputEl.classList.toggle('is-active', Boolean(timelineState.shekereBeatEnabled));
             }
         });
+        syncPracticeTempoRampControls();
         const currentProfileKey = getCurrentTimelineSwingProfileKey();
         const currentProfile = normalizeTimelineSwingProfile(
             timelineState.swingProfile && timelineState.swingProfile[currentProfileKey],
@@ -6087,17 +6223,47 @@ document.addEventListener('DOMContentLoaded', function () {
         sendPracticeAudioMessage(message);
         sendTimelineAudioMessage(message);
     }
+    function inputHasCompleteNumberValue(inputEl) {
+        if (!inputEl || inputEl.value === '') {
+            return false;
+        }
+        const numericValue = Number(inputEl.value);
+        if (!Number.isFinite(numericValue)) {
+            return false;
+        }
+        const minValue = inputEl.min === '' ? -Infinity : Number(inputEl.min);
+        const maxValue = inputEl.max === '' ? Infinity : Number(inputEl.max);
+        if (Number.isFinite(minValue) && numericValue < minValue) {
+            return false;
+        }
+        if (Number.isFinite(maxValue) && numericValue > maxValue) {
+            return false;
+        }
+        return true;
+    }
     ['timelineTempo', 'practiceTempo'].forEach(function (inputId) {
         const inputEl = document.querySelector('#' + inputId);
         if (!inputEl) {
             return;
         }
         inputEl.addEventListener('input', function (event) {
+            if (!inputHasCompleteNumberValue(event.target)) {
+                return;
+            }
             const nextValue = normalizeTimelineTempo(event.target.value);
             if (timelineState.tempo !== nextValue) {
                 recordArrangementHistorySnapshot();
             }
             timelineState.tempo = nextValue;
+            notifyTimingControlsChanged();
+        });
+        inputEl.addEventListener('change', function (event) {
+            const nextValue = normalizeTimelineTempo(event.target.value);
+            if (timelineState.tempo !== nextValue) {
+                recordArrangementHistorySnapshot();
+            }
+            timelineState.tempo = nextValue;
+            event.target.value = String(nextValue);
             notifyTimingControlsChanged();
         });
     });
@@ -6224,6 +6390,65 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     }
+    const practiceVolumeButtonEl = document.querySelector('#practiceVolumeButton');
+    if (practiceVolumeButtonEl) {
+        practiceVolumeButtonEl.addEventListener('click', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            if (typeof openTimelineInstrumentVolumesPopover === 'function') {
+                openTimelineInstrumentVolumesPopover(practiceVolumeButtonEl);
+            }
+        });
+    }
+    document.querySelector('#practiceTempoRampButton').addEventListener('click', openPracticeTempoRampDialog);
+    document.querySelector('#practiceTempoRampCloseButton').addEventListener('click', closePracticeTempoRampDialog);
+    document.querySelector('#practiceTempoRampDoneButton').addEventListener('click', closePracticeTempoRampDialog);
+    document.querySelector('#practiceTempoRampDialog').addEventListener('click', function (event) {
+        if (event.target && event.target.id === 'practiceTempoRampDialog') {
+            closePracticeTempoRampDialog();
+        }
+    });
+    document.querySelector('#practiceTempoRampResetButton').addEventListener('click', function () {
+        recordArrangementHistorySnapshot();
+        practiceState.tempoRampEnabled = false;
+        practiceState.tempoRampStart = normalizePracticeTempo(timelineState.tempo, 100);
+        practiceState.tempoRampEnd = normalizePracticeTempo(timelineState.tempo, 100);
+        practiceState.tempoRampEvery = 2;
+        practiceState.tempoRampStep = 5;
+        notifyPracticeTempoRampChanged();
+    });
+    [
+        ['practiceTempoRampEnabled', 'tempoRampEnabled', function (value) { return Boolean(value); }, 'checked'],
+        ['practiceTempoRampStart', 'tempoRampStart', function (value) { return normalizePracticeTempo(value, timelineState.tempo); }, 'value'],
+        ['practiceTempoRampEnd', 'tempoRampEnd', function (value) { return normalizePracticeTempo(value, timelineState.tempo); }, 'value'],
+        ['practiceTempoRampEvery', 'tempoRampEvery', normalizePracticeTempoRampEvery, 'value'],
+        ['practiceTempoRampStep', 'tempoRampStep', normalizePracticeTempoRampStep, 'value']
+    ].forEach(function (rampConfig) {
+        const inputEl = document.querySelector('#' + rampConfig[0]);
+        if (!inputEl) {
+            return;
+        }
+        inputEl.addEventListener('input', function (event) {
+            if (event.target.type === 'number' && !inputHasCompleteNumberValue(event.target)) {
+                return;
+            }
+            const nextValue = rampConfig[2](event.target[rampConfig[3]]);
+            if (practiceState[rampConfig[1]] !== nextValue) {
+                recordArrangementHistorySnapshot();
+            }
+            practiceState[rampConfig[1]] = nextValue;
+            notifyPracticeTempoRampChanged();
+        });
+        inputEl.addEventListener('change', function (event) {
+            const nextValue = rampConfig[2](event.target[rampConfig[3]]);
+            if (practiceState[rampConfig[1]] !== nextValue) {
+                recordArrangementHistorySnapshot();
+            }
+            practiceState[rampConfig[1]] = nextValue;
+            notifyPracticeTempoRampChanged();
+            syncPracticeTempoRampControls();
+        });
+    });
     document.querySelector('#practiceFeelProfileButton').addEventListener('click', openPracticeFeelProfileDialog);
     document.querySelector('#practiceFeelProfileCloseButton').addEventListener('click', closePracticeFeelProfileDialog);
     document.querySelector('#practiceFeelProfileDoneButton').addEventListener('click', closePracticeFeelProfileDialog);

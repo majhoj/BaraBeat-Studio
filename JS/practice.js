@@ -7,6 +7,11 @@ const practiceState = {
     loopsWithSolo: 1,
     repeatCount: 4,
     timerMinutes: 0,
+    tempoRampEnabled: false,
+    tempoRampStart: 80,
+    tempoRampEnd: 100,
+    tempoRampEvery: 2,
+    tempoRampStep: 5,
     accompanimentStart: 'immediate',
     accompanimentBetweenPatterns: false,
     pauseAccompanimentForLeadInPatterns: false,
@@ -19,6 +24,8 @@ const practiceState = {
     patternRepeatCounts: {},
     patternTargetInstruments: {},
     patternChooserExpanded: false,
+    practiceScenarios: [],
+    activePracticeScenarioId: '',
     defaultsApplied: false,
     defaultSelectionSourceHash: ''
 };
@@ -141,7 +148,12 @@ const practiceScrollerState = {
     animationFrameId: null,
     playbackEvents: [],
     playbackAnchor: null,
-    activeCells: []
+    activeCells: [],
+    playbackStartedAt: null,
+    timerEndsAt: null,
+    repeatCount: 1,
+    practiceDurationSeconds: 0,
+    tempoRampLeadInCycles: 0
 };
 
 function isPracticeScrollerCompactViewport() {
@@ -287,6 +299,23 @@ function normalizePracticePatternRepeatCount(rawValue) {
         return null;
     }
     return Math.max(1, Math.min(32, Math.round(numericValue)));
+}
+
+function normalizePracticeTempo(rawValue, fallback) {
+    const normalizedFallback = typeof normalizeTimelineTempo === 'function'
+        ? normalizeTimelineTempo(fallback)
+        : Math.max(30, Math.min(180, Number(fallback) || 100));
+    return typeof normalizeTimelineTempo === 'function'
+        ? normalizeTimelineTempo(rawValue === null || rawValue === undefined || rawValue === '' ? normalizedFallback : rawValue)
+        : Math.max(30, Math.min(180, Number(rawValue) || normalizedFallback));
+}
+
+function normalizePracticeTempoRampEvery(rawValue) {
+    return normalizePracticeCount(rawValue, 2, 1, 64);
+}
+
+function normalizePracticeTempoRampStep(rawValue) {
+    return normalizePracticeCount(rawValue, 5, 1, 30);
 }
 
 function getPracticeSoloPatternRepeatCount(patternId) {
@@ -477,7 +506,7 @@ function getPracticePatternIdsFromMetadata(sourceKeys, patternIds, patternLibrar
     return selectedIds;
 }
 
-function buildPracticeMetadata() {
+function buildPracticeSettingsMetadata() {
     const persistedPatternTargets = getPersistedPracticePatternTargets();
     return {
         version: 1,
@@ -493,6 +522,11 @@ function buildPracticeMetadata() {
         loopsWithSolo: practiceState.loopsWithSolo,
         repeatCount: practiceState.repeatCount,
         timerMinutes: practiceState.timerMinutes,
+        tempoRampEnabled: Boolean(practiceState.tempoRampEnabled),
+        tempoRampStart: normalizePracticeTempo(practiceState.tempoRampStart, timelineState.tempo),
+        tempoRampEnd: normalizePracticeTempo(practiceState.tempoRampEnd, timelineState.tempo),
+        tempoRampEvery: normalizePracticeTempoRampEvery(practiceState.tempoRampEvery),
+        tempoRampStep: normalizePracticeTempoRampStep(practiceState.tempoRampStep),
         accompanimentPatternIds: practiceState.accompanimentPatternIds.slice(),
         soloPatternIds: practiceState.soloPatternIds.slice(),
         accompanimentPatternSourceKeys: getPracticePatternSourceKeys(practiceState.accompanimentPatternIds),
@@ -508,6 +542,59 @@ function buildPracticeMetadata() {
     };
 }
 
+function normalizePracticeScenarioName(rawName, index) {
+    const name = String(rawName || '').trim();
+    return name || ('Szenario ' + (index + 1));
+}
+
+function createPracticeScenarioId() {
+    return 'practice-scenario-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+}
+
+function normalizePracticeScenario(rawScenario, index) {
+    if (!rawScenario || typeof rawScenario !== 'object') {
+        return null;
+    }
+    const rawSettings = rawScenario.settings && typeof rawScenario.settings === 'object'
+        ? rawScenario.settings
+        : rawScenario;
+    const scenarioId = String(rawScenario.id || '').trim() || createPracticeScenarioId();
+    return {
+        id: scenarioId,
+        name: normalizePracticeScenarioName(rawScenario.name, index),
+        settings: Object.assign({}, rawSettings)
+    };
+}
+
+function normalizePracticeScenarios(rawScenarios) {
+    const sourceScenarios = Array.isArray(rawScenarios) ? rawScenarios : [];
+    const usedIds = [];
+    return sourceScenarios.map(function (rawScenario, index) {
+        const scenario = normalizePracticeScenario(rawScenario, index);
+        if (!scenario) {
+            return null;
+        }
+        while (usedIds.indexOf(scenario.id) !== -1) {
+            scenario.id = createPracticeScenarioId();
+        }
+        usedIds.push(scenario.id);
+        return scenario;
+    }).filter(Boolean);
+}
+
+function buildPracticeMetadata() {
+    const metadata = buildPracticeSettingsMetadata();
+    metadata.scenarios = normalizePracticeScenarios(practiceState.practiceScenarios).map(function (scenario) {
+        return {
+            id: scenario.id,
+            name: scenario.name,
+            settings: Object.assign({}, scenario.settings)
+        };
+    });
+    metadata.activeScenarioId = practiceState.activePracticeScenarioId || '';
+    return metadata;
+}
+
 function resetPracticeForSource(sourceHash) {
     practiceState.accompanimentPatternIds = [];
     practiceState.soloPatternIds = [];
@@ -516,16 +603,13 @@ function resetPracticeForSource(sourceHash) {
     practiceState.patternRepeatCounts = {};
     practiceState.instrumentVolumes = {};
     practiceState.instrumentToneVolumes = {};
+    practiceState.practiceScenarios = [];
+    practiceState.activePracticeScenarioId = '';
     practiceState.defaultsApplied = false;
     practiceState.defaultSelectionSourceHash = sourceHash || timelineState.sourceHash || '';
 }
 
-function applyPracticeMetadata(metadata, patternLibrary, sourceHash) {
-    if (!metadata || typeof metadata !== 'object') {
-        resetPracticeForSource(sourceHash);
-        return;
-    }
-
+function applyPracticeSettingsMetadata(metadata, patternLibrary, sourceHash) {
     practiceState.accompanimentStart = normalizePracticeStartMode(metadata.accompanimentStart);
     practiceState.accompanimentBetweenPatterns = Boolean(metadata.accompanimentBetweenPatterns);
     practiceState.pauseAccompanimentForLeadInPatterns = Boolean(metadata.pauseAccompanimentForLeadInPatterns);
@@ -537,6 +621,11 @@ function applyPracticeMetadata(metadata, patternLibrary, sourceHash) {
     practiceState.loopsWithSolo = normalizePracticeCount(metadata.loopsWithSolo, 1, 1, 32);
     practiceState.repeatCount = normalizePracticeCount(metadata.repeatCount, 4, 1, practiceRepeatCountMax);
     practiceState.timerMinutes = normalizePracticeTimerMinutes(metadata.timerMinutes);
+    practiceState.tempoRampEnabled = Boolean(metadata.tempoRampEnabled);
+    practiceState.tempoRampStart = normalizePracticeTempo(metadata.tempoRampStart, timelineState.tempo);
+    practiceState.tempoRampEnd = normalizePracticeTempo(metadata.tempoRampEnd, timelineState.tempo);
+    practiceState.tempoRampEvery = normalizePracticeTempoRampEvery(metadata.tempoRampEvery);
+    practiceState.tempoRampStep = normalizePracticeTempoRampStep(metadata.tempoRampStep);
     practiceState.accompanimentPatternIds = getPracticePatternIdsFromMetadata(
         metadata.accompanimentPatternSourceKeys,
         metadata.accompanimentPatternIds,
@@ -572,6 +661,154 @@ function applyPracticeMetadata(metadata, patternLibrary, sourceHash) {
         practiceState.soloPatternIds.length > 0;
     practiceState.defaultsApplied = hasPersistedPatternSelection;
     practiceState.defaultSelectionSourceHash = sourceHash || timelineState.sourceHash || '';
+}
+
+function applyPracticeMetadata(metadata, patternLibrary, sourceHash) {
+    if (!metadata || typeof metadata !== 'object') {
+        resetPracticeForSource(sourceHash);
+        return;
+    }
+
+    practiceState.practiceScenarios = normalizePracticeScenarios(metadata.scenarios);
+    practiceState.activePracticeScenarioId = practiceState.practiceScenarios.some(function (scenario) {
+        return scenario.id === metadata.activeScenarioId;
+    }) ? metadata.activeScenarioId : '';
+    applyPracticeSettingsMetadata(metadata, patternLibrary, sourceHash);
+}
+
+function getActivePracticeScenario() {
+    return practiceState.practiceScenarios.find(function (scenario) {
+        return scenario.id === practiceState.activePracticeScenarioId;
+    }) || null;
+}
+
+function savePracticeScenario(name, scenarioId) {
+    const safeName = normalizePracticeScenarioName(name, practiceState.practiceScenarios.length);
+    const settings = buildPracticeSettingsMetadata();
+    const existingScenario = practiceState.practiceScenarios.find(function (scenario) {
+        return scenario.id === scenarioId;
+    });
+    if (existingScenario) {
+        existingScenario.name = safeName;
+        existingScenario.settings = settings;
+        practiceState.activePracticeScenarioId = existingScenario.id;
+        return existingScenario;
+    }
+
+    const scenario = {
+        id: createPracticeScenarioId(),
+        name: safeName,
+        settings: settings
+    };
+    practiceState.practiceScenarios.push(scenario);
+    practiceState.activePracticeScenarioId = scenario.id;
+    return scenario;
+}
+
+function renderPracticeScenarioControls() {
+    const selectEls = [
+        document.getElementById('practiceScenarioSelect'),
+        document.getElementById('practiceScenarioHeaderSelect')
+    ].filter(Boolean);
+    if (selectEls.length === 0) {
+        return;
+    }
+
+    const activeScenarioExists = practiceState.practiceScenarios.some(function (scenario) {
+        return scenario.id === practiceState.activePracticeScenarioId;
+    });
+    if (!activeScenarioExists) {
+        practiceState.activePracticeScenarioId = '';
+    }
+
+    selectEls.forEach(function (selectEl) {
+        selectEl.innerHTML = '';
+        const currentOptionEl = document.createElement('option');
+        currentOptionEl.value = '';
+        currentOptionEl.textContent = 'Aktuelle Einstellungen';
+        selectEl.appendChild(currentOptionEl);
+        practiceState.practiceScenarios.forEach(function (scenario) {
+            const optionEl = document.createElement('option');
+            optionEl.value = scenario.id;
+            optionEl.textContent = scenario.name;
+            selectEl.appendChild(optionEl);
+        });
+        selectEl.value = practiceState.activePracticeScenarioId || '';
+    });
+}
+
+function updatePracticeScenarioMetadata() {
+    if (typeof updateTimelineMetadataNode === 'function') {
+        updateTimelineMetadataNode();
+    }
+}
+
+async function persistPracticeScenarioMetadataToScore() {
+    updatePracticeScenarioMetadata();
+    if (typeof saveCurrentScoreFromMenu === 'function') {
+        await saveCurrentScoreFromMenu();
+    }
+}
+
+async function createPracticeScenarioFromCurrent() {
+    const defaultName = 'Szenario ' + (practiceState.practiceScenarios.length + 1);
+    const name = window.prompt('Name für das Übungsszenario:', defaultName);
+    if (name === null) {
+        return;
+    }
+    recordArrangementHistorySnapshot();
+    savePracticeScenario(name, '');
+    renderPracticePanel();
+    await persistPracticeScenarioMetadataToScore();
+}
+
+async function saveActivePracticeScenario() {
+    const activeScenario = getActivePracticeScenario();
+    if (!activeScenario) {
+        await createPracticeScenarioFromCurrent();
+        return;
+    }
+    recordArrangementHistorySnapshot();
+    savePracticeScenario(activeScenario.name, activeScenario.id);
+    renderPracticePanel();
+    await persistPracticeScenarioMetadataToScore();
+}
+
+async function deleteActivePracticeScenario() {
+    const activeScenario = getActivePracticeScenario();
+    if (!activeScenario) {
+        return;
+    }
+    if (!window.confirm('Übungsszenario "' + activeScenario.name + '" löschen?')) {
+        return;
+    }
+    recordArrangementHistorySnapshot();
+    practiceState.practiceScenarios = practiceState.practiceScenarios.filter(function (scenario) {
+        return scenario.id !== activeScenario.id;
+    });
+    practiceState.activePracticeScenarioId = '';
+    renderPracticePanel();
+    await persistPracticeScenarioMetadataToScore();
+}
+
+function applyPracticeScenario(scenarioId) {
+    const scenario = practiceState.practiceScenarios.find(function (candidate) {
+        return candidate.id === scenarioId;
+    });
+    if (!scenario) {
+        practiceState.activePracticeScenarioId = '';
+        renderPracticePanel();
+        updatePracticeScenarioMetadata();
+        return;
+    }
+    recordArrangementHistorySnapshot();
+    practiceState.activePracticeScenarioId = scenario.id;
+    applyPracticeSettingsMetadata(scenario.settings, timelineState.sourcePatterns, timelineState.sourceHash);
+    renderPracticePanel();
+    if (typeof notifyPracticeSelectionChanged === 'function') {
+        notifyPracticeSelectionChanged();
+    }
+    updatePracticeScenarioMetadata();
 }
 
 function syncPracticeSelectionsWithPatternLibrary() {
@@ -1050,6 +1287,8 @@ function renderPracticePatternList(containerId, listName) {
 }
 
 function updatePracticeInputs() {
+    renderPracticeScenarioControls();
+
     const withoutSoloEl = document.getElementById('practiceWithoutSoloLoops');
     const withSoloEl = document.getElementById('practiceWithSoloLoops');
     const repeatEl = document.getElementById('practiceRepeatCount');
@@ -1180,6 +1419,9 @@ function createPracticeEntry(pattern, parallelGroupId, blockId, repeatCount, isL
         repeatCount: normalizePracticeCount(repeatCount, 1, 1, 32),
         isLeadIn: Boolean(isLeadIn),
         suppressPlayback: Boolean(entryOptions.suppressPlayback),
+        sectionTempo: entryOptions.sectionTempo === null || entryOptions.sectionTempo === undefined
+            ? null
+            : normalizePracticeTempo(entryOptions.sectionTempo, timelineState.tempo),
         patternId: pattern.id,
         patternSourceKey: pattern.sourceKey,
         isPracticeTarget: practiceState.soloPatternIds.indexOf(pattern.id) !== -1,
@@ -1191,7 +1433,7 @@ function createPracticeEntry(pattern, parallelGroupId, blockId, repeatCount, isL
     };
 }
 
-function addPracticeParallelGroup(entries, patterns, blockIndex, repeatCount, isLeadIn) {
+function addPracticeParallelGroup(entries, patterns, blockIndex, repeatCount, isLeadIn, options) {
     const safePatterns = patterns.filter(Boolean);
     if (safePatterns.length === 0) {
         return [];
@@ -1201,7 +1443,7 @@ function addPracticeParallelGroup(entries, patterns, blockIndex, repeatCount, is
     const blockId = 'practice-block-' + blockIndex;
     const createdEntries = [];
     safePatterns.forEach(function (pattern) {
-        const entry = createPracticeEntry(pattern, parallelGroupId, blockId, repeatCount, isLeadIn);
+        const entry = createPracticeEntry(pattern, parallelGroupId, blockId, repeatCount, isLeadIn, options);
         entries.push(entry);
         createdEntries.push(entry);
     });
@@ -1299,7 +1541,11 @@ function buildPracticeEntries(options) {
     const buildOptions = options || {};
     const repeatCycles = buildOptions.singleCycle
         ? 1
-        : practiceState.repeatCount;
+        : normalizePracticeCount(buildOptions.repeatCycles, practiceState.repeatCount, 1, practiceRepeatCountMax);
+    const sectionTempoSequence = Array.isArray(buildOptions.sectionTempoSequence)
+        ? buildOptions.sectionTempoSequence
+        : [];
+    const leadInCycleCount = Math.max(0, Math.min(repeatCycles, Math.round(Number(buildOptions.leadInCycleCount) || 0)));
     const accompanimentPatterns = getPracticePatternsByIds(practiceState.accompanimentPatternIds);
     const soloPatterns = getPracticePatternsByIds(practiceState.soloPatternIds);
     const cycleSoloPatterns = getPracticeCyclePatterns(soloPatterns);
@@ -1310,8 +1556,12 @@ function buildPracticeEntries(options) {
     let blockIndex = 1;
 
     for (let cycleIndex = 0; cycleIndex < repeatCycles; cycleIndex += 1) {
+        const cycleOptions = sectionTempoSequence[cycleIndex] === null || sectionTempoSequence[cycleIndex] === undefined
+            ? {}
+            : { sectionTempo: sectionTempoSequence[cycleIndex] };
+        const isLeadInCycle = cycleIndex < leadInCycleCount;
         if (accompanimentOnlyLoops > 0) {
-            addPracticeParallelGroup(entries, accompanimentPatterns, blockIndex, accompanimentOnlyLoops);
+            addPracticeParallelGroup(entries, accompanimentPatterns, blockIndex, accompanimentOnlyLoops, isLeadInCycle, cycleOptions);
             blockIndex += 1;
         }
 
@@ -1334,7 +1584,8 @@ function buildPracticeEntries(options) {
                 groupPatterns,
                 blockIndex,
                 getPracticePatternDefaultRepeatCount(soloPattern),
-                false
+                isLeadInCycle,
+                cycleOptions
             );
             if (isPausePattern && accompanimentIsActive) {
                 createdEntries.forEach(function (entry) {
@@ -1353,7 +1604,7 @@ function buildPracticeEntries(options) {
             }
             if (practiceState.accompanimentBetweenPatterns && soloPatternIndex < cycleSoloPatterns.length - 1) {
                 if (practiceState.loopsWithoutSolo > 0) {
-                    addPracticeParallelGroup(entries, accompanimentPatterns, blockIndex, practiceState.loopsWithoutSolo);
+                    addPracticeParallelGroup(entries, accompanimentPatterns, blockIndex, practiceState.loopsWithoutSolo, isLeadInCycle, cycleOptions);
                     blockIndex += 1;
                 }
             }
@@ -1376,6 +1627,9 @@ function buildPracticeBlocksFromEntries(entries) {
                 id: blockId,
                 repeatCount: normalizePracticeCount(entry.repeatCount, 1, 1, 32),
                 isLeadIn: Boolean(entry.isLeadIn),
+                sectionTempo: entry.sectionTempo === null || entry.sectionTempo === undefined
+                    ? null
+                    : normalizePracticeTempo(entry.sectionTempo, timelineState.tempo),
                 entries: []
             };
             blocks.push(blockById[blockId]);
@@ -1391,10 +1645,50 @@ function buildPracticeBlocksFromEntries(entries) {
             suppressPlayback: Boolean(entry.suppressPlayback),
             repeatCount: normalizePracticeCount(entry.repeatCount, 1, 1, 32),
             isLeadIn: Boolean(entry.isLeadIn),
+            sectionTempo: entry.sectionTempo === null || entry.sectionTempo === undefined
+                ? null
+                : normalizePracticeTempo(entry.sectionTempo, timelineState.tempo),
             targetInstruments: Array.isArray(entry.targetInstruments) ? entry.targetInstruments.slice() : []
         });
     });
     return blocks;
+}
+
+function getPracticeTempoRampConfig() {
+    const startTempo = normalizePracticeTempo(practiceState.tempoRampStart, timelineState.tempo);
+    const endTempo = normalizePracticeTempo(practiceState.tempoRampEnd, timelineState.tempo);
+    const every = normalizePracticeTempoRampEvery(practiceState.tempoRampEvery);
+    const step = normalizePracticeTempoRampStep(practiceState.tempoRampStep);
+    return {
+        enabled: Boolean(practiceState.tempoRampEnabled) && endTempo > startTempo,
+        startTempo: startTempo,
+        endTempo: endTempo,
+        every: every,
+        step: step
+    };
+}
+
+function buildPracticeTempoRampPlan() {
+    const rampConfig = getPracticeTempoRampConfig();
+    if (!rampConfig.enabled) {
+        return null;
+    }
+
+    const rampTempos = [];
+    let currentTempo = rampConfig.startTempo;
+    let safetyCounter = 0;
+    while (currentTempo < rampConfig.endTempo && safetyCounter < 512) {
+        for (let repeatIndex = 0; repeatIndex < rampConfig.every; repeatIndex += 1) {
+            rampTempos.push(currentTempo);
+        }
+        currentTempo = Math.min(rampConfig.endTempo, currentTempo + rampConfig.step);
+        safetyCounter += 1;
+    }
+    rampTempos.push(rampConfig.endTempo);
+    return {
+        rampTempos: rampTempos,
+        targetTempo: rampConfig.endTempo
+    };
 }
 
 function createEmptyPracticeTrackNotes() {
@@ -1888,6 +2182,9 @@ function createPracticeSection(block, blockIndex, sectionSuffix) {
             labelName: '',
             runtimeKey: 'practice-js::' + block.id + safeSuffix + '::' + blockIndex,
             swingFactor: null,
+            sectionTempo: block.sectionTempo === null || block.sectionTempo === undefined
+                ? null
+                : normalizePracticeTempo(block.sectionTempo, timelineState.tempo),
             trackNotes: createEmptyPracticeTrackNotes(),
             trackHandModes: createEmptyPracticeTrackHandModes(),
             trackTargetFlags: createEmptyPracticeTrackFlags(),
@@ -1907,6 +2204,9 @@ function clonePracticeSection(section, sectionSuffix) {
         labelName: section.labelName,
         runtimeKey: section.runtimeKey + safeSuffix,
         swingFactor: section.swingFactor,
+        sectionTempo: section.sectionTempo === null || section.sectionTempo === undefined
+            ? null
+            : normalizePracticeTempo(section.sectionTempo, timelineState.tempo),
         trackNotes: createEmptyPracticeTrackNotes(),
         trackHandModes: createEmptyPracticeTrackHandModes(),
         trackTargetFlags: createEmptyPracticeTrackFlags(),
@@ -2547,7 +2847,17 @@ function buildPracticePlayerPayload() {
         throw new Error('Bitte mindestens ein Begleit- oder Übungsteil-Pattern für den Übungsmodus auswählen.');
     }
 
-    const entries = buildPracticeEntries({ singleCycle: true });
+    const tempoRampPlan = buildPracticeTempoRampPlan();
+    const tempoSequence = tempoRampPlan
+        ? tempoRampPlan.rampTempos.concat([tempoRampPlan.targetTempo])
+        : null;
+    const entries = tempoRampPlan && tempoSequence.length > 0
+        ? buildPracticeEntries({
+            repeatCycles: tempoSequence.length,
+            sectionTempoSequence: tempoSequence,
+            leadInCycleCount: tempoRampPlan.rampTempos.length
+        })
+        : buildPracticeEntries({ singleCycle: true });
     if (entries.length === 0) {
         throw new Error('Aus den Übungseinstellungen konnte keine Abspielfolge erzeugt werden.');
     }
@@ -2557,6 +2867,13 @@ function buildPracticePlayerPayload() {
         payload[0].PracticeMode = true;
         payload[0].PracticeBlocks = buildPracticeBlocksFromEntries(entries);
         payload[0].PracticeSections = buildPracticeSectionsFromEntries(entries);
+        payload[0].PracticeExpandedSequence = Boolean(tempoRampPlan);
+        payload[0].PracticeTempoRampLeadInCycles = tempoRampPlan
+            ? tempoRampPlan.rampTempos.length
+            : 0;
+        if (tempoRampPlan) {
+            payload[0].Tempo = tempoSequence[0];
+        }
         payload[0].PracticeH2HRestMute = Boolean(practiceState.h2hRestMute);
         payload[0].PracticeInstrumentVolumes = normalizePracticeInstrumentVolumes(practiceState.instrumentVolumes);
         payload[0].PracticeInstrumentToneVolumes = normalizePracticeInstrumentToneVolumes(practiceState.instrumentToneVolumes);
@@ -2793,7 +3110,8 @@ function createPracticeScrollerNoteSymbol(noteValue) {
     return symbolEl;
 }
 
-function flattenPracticeScrollerSections(sections) {
+function flattenPracticeScrollerSections(sections, options) {
+    const flattenOptions = options || {};
     const safeSections = Array.isArray(sections) ? sections : [];
     const visualLoopCopies = getPracticeScrollerVisualLoopCopies();
     const sectionVisualRepeatCopies = getPracticeScrollerSectionVisualRepeatCopies(safeSections, visualLoopCopies);
@@ -3494,7 +3812,9 @@ function renderPracticeScrollerFromPayload(playerPayload) {
     practiceScrollerState.activeCells = [];
     closePracticeInstrumentVolumePopover();
 
-    const flattened = flattenPracticeScrollerSections(sections);
+    const flattened = flattenPracticeScrollerSections(sections, {
+        expandedSequence: Boolean(config && config.PracticeExpandedSequence)
+    });
     const stepsPerBar = getPracticeScrollerStepsPerBar();
     practiceScrollerState.totalSteps = flattened.totalSteps;
     practiceScrollerState.loopSegments = flattened.loopSegments;
@@ -3510,6 +3830,14 @@ function renderPracticeScrollerFromPayload(playerPayload) {
     practiceScrollerState.visualTotalSteps = flattened.totalSteps;
     practiceScrollerState.visualTailSteps = flattened.visualTailSteps;
     practiceScrollerState.recycleVisualLoop = Boolean(flattened.recycleVisualLoop);
+    practiceScrollerState.repeatCount = normalizePracticeCount(practiceState.repeatCount, 1, 1, practiceRepeatCountMax);
+    practiceScrollerState.practiceDurationSeconds = Math.max(0, Number(config && config.PracticeDurationSeconds) || 0);
+    practiceScrollerState.tempoRampLeadInCycles = Math.max(
+        0,
+        Math.round(Number(config && config.PracticeTempoRampLeadInCycles) || 0)
+    );
+    practiceScrollerState.playbackStartedAt = null;
+    practiceScrollerState.timerEndsAt = null;
     practiceScrollerState.stepsPerBar = stepsPerBar;
     practiceScrollerState.currentStep = 0;
     practiceScrollerState.activeStep = -1;
@@ -3632,7 +3960,49 @@ function renderPracticeScrollerFromPayload(playerPayload) {
     });
 
     updatePracticeScrollerPosition(-practiceScrollerState.visualLeadInSteps);
-    statusEl.textContent = Math.ceil(flattened.totalSteps / stepsPerBar) + ' Takte';
+}
+
+function formatPracticeRemainingTime(milliseconds) {
+    const totalSeconds = Math.max(0, Math.ceil(Number(milliseconds) / 1000) || 0);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return minutes + ':' + String(seconds).padStart(2, '0');
+}
+
+function getPracticeScrollerRemainingStatus(rawStep) {
+    const safeStep = Math.max(0, Number(rawStep) || 0);
+    const loopStart = Math.max(0, Number(practiceScrollerState.playbackLoopStart) || 0);
+    const rampLeadInCycles = Math.max(0, Number(practiceScrollerState.tempoRampLeadInCycles) || 0);
+    if (rampLeadInCycles > 0 && loopStart > 0 && safeStep < loopStart) {
+        const rampCycleLength = Math.max(1, loopStart / rampLeadInCycles);
+        const remainingRampCycles = Math.max(0, Math.ceil((loopStart - safeStep) / rampCycleLength));
+        return 'Tempoaufbau: noch ' + remainingRampCycles + ' Wdh.';
+    }
+
+    if (practiceScrollerState.practiceDurationSeconds > 0) {
+        if (practiceScrollerState.timerEndsAt === null &&
+                practiceScrollerState.playbackAnchor !== null &&
+                safeStep >= loopStart) {
+            practiceScrollerState.timerEndsAt = window.performance.now() +
+                (practiceScrollerState.practiceDurationSeconds * 1000);
+        }
+        const remainingMilliseconds = practiceScrollerState.timerEndsAt !== null
+            ? practiceScrollerState.timerEndsAt - window.performance.now()
+            : practiceScrollerState.practiceDurationSeconds * 1000;
+        return 'Noch ' + formatPracticeRemainingTime(remainingMilliseconds);
+    }
+
+    const repeatCount = normalizePracticeCount(practiceScrollerState.repeatCount, 1, 1, practiceRepeatCountMax);
+    const loopLength = Math.max(0, Number(practiceScrollerState.playbackLoopLength) || 0);
+    if (loopLength <= 0) {
+        return 'Noch ' + repeatCount + ' Wdh.';
+    }
+
+    const completedLoops = safeStep < loopStart
+        ? 0
+        : Math.floor((safeStep - loopStart) / loopLength);
+    const remainingLoops = Math.max(0, repeatCount - completedLoops);
+    return 'Noch ' + remainingLoops + ' Wdh.';
 }
 
 function normalizePracticeScrollerPlaybackStep(playbackStep) {
@@ -3717,6 +4087,9 @@ function updatePracticeScrollerPosition(playbackStep) {
     practiceScrollerState.currentStep = rawStep;
     practiceScrollerState.stepWidth = stepWidth;
     scrollerEl.style.setProperty('--practice-scroller-offset', laneOffset + 'px');
+    if (statusEl) {
+        statusEl.textContent = getPracticeScrollerRemainingStatus(rawStep);
+    }
 
     if (practiceScrollerState.activeStep !== activeStep) {
         if (isPracticeScrollerCompactViewport()) {
@@ -3739,15 +4112,6 @@ function updatePracticeScrollerPosition(playbackStep) {
             });
         }
         practiceScrollerState.activeStep = activeStep;
-
-        if (statusEl && (!isPracticeScrollerCompactViewport() || activeStep % practiceScrollerState.stepsPerBar === 0)) {
-            const displayBase = practiceScrollerState.visualCycleSteps || practiceScrollerState.totalSteps;
-            const displayStep = displayBase > 0
-                ? activeStep % displayBase
-                : activeStep;
-            statusEl.textContent = 'Takt ' + (Math.floor(displayStep / practiceScrollerState.stepsPerBar) + 1) +
-                ', Schritt ' + ((displayStep % practiceScrollerState.stepsPerBar) + 1);
-        }
     }
 }
 
@@ -3854,6 +4218,11 @@ function startPracticeScrollerLeadIn(leadInMs) {
         step: -practiceScrollerState.visualLeadInSteps,
         time: window.performance.now()
     };
+    practiceScrollerState.playbackStartedAt = practiceScrollerState.playbackAnchor.time + safeLeadInMs;
+    practiceScrollerState.timerEndsAt = practiceScrollerState.practiceDurationSeconds > 0 &&
+            practiceScrollerState.tempoRampLeadInCycles <= 0
+        ? practiceScrollerState.playbackStartedAt + (practiceScrollerState.practiceDurationSeconds * 1000)
+        : null;
     updatePracticeScrollerPosition(practiceScrollerState.playbackAnchor.step);
 
     if (safeLeadInMs <= 0) {
@@ -3884,6 +4253,8 @@ function updatePracticeScrollerState(nextState, leadInMs, endDelayMs) {
             stopPracticeScrollerAnimation();
             practiceScrollerState.playbackEvents = [];
             practiceScrollerState.playbackAnchor = null;
+            practiceScrollerState.playbackStartedAt = null;
+            practiceScrollerState.timerEndsAt = null;
         }, safeEndDelayMs + 30);
         return;
     }
@@ -3896,6 +4267,8 @@ function updatePracticeScrollerState(nextState, leadInMs, endDelayMs) {
         stopPracticeScrollerAnimation();
         practiceScrollerState.playbackEvents = [];
         practiceScrollerState.playbackAnchor = null;
+        practiceScrollerState.playbackStartedAt = null;
+        practiceScrollerState.timerEndsAt = null;
         closePracticeInstrumentVolumePopover();
         updatePracticeScrollerPosition(-practiceScrollerState.visualLeadInSteps);
     }
@@ -3909,6 +4282,8 @@ function clearPracticeScrollerPlayback() {
     stopPracticeScrollerAnimation();
     practiceScrollerState.playbackEvents = [];
     practiceScrollerState.playbackAnchor = null;
+    practiceScrollerState.playbackStartedAt = null;
+    practiceScrollerState.timerEndsAt = null;
     closePracticeInstrumentVolumePopover();
     updatePracticeScrollerState('stopped');
 }
