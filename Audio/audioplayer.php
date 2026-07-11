@@ -698,6 +698,13 @@ function createEmptyTrackStepMap() {
   }, {});
 }
 
+function createEmptyTrackTextMap() {
+  return trackInstrumentNames.reduce(function (trackMap, instrumentName) {
+    trackMap[instrumentName] = '';
+    return trackMap;
+  }, {});
+}
+
 function createOrderedSection(label) {
   return {
     label: label,
@@ -711,6 +718,7 @@ function createOrderedSection(label) {
     trackNotes: createEmptyTrackNoteMap(),
     trackHandModes: createEmptyTrackHandModeMap(),
     finalRepeatOutSteps: createEmptyTrackStepMap(),
+    finalRepeatOutStepTypes: createEmptyTrackTextMap(),
     forceFinalOutAtSectionEnd: false,
     continuingAccompaniments: {},
     practiceTargetInstruments: [],
@@ -2532,12 +2540,16 @@ function buildConfiguredPracticeSections(config) {
     const sourceFinalRepeatOutSteps = configuredSection && configuredSection.finalRepeatOutSteps
       ? configuredSection.finalRepeatOutSteps
       : {};
+    const sourceFinalRepeatOutStepTypes = configuredSection && configuredSection.finalRepeatOutStepTypes
+      ? configuredSection.finalRepeatOutStepTypes
+      : {};
     trackInstrumentNames.forEach(function (instrumentName) {
       section.trackNotes[instrumentName] = Array.isArray(sourceTrackNotes[instrumentName])
         ? sourceTrackNotes[instrumentName].slice()
         : [];
       section.trackHandModes[instrumentName] = String(sourceTrackHandModes[instrumentName] || '');
       section.finalRepeatOutSteps[instrumentName] = normalizeSectionOutStep(sourceFinalRepeatOutSteps[instrumentName]);
+      section.finalRepeatOutStepTypes[instrumentName] = String(sourceFinalRepeatOutStepTypes[instrumentName] || '');
     });
 
     normalizeSectionTrackLoops(section);
@@ -3696,7 +3708,11 @@ function getTrackPlaybackAtStep(trackName, trackState, playbackStep) {
     const isFinalSectionRepeat = sectionContext.loopCycleIndex === sectionContext.section.repeatCount - 1;
     const isFinalPlaybackContext = isFinalTimelinePlaybackContext(sectionContext);
     const forceFinalOutAtSectionEnd = Boolean(sectionContext.section.forceFinalOutAtSectionEnd);
+    const finalRepeatOutStepType = sectionContext.section.finalRepeatOutStepTypes
+      ? String(sectionContext.section.finalRepeatOutStepTypes[trackName] || '')
+      : '';
     const shouldMuteForOut = isFinalSectionRepeat &&
+      (finalRepeatOutStepType !== 'Begleitung' || forceFinalOutAtSectionEnd) &&
       (isPracticeTargetTrack || isFinalPlaybackContext || forceFinalOutAtSectionEnd) &&
       finalRepeatOutStep !== null &&
       sectionContext.localStep > finalRepeatOutStep;

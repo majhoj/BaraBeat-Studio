@@ -94,7 +94,6 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
         <details class="app-menu" data-mobile-practice-menu="true">
             <summary><span class="desktop-menu-label">Werkzeuge</span><span class="mobile-menu-label">Üben</span></summary>
             <div class="app-menu-panel">
-                <button type="button" id="button10" hidden>Audiotest</button>
                 <button type="button" id="practiceButton">Üben</button>
                 <button type="button" id="button11">Arrangieren</button>
                 <a class="app-menu-link" href="Bedienungsanleitung.html" target="_blank" rel="noopener">Bedienungsanleitung</a>
@@ -4666,20 +4665,6 @@ function runReadRhythm() {
     }
 }
 
-function runAudioTest() {
-    try {
-        const audioTest = buildAudioTestPayload(false);
-        if (audioTest.practiceIsActive) {
-            openPracticeAudioPlayer(audioTest.playerPayload);
-            return;
-        }
-        openAudioTestWindow(audioTest.playerPayload);
-    } catch (error) {
-        console.error('runAudioTest failed', error);
-        alert('Fehler beim Audiotest: ' + error.message);
-    }
-}
-
 function openPracticeAudioPlayer(playerPayload) {
     const playerPanelEl = document.querySelector('.practice-player-panel');
     const playerFrameEl = document.getElementById('practiceAudioFrame');
@@ -5615,7 +5600,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
     document.querySelector('#button3').addEventListener('click', runReadRhythm);
-    document.querySelector('#button10').addEventListener('click', runAudioTest);
     document.querySelector('#button4').addEventListener('click', function () {
         recordHistorySnapshot();
         viererNoten();
@@ -6493,7 +6477,6 @@ document.addEventListener('DOMContentLoaded', function () {
         '#button8',
         '#button9',
         '#resetPaletteButton',
-        '#button10',
         '#practiceButton',
         '#button11',
         '#themeClearButton',
