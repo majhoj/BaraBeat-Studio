@@ -322,7 +322,7 @@
             </tr>
             <tr>
               <td><strong>Werkzeuge</strong></td>
-              <td>Übungsmodus, Arrangement und Template-Auswahl öffnen.</td>
+              <td>Übungsmodus, Arrangement, Bedienungsanleitung und Template-Auswahl öffnen.</td>
             </tr>
           </tbody>
         </table>
@@ -338,7 +338,7 @@
         <h3>Öffnen</h3>
         <ul>
           <li><strong>Lokal</strong> zeigt Dateien, die im Browser gespeichert wurden.</li>
-          <li><strong>Server</strong> zeigt Notenblätter aus dem Ordner <code>Noten/</code>.</li>
+          <li><strong>Server</strong> zeigt Notenblätter aus dem Ordner <code>Noten/</code>. Die Serverliste enthält Änderungszeiten und kann anzeigen, wenn auf dem Server eine neuere Version als die lokal geladene Datei liegt.</li>
           <li>Auf Smartphones ist die Dateiansicht vereinfacht, damit Öffnen und Löschen lokaler Dateien gut erreichbar bleiben.</li>
         </ul>
 
@@ -350,7 +350,7 @@
         </ul>
 
         <div class="hint">
-          <strong>Hinweis:</strong> Im Notenblatt werden nicht nur die gezeichneten Noten gespeichert, sondern auch Übungseinstellungen, Patternauswahl, Arrangement-Timeline, Lautstärken, Swing, Feel und weitere Metadaten.
+          <strong>Hinweis:</strong> Im Notenblatt werden nicht nur die gezeichneten Noten gespeichert, sondern auch Übungseinstellungen, gespeicherte Übungsszenarien, Patternauswahl, Arrangement-Timeline, Lautstärken, Swing, Feel und weitere Metadaten.
         </div>
       </section>
 
@@ -454,6 +454,9 @@
         <div class="warning">
           <strong>ShortBar:</strong> Bei binären Rhythmen verkürzt ShortBar die letzten vier Einheiten, bei tenären und 9/8-Rhythmen die letzten drei Einheiten. Dadurch bleibt die optische Struktur stabil, während Audio und laufende Noten die verkürzte Länge beachten.
         </div>
+        <div class="hint">
+          <strong>Out bei Begleitpattern:</strong> Im Arrangement kann ein Out in einer Begleitung ein bewusstes Aussteigen markieren. Im Übungsmodus wird ein Out in einem Begleitpattern normalerweise ignoriert, damit Loops durchlaufen. Es kann aber greifen, wenn die Begleitung ausdrücklich vor Call/Intro stoppen soll oder wenn ein als Übungsteil gespieltes Begleitpattern im letzten Durchlauf vor dem nächsten Call/Intro aussteigen soll.
+        </div>
         <p>Das Triolen-/Quartolenzeichen wird in Palette und Legende rhythmusabhängig angezeigt. Die kompakte Darstellung besteht aus drei Punkten und einem Buchstaben: <strong>T</strong> für Triole oder <strong>Q</strong> für Quartole.</p>
       </section>
 
@@ -519,7 +522,8 @@
         <p>Im Übungsmodus gibt es den Regler <strong>Latenz für Bluetooth ms</strong>. Damit kann die Anzeige gegenüber dem Ton verschoben werden, damit rote Linie und hörbarer Schlag auch bei Bluetooth-Kopfhörern zusammenpassen.</p>
 
         <h3>Laufende Noten</h3>
-        <p>Unter dem Player laufen die gerade gespielten Noten von rechts nach links unter einer festen roten Linie hindurch. Der Schlag erklingt, wenn das Symbol die rote Linie erreicht. Taktlinien und Patternhinterlegung helfen bei der Orientierung.</p>
+        <p>Unter dem Player laufen die gerade gespielten Noten von rechts nach links unter einer festen roten Linie hindurch. Der Schlag erklingt, wenn das Symbol die rote Linie erreicht. Taktlinien, Patternhinterlegung, Instrumentenname und Patternname helfen bei der Orientierung.</p>
+        <p>Rechts in der Kopfzeile der laufenden Noten wird je nach Modus angezeigt, wie viele Wiederholungen noch offen sind oder wie lange die Übung noch läuft. Bei aktivem Tempoaufbau wird zunächst die verbleibende Anzahl der Aufbau-Wiederholungen angezeigt.</p>
       </section>
 
       <section id="uebungsmodus">
@@ -533,6 +537,11 @@
           <li><strong>Begleitung auswählen</strong> für Pattern, die parallel als Grundrhythmus laufen.</li>
           <li><strong>Übungsteile auswählen</strong> für Calls, Intros, Soli, Echauffements, Pausen und Begleitpattern, die geübt werden sollen.</li>
         </ul>
+        <p>Auf dem Desktop werden diese Bereiche beim Öffnen ausgeklappt angezeigt. Auf Smartphones bleiben sie zunächst eingeklappt, damit der Player und die laufenden Noten im Vordergrund bleiben.</p>
+
+        <h3>Übungsszenarien</h3>
+        <p>Für ein Notenblatt können mehrere Übungsszenarien gespeichert werden. Ein Szenario enthält die aktuellen Übungseinstellungen, ausgewählte Begleitungen und Übungsteile, Reihenfolge, Wiederholungen, Timer, Tempoaufbau, Lautstärken und weitere Werte. Die Szenarien werden mit dem Notenblatt gespeichert.</p>
+        <p>Das aktive Szenario kann oben neben <strong>Übungsmodus</strong> oder in der Patternauswahl gewählt werden. Die Auswahl ist alphabetisch sortiert. <strong>Aktuelle Einstellungen</strong> bedeutet, dass gerade kein gespeichertes Szenario aktiv ist.</p>
 
         <h3>Begleitung startet</h3>
         <p>Die Begleitung kann sofort, nach Call, nach Intro oder nach Call und Intro starten. Wenn Call oder Intro bereits im Übungsteil ausgewählt sind, werden sie nicht doppelt hinzugefügt. Pausen und ShortBars werden berücksichtigt, damit die Begleitungen danach wieder gemeinsam starten.</p>
@@ -550,11 +559,18 @@
           <li>Wenn der Timer aktiv ist, läuft der aktuelle Übungsloop noch bis zum Ende, statt mitten im Pattern abzubrechen.</li>
         </ul>
 
+        <h3>Tempoaufbau</h3>
+        <p>Der Tempoaufbau erlaubt ein Starttempo und ein Zieltempo. Zusätzlich kann eingestellt werden, nach wie vielen Wiederholungen das Tempo um welchen Wert steigt. Zuerst wird der Tempoaufbau vollständig gespielt. Danach laufen die normalen Wiederholungen oder die Timerzeit weiter.</p>
+        <p>Der Audioplayer zeigt das jeweils aktuelle Tempo an, während der Aufbau läuft.</p>
+
         <h3>Handsatz und H2H Leer = Mute</h3>
         <p>Für Djembe-Pattern kann der Handsatz pro Pattern gewählt werden, zum Beispiel <strong>Auto</strong>, <strong>H2H</strong> oder andere Modi. Bei <strong>H2H Leer = Mute</strong> werden Leernoten als leise Mute-Schläge hörbar. Die Lautstärke dieser Mute-Töne kann instrumentabhängig eingestellt sein.</p>
 
         <h3>Lautstärke im Übungsmodus</h3>
         <p>Ein Klick auf den Instrumentennamen bei den laufenden Noten öffnet die Lautstärke für dieses Instrument. Dort kann auch ein weiteres Overlay für einzelne Tonarten geöffnet werden, damit zum Beispiel Bass, Tone, Slap oder Mute relativ zueinander angepasst werden können.</p>
+
+        <h3>Shekere-Beat</h3>
+        <p>Der Shekere-Beat kann in Üben und Arrangement zugeschaltet werden. Er betont den Beat und kann als Orientierung oder Einzähler genutzt werden. Die Shekere besitzt eine eigene Lautstärkeeinstellung.</p>
       </section>
 
       <section id="arrangement">
@@ -585,6 +601,9 @@
 
         <h3>Tempo im Arrangement</h3>
         <p>Jeder Abschnitt kann ein eigenes Tempo erhalten. Ein Tempowechsel gleitet über etwa zwei Takte in das neue Tempo und bleibt für die folgenden Abschnitte gültig, bis ein weiterer Tempowechsel gesetzt wird.</p>
+
+        <h3>Shekere und Lautstärken</h3>
+        <p>Auch im Arrangement kann der Shekere-Beat zugeschaltet werden. Die Instrumentenlautstärken gelten gemeinsam für Üben und Arrangement und werden mit dem Notenblatt gespeichert.</p>
       </section>
 
       <section id="klang">
@@ -592,7 +611,7 @@
         <p>BaraBeat-Studio bietet mehrere Ebenen zur klanglichen Anpassung.</p>
 
         <h3>Instrumentenlautstärke</h3>
-        <p>Die Gesamtlautstärke einzelner Instrumente kann im Übungsmodus über die laufenden Noten eingestellt werden. Diese Werte werden mit dem Notenblatt gespeichert.</p>
+        <p>Die Gesamtlautstärke einzelner Instrumente kann im Übungsmodus über die laufenden Noten eingestellt werden. Dazu gehört auch die Shekere. Diese Werte werden mit dem Notenblatt gespeichert.</p>
 
         <h3>Tonlautstärke pro Instrument</h3>
         <p>Zusätzlich können die verschiedenen Schläge eines Instruments relativ zueinander eingestellt werden, zum Beispiel Bass, Tone, Slap, Mute oder gedämpfte Schläge. Das ist hilfreich, wenn Samples unterschiedlich laut aufgenommen wurden.</p>
@@ -616,7 +635,7 @@
         <p>Im Portrait-Modus steht die Übungsoberfläche im Vordergrund. Im Landscape-Modus kann das Notenblatt breiter dargestellt werden, damit es besser lesbar ist.</p>
 
         <h3>Mobile Notenblattansicht</h3>
-        <p>Mehrseitige Notenblätter werden seitenweise skaliert, nicht als gesamter Stapel auf eine Displayhöhe gedrückt. Dadurch bleiben mehrseitige Blätter lesbar.</p>
+        <p>Mehrseitige Notenblätter werden seitenweise skaliert, nicht als gesamter Stapel auf eine Displayhöhe gedrückt. Dadurch bleiben mehrseitige Blätter lesbar. In der mobilen Ansicht wird das Notenblatt kompakter als Ein-Takt-Ansicht dargestellt, damit auch auf kleinen Displays mehr Details erkennbar bleiben.</p>
 
         <h3>Leistung und Speicher</h3>
         <p>iOS Safari ist bei Audio und vielen DOM-Elementen empfindlich. Der Player arbeitet deshalb speicherschonend: Wiederholungen werden nicht unnötig vollständig vorgerendert, laufende Noten werden begrenzt aufgebaut und Samples werden möglichst nicht mehrfach gehalten.</p>
@@ -641,6 +660,7 @@
           <li>Eine Begleitung auswählen.</li>
           <li>Ein oder mehrere Übungsteile auswählen und sortieren.</li>
           <li>Wiederholungen oder Timer einstellen.</li>
+          <li>Optional ein Übungsszenario speichern, wenn diese Kombination später wieder gebraucht wird.</li>
           <li>Play drücken.</li>
         </ol>
 
@@ -678,6 +698,7 @@
           <li>Prüfen, ob sehr lange Wiederholungen oder viele Pattern gleichzeitig aktiv sind.</li>
           <li>Auf iPhone/Safari möglichst mit realistischen Wiederholungen testen.</li>
           <li>Bei neu gebauten Dateien speichern und neu öffnen, damit Metadaten sauber aktualisiert werden.</li>
+          <li>Bei Übergängen mit Call, Intro, ShortBar oder Begleit-Out prüfen, ob der gewünschte Übungsfall wirklich als Szenario gespeichert wurde.</li>
         </ul>
 
         <h3>Die Timeline zeigt "gemischt"</h3>
@@ -692,11 +713,12 @@
         <p><span class="tag">Pattern</span> Ein im Notenblatt markierter musikalischer Abschnitt.</p>
         <p><span class="tag">Begleitung</span> Ein Pattern, das als Grundrhythmus läuft.</p>
         <p><span class="tag">Übungsteil</span> Ein Pattern, das gezielt trainiert wird.</p>
+        <p><span class="tag">Übungsszenario</span> Eine gespeicherte Kombination aus Übungseinstellungen, Begleitungen, Übungsteilen, Lautstärken und Timing-Werten.</p>
         <p><span class="tag">Arrangement</span> Eine Reihenfolge aus Abschnitten in der Timeline.</p>
         <p><span class="tag">Overlay</span> Ein Solo, das in einem bestimmten Durchlauf über eine Begleitung gelegt wird.</p>
         <p><span class="tag">ShortBar</span> Ein verkürzter Takt mit optisch markierten Leerstellen.</p>
         <p><span class="tag">Triole / Quartole</span> Eine zusätzliche Unterteilung eines Schlags. Binäre Blätter verwenden Triolen, tenäre und 9/8-Blätter verwenden Quartolen.</p>
-        <p class="footer-note">Stand: Juni 2026. Diese Anleitung kann direkt im Browser geöffnet oder ausgedruckt werden.</p>
+        <p class="footer-note">Stand: Juli 2026. Diese Anleitung kann direkt im Browser geöffnet oder ausgedruckt werden.</p>
       </section>
     </article>
   </main>
