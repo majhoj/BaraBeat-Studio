@@ -3183,6 +3183,9 @@ function renderTimelinePanel() {
     }
 
     panelEl.hidden = !timelineState.visible;
+    if (typeof updateMobileArrangementButtonVisibility === 'function') {
+        updateMobileArrangementButtonVisibility();
+    }
     if (panelEl.hidden) {
         return;
     }

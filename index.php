@@ -107,6 +107,7 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
                 </details>
             </div>
         </details>
+        <button type="button" id="mobileArrangementPlayerButton" class="mobile-menu-action" hidden>Arrangement abspielen</button>
         <button type="button" id="mobilePatternChooserButton" class="mobile-menu-action" hidden>Patternauswahl öffnen</button>
         <form action="" name="uploadForm" class="hidden-upload-form">
             <input type="hidden" size="40" id="iofield" name="iofield" />
@@ -119,6 +120,16 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
     </section>
 
     <section id="mobileSheetView" class="mobile-sheet-view" hidden aria-label="Mobile Notenblattansicht"></section>
+
+    <div id="mobileArrangementOverlay" class="mobile-arrangement-overlay" hidden>
+        <section class="mobile-arrangement-player" role="dialog" aria-modal="true" aria-labelledby="mobileArrangementTitle">
+            <header class="mobile-arrangement-header">
+                <h2 id="mobileArrangementTitle">Arrangement</h2>
+                <button type="button" id="mobileArrangementCloseButton">Schließen</button>
+            </header>
+            <iframe id="mobileArrangementAudioFrame" name="mobileArrangementAudioFrame" title="Audioplayer Arrangement mobil"></iframe>
+        </section>
+    </div>
 
     <section id="mobileOrientationNotice" class="mobile-orientation-notice" aria-live="polite" aria-hidden="true">
         <div>
@@ -3980,6 +3991,84 @@ function updateMobilePracticeModeAvailability() {
         renderTimelinePanel();
     }
     renderMobileSheetView();
+    updateMobileArrangementButtonVisibility();
+}
+
+function getCurrentTimelineArrangementPayload() {
+    const readResult = callPHPScript_lesen(zeilenAnzahl, { showAlert: false });
+    syncTimelineStateFromReadResultIfNeeded(readResult, buildCurrentTimelineSyncOptions());
+    const playerPayload = buildTimelinePlayerPayload(timelineState.sourcePatterns, timelineState.entries);
+    return timelinePayloadHasPlayableEntries(playerPayload) ? playerPayload : null;
+}
+
+function updateMobileArrangementButtonVisibility() {
+    const buttonEl = document.getElementById('mobileArrangementPlayerButton');
+    if (!buttonEl) {
+        return;
+    }
+
+    let hasArrangement = false;
+    if (isMobilePracticeViewport() &&
+            Array.isArray(timelineState.sourcePatterns) &&
+            timelineState.sourcePatterns.length > 0 &&
+            Array.isArray(timelineState.entries) &&
+            timelineState.entries.length > 0) {
+        try {
+            hasArrangement = timelinePayloadHasPlayableEntries(
+                buildTimelinePlayerPayload(timelineState.sourcePatterns, timelineState.entries)
+            );
+        } catch (error) {
+            hasArrangement = false;
+        }
+    }
+
+    buttonEl.hidden = !hasArrangement;
+}
+
+function openMobileArrangementPlayer() {
+    if (!isMobilePracticeViewport()) {
+        return;
+    }
+
+    try {
+        const playerPayload = getCurrentTimelineArrangementPayload();
+        if (!playerPayload) {
+            alert('Für dieses Notenblatt ist noch kein spielbares Arrangement vorhanden.');
+            updateMobileArrangementButtonVisibility();
+            return;
+        }
+
+        const overlayEl = document.getElementById('mobileArrangementOverlay');
+        const frameEl = document.getElementById('mobileArrangementAudioFrame');
+        if (!overlayEl || !frameEl) {
+            openAudioTestWindow(playerPayload);
+            return;
+        }
+
+        practiceState.visible = false;
+        clearPracticeAudioPlayer();
+        timelineState.visible = false;
+        clearTimelineAudioPlayer();
+        renderPracticePanel();
+        renderTimelinePanel();
+        overlayEl.hidden = false;
+        openAudioTestFrame(playerPayload, frameEl.name || 'mobileArrangementAudioFrame');
+    } catch (error) {
+        console.error('Mobiler Arrangement-Player konnte nicht gestartet werden', error);
+        alert('Fehler beim Starten des Arrangements: ' + error.message);
+    }
+}
+
+function closeMobileArrangementPlayer() {
+    const overlayEl = document.getElementById('mobileArrangementOverlay');
+    const frameEl = document.getElementById('mobileArrangementAudioFrame');
+    if (overlayEl) {
+        overlayEl.hidden = true;
+    }
+    if (frameEl) {
+        frameEl.src = 'about:blank';
+    }
+    timelineAudioPlaybackState = 'stopped';
 }
 
 function getMobileSheetStepsPerBeat() {
@@ -4823,9 +4912,12 @@ function handleEmbeddedAudioPlayerMessage(event) {
 
     const practiceFrameEl = document.getElementById('practiceAudioFrame');
     const timelineFrameEl = document.getElementById('timelineAudioFrame');
+    const mobileArrangementFrameEl = document.getElementById('mobileArrangementAudioFrame');
     const isPracticeFrame = practiceFrameEl && event.source === practiceFrameEl.contentWindow;
     const isTimelineFrame = timelineFrameEl && event.source === timelineFrameEl.contentWindow;
-    if (!isPracticeFrame && !isTimelineFrame) {
+    const isMobileArrangementFrame = mobileArrangementFrameEl && event.source === mobileArrangementFrameEl.contentWindow;
+    const isArrangementFrame = isTimelineFrame || isMobileArrangementFrame;
+    if (!isPracticeFrame && !isArrangementFrame) {
         return;
     }
 
@@ -4835,7 +4927,7 @@ function handleEmbeddedAudioPlayerMessage(event) {
             recordArrangementHistorySnapshot();
         }
         timelineState.tempo = nextTempo;
-        window.suppressNextTimelineAudioRefresh = isTimelineFrame;
+        window.suppressNextTimelineAudioRefresh = isArrangementFrame;
         updateTimelineMetadataNode();
         renderTimelinePanel();
         return;
@@ -4847,7 +4939,7 @@ function handleEmbeddedAudioPlayerMessage(event) {
     }
 
     if (message.type === 'barabeat-audio-state') {
-        if (isTimelineFrame) {
+        if (isArrangementFrame) {
             timelineAudioPlaybackState = message.state || 'stopped';
             return;
         }
@@ -5721,6 +5813,17 @@ document.addEventListener('DOMContentLoaded', function () {
                     panelEl.scrollTo({ top: Math.max(0, chooserEl.offsetTop - 8), behavior: 'smooth' });
                 }, 0);
             }
+        }
+    });
+    document.querySelector('#mobileArrangementPlayerButton').addEventListener('click', function () {
+        openMobileArrangementPlayer();
+    });
+    document.querySelector('#mobileArrangementCloseButton').addEventListener('click', function () {
+        closeMobileArrangementPlayer();
+    });
+    document.querySelector('#mobileArrangementOverlay').addEventListener('click', function (event) {
+        if (event.target === event.currentTarget) {
+            closeMobileArrangementPlayer();
         }
     });
     document.querySelectorAll('.practice-column-toggle').forEach(function (toggleEl) {
