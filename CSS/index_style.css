@@ -480,6 +480,76 @@ html {
     display: none;
 }
 
+.sheet-quick-play-controls {
+    position: absolute;
+    z-index: 10;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    border: 1px solid rgba(176, 129, 73, 0.55);
+    border-radius: var(--ui-radius-small);
+    background: rgba(255, 252, 245, 0.94);
+    color: var(--ui-text);
+    font: 700 13px var(--ui-font);
+    box-shadow: 0 2px 8px rgba(78, 48, 24, 0.10);
+}
+
+.sheet-quick-play-controls input {
+    width: 64px;
+    padding: 4px 6px;
+    border: 1px solid var(--ui-border);
+    border-radius: 6px;
+    background: white;
+    color: var(--ui-text);
+    font: 600 13px var(--ui-font);
+}
+
+.sheet-quick-play-controls button {
+    width: 34px;
+    height: 30px;
+    border: 2px solid #1c1c1c;
+    border-radius: 9px;
+    background: #dfc295;
+    color: #111;
+    font: 800 14px var(--ui-font);
+    cursor: pointer;
+}
+
+.sheet-quick-play-controls button.is-playing {
+    background: #f2b36c;
+}
+
+.sheet-quick-play-frame {
+    position: fixed;
+    left: -10000px;
+    top: -10000px;
+    width: 1px;
+    height: 1px;
+    border: 0;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.sheet-quick-play-highlight {
+    transition: opacity 90ms ease, stroke-width 90ms ease;
+}
+
+.sheet-quick-play-highlight.is-selected {
+    opacity: 0.18;
+}
+
+.sheet-quick-play-highlight.is-active {
+    opacity: 0.42;
+    stroke-width: 2.2;
+}
+
+.sheet-quick-play-hitarea.is-selected {
+    fill: #f6b35f;
+    stroke: #8d4e16;
+    opacity: 1;
+}
+
 .menu-file-picker {
     display: flex;
     flex-direction: column;

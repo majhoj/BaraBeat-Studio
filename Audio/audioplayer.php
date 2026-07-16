@@ -158,6 +158,7 @@ updateLoadingStatus('Player startet...');
 
 const playerConfig = Array.isArray(obj) && obj.length > 0 ? obj[0] : {};
 const isPracticeMode = Boolean(playerConfig.PracticeMode);
+const isSheetQuickPlayMode = Boolean(playerConfig.SheetQuickPlayMode);
 const allPracticeTrackNames = ['Kenkeni', 'Sangban', 'Doundoun', 'Dreierbass', 'Djembe_1', 'Djembe_2', 'Djembe_3', 'Shekere'];
 const practiceInstrumentToneVolumeKeys = {
   Kenkeni: ['open', 'muffled', 'bell', 'klick'],
@@ -500,6 +501,16 @@ function buildRepeatRangesFromPatternBars(patternBars) {
   return sanitizeRepeatRanges(repeatRanges);
 }
 
+function patternHasRawControl(pattern, controlType) {
+  const patternBars = pattern && Array.isArray(pattern.bars) ? pattern.bars : [];
+  return patternBars.some(function (bar) {
+    const barControls = bar && Array.isArray(bar.controls) ? bar.controls : [];
+    return barControls.some(function (control) {
+      return control && control.type === controlType;
+    });
+  });
+}
+
 function expandPatternBars(pattern) {
   const patternBars = pattern && Array.isArray(pattern.bars) ? pattern.bars : [];
   if (patternBars.length === 0) {
@@ -511,10 +522,15 @@ function expandPatternBars(pattern) {
   }
 
   const patternRepeatRanges = buildRepeatRangesFromPatternBars(patternBars);
-  if (patternRepeatRanges.length === 0) {
+  const repeatRangesForPattern = isSheetQuickPlayMode && patternHasRawControl(pattern, 'in')
+    ? patternRepeatRanges.filter(function (repeatRange) {
+        return !(repeatRange.startBar === 1 && repeatRange.endBar === patternBars.length);
+      })
+    : patternRepeatRanges;
+  if (repeatRangesForPattern.length === 0) {
     return patternBars;
   }
-  return expandBarsWithRepeats(patternBars, patternRepeatRanges, 1, patternBars.length);
+  return expandBarsWithRepeats(patternBars, repeatRangesForPattern, 1, patternBars.length);
 }
 
 const repeatRanges = sanitizeRepeatRanges(playerConfig.RepeatRanges);
@@ -1105,10 +1121,8 @@ function getTimelineEntryPlaybackLength(entryData) {
   if (patternLength <= 0) {
     return 0;
   }
-  const pickupEndStep = entryData && entryData.label !== 'Begleitung'
-    ? getTimelineEntryPickupEndStep(entryData)
-    : 0;
-  return Math.max(0, patternLength - pickupEndStep);
+  const skippedStartStep = getTimelineEntrySkippedStartStep(entryData);
+  return Math.max(0, patternLength - skippedStartStep);
 }
 
 function getMaxPatternNotesLength(entryDataList) {
@@ -1142,17 +1156,26 @@ function getTimelineEntryOutStep(entryData, effectiveNotesLength) {
     return null;
   }
 
-  const pickupEndStep = entryData && entryData.label !== 'Begleitung'
-    ? getTimelineEntryPickupEndStep(entryData)
-    : 0;
-  const sourceLength = Math.max(0, getPatternNotesLength(entryData) - pickupEndStep);
+  const skippedStartStep = getTimelineEntrySkippedStartStep(entryData);
+  const sourceLength = Math.max(0, getPatternNotesLength(entryData) - skippedStartStep);
   const safeEffectiveLength = Math.max(0, Number(effectiveNotesLength) || 0);
-  const normalizedPatternOutStep = Math.max(0, Math.round(Number(entryData.patternOutStep) || 0) - pickupEndStep);
+  const normalizedPatternOutStep = Math.max(0, Math.round(Number(entryData.patternOutStep) || 0) - skippedStartStep);
   let outStep = safeEffectiveLength > sourceLength && sourceLength > 0
     ? safeEffectiveLength - sourceLength + normalizedPatternOutStep
     : normalizedPatternOutStep;
 
   return outStep;
+}
+
+function getTimelineEntrySkippedStartStep(entryData) {
+  if (!entryData) {
+    return 0;
+  }
+  if (entryData.label === 'Begleitung' &&
+      !(isSheetQuickPlayMode && entryData.patternInStep !== null && entryData.patternInStep !== undefined)) {
+    return 0;
+  }
+  return getTimelineEntryPickupEndStep(entryData);
 }
 
 function getTimelineEntryPickupEndStep(entryData) {
@@ -1177,11 +1200,9 @@ function getTimelineEntryPickupEndStep(entryData) {
 function getTimelineEntryEffectiveNotes(entryData, shouldApplyOut, loopToLength) {
   const sourceNotes = Array.isArray(entryData && entryData.patternNotes) ? entryData.patternNotes : [];
   let effectiveNotes = sourceNotes.slice();
-  const pickupEndStep = entryData && entryData.label !== 'Begleitung'
-    ? getTimelineEntryPickupEndStep(entryData)
-    : 0;
-  if (pickupEndStep > 0) {
-    effectiveNotes = effectiveNotes.slice(pickupEndStep);
+  const skippedStartStep = getTimelineEntrySkippedStartStep(entryData);
+  if (skippedStartStep > 0) {
+    effectiveNotes = effectiveNotes.slice(skippedStartStep);
   }
   const safeLoopToLength = Math.max(0, Number(loopToLength) || 0);
 
@@ -1672,11 +1693,14 @@ function getTimelinePlaybackBlockEntries(playbackEntries, startIndex) {
   const blockId = firstEntry.blockId;
   const parallelGroupId = firstEntry.parallelGroupId;
   const isPracticeBlock = isPracticeMode && blockId;
+  const isSheetQuickPlayBlock = isSheetQuickPlayMode && blockId;
   let endIndex = safeStartIndex + 1;
 
   while (endIndex < entries.length) {
     const nextEntry = entries[endIndex];
-    const belongsToCurrentBlock = isPracticeBlock
+    const belongsToCurrentBlock = isSheetQuickPlayBlock
+      ? nextEntry.blockId === blockId
+      : isPracticeBlock
       ? nextEntry.blockId === blockId
       : (parallelGroupId
           ? nextEntry.parallelGroupId === parallelGroupId
@@ -1809,9 +1833,11 @@ function applyContinuingAccompanimentsToSections(sections) {
 
 function finalizeSectionLengths(sections) {
   sections.forEach(function (section) {
-    section.length = Math.max.apply(null, trackInstrumentNames.map(function (instrumentName) {
+    const naturalLength = Math.max.apply(null, trackInstrumentNames.map(function (instrumentName) {
       return getSectionLength(section.trackNotes[instrumentName]);
     }).concat(0));
+    const fixedLength = Math.max(0, Math.round(Number(section.fixedLength) || 0));
+    section.length = fixedLength > 0 ? fixedLength : naturalLength;
     section.repeatCount = normalizeSectionRepeatCount(section.repeatCount);
     section.playbackLength = section.length * section.repeatCount;
   });
@@ -1906,6 +1932,10 @@ function isTimelineContinuationMarker(markerValue) {
 }
 
 function patternStartsContinuingAccompaniment(pattern) {
+  if (isSheetQuickPlayMode) {
+    return false;
+  }
+
   if (isPracticeMode) {
     return false;
   }
@@ -2093,10 +2123,13 @@ function buildTimelineSections(config) {
     const parallelGroupId = playbackEntries[blockStartIndex].parallelGroupId;
     const blockSectionTempo = normalizeSectionTempo(playbackEntries[blockStartIndex].sectionTempo);
     const isPracticeBlock = isPracticeMode && blockId;
+    const isSheetQuickPlayBlock = isSheetQuickPlayMode && blockId;
     let blockEndIndex = blockStartIndex + 1;
     while (blockEndIndex < playbackEntries.length) {
       const nextEntry = playbackEntries[blockEndIndex];
-      const belongsToCurrentBlock = isPracticeBlock
+      const belongsToCurrentBlock = isSheetQuickPlayBlock
+        ? nextEntry.blockId === blockId
+        : isPracticeBlock
         ? nextEntry.blockId === blockId
         : (parallelGroupId
             ? nextEntry.parallelGroupId === parallelGroupId
@@ -2157,6 +2190,7 @@ function buildTimelineSections(config) {
     const shouldMergeBlockAsParallel = Boolean(
       parallelGroupId ||
       isPracticeBlock ||
+      isSheetQuickPlayBlock ||
       (!parallelGroupId && !isPracticeBlock && blockLanes.length > 1 && blockLabel !== 'Begleitung')
     );
 
@@ -2251,7 +2285,7 @@ function buildTimelineSections(config) {
           normalizeSectionTrackLoops(repeatedSection);
           if (repeatIndex === 0 && hasNonOverlayTimelineInEntry(repeatEntries)) {
             mergeTimelineEntryPickupsIntoPreviousSection(sections, repeatEntries, {
-              alignFullPatternToPreviousSectionStart: true,
+              alignFullPatternToPreviousSectionStart: !isSheetQuickPlayMode,
               allowStandalonePickup: true
             });
           } else {
@@ -2346,7 +2380,7 @@ function buildTimelineSections(config) {
       ].join('::');
       normalizeSectionTrackLoops(mergedSection);
       const consumedByInstrument = mergeTimelineEntryPickupsIntoPreviousSection(sections, blockEntries, {
-        alignFullPatternToPreviousSectionStart: !isPracticeBlock && !currentBlockContainsOverlay,
+        alignFullPatternToPreviousSectionStart: !isSheetQuickPlayMode && !isPracticeBlock && !currentBlockContainsOverlay,
         allowStandalonePickup: true,
         limitOverlayPickupToBar: currentBlockContainsOverlay
       });
@@ -2518,6 +2552,7 @@ function buildConfiguredPracticeSections(config) {
     const section = createOrderedSection(configuredSection && configuredSection.label ? configuredSection.label : 'Begleitung');
     section.repeatCount = normalizeSectionRepeatCount(configuredSection && configuredSection.repeatCount);
     section.isLeadIn = Boolean(configuredSection && configuredSection.isLeadIn);
+    section.fixedLength = Math.max(0, Math.round(Number(configuredSection && configuredSection.fixedLength) || 0));
     section.labelName = configuredSection && configuredSection.labelName ? configuredSection.labelName : section.label;
     section.runtimeKey = configuredSection && configuredSection.runtimeKey
       ? configuredSection.runtimeKey
@@ -2874,7 +2909,7 @@ if (soloTrackControl) {
 const lookahead = 25;          // ms
 const scheduleAheadTime = 0.25; // sec
 const playerStartDelay = 0.18; // sec
-const practiceLeadInDelay = isPracticeMode ? 3.0 : 0; // sec
+const practiceLeadInDelay = isPracticeMode && !isSheetQuickPlayMode ? 3.0 : 0; // sec
 const practiceCountInBeats = 4;
 
 let nextNoteTime = 0.0;
@@ -3152,13 +3187,13 @@ function getPracticeCountInBeatDuration() {
 }
 
 function getPracticeCountInDuration() {
-  return isPracticeMode && practiceCountInBuffer
+  return isPracticeMode && !isSheetQuickPlayMode && practiceCountInBuffer
     ? getPracticeCountInBeatDuration() * practiceCountInBeats
     : 0;
 }
 
 function schedulePracticeCountIn(firstPlaybackTime) {
-  if (!isPracticeMode || !practiceCountInBuffer || !instr || !instr._audioCtx) {
+  if (!isPracticeMode || isSheetQuickPlayMode || !practiceCountInBuffer || !instr || !instr._audioCtx) {
     return;
   }
 

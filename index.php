@@ -212,6 +212,13 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
         </section>
     </div>
 
+    <div id="sheetQuickPlayControls" class="sheet-quick-play-controls" aria-label="Direktes Abspielen vom Notenblatt">
+        <label for="sheetQuickPlayTempo">Tempo</label>
+        <input type="number" id="sheetQuickPlayTempo" min="30" max="180" step="1" value="100" />
+        <button type="button" id="sheetQuickPlayButton" aria-pressed="false" title="Ausgewählte Pattern abspielen">▶</button>
+    </div>
+    <iframe id="sheetQuickPlayFrame" name="sheetQuickPlayFrame" class="sheet-quick-play-frame" title="Notenblatt Vorhörspieler"></iframe>
+
     <div id="timelinePanel" hidden>
         <div class="timeline-sticky-region">
             <div class="timeline-panel-header">
@@ -1904,8 +1911,9 @@ function createEditableTextElement(x, y, textContent) {
 }
 
 function clear_all() {
+    stopSheetQuickPlay();
     resetSelectionArtifacts();
-    removeCanvasElements("#notenlinien, .shp, " + chooserSelector + ", " + timelineMetadataSelector);
+    removeCanvasElements("#notenlinien, .sheet-quick-play-overlay, .shp, " + chooserSelector + ", " + timelineMetadataSelector);
     timelineState.nextBlockId = 1;
     timelineState.nextParallelGroupId = 1;
     timelineState.sourcePatterns = [];
@@ -2039,6 +2047,7 @@ function drawRhythmSheet(config) {
     }
 
     renderLegend(initialChooserX);
+    renderSheetQuickPlaySelectors();
 
     if (shouldResetTitle) {
         currentScoreId = null;
@@ -2051,6 +2060,13 @@ function drawRhythmSheet(config) {
 var titel = s.text(100, y - 100, defaultRhythmTitle).attr({ id: 'basis', 'font-size': 24, 'font-family': 'sans-serif', 'font-weight': 'bold', fill: '#8a8a8a', cursor: 'text' });
 titel.click(edit_title);
 titel.dblclick(edit_title);
+
+const sheetQuickPlayState = {
+    selectedPatternIds: [],
+    patternLibrary: [],
+    isPlaying: false,
+    activeHighlightTimers: []
+};
 
 const zeilenProBlatt = 10;
 let zeilenAnzahl = 10;
@@ -2072,6 +2088,601 @@ function getSheetPageOffsetY(pageIndex) {
 function getSheetDocumentHeight(lineCount) {
     const pageCount = getSheetPageCount(lineCount);
     return pageCount * sheetPageHeight + (pageCount - 1) * sheetPageGapY;
+}
+
+function getSheetBarBounds(sourceBarIndex) {
+    const zeroBasedBarIndex = Math.max(0, Number(sourceBarIndex) - 1);
+    const lineIndex = Math.floor(zeroBasedBarIndex / 2);
+    const isRightBar = zeroBasedBarIndex % 2 === 1;
+    const lineBaseY = getSheetLineBaseY(lineIndex);
+    return {
+        x: isRightBar ? 528 : 103,
+        y: lineBaseY - 70,
+        width: 422,
+        height: 126
+    };
+}
+
+function positionSheetQuickPlayControls() {
+    const controlsEl = document.getElementById('sheetQuickPlayControls');
+    if (!controlsEl || !s || !s.node) {
+        return;
+    }
+
+    const svgBounds = s.node.getBoundingClientRect();
+    const scrollX = window.pageXOffset || document.documentElement.scrollLeft || 0;
+    const scrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
+    controlsEl.style.left = (svgBounds.left + scrollX + svgBounds.width - controlsEl.offsetWidth - 40) + 'px';
+    controlsEl.style.top = (svgBounds.top + scrollY + 44) + 'px';
+}
+
+function getSheetQuickPlayTempo() {
+    const tempoInputEl = document.getElementById('sheetQuickPlayTempo');
+    const tempo = typeof normalizeTimelineTempo === 'function'
+        ? normalizeTimelineTempo(tempoInputEl ? tempoInputEl.value : timelineState.tempo)
+        : Math.max(30, Math.min(180, Math.round(Number(tempoInputEl ? tempoInputEl.value : 100) || 100)));
+    if (tempoInputEl) {
+        tempoInputEl.value = tempo;
+    }
+    return tempo;
+}
+
+function setSheetQuickPlayButtonState(isPlaying) {
+    const buttonEl = document.getElementById('sheetQuickPlayButton');
+    sheetQuickPlayState.isPlaying = Boolean(isPlaying);
+    if (buttonEl) {
+        buttonEl.textContent = sheetQuickPlayState.isPlaying ? '■' : '▶';
+        buttonEl.setAttribute('aria-pressed', sheetQuickPlayState.isPlaying ? 'true' : 'false');
+        buttonEl.classList.toggle('is-playing', sheetQuickPlayState.isPlaying);
+    }
+}
+
+function getSheetQuickPlaySelectedPatterns() {
+    const selectedSet = new Set(sheetQuickPlayState.selectedPatternIds);
+    return sheetQuickPlayState.patternLibrary.filter(function (pattern) {
+        return pattern && selectedSet.has(pattern.id);
+    });
+}
+
+function clearSheetQuickPlayHighlights() {
+    sheetQuickPlayState.activeHighlightTimers.forEach(function (timerId) {
+        window.clearTimeout(timerId);
+    });
+    sheetQuickPlayState.activeHighlightTimers = [];
+    s.selectAll('.sheet-quick-play-highlight').forEach(function (highlightEl) {
+        highlightEl.removeClass('is-active');
+    });
+}
+
+function flashSheetQuickPlayHighlights() {
+    clearSheetQuickPlayHighlights();
+    s.selectAll('.sheet-quick-play-highlight.is-selected').forEach(function (highlightEl) {
+        highlightEl.addClass('is-active');
+    });
+    sheetQuickPlayState.activeHighlightTimers.push(window.setTimeout(function () {
+        s.selectAll('.sheet-quick-play-highlight').forEach(function (highlightEl) {
+            highlightEl.removeClass('is-active');
+        });
+    }, 140));
+}
+
+function updateSheetQuickPlaySelectionClasses() {
+    const selectedSet = new Set(sheetQuickPlayState.selectedPatternIds);
+    s.selectAll('.sheet-quick-play-overlay').forEach(function (overlayEl) {
+        const patternId = overlayEl.attr('data-pattern-id');
+        const isSelected = selectedSet.has(patternId);
+        if (isSelected) {
+            overlayEl.addClass('is-selected');
+        } else {
+            overlayEl.removeClass('is-selected');
+        }
+    });
+}
+
+function selectSheetQuickPlayPattern(patternId) {
+    if (!patternId) {
+        return;
+    }
+    const selectedIds = sheetQuickPlayState.selectedPatternIds.slice();
+    const existingIndex = selectedIds.indexOf(patternId);
+    if (existingIndex >= 0) {
+        selectedIds.splice(existingIndex, 1);
+    } else {
+        selectedIds.push(patternId);
+    }
+    sheetQuickPlayState.selectedPatternIds = selectedIds;
+    updateSheetQuickPlaySelectionClasses();
+}
+
+function buildSheetQuickPlayRepeatRanges(patternBars) {
+    const bars = Array.isArray(patternBars) ? patternBars : [];
+    const boundaries = new Array(bars.length + 1).fill(null).map(function (_, boundaryIndex) {
+        return {
+            index: boundaryIndex,
+            startMarkers: [],
+            endMarkers: []
+        };
+    });
+    const ranges = [];
+    const startStack = [];
+
+    bars.forEach(function (bar, barIndex) {
+        const repeatInfo = bar && bar.repeat ? bar.repeat : {};
+        const startMarkers = Array.isArray(repeatInfo.start) ? repeatInfo.start : (repeatInfo.start ? [repeatInfo.start] : []);
+        const endMarkers = Array.isArray(repeatInfo.end) ? repeatInfo.end : (repeatInfo.end ? [repeatInfo.end] : []);
+        startMarkers.forEach(function (marker) {
+            if (marker !== false && marker !== null && marker !== undefined && marker !== '') {
+                boundaries[barIndex].startMarkers.push(marker);
+            }
+        });
+        endMarkers.forEach(function (marker) {
+            if (marker !== false && marker !== null && marker !== undefined && marker !== '') {
+                boundaries[barIndex + 1].endMarkers.push(marker);
+            }
+        });
+    });
+
+    boundaries.forEach(function (boundary) {
+        boundary.endMarkers.forEach(function (endMarker) {
+            if (endMarker === 'continue') {
+                return;
+            }
+            const startBoundary = startStack.pop();
+            const repeatCount = endMarker === 'loop'
+                ? 1
+                : Math.max(1, Math.round(Number(endMarker) || 1));
+            if (startBoundary === undefined || startBoundary === null) {
+                return;
+            }
+            ranges.push({
+                startBar: startBoundary + 1,
+                endBar: boundary.index,
+                count: repeatCount
+            });
+        });
+        boundary.startMarkers.forEach(function () {
+            startStack.push(boundary.index);
+        });
+    });
+
+    return ranges;
+}
+
+function expandSheetQuickPlayBars(patternBars, repeatRangesToApply, startBarIndex, endBarIndex) {
+    const bars = Array.isArray(patternBars) ? patternBars : [];
+    const ranges = Array.isArray(repeatRangesToApply) ? repeatRangesToApply : [];
+    const expandedBars = [];
+    let currentBarIndex = startBarIndex;
+
+    while (currentBarIndex <= endBarIndex) {
+        const matchingRange = ranges
+            .filter(function (repeatRange) {
+                return repeatRange &&
+                    repeatRange.startBar === currentBarIndex &&
+                    repeatRange.endBar <= endBarIndex;
+            })
+            .sort(function (rangeA, rangeB) {
+                return rangeB.endBar - rangeA.endBar;
+            })[0];
+
+        if (!matchingRange) {
+            expandedBars.push(bars[currentBarIndex - 1]);
+            currentBarIndex += 1;
+            continue;
+        }
+
+        const nestedRanges = ranges.filter(function (repeatRange) {
+            return repeatRange.startBar >= matchingRange.startBar &&
+                repeatRange.endBar <= matchingRange.endBar &&
+                !(repeatRange.startBar === matchingRange.startBar && repeatRange.endBar === matchingRange.endBar);
+        });
+        const repeatedSegment = expandSheetQuickPlayBars(
+            bars,
+            nestedRanges,
+            matchingRange.startBar,
+            matchingRange.endBar
+        );
+        expandedBars.push.apply(expandedBars, repeatedSegment);
+        for (let repeatIndex = 0; repeatIndex < Math.max(0, Number(matchingRange.count) || 0); repeatIndex++) {
+            expandedBars.push.apply(expandedBars, repeatedSegment);
+        }
+        currentBarIndex = matchingRange.endBar + 1;
+    }
+
+    return expandedBars.filter(Boolean);
+}
+
+function buildSheetQuickPlayPreparedPattern(pattern, patternIndex) {
+    const sourceBars = Array.isArray(pattern && pattern.bars) ? pattern.bars : [];
+    const repeatRanges = buildSheetQuickPlayRepeatRanges(sourceBars).filter(function (repeatRange) {
+        return !(repeatRange.startBar === 1 && repeatRange.endBar === sourceBars.length);
+    });
+    const expandedBars = expandSheetQuickPlayBars(sourceBars, repeatRanges, 1, sourceBars.length);
+    let keptInControl = false;
+    let inStep = null;
+    let stepOffset = 0;
+
+    const preparedBars = expandedBars.map(function (bar, barIndex) {
+        const barNotes = Array.isArray(bar && bar.notes) ? bar.notes.slice() : [];
+        const barControls = Array.isArray(bar && bar.controls) ? bar.controls : [];
+        const preparedControls = [];
+
+        barControls.forEach(function (control) {
+            if (!control || !control.type) {
+                return;
+            }
+            if (control.type === 'in') {
+                if (keptInControl) {
+                    return;
+                }
+                keptInControl = true;
+            }
+            preparedControls.push(Object.assign({}, control));
+        });
+
+        if (inStep === null) {
+            const inControl = preparedControls
+                .filter(function (control) {
+                    return control && control.type === 'in';
+                })
+                .sort(function (controlA, controlB) {
+                    return Number(controlA.stepIndex) - Number(controlB.stepIndex);
+                })[0];
+            if (inControl) {
+                inStep = stepOffset + Math.max(0, Math.min(barNotes.length, Number(inControl.stepIndex) || 0));
+            }
+        }
+        stepOffset += barNotes.length;
+
+        return {
+            sourceBarIndex: barIndex + 1,
+            label: bar && bar.label ? bar.label : pattern.labelType,
+            repeat: {
+                start: [],
+                end: []
+            },
+            controls: preparedControls,
+            notes: barNotes
+        };
+    });
+
+    return Object.assign({}, pattern, {
+        id: 'sheet-quick-play-pattern-' + patternIndex,
+        sourceKey: 'sheet-quick-play|' + (pattern.sourceKey || pattern.id || patternIndex),
+        quickPlayDebug: {
+            originalId: pattern.id,
+            originalSourceKey: pattern.sourceKey,
+            name: pattern.name || pattern.labelName || pattern.labelType || '',
+            foundInStep: inStep,
+            originalBarCount: sourceBars.length,
+            preparedBarCount: preparedBars.length
+        },
+        bars: preparedBars
+    });
+}
+
+function createSheetQuickPlayTrackMap() {
+    return {
+        Kenkeni: [],
+        Sangban: [],
+        Doundoun: [],
+        Dreierbass: [],
+        Djembe_1: [],
+        Djembe_2: [],
+        Djembe_3: [],
+        Shekere: []
+    };
+}
+
+function mergeSheetQuickPlayNotes(targetNotes, sourceNotes, offset) {
+    const mergedNotes = Array.isArray(targetNotes) ? targetNotes.slice() : [];
+    const safeSourceNotes = Array.isArray(sourceNotes) ? sourceNotes : [];
+    const writeOffset = Math.max(0, Number(offset) || 0);
+    while (mergedNotes.length < writeOffset) {
+        mergedNotes.push('f');
+    }
+    safeSourceNotes.forEach(function (noteValue, noteIndex) {
+        const writeIndex = writeOffset + noteIndex;
+        while (mergedNotes.length <= writeIndex) {
+            mergedNotes.push('f');
+        }
+        if (noteValue !== 'f' && noteValue !== null && noteValue !== undefined && noteValue !== '') {
+            mergedNotes[writeIndex] = noteValue;
+        } else if (mergedNotes[writeIndex] === undefined) {
+            mergedNotes[writeIndex] = 'f';
+        }
+    });
+    return mergedNotes;
+}
+
+function getSheetQuickPlayPatternNotes(pattern) {
+    return (Array.isArray(pattern && pattern.bars) ? pattern.bars : []).reduce(function (allNotes, bar) {
+        const barNotes = Array.isArray(bar && bar.notes) ? bar.notes : [];
+        return allNotes.concat(barNotes);
+    }, []);
+}
+
+function getSheetQuickPlayPatternInStep(pattern) {
+    let stepOffset = 0;
+    const bars = Array.isArray(pattern && pattern.bars) ? pattern.bars : [];
+    for (let barIndex = 0; barIndex < bars.length; barIndex++) {
+        const bar = bars[barIndex];
+        const barNotes = Array.isArray(bar && bar.notes) ? bar.notes : [];
+        const inControl = (Array.isArray(bar && bar.controls) ? bar.controls : [])
+            .filter(function (control) {
+                return control && control.type === 'in';
+            })
+            .sort(function (controlA, controlB) {
+                return Number(controlA.stepIndex) - Number(controlB.stepIndex);
+            })[0];
+        if (inControl) {
+            return stepOffset + Math.max(0, Math.min(barNotes.length, Number(inControl.stepIndex) || 0));
+        }
+        stepOffset += barNotes.length;
+    }
+    return null;
+}
+
+function getSheetQuickPlayPickupEndStep(patternNotes, inStep, stepsPerBar) {
+    const sourceLength = Array.isArray(patternNotes) ? patternNotes.length : 0;
+    if (inStep === null || inStep === undefined || sourceLength <= 0 || stepsPerBar <= 0) {
+        return 0;
+    }
+    const safeInStep = Math.max(0, Math.min(sourceLength - 1, Number(inStep) || 0));
+    return Math.min(sourceLength, (Math.floor(safeInStep / stepsPerBar) + 1) * stepsPerBar);
+}
+
+function buildSheetQuickPlayPickupNotes(patternNotes, inStep, stepsPerBar) {
+    const sourceNotes = Array.isArray(patternNotes) ? patternNotes : [];
+    const pickupEndStep = getSheetQuickPlayPickupEndStep(sourceNotes, inStep, stepsPerBar);
+    if (pickupEndStep <= 0) {
+        return [];
+    }
+    const pickupStartStep = Math.max(0, pickupEndStep - stepsPerBar);
+    const safeInStep = Math.max(0, Math.min(sourceNotes.length - 1, Number(inStep) || 0));
+    return sourceNotes.slice(pickupStartStep, pickupEndStep).map(function (noteValue, noteIndex) {
+        return pickupStartStep + noteIndex < safeInStep ? 'f' : noteValue;
+    });
+}
+
+function buildSheetQuickPlayConfiguredSections(preparedPatterns) {
+    const stepsPerBar = getReadRhythmConfig().stepsPerBar;
+    const pickupTrackNotes = createSheetQuickPlayTrackMap();
+    const mainTrackNotes = createSheetQuickPlayTrackMap();
+    const mainLabels = [];
+    const pickupLabels = [];
+    let hasPickupNotes = false;
+    let hasMainNotes = false;
+
+    preparedPatterns.forEach(function (pattern) {
+        const targetInstruments = Array.isArray(pattern.defaultTargets) ? pattern.defaultTargets.slice() : [];
+        if (targetInstruments.length === 0) {
+            return;
+        }
+        const patternNotes = getSheetQuickPlayPatternNotes(pattern);
+        const inStep = pattern.labelType === 'Begleitung' ? null : getSheetQuickPlayPatternInStep(pattern);
+        const pickupEndStep = getSheetQuickPlayPickupEndStep(patternNotes, inStep, stepsPerBar);
+        const pickupNotes = buildSheetQuickPlayPickupNotes(patternNotes, inStep, stepsPerBar);
+        const mainNotes = pickupEndStep > 0 ? patternNotes.slice(pickupEndStep) : patternNotes.slice();
+        const labelName = pattern.labelName || pattern.labelType || '';
+
+        targetInstruments.forEach(function (instrumentName) {
+            if (!mainTrackNotes[instrumentName]) {
+                return;
+            }
+            if (pickupNotes.length > 0) {
+                pickupTrackNotes[instrumentName] = mergeSheetQuickPlayNotes(
+                    pickupTrackNotes[instrumentName],
+                    pickupNotes,
+                    0
+                );
+                hasPickupNotes = true;
+            }
+            if (mainNotes.length > 0) {
+                mainTrackNotes[instrumentName] = mergeSheetQuickPlayNotes(
+                    mainTrackNotes[instrumentName],
+                    mainNotes,
+                    0
+                );
+                hasMainNotes = true;
+            }
+        });
+
+        if (pickupNotes.length > 0 && labelName && pickupLabels.indexOf(labelName) === -1) {
+            pickupLabels.push(labelName);
+        }
+        if (mainNotes.length > 0 && labelName && mainLabels.indexOf(labelName) === -1) {
+            mainLabels.push(labelName);
+        }
+    });
+
+    const sections = [];
+    if (hasPickupNotes) {
+        sections.push({
+            label: 'Auftakt',
+            labelName: pickupLabels.length > 0 ? pickupLabels.join(' + ') + ' Auftakt' : 'Auftakt',
+            runtimeKey: 'sheet-quick-play-pickup',
+            isLeadIn: true,
+            fixedLength: stepsPerBar,
+            repeatCount: 1,
+            trackNotes: pickupTrackNotes,
+            trackHandModes: {},
+            practiceTargetInstruments: []
+        });
+    }
+    if (hasMainNotes) {
+        sections.push({
+            label: 'Begleitung',
+            labelName: mainLabels.join(' + ') || 'Vorhören',
+            runtimeKey: 'sheet-quick-play-main',
+            isLeadIn: false,
+            repeatCount: 1,
+            trackNotes: mainTrackNotes,
+            trackHandModes: {},
+            practiceTargetInstruments: []
+        });
+    }
+    return sections;
+}
+
+function renderSheetQuickPlaySelectors(readResult) {
+    stopSheetQuickPlay();
+    removeCanvasElements('.sheet-quick-play-overlay');
+    const syncOptions = buildCurrentTimelineSyncOptions();
+    const resolvedReadResult = readResult || callPHPScript_lesen(zeilenAnzahl, {
+        showAlert: false,
+        updateQuickPlaySelectors: false
+    });
+    syncTimelineStateFromReadResultIfNeeded(resolvedReadResult, syncOptions);
+    sheetQuickPlayState.patternLibrary = Array.isArray(timelineState.sourcePatterns)
+        ? timelineState.sourcePatterns.slice()
+        : [];
+
+    const availablePatternIds = new Set(sheetQuickPlayState.patternLibrary.map(function (pattern) {
+        return pattern.id;
+    }));
+    sheetQuickPlayState.selectedPatternIds = sheetQuickPlayState.selectedPatternIds.filter(function (patternId) {
+        return availablePatternIds.has(patternId);
+    });
+
+    sheetQuickPlayState.patternLibrary.forEach(function (pattern) {
+        if (!pattern || !Array.isArray(pattern.bars)) {
+            return;
+        }
+        pattern.bars.forEach(function (bar) {
+            const bounds = getSheetBarBounds(bar.sourceBarIndex);
+            const highlightEl = s.rect(bounds.x, bounds.y, bounds.width, bounds.height).attr({
+                class: 'sheet-quick-play-overlay sheet-quick-play-highlight',
+                fill: '#f6b35f',
+                opacity: 0,
+                stroke: '#c5761e',
+                strokeWidth: 1.2,
+                rx: 8,
+                ry: 8,
+                pointerEvents: 'none',
+                'data-pattern-id': pattern.id
+            });
+            const hitEl = s.rect(bounds.x + 1, bounds.y + 25, 14, 14).attr({
+                class: 'sheet-quick-play-overlay sheet-quick-play-hitarea',
+                fill: '#fffaf0',
+                opacity: 0.92,
+                stroke: '#b77d43',
+                strokeWidth: 1.2,
+                rx: 3,
+                ry: 3,
+                cursor: 'pointer',
+                'data-pattern-id': pattern.id
+            });
+            hitEl.click(function (event) {
+                if (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+                selectSheetQuickPlayPattern(pattern.id);
+            });
+            if (typeof highlightEl.insertBefore === 'function') {
+                highlightEl.insertBefore(hitEl);
+            }
+        });
+    });
+
+    updateSheetQuickPlaySelectionClasses();
+    window.requestAnimationFrame(positionSheetQuickPlayControls);
+}
+
+function buildSheetQuickPlayPayload() {
+    const selectedPatterns = getSheetQuickPlaySelectedPatterns();
+    if (selectedPatterns.length === 0) {
+        return null;
+    }
+    const preparedPatterns = selectedPatterns.map(buildSheetQuickPlayPreparedPattern);
+    const entries = preparedPatterns.map(function (pattern, patternIndex) {
+        return {
+            id: 'sheet-quick-play-' + patternIndex,
+            blockId: 'sheet-quick-play-block',
+            parallelGroupId: '',
+            overlayRepeatIndex: null,
+            patternId: pattern.id,
+            patternSourceKey: pattern.sourceKey,
+            handMode: '',
+            swingFactor: null,
+            sectionTempo: null,
+            targetInstruments: Array.isArray(pattern.defaultTargets) ? pattern.defaultTargets.slice() : []
+        };
+    });
+    const previousTempo = timelineState.tempo;
+    timelineState.tempo = getSheetQuickPlayTempo();
+    const payload = buildTimelinePlayerPayload(preparedPatterns, entries);
+    timelineState.tempo = previousTempo;
+    if (Array.isArray(payload) && payload[0]) {
+        payload[0].PracticeMode = true;
+        payload[0].TimelineLoop = false;
+        payload[0].TimelineLoopCount = false;
+        payload[0].SheetQuickPlayMode = true;
+        payload[0].Tempo = getSheetQuickPlayTempo();
+        payload[0].PracticeSections = buildSheetQuickPlayConfiguredSections(preparedPatterns);
+    }
+    window.lastSheetQuickPlayPayload = payload;
+    return payload;
+}
+
+function requestSheetQuickPlayStart(frameEl) {
+    let attemptsLeft = 80;
+    function tryStart() {
+        if (!sheetQuickPlayState.isPlaying) {
+            return;
+        }
+        const frameWindow = frameEl && frameEl.contentWindow;
+        const frameDocument = frameEl && frameEl.contentDocument;
+        const playButtonEl = frameDocument ? frameDocument.querySelector('[data-playing]') : null;
+        if (playButtonEl && !playButtonEl.disabled) {
+            if (playButtonEl.dataset.playing !== 'true') {
+                playButtonEl.click();
+            }
+            return;
+        }
+        attemptsLeft -= 1;
+        if (frameWindow && attemptsLeft > 0) {
+            window.setTimeout(tryStart, 100);
+        }
+    }
+    tryStart();
+}
+
+function stopSheetQuickPlay() {
+    const frameEl = document.getElementById('sheetQuickPlayFrame');
+    if (frameEl && frameEl.contentDocument) {
+        const playButtonEl = frameEl.contentDocument.querySelector('[data-playing]');
+        if (playButtonEl && playButtonEl.dataset.playing === 'true') {
+            playButtonEl.click();
+        }
+        frameEl.src = 'about:blank';
+    }
+    clearSheetQuickPlayHighlights();
+    setSheetQuickPlayButtonState(false);
+}
+
+function startSheetQuickPlay() {
+    renderSheetQuickPlaySelectors();
+    const payload = buildSheetQuickPlayPayload();
+    const frameEl = document.getElementById('sheetQuickPlayFrame');
+    if (!payload || !frameEl) {
+        alert('Bitte zuerst ein Pattern im Notenblatt auswählen.');
+        return;
+    }
+    setSheetQuickPlayButtonState(true);
+    frameEl.onload = function () {
+        requestSheetQuickPlayStart(frameEl);
+    };
+    openAudioTestFrame(payload, frameEl.name || 'sheetQuickPlayFrame');
+}
+
+function toggleSheetQuickPlay() {
+    if (sheetQuickPlayState.isPlaying) {
+        stopSheetQuickPlay();
+        return;
+    }
+    startSheetQuickPlay();
 }
 
 function getSheetLinePageIndex(lineIndex) {
@@ -2138,6 +2749,7 @@ function redrawCurrentSheetFromSnapshot(snapshot, syncOptions) {
     bindLoadedScoreElements();
     setRhythmTitle(snapshot.title || 'Unbenannt');
     syncStateAfterHistoryRestore(syncOptions || buildCurrentTimelineSyncOptions());
+    renderSheetQuickPlaySelectors();
 }
 
 function removeElementsOutsideSheetLineCount(lineCount) {
@@ -4737,6 +5349,17 @@ function callPHPScript_lesen(anzahl, options) {
         alert(notenText);
     }
 
+    if (readOptions.updateQuickPlaySelectors !== false) {
+        window.setTimeout(function () {
+            renderSheetQuickPlaySelectors({
+                rhythmBars: rhythmBars,
+                repeatBoundaries: repeatBoundaries,
+                repeatRanges: repeatRanges,
+                summaryText: notenText
+            });
+        }, 0);
+    }
+
     return {
         rhythmBars: rhythmBars,
         repeatBoundaries: repeatBoundaries,
@@ -4913,11 +5536,28 @@ function handleEmbeddedAudioPlayerMessage(event) {
     const practiceFrameEl = document.getElementById('practiceAudioFrame');
     const timelineFrameEl = document.getElementById('timelineAudioFrame');
     const mobileArrangementFrameEl = document.getElementById('mobileArrangementAudioFrame');
+    const sheetQuickPlayFrameEl = document.getElementById('sheetQuickPlayFrame');
     const isPracticeFrame = practiceFrameEl && event.source === practiceFrameEl.contentWindow;
     const isTimelineFrame = timelineFrameEl && event.source === timelineFrameEl.contentWindow;
     const isMobileArrangementFrame = mobileArrangementFrameEl && event.source === mobileArrangementFrameEl.contentWindow;
+    const isSheetQuickPlayFrame = sheetQuickPlayFrameEl && event.source === sheetQuickPlayFrameEl.contentWindow;
     const isArrangementFrame = isTimelineFrame || isMobileArrangementFrame;
-    if (!isPracticeFrame && !isArrangementFrame) {
+    if (!isPracticeFrame && !isArrangementFrame && !isSheetQuickPlayFrame) {
+        return;
+    }
+
+    if (isSheetQuickPlayFrame) {
+        if (message.type === 'barabeat-audio-step') {
+            flashSheetQuickPlayHighlights();
+            return;
+        }
+        if (message.type === 'barabeat-audio-state') {
+            if (message.state !== 'playing') {
+                setSheetQuickPlayButtonState(false);
+                clearSheetQuickPlayHighlights();
+            }
+            return;
+        }
         return;
     }
 
@@ -5739,6 +6379,18 @@ document.addEventListener('DOMContentLoaded', function () {
             alert('Fehler beim Aufbau der Timeline: ' + error.message);
         }
     });
+    document.querySelector('#sheetQuickPlayButton').addEventListener('click', function () {
+        toggleSheetQuickPlay();
+    });
+    document.querySelector('#sheetQuickPlayTempo').addEventListener('change', function () {
+        getSheetQuickPlayTempo();
+        if (sheetQuickPlayState.isPlaying) {
+            stopSheetQuickPlay();
+            startSheetQuickPlay();
+        }
+    });
+    window.addEventListener('resize', positionSheetQuickPlayControls);
+    window.addEventListener('scroll', positionSheetQuickPlayControls, { passive: true });
     document.querySelector('#themeClearButton').addEventListener('click', function () {
         setUiTheme('');
     });
@@ -6668,6 +7320,11 @@ function onSVGLoaded(data) {
             persistedVersion: persistedTimelineMetadata ? persistedTimelineMetadata.version : null,
             persistedSourceHash: persistedTimelineMetadata ? persistedTimelineMetadata.sourceHash : ''
         });
+        const sheetQuickPlayTempoEl = document.getElementById('sheetQuickPlayTempo');
+        if (sheetQuickPlayTempoEl) {
+            sheetQuickPlayTempoEl.value = normalizeTimelineTempo(timelineState.tempo);
+        }
+        renderSheetQuickPlaySelectors(readResult);
         renderMobileSheetView(readResult);
         renderPracticePanel();
         if (practiceState.visible) {
