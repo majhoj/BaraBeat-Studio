@@ -2138,10 +2138,17 @@ function setSheetQuickPlayButtonState(isPlaying) {
 }
 
 function getSheetQuickPlaySelectedPatterns() {
-    const selectedSet = new Set(sheetQuickPlayState.selectedPatternIds);
-    return sheetQuickPlayState.patternLibrary.filter(function (pattern) {
-        return pattern && selectedSet.has(pattern.id);
+    const patternById = {};
+    sheetQuickPlayState.patternLibrary.forEach(function (pattern) {
+        if (pattern && pattern.id) {
+            patternById[pattern.id] = pattern;
+        }
     });
+    return sheetQuickPlayState.selectedPatternIds
+        .map(function (patternId) {
+            return patternById[patternId] || null;
+        })
+        .filter(Boolean);
 }
 
 function clearSheetQuickPlayHighlights() {
@@ -2423,12 +2430,38 @@ function getSheetQuickPlayPatternInStep(pattern) {
     return null;
 }
 
+function getSheetQuickPlayPatternOutStep(pattern) {
+    let stepOffset = 0;
+    let matchedOutStep = null;
+    const bars = Array.isArray(pattern && pattern.bars) ? pattern.bars : [];
+    for (let barIndex = 0; barIndex < bars.length; barIndex++) {
+        const bar = bars[barIndex];
+        const barNotes = Array.isArray(bar && bar.notes) ? bar.notes : [];
+        const outControl = (Array.isArray(bar && bar.controls) ? bar.controls : [])
+            .filter(function (control) {
+                return control && control.type === 'out';
+            })
+            .sort(function (controlA, controlB) {
+                return Number(controlA.stepIndex) - Number(controlB.stepIndex);
+            })[0];
+        if (outControl) {
+            matchedOutStep = stepOffset + Math.max(0, Math.min(barNotes.length - 1, Number(outControl.stepIndex) || 0));
+        }
+        stepOffset += barNotes.length;
+    }
+    return matchedOutStep;
+}
+
 function getSheetQuickPlayPickupEndStep(patternNotes, inStep, stepsPerBar) {
     const sourceLength = Array.isArray(patternNotes) ? patternNotes.length : 0;
     if (inStep === null || inStep === undefined || sourceLength <= 0 || stepsPerBar <= 0) {
         return 0;
     }
     const safeInStep = Math.max(0, Math.min(sourceLength - 1, Number(inStep) || 0));
+    const pickupStartStep = Math.floor(safeInStep / stepsPerBar) * stepsPerBar;
+    if (safeInStep === pickupStartStep) {
+        return 0;
+    }
     return Math.min(sourceLength, (Math.floor(safeInStep / stepsPerBar) + 1) * stepsPerBar);
 }
 
@@ -2445,83 +2478,320 @@ function buildSheetQuickPlayPickupNotes(patternNotes, inStep, stepsPerBar) {
     });
 }
 
-function buildSheetQuickPlayConfiguredSections(preparedPatterns) {
-    const stepsPerBar = getReadRhythmConfig().stepsPerBar;
-    const pickupTrackNotes = createSheetQuickPlayTrackMap();
-    const mainTrackNotes = createSheetQuickPlayTrackMap();
-    const mainLabels = [];
-    const pickupLabels = [];
-    let hasPickupNotes = false;
-    let hasMainNotes = false;
+function normalizeSheetQuickPlayTargetInstrument(instrumentName) {
+    const instrumentMap = {
+        Djembe_1: ['Djembe_1'],
+        Djembe_2: ['Djembe_2'],
+        Djembe_3: ['Djembe_3'],
+        'Djembe 1': ['Djembe_1'],
+        'Djembe 2': ['Djembe_2'],
+        'Djembe 3': ['Djembe_3'],
+        Kenkeni: ['Kenkeni'],
+        Sangban: ['Sangban'],
+        Doundoun: ['Doundoun'],
+        Dununba: ['Doundoun'],
+        Dreierbass: ['Dreierbass'],
+        'Bässe': ['Kenkeni', 'Sangban', 'Doundoun'],
+        Shekere: ['Shekere']
+    };
+    return instrumentMap[instrumentName] || [];
+}
 
-    preparedPatterns.forEach(function (pattern) {
-        const targetInstruments = Array.isArray(pattern.defaultTargets) ? pattern.defaultTargets.slice() : [];
-        if (targetInstruments.length === 0) {
-            return;
-        }
-        const patternNotes = getSheetQuickPlayPatternNotes(pattern);
-        const inStep = pattern.labelType === 'Begleitung' ? null : getSheetQuickPlayPatternInStep(pattern);
-        const pickupEndStep = getSheetQuickPlayPickupEndStep(patternNotes, inStep, stepsPerBar);
-        const pickupNotes = buildSheetQuickPlayPickupNotes(patternNotes, inStep, stepsPerBar);
-        const mainNotes = pickupEndStep > 0 ? patternNotes.slice(pickupEndStep) : patternNotes.slice();
-        const labelName = pattern.labelName || pattern.labelType || '';
-
-        targetInstruments.forEach(function (instrumentName) {
-            if (!mainTrackNotes[instrumentName]) {
-                return;
-            }
-            if (pickupNotes.length > 0) {
-                pickupTrackNotes[instrumentName] = mergeSheetQuickPlayNotes(
-                    pickupTrackNotes[instrumentName],
-                    pickupNotes,
-                    0
-                );
-                hasPickupNotes = true;
-            }
-            if (mainNotes.length > 0) {
-                mainTrackNotes[instrumentName] = mergeSheetQuickPlayNotes(
-                    mainTrackNotes[instrumentName],
-                    mainNotes,
-                    0
-                );
-                hasMainNotes = true;
+function normalizeSheetQuickPlayTargetInstruments(targetInstruments) {
+    return (Array.isArray(targetInstruments) ? targetInstruments : []).reduce(function (targets, targetName) {
+        normalizeSheetQuickPlayTargetInstrument(targetName).forEach(function (instrumentName) {
+            if (targets.indexOf(instrumentName) === -1) {
+                targets.push(instrumentName);
             }
         });
+        return targets;
+    }, []);
+}
 
-        if (pickupNotes.length > 0 && labelName && pickupLabels.indexOf(labelName) === -1) {
-            pickupLabels.push(labelName);
+function getSheetQuickPlayTrackNames() {
+    return Object.keys(createSheetQuickPlayTrackMap());
+}
+
+function createSheetQuickPlayTrackValueMap(defaultValue) {
+    return getSheetQuickPlayTrackNames().reduce(function (trackMap, instrumentName) {
+        trackMap[instrumentName] = defaultValue;
+        return trackMap;
+    }, {});
+}
+
+function isSheetQuickPlayPlayableNote(noteValue) {
+    return noteValue !== 'f' && noteValue !== null && noteValue !== undefined && noteValue !== '';
+}
+
+function sheetQuickPlaySectionHasNotes(section) {
+    const trackNotes = section && section.trackNotes ? section.trackNotes : {};
+    return getSheetQuickPlayTrackNames().some(function (instrumentName) {
+        return Array.isArray(trackNotes[instrumentName]) &&
+            trackNotes[instrumentName].some(isSheetQuickPlayPlayableNote);
+    });
+}
+
+function getSheetQuickPlaySectionLength(section) {
+    const trackNotes = section && section.trackNotes ? section.trackNotes : {};
+    return Math.max.apply(null, getSheetQuickPlayTrackNames().map(function (instrumentName) {
+        return Array.isArray(trackNotes[instrumentName]) ? trackNotes[instrumentName].length : 0;
+    }).concat(0));
+}
+
+function getSheetQuickPlayFullBarLength(noteLength, stepsPerBar) {
+    const safeLength = Math.max(0, Math.round(Number(noteLength) || 0));
+    const safeStepsPerBar = Math.max(0, Math.round(Number(stepsPerBar) || 0));
+    if (safeLength <= 0 || safeStepsPerBar <= 0) {
+        return safeLength;
+    }
+    return Math.ceil(safeLength / safeStepsPerBar) * safeStepsPerBar;
+}
+
+function getSheetQuickPlaySectionPlaybackLength(section) {
+    const noteLength = getSheetQuickPlaySectionLength(section);
+    const fixedLength = Math.max(0, Math.round(Number(section && section.fixedLength) || 0));
+    return Math.max(noteLength, fixedLength);
+}
+
+function getSheetQuickPlayPatternSectionLength(patternLength, outStep, sectionStartStep, stepsPerBar) {
+    const safePatternLength = Math.max(0, Math.round(Number(patternLength) || 0));
+    const safeSectionStartStep = Math.max(0, Math.round(Number(sectionStartStep) || 0));
+    const outIsInSection = outStep !== null && outStep !== undefined && Number(outStep) >= safeSectionStartStep;
+    const lengthThroughOut = outIsInSection
+        ? Math.max(0, Math.round(Number(outStep) || 0) - safeSectionStartStep + 1)
+        : 0;
+    const remainingPatternLength = Math.max(0, safePatternLength - safeSectionStartStep);
+    return getSheetQuickPlayFullBarLength(
+        Math.max(remainingPatternLength, lengthThroughOut),
+        stepsPerBar
+    );
+}
+
+function createSheetQuickPlaySection(label, labelName, runtimeKey, options) {
+    const sectionOptions = options || {};
+    return {
+        label: label || 'Begleitung',
+        labelName: labelName || label || 'Vorhören',
+        runtimeKey: runtimeKey || ('sheet-quick-play-' + Date.now()),
+        isLeadIn: Boolean(sectionOptions.isLeadIn),
+        fixedLength: Math.max(0, Math.round(Number(sectionOptions.fixedLength) || 0)),
+        repeatCount: 1,
+        trackNotes: createSheetQuickPlayTrackMap(),
+        trackHandModes: {},
+        finalRepeatOutSteps: createSheetQuickPlayTrackValueMap(null),
+        finalRepeatOutStepTypes: createSheetQuickPlayTrackValueMap(''),
+        forceFinalOutAtSectionEnd: false,
+        practiceTargetInstruments: []
+    };
+}
+
+function doSheetQuickPlayTargetsOverlap(targetsA, targetsB) {
+    const safeTargetsA = Array.isArray(targetsA) ? targetsA : [];
+    const safeTargetsB = Array.isArray(targetsB) ? targetsB : [];
+    return safeTargetsA.some(function (targetName) {
+        return safeTargetsB.indexOf(targetName) !== -1;
+    });
+}
+
+function buildSheetQuickPlayPatternGroups(preparedPatterns) {
+    const groups = [];
+    let currentGroup = [];
+    let currentTargets = [];
+
+    preparedPatterns.forEach(function (pattern) {
+        const targetInstruments = normalizeSheetQuickPlayTargetInstruments(pattern.defaultTargets);
+        if (currentGroup.length > 0 && doSheetQuickPlayTargetsOverlap(currentTargets, targetInstruments)) {
+            groups.push(currentGroup);
+            currentGroup = [];
+            currentTargets = [];
         }
-        if (mainNotes.length > 0 && labelName && mainLabels.indexOf(labelName) === -1) {
-            mainLabels.push(labelName);
+        currentGroup.push({
+            pattern: pattern,
+            targetInstruments: targetInstruments
+        });
+        targetInstruments.forEach(function (instrumentName) {
+            if (currentTargets.indexOf(instrumentName) === -1) {
+                currentTargets.push(instrumentName);
+            }
+        });
+    });
+
+    if (currentGroup.length > 0) {
+        groups.push(currentGroup);
+    }
+
+    return groups;
+}
+
+function trimSheetQuickPlayStandalonePickupNotes(pickupNotes) {
+    const notes = Array.isArray(pickupNotes) ? pickupNotes : [];
+    const firstPlayableIndex = notes.findIndex(isSheetQuickPlayPlayableNote);
+    return firstPlayableIndex >= 0 ? notes.slice(firstPlayableIndex) : [];
+}
+
+function mergeSheetQuickPlayPickupIntoHostSection(hostSection, pickupSection) {
+    if (!hostSection || !pickupSection || !sheetQuickPlaySectionHasNotes(pickupSection)) {
+        return;
+    }
+
+    const hostLength = getSheetQuickPlaySectionPlaybackLength(hostSection);
+    const pickupLength = getSheetQuickPlaySectionLength(pickupSection);
+    const stepsPerBar = getReadRhythmConfig().stepsPerBar;
+    const pickupSpan = Math.max(stepsPerBar, pickupLength);
+    const pickupOffset = Math.max(0, hostLength - pickupSpan);
+    const pickupTrimStart = Math.max(0, pickupSpan - hostLength);
+
+    getSheetQuickPlayTrackNames().forEach(function (instrumentName) {
+        const pickupNotes = pickupSection.trackNotes[instrumentName];
+        if (!Array.isArray(pickupNotes) || pickupNotes.length === 0) {
+            return;
+        }
+        const alignedPickupNotes = pickupTrimStart > 0
+            ? pickupNotes.slice(pickupTrimStart)
+            : pickupNotes;
+        if (alignedPickupNotes.length === 0) {
+            return;
+        }
+        hostSection.trackNotes[instrumentName] = mergeSheetQuickPlayNotes(
+            hostSection.trackNotes[instrumentName],
+            alignedPickupNotes,
+            pickupOffset
+        );
+        if (pickupSection.trackHandModes[instrumentName]) {
+            hostSection.trackHandModes[instrumentName] = pickupSection.trackHandModes[instrumentName];
+        }
+    });
+    hostSection.fixedLength = getSheetQuickPlayFullBarLength(
+        getSheetQuickPlaySectionPlaybackLength(hostSection),
+        stepsPerBar
+    );
+}
+
+function buildSheetQuickPlayConfiguredSections(preparedPatterns) {
+    const stepsPerBar = getReadRhythmConfig().stepsPerBar;
+    const sections = [];
+    const groups = buildSheetQuickPlayPatternGroups(preparedPatterns);
+
+    groups.forEach(function (group, groupIndex) {
+        const labels = [];
+        const labelNames = [];
+        const section = createSheetQuickPlaySection(
+            'Begleitung',
+            '',
+            'sheet-quick-play-main-' + groupIndex
+        );
+        const pickupSection = createSheetQuickPlaySection(
+            'Auftakt',
+            '',
+            'sheet-quick-play-pickup-' + groupIndex,
+            { isLeadIn: true, fixedLength: stepsPerBar }
+        );
+        const hostSection = sections.slice().reverse().find(sheetQuickPlaySectionHasNotes);
+        const hasHostSection = Boolean(hostSection);
+
+        group.forEach(function (groupEntry) {
+            const pattern = groupEntry.pattern;
+            const targetInstruments = groupEntry.targetInstruments;
+            const patternNotes = getSheetQuickPlayPatternNotes(pattern);
+            const inStep = getSheetQuickPlayPatternInStep(pattern);
+            const outStep = getSheetQuickPlayPatternOutStep(pattern);
+            const pickupEndStep = getSheetQuickPlayPickupEndStep(patternNotes, inStep, stepsPerBar);
+            let pickupNotes = buildSheetQuickPlayPickupNotes(patternNotes, inStep, stepsPerBar);
+            let mainNotes = pickupEndStep > 0 ? patternNotes.slice(pickupEndStep) : patternNotes.slice();
+            let sectionStartStep = pickupEndStep > 0 ? pickupEndStep : 0;
+            const label = pattern.labelType || pattern.label || 'Begleitung';
+            const labelName = pattern.labelName || pattern.name || label;
+
+            if (pickupEndStep > 0 && !hasHostSection && group.length === 1) {
+                const safeInStep = Math.max(0, Math.min(patternNotes.length - 1, Number(inStep) || 0));
+                pickupNotes = [];
+                mainNotes = patternNotes.slice(safeInStep);
+                sectionStartStep = safeInStep;
+            } else if (pickupEndStep > 0 && !hasHostSection) {
+                sectionStartStep = Math.max(0, pickupEndStep - stepsPerBar);
+                mainNotes = pickupNotes.concat(mainNotes);
+                pickupNotes = [];
+            }
+
+            section.fixedLength = Math.max(
+                section.fixedLength,
+                getSheetQuickPlayPatternSectionLength(
+                    patternNotes.length,
+                    outStep,
+                    sectionStartStep,
+                    stepsPerBar
+                )
+            );
+
+            if (label && labels.indexOf(label) === -1) {
+                labels.push(label);
+            }
+            if (labelName && labelNames.indexOf(labelName) === -1) {
+                labelNames.push(labelName);
+            }
+
+            targetInstruments.forEach(function (instrumentName) {
+                if (!section.trackNotes[instrumentName]) {
+                    return;
+                }
+                if (outStep !== null && outStep !== undefined && Number(outStep) >= sectionStartStep) {
+                    section.finalRepeatOutSteps[instrumentName] = Math.max(
+                        0,
+                        Math.round(Number(outStep) || 0) - sectionStartStep
+                    );
+                    section.finalRepeatOutStepTypes[instrumentName] = label || '';
+                    section.forceFinalOutAtSectionEnd = true;
+                }
+                if (pickupNotes.length > 0) {
+                    pickupSection.trackNotes[instrumentName] = mergeSheetQuickPlayNotes(
+                        pickupSection.trackNotes[instrumentName],
+                        pickupNotes,
+                        0
+                    );
+                }
+                if (mainNotes.length > 0) {
+                    section.trackNotes[instrumentName] = mergeSheetQuickPlayNotes(
+                        section.trackNotes[instrumentName],
+                        mainNotes,
+                        0
+                    );
+                }
+            });
+        });
+
+        section.label = labels.indexOf('Begleitung') !== -1 ? 'Begleitung' : (labels[0] || 'Begleitung');
+        section.labelName = labelNames.join(' + ') || 'Vorhören';
+        pickupSection.label = section.label;
+        pickupSection.labelName = section.labelName ? section.labelName + ' Auftakt' : 'Auftakt';
+
+        if (sheetQuickPlaySectionHasNotes(pickupSection)) {
+            if (hostSection) {
+                mergeSheetQuickPlayPickupIntoHostSection(hostSection, pickupSection);
+            } else {
+                getSheetQuickPlayTrackNames().forEach(function (instrumentName) {
+                    pickupSection.trackNotes[instrumentName] = trimSheetQuickPlayStandalonePickupNotes(
+                        pickupSection.trackNotes[instrumentName]
+                    );
+                });
+                pickupSection.fixedLength = 0;
+                if (sheetQuickPlaySectionHasNotes(pickupSection)) {
+                    sections.push(pickupSection);
+                }
+            }
+        }
+
+        if (sheetQuickPlaySectionHasNotes(section)) {
+            section.fixedLength = Math.max(
+                section.fixedLength,
+                getSheetQuickPlayFullBarLength(
+                    getSheetQuickPlaySectionLength(section),
+                    stepsPerBar
+                )
+            );
+            sections.push(section);
         }
     });
 
-    const sections = [];
-    if (hasPickupNotes) {
-        sections.push({
-            label: 'Auftakt',
-            labelName: pickupLabels.length > 0 ? pickupLabels.join(' + ') + ' Auftakt' : 'Auftakt',
-            runtimeKey: 'sheet-quick-play-pickup',
-            isLeadIn: true,
-            fixedLength: stepsPerBar,
-            repeatCount: 1,
-            trackNotes: pickupTrackNotes,
-            trackHandModes: {},
-            practiceTargetInstruments: []
-        });
-    }
-    if (hasMainNotes) {
-        sections.push({
-            label: 'Begleitung',
-            labelName: mainLabels.join(' + ') || 'Vorhören',
-            runtimeKey: 'sheet-quick-play-main',
-            isLeadIn: false,
-            repeatCount: 1,
-            trackNotes: mainTrackNotes,
-            trackHandModes: {},
-            practiceTargetInstruments: []
-        });
-    }
     return sections;
 }
 
@@ -2599,7 +2869,7 @@ function buildSheetQuickPlayPayload() {
     const entries = preparedPatterns.map(function (pattern, patternIndex) {
         return {
             id: 'sheet-quick-play-' + patternIndex,
-            blockId: 'sheet-quick-play-block',
+            blockId: 'sheet-quick-play-block-' + patternIndex,
             parallelGroupId: '',
             overlayRepeatIndex: null,
             patternId: pattern.id,
@@ -2616,8 +2886,8 @@ function buildSheetQuickPlayPayload() {
     timelineState.tempo = previousTempo;
     if (Array.isArray(payload) && payload[0]) {
         payload[0].PracticeMode = true;
-        payload[0].TimelineLoop = false;
-        payload[0].TimelineLoopCount = false;
+        payload[0].TimelineLoop = true;
+        payload[0].TimelineLoopCount = 'loop';
         payload[0].SheetQuickPlayMode = true;
         payload[0].Tempo = getSheetQuickPlayTempo();
         payload[0].PracticeSections = buildSheetQuickPlayConfiguredSections(preparedPatterns);

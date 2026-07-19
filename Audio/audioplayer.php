@@ -2587,6 +2587,15 @@ function buildConfiguredPracticeSections(config) {
       section.finalRepeatOutStepTypes[instrumentName] = String(sourceFinalRepeatOutStepTypes[instrumentName] || '');
     });
 
+    if (section.fixedLength > 0) {
+      trackInstrumentNames.forEach(function (instrumentName) {
+        const currentLength = getSectionLength(section.trackNotes[instrumentName]);
+        if (currentLength > 0 && currentLength < section.fixedLength) {
+          section.trackNotes[instrumentName] = padNotesToLength(section.trackNotes[instrumentName], section.fixedLength);
+        }
+      });
+    }
+
     normalizeSectionTrackLoops(section);
     return section;
   }).filter(function (section) {
@@ -2973,9 +2982,11 @@ let timelinePlaybackLength = 0;
 
 function recalculateOrderedSectionTiming() {
   orderedSections.forEach(function (section, sectionIndex) {
-    section.length = Math.max.apply(null, trackInstrumentNames.map(function (instrumentName) {
+    const naturalLength = Math.max.apply(null, trackInstrumentNames.map(function (instrumentName) {
       return getSectionLength(section.trackNotes[instrumentName]);
     }).concat(0));
+    const fixedLength = Math.max(0, Math.round(Number(section.fixedLength) || 0));
+    section.length = fixedLength > 0 ? fixedLength : naturalLength;
     section.repeatCount = normalizeSectionRepeatCount(section.repeatCount);
     section.playbackLength = section.length * section.repeatCount;
     section.startStep = sectionIndex === 0 ? 0 : orderedSections[sectionIndex - 1].endStep;
@@ -3104,6 +3115,27 @@ function getNeunaerSwingStepOffsets(activeSwingFactor) {
 }
 
 function getPlaybackSectionContext(playbackStep) {
+  if (isSheetQuickPlayMode && timelineLoopCount && orderedFallbackLoopLength > 0) {
+    let loopStep = playbackStep % orderedFallbackLoopLength;
+    const loopCycleIndex = Math.floor(playbackStep / orderedFallbackLoopLength);
+    for (let sectionIndex = 0; sectionIndex < orderedFallbackLoopSections.length; sectionIndex++) {
+      const loopSection = orderedFallbackLoopSections[sectionIndex];
+      const loopSectionLength = loopSection.playbackLength || loopSection.length || 0;
+      if (loopStep < loopSectionLength) {
+        const repeatedLocalStep = loopSection.length > 0 ? loopStep % loopSection.length : 0;
+        const repeatedCycleIndex = loopSection.length > 0 ? Math.floor(loopStep / loopSection.length) : 0;
+        return {
+          section: loopSection,
+          localStep: repeatedLocalStep,
+          sectionStep: loopStep,
+          loopCycleIndex: repeatedCycleIndex,
+          outerLoopIndex: loopCycleIndex
+        };
+      }
+      loopStep -= loopSectionLength;
+    }
+  }
+
   for (let sectionIndex = 0; sectionIndex < orderedSections.length; sectionIndex++) {
     const section = orderedSections[sectionIndex];
     if (playbackStep >= section.startStep && playbackStep < section.endStep) {
