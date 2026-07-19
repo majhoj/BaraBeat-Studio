@@ -1,4 +1,16 @@
 // JavaScript Document
+function configureBarabeatAudioSession() {
+  if (typeof navigator === 'undefined' || !navigator.audioSession) {
+    return;
+  }
+
+  try {
+    navigator.audioSession.type = 'playback';
+  } catch (error) {
+    console.warn('AudioSession konnte nicht auf playback gesetzt werden:', error);
+  }
+}
+
 class Instrumente {
   constructor(sounds, pan, vol) {
     this._sounds = sounds;
@@ -130,6 +142,8 @@ class Instrumente {
   }
 
   play(name, time_i, gainMultiplier = 1) {
+    configureBarabeatAudioSession();
+
     if (Object.prototype.hasOwnProperty.call(this._snd, name)) {
       const sampleSource = this._audioCtx.createBufferSource();
       const vol_tone = this._audioCtx.createGain();
