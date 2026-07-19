@@ -2623,6 +2623,10 @@ function buildSheetQuickPlayPatternGroups(preparedPatterns) {
     return groups;
 }
 
+function isSheetQuickPlayAccompanimentPattern(pattern) {
+    return (pattern && (pattern.labelType || pattern.label || '')) === 'Begleitung';
+}
+
 function trimSheetQuickPlayStandalonePickupNotes(pickupNotes) {
     const notes = Array.isArray(pickupNotes) ? pickupNotes : [];
     const firstPlayableIndex = notes.findIndex(isSheetQuickPlayPlayableNote);
@@ -2688,6 +2692,9 @@ function buildSheetQuickPlayConfiguredSections(preparedPatterns) {
         );
         const hostSection = sections.slice().reverse().find(sheetQuickPlaySectionHasNotes);
         const hasHostSection = Boolean(hostSection);
+        const accompanimentPatternCount = group.filter(function (groupEntry) {
+            return isSheetQuickPlayAccompanimentPattern(groupEntry && groupEntry.pattern);
+        }).length;
 
         group.forEach(function (groupEntry) {
             const pattern = groupEntry.pattern;
@@ -2734,7 +2741,11 @@ function buildSheetQuickPlayConfiguredSections(preparedPatterns) {
                 if (!section.trackNotes[instrumentName]) {
                     return;
                 }
-                if (outStep !== null && outStep !== undefined && Number(outStep) >= sectionStartStep) {
+                const shouldIgnoreOutForAccompanimentLoop = label === 'Begleitung' && accompanimentPatternCount > 1;
+                if (!shouldIgnoreOutForAccompanimentLoop &&
+                        outStep !== null &&
+                        outStep !== undefined &&
+                        Number(outStep) >= sectionStartStep) {
                     section.finalRepeatOutSteps[instrumentName] = Math.max(
                         0,
                         Math.round(Number(outStep) || 0) - sectionStartStep
