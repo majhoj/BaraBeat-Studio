@@ -169,12 +169,9 @@ function getPracticeScrollerVisualLoopCopies() {
     return practiceScrollerState.visualLoopCopies;
 }
 
-function getPracticeScrollerSectionVisualRepeatCopies(sections, baseVisualLoopCopies) {
-    const safeSections = Array.isArray(sections) ? sections : [];
-    return safeSections.reduce(function (maxRepeatCount, section) {
-        const repeatCount = normalizePracticeCount(section && section.repeatCount, 1, 1, 32);
-        return Math.max(maxRepeatCount, repeatCount);
-    }, Math.max(1, Number(baseVisualLoopCopies) || 1));
+function getPracticeScrollerSectionVisualRepeatCopies(baseVisualLoopCopies) {
+    const minimumCopies = 4;
+    return Math.max(minimumCopies, Math.max(1, Number(baseVisualLoopCopies) || 1));
 }
 
 function getPracticeScrollerTailSteps(visualLoopLength) {
@@ -2744,7 +2741,7 @@ function buildPracticeSectionsFromEntries(entries) {
         const blockHasPickup = !previousBlockEndedWithShortBar && block.entries.some(function (entry) {
             return practiceEntryAllowsPickup(entry, block);
         });
-        const blockPracticeLength = block.entries.reduce(function (maxLength, entry) {
+        const targetPatternLength = block.entries.reduce(function (maxLength, entry) {
             if (!entry || !entry.isPracticeTarget) {
                 return maxLength;
             }
@@ -2754,6 +2751,23 @@ function buildPracticeSectionsFromEntries(entries) {
                 : flattenPracticePatternNotes(pattern);
             return Math.max(maxLength, patternNotes.length);
         }, 0);
+        const hasTargetAccompaniment = block.entries.some(function (entry) {
+            const pattern = findPatternById(entry && entry.patternId);
+            return Boolean(entry && entry.isPracticeTarget && pattern && pattern.labelType === 'Begleitung');
+        });
+        const accompanimentCycleLength = hasTargetAccompaniment
+            ? block.entries.reduce(function (maxLength, entry) {
+                const pattern = findPatternById(entry && entry.patternId);
+                if (!entry || entry.suppressPlayback || !pattern || pattern.labelType !== 'Begleitung') {
+                    return maxLength;
+                }
+                const patternNotes = ignoreShortBarForRunningAccompaniment
+                    ? flattenPracticePatternNotesIgnoringShortBars(pattern)
+                    : flattenPracticePatternNotes(pattern);
+                return Math.max(maxLength, patternNotes.length);
+            }, 0)
+            : 0;
+        const blockPracticeLength = Math.max(targetPatternLength, accompanimentCycleLength);
         if (ignoreShortBarForRunningAccompaniment && blockPracticeLength > 0) {
             section.minLength = Math.max(section.minLength || 0, blockPracticeLength);
         }
@@ -2775,9 +2789,16 @@ function buildPracticeSectionsFromEntries(entries) {
             const shouldUseAccompanimentSegment = isAccompanimentEntry &&
                 blockPracticeLength > 0 &&
                 rawPatternNotes.length > blockPracticeLength;
+            const shouldLoopTargetAccompaniment = entry.isPracticeTarget &&
+                pattern.labelType === 'Begleitung' &&
+                rawPatternNotes.length > 0 &&
+                rawPatternNotes.length < blockPracticeLength;
+            const patternSegmentOffset = shouldUseAccompanimentSegment ? accompanimentOffset : 0;
             let patternNotes = shouldUseAccompanimentSegment
                 ? getPracticeLoopedSegment(rawPatternNotes, accompanimentOffset, blockPracticeLength, 'f')
-                : rawPatternNotes.slice();
+                : shouldLoopTargetAccompaniment
+                    ? getPracticeLoopedSegment(rawPatternNotes, 0, blockPracticeLength, 'f')
+                    : rawPatternNotes.slice();
             if (!shouldUseAccompanimentSegment && rawPatternPickupEndStep > 0) {
                 patternNotes = patternNotes.slice(rawPatternPickupEndStep);
             }
@@ -2786,11 +2807,11 @@ function buildPracticeSectionsFromEntries(entries) {
             }
             const patternOutStep = getPracticePatternOutStep(pattern);
             const rawPatternBarStartSteps = getPracticePatternBarStartSteps(pattern);
-            const patternBarStartSteps = shouldUseAccompanimentSegment
+            const patternBarStartSteps = shouldUseAccompanimentSegment || shouldLoopTargetAccompaniment
                 ? getPracticeLoopedBarStartSegment(
                     rawPatternBarStartSteps,
                     rawPatternNotes.length,
-                    accompanimentOffset,
+                    patternSegmentOffset,
                     blockPracticeLength
                 )
                 : shiftPracticeBarStartStepsAfterOffset(
@@ -2798,9 +2819,19 @@ function buildPracticeSectionsFromEntries(entries) {
                     rawPatternPickupEndStep,
                     patternNotes.length
                 );
-            const effectivePatternOutStep = patternOutStep !== null && patternOutStep !== undefined
+            let effectivePatternOutStep = patternOutStep !== null && patternOutStep !== undefined
                 ? Math.max(0, Math.round(Number(patternOutStep) || 0) - rawPatternPickupEndStep)
                 : patternOutStep;
+            if (shouldLoopTargetAccompaniment &&
+                    effectivePatternOutStep !== null &&
+                    effectivePatternOutStep !== undefined) {
+                const lastLoopStart = Math.floor((blockPracticeLength - 1) / rawPatternNotes.length) *
+                    rawPatternNotes.length;
+                effectivePatternOutStep = Math.min(
+                    blockPracticeLength - 1,
+                    lastLoopStart + Math.max(0, Math.round(Number(effectivePatternOutStep) || 0))
+                );
+            }
             const targetInstruments = normalizePracticeTargetInstruments(entry.targetInstruments);
             const label = pattern.labelType || pattern.label || '';
             const labelName = pattern.labelName || pattern.name || label;
@@ -3241,7 +3272,7 @@ function flattenPracticeScrollerSections(sections, options) {
     const flattenOptions = options || {};
     const safeSections = Array.isArray(sections) ? sections : [];
     const visualLoopCopies = getPracticeScrollerVisualLoopCopies();
-    const sectionVisualRepeatCopies = getPracticeScrollerSectionVisualRepeatCopies(safeSections, visualLoopCopies);
+    const sectionVisualRepeatCopies = getPracticeScrollerSectionVisualRepeatCopies(visualLoopCopies);
     const hasTimerLoop = practiceState.timerMinutes > 0;
     const configuredPracticeRepeats = normalizePracticeCount(practiceState.repeatCount, 1, 1, practiceRepeatCountMax);
     const actualOuterLoopCopies = hasTimerLoop ? visualLoopCopies : Math.max(0, configuredPracticeRepeats - 1);
@@ -3308,7 +3339,10 @@ function flattenPracticeScrollerSections(sections, options) {
             playbackStart: playbackOffset,
             playbackLength: sectionLength * repeatCount,
             visualStart: stepOffset,
-            visualLength: sectionLength * renderRepeatCount
+            visualLength: sectionLength * renderRepeatCount,
+            sectionLength: sectionLength,
+            repeatCount: repeatCount,
+            visualRepeatCount: renderRepeatCount
         });
 
         practiceTrackInstrumentNames.forEach(function (instrumentName) {
@@ -3352,7 +3386,7 @@ function flattenPracticeScrollerSections(sections, options) {
                     const shouldMuteForOut = safeOutStep !== null &&
                         (outType !== 'Begleitung' || forceFinalOutAtSectionEnd) &&
                         (shouldUseOutAsSectionEnd || forceFinalOutAtSectionEnd) &&
-                        repeatIndex === repeatCount - 1 &&
+                        repeatIndex === renderRepeatCount - 1 &&
                         stepIndex > safeOutStep;
                     trackNotes[instrumentName].push(shouldMuteForOut ? 'f' : (notes[stepIndex] || 'f'));
                     const isStepTarget = Boolean(isPracticeTarget) || Boolean(stepTargetFlags[stepIndex]);
@@ -4138,7 +4172,7 @@ function getPracticeScrollerRemainingStatus(rawStep) {
 }
 
 function normalizePracticeScrollerPlaybackStep(playbackStep) {
-    const rawStep = Math.max(0, Math.floor(Number(playbackStep) || 0));
+    const rawStep = Math.max(0, Number(playbackStep) || 0);
     const playbackSegments = practiceScrollerState.playbackSegments || [];
     const playbackTotalSteps = practiceScrollerState.playbackTotalSteps || 0;
     if (practiceScrollerState.totalSteps <= 0 || playbackSegments.length === 0 || playbackTotalSteps <= 0) {
@@ -4169,7 +4203,46 @@ function normalizePracticeScrollerPlaybackStep(playbackStep) {
     const segmentVisualStart = rawStep >= playbackTotalSteps
         ? Math.max(0, matchedSegment.visualStart - practiceScrollerState.loopStartStep)
         : matchedSegment.visualStart;
-    return baseVisualStart + segmentVisualStart + (localPlaybackStep % matchedSegment.visualLength);
+    return baseVisualStart + segmentVisualStart +
+        getPracticeScrollerSegmentVisualStep(matchedSegment, localPlaybackStep);
+}
+
+function getPracticeScrollerSegmentVisualStep(segment, localPlaybackStep) {
+    const safeSegment = segment || {};
+    const visualLength = Math.max(0, Number(safeSegment.visualLength) || 0);
+    const sectionLength = Math.max(0, Number(safeSegment.sectionLength) || 0);
+    const repeatCount = Math.max(1, Number(safeSegment.repeatCount) || 1);
+    const visualRepeatCount = Math.max(1, Number(safeSegment.visualRepeatCount) || 1);
+    const safeLocalStep = Math.max(0, Number(localPlaybackStep) || 0);
+
+    if (visualLength <= 0 || sectionLength <= 0) {
+        return 0;
+    }
+    if (repeatCount <= visualRepeatCount) {
+        return Math.min(visualLength - 1, safeLocalStep);
+    }
+
+    // Keep dedicated copies for the real first and last repeat; recycle only the middle.
+    const playbackRepeatIndex = Math.min(repeatCount - 1, Math.floor(safeLocalStep / sectionLength));
+    const stepInRepeat = safeLocalStep % sectionLength;
+    let visualRepeatIndex = 0;
+
+    const trailingCopyCount = Math.min(2, Math.max(1, visualRepeatCount - 2));
+    const trailingPlaybackStart = repeatCount - trailingCopyCount;
+
+    if (playbackRepeatIndex === 0) {
+        visualRepeatIndex = 0;
+    } else if (playbackRepeatIndex >= trailingPlaybackStart) {
+        visualRepeatIndex = visualRepeatCount - (repeatCount - playbackRepeatIndex);
+    } else {
+        const reusableCopyCount = Math.max(1, visualRepeatCount - trailingCopyCount - 1);
+        visualRepeatIndex = 1 + ((playbackRepeatIndex - 1) % reusableCopyCount);
+    }
+
+    return Math.min(
+        visualLength - 1,
+        (visualRepeatIndex * sectionLength) + stepInRepeat
+    );
 }
 
 function getRenderedPracticeScrollerStep(visualStep) {
@@ -4203,9 +4276,12 @@ function updatePracticeScrollerPosition(playbackStep) {
     const minVisualStep = -practiceScrollerState.visualLeadInSteps;
     const maxVisualStep = Math.max(0, practiceScrollerState.visualTotalSteps - 1);
     const rawStep = Math.max(minVisualStep, Number(playbackStep) || 0);
-    const renderedStep = getRenderedPracticeScrollerStep(rawStep);
+    const normalizedStep = rawStep < 0
+        ? rawStep
+        : normalizePracticeScrollerPlaybackStep(rawStep);
+    const renderedStep = getRenderedPracticeScrollerStep(normalizedStep);
     const safeStep = Math.max(minVisualStep, Math.min(maxVisualStep, renderedStep));
-    const activeStep = Math.max(0, Math.min(maxVisualStep, Math.round(safeStep)));
+    const activeStep = Math.max(0, Math.min(maxVisualStep, Math.floor(safeStep)));
     const cellRect = firstCellEl ? firstCellEl.getBoundingClientRect() : null;
     const stepWidth = cellRect && cellRect.width > 0 ? cellRect.width : practiceScrollerState.stepWidth;
     const activePlayheadRatio = window.matchMedia('(max-width: 760px)').matches
@@ -4310,7 +4386,7 @@ function recyclePracticeScrollerVisualLoop(nextStep) {
 }
 
 function updatePracticeScrollerPlayback(playbackStep, delayMs) {
-    const stepNumber = normalizePracticeScrollerPlaybackStep(playbackStep);
+    const stepNumber = Math.max(0, Number(playbackStep) || 0);
     const eventTime = window.performance.now() + Math.max(0, Number(delayMs) || 0) + practiceState.audioLatencyMs;
     const matchingEvent = practiceScrollerState.playbackEvents.find(function (playbackEvent) {
         return playbackEvent.step === stepNumber && Math.abs(playbackEvent.time - eventTime) < 40;

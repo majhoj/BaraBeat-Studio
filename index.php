@@ -8,6 +8,8 @@ $jsFn = @filemtime(__DIR__ . '/JS/functions.js') ?: 1;
 $jsTimeline = @filemtime(__DIR__ . '/JS/timeline.js') ?: 1;
 $jsPractice = @filemtime(__DIR__ . '/JS/practice.js') ?: 1;
 $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
+$faviconSvg = @filemtime(__DIR__ . '/Assets/favicon.svg') ?: 1;
+$faviconPng = @filemtime(__DIR__ . '/Assets/favicon-32.png') ?: 1;
 ?>
 <!doctype html>
 <html>
@@ -15,6 +17,8 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title><BaraBeat-Studio></title>
+    <link rel="icon" href="Assets/favicon.svg?v=<?php echo $faviconSvg; ?>" type="image/svg+xml">
+    <link rel="icon" href="Assets/favicon-32.png?v=<?php echo $faviconPng; ?>" type="image/png" sizes="32x32">
     <script src="JS/snapNEU.svg.js?v=<?php echo $jsSnap; ?>"></script>
     <script src="JS/jquery.min.js?v=<?php echo $jsJq; ?>"></script>
     <script src="JS/localLibrary.js?v=<?php echo $jsLocalLibrary; ?>"></script>
@@ -2547,6 +2551,24 @@ function getSheetQuickPlayFullBarLength(noteLength, stepsPerBar) {
     return Math.ceil(safeLength / safeStepsPerBar) * safeStepsPerBar;
 }
 
+function repeatSheetQuickPlayNotesToLength(notes, targetLength) {
+    const sourceNotes = Array.isArray(notes) ? notes : [];
+    const safeTargetLength = Math.max(0, Math.round(Number(targetLength) || 0));
+    if (sourceNotes.length === 0 || safeTargetLength <= 0) {
+        return sourceNotes.slice();
+    }
+
+    const repeatedNotes = [];
+    while (repeatedNotes.length < safeTargetLength) {
+        const remainingLength = safeTargetLength - repeatedNotes.length;
+        repeatedNotes.push.apply(
+            repeatedNotes,
+            sourceNotes.slice(0, Math.min(sourceNotes.length, remainingLength))
+        );
+    }
+    return repeatedNotes;
+}
+
 function getSheetQuickPlaySectionPlaybackLength(section) {
     const noteLength = getSheetQuickPlaySectionLength(section);
     const fixedLength = Math.max(0, Math.round(Number(section && section.fixedLength) || 0));
@@ -2679,6 +2701,7 @@ function buildSheetQuickPlayConfiguredSections(preparedPatterns) {
     groups.forEach(function (group, groupIndex) {
         const labels = [];
         const labelNames = [];
+        const parallelAccompanimentLoops = [];
         const section = createSheetQuickPlaySection(
             'Begleitung',
             '',
@@ -2735,6 +2758,12 @@ function buildSheetQuickPlayConfiguredSections(preparedPatterns) {
             }
             if (labelName && labelNames.indexOf(labelName) === -1) {
                 labelNames.push(labelName);
+            }
+            if (accompanimentPatternCount > 1 && label === 'Begleitung' && mainNotes.length > 0) {
+                parallelAccompanimentLoops.push({
+                    targetInstruments: targetInstruments.slice(),
+                    notes: mainNotes.slice()
+                });
             }
 
             targetInstruments.forEach(function (instrumentName) {
@@ -2799,6 +2828,17 @@ function buildSheetQuickPlayConfiguredSections(preparedPatterns) {
                     stepsPerBar
                 )
             );
+            parallelAccompanimentLoops.forEach(function (loopEntry) {
+                const repeatedNotes = repeatSheetQuickPlayNotesToLength(
+                    loopEntry.notes,
+                    section.fixedLength
+                );
+                loopEntry.targetInstruments.forEach(function (instrumentName) {
+                    if (section.trackNotes[instrumentName]) {
+                        section.trackNotes[instrumentName] = repeatedNotes.slice();
+                    }
+                });
+            });
             sections.push(section);
         }
     });

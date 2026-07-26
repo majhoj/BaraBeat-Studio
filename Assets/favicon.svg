@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="sky" x1="14" y1="6" x2="50" y2="38" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffe800"/>
+      <stop offset="0.35" stop-color="#ff9d00"/>
+      <stop offset="0.72" stop-color="#e94112"/>
+      <stop offset="1" stop-color="#7b170e"/>
+    </linearGradient>
+    <clipPath id="circle">
+      <circle cx="32" cy="24" r="22"/>
+    </clipPath>
+  </defs>
+  <circle cx="32" cy="24" r="22" fill="url(#sky)"/>
+  <g clip-path="url(#circle)" fill="none" stroke="#fff4cd" stroke-width="2.8" stroke-linecap="round">
+    <path d="M6 16 C18 19 25 9 38 12 C49 14 55 9 62 7"/>
+    <path d="M5 26 C18 29 26 18 39 22 C49 24 57 18 64 17"/>
+    <path d="M4 36 C17 40 27 27 41 31 C51 34 58 28 65 27"/>
+  </g>
+  <path d="M10 37 C20 41 44 41 54 37 C53 51 44 61 32 62 C20 61 11 51 10 37Z" fill="#17140b"/>
+  <g fill="#fff5db">
+    <path d="M19 44 C21 49 23 55 21 61"/>
+    <path d="M45 44 C43 49 41 55 43 61"/>
+    <path d="M30 44 C27 50 27 57 28 62 L36 62 C37 57 37 50 34 44Z"/>
+    <circle cx="17" cy="43" r="2.2"/>
+    <circle cx="26" cy="46" r="2"/>
+    <circle cx="38" cy="46" r="2"/>
+    <circle cx="47" cy="43" r="2.2"/>
+  </g>
+  <path d="M9 36 C20 42 44 42 55 36" fill="none" stroke="#fff5db" stroke-width="4" stroke-linecap="round"/>
+</svg>
