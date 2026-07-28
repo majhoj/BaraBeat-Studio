@@ -1556,7 +1556,8 @@ function buildPracticeEntries(options) {
     const accompanimentPatterns = getPracticePatternsByIds(practiceState.accompanimentPatternIds);
     const soloPatterns = getPracticePatternsByIds(practiceState.soloPatternIds);
     const cycleSoloPatterns = getPracticeCyclePatterns(soloPatterns);
-    const accompanimentOnlyLoops = cycleSoloPatterns.length === 0 && accompanimentPatterns.length > 0
+    const hasSelectedPracticePatterns = soloPatterns.length > 0;
+    const accompanimentOnlyLoops = !hasSelectedPracticePatterns && accompanimentPatterns.length > 0
         ? Math.max(1, practiceState.loopsWithoutSolo)
         : practiceState.loopsWithoutSolo;
     const entries = [];
@@ -1567,6 +1568,35 @@ function buildPracticeEntries(options) {
             ? {}
             : { sectionTempo: sectionTempoSequence[cycleIndex] };
         const isLeadInCycle = cycleIndex < leadInCycleCount;
+
+        if (!hasSelectedPracticePatterns) {
+            if (cycleIndex === 0) {
+                cycleSoloPatterns.forEach(function (leadInPattern) {
+                    addPracticeParallelGroup(
+                        entries,
+                        [leadInPattern],
+                        blockIndex,
+                        1,
+                        true,
+                        cycleOptions
+                    );
+                    blockIndex += 1;
+                });
+            }
+            if (accompanimentPatterns.length > 0) {
+                addPracticeParallelGroup(
+                    entries,
+                    accompanimentPatterns,
+                    blockIndex,
+                    accompanimentOnlyLoops,
+                    isLeadInCycle,
+                    cycleOptions
+                );
+                blockIndex += 1;
+            }
+            continue;
+        }
+
         if (accompanimentOnlyLoops > 0) {
             addPracticeParallelGroup(entries, accompanimentPatterns, blockIndex, accompanimentOnlyLoops, isLeadInCycle, cycleOptions);
             blockIndex += 1;
