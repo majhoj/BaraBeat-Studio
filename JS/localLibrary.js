@@ -256,6 +256,19 @@
     });
   }
 
+  async function updateScoreMetadata(scoreId, metadata) {
+    const score = await getByKey("scores", scoreId);
+    if (!score) {
+      throw new Error("Das Notenblatt wurde nicht gefunden: " + scoreId);
+    }
+
+    const updatedScore = Object.assign({}, score, metadata || {});
+    return withStore("scores", "readwrite", async function (stores) {
+      await promisifyRequest(stores.scores.put(updatedScore));
+      return updatedScore;
+    });
+  }
+
   function getScore(id) {
     return getByKey("scores", id);
   }
@@ -408,6 +421,7 @@
     getFolder: getFolder,
     renameFolder: renameFolder,
     saveScore: saveScore,
+    updateScoreMetadata: updateScoreMetadata,
     getScore: getScore,
     listScores: listScores,
     findScoreByServerPath: findScoreByServerPath,

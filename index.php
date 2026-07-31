@@ -175,9 +175,11 @@ $faviconPng = @filemtime(__DIR__ . '/Assets/favicon-32.png') ?: 1;
                         <span id="fileDialogFolderName" class="file-dialog-folder-name">Lokal</span>
                         <input type="search" id="fileDialogSearch" placeholder="Suchen" />
                     </div>
-                    <div id="fileDialogServerNotice" class="file-dialog-server-notice" hidden>
-                        <span></span>
-                        <button type="button">Serverversion laden</button>
+                    <div id="fileDialogServerNoticeSlot" class="file-dialog-server-notice-slot">
+                        <div id="fileDialogServerNotice" class="file-dialog-server-notice" hidden>
+                            <span></span>
+                            <button type="button">Serverversion laden</button>
+                        </div>
                     </div>
                     <div class="file-dialog-table-wrap">
                         <table class="file-dialog-table">
@@ -425,10 +427,10 @@ $faviconPng = @filemtime(__DIR__ . '/Assets/favicon-32.png') ?: 1;
             </header>
             <div class="swing-profile-preview" id="practiceSwingProfilePreview" aria-hidden="true"></div>
             <div class="swing-profile-controls" id="practiceSwingProfileControls">
-                <label>S1 <input type="number" id="practiceSwingAnchor1" step="1" value="0" /></label>
-                <label>S2 <input type="number" id="practiceSwingAnchor2" step="1" value="0" /></label>
-                <label>S3 <input type="number" id="practiceSwingAnchor3" step="1" value="0" /></label>
-                <label>S4 <input type="number" id="practiceSwingAnchor4" step="1" value="0" /></label>
+                <label>S1 <input type="number" id="practiceSwingAnchor1" min="-50" max="50" step="1" value="0" /></label>
+                <label>S2 <input type="number" id="practiceSwingAnchor2" min="-50" max="50" step="1" value="0" /></label>
+                <label>S3 <input type="number" id="practiceSwingAnchor3" min="-50" max="50" step="1" value="0" /></label>
+                <label>S4 <input type="number" id="practiceSwingAnchor4" min="-50" max="50" step="1" value="0" /></label>
             </div>
             <footer class="swing-profile-dialog-footer">
                 <button type="button" id="practiceSwingProfileResetButton">Zurücksetzen</button>
@@ -848,7 +850,7 @@ function getScoreStatusLabel(score) {
         return '';
     }
     if (score.serverUpdateAvailable) {
-        return 'Server neuer';
+        return score.syncState === 'modified-local' ? 'Konflikt' : 'Server geändert';
     }
     if (score.syncState === 'modified-local') {
         return 'Geändert';
@@ -883,12 +885,53 @@ function isServerInfoNewerThanLocal(serverInfo, localScore) {
 }
 
 function formatServerVersionDate(serverInfo) {
-    const rawDate = serverInfo && serverInfo.serverUpdatedAt;
-    if (rawDate) {
-        return formatFileDialogDate(rawDate);
-    }
     const modifiedTs = getServerInfoModifiedTs(serverInfo);
-    return modifiedTs > 0 ? formatFileDialogDate(new Date(modifiedTs * 1000).toISOString()) : '';
+    if (modifiedTs > 0) {
+        return formatFileDialogDate(new Date(modifiedTs * 1000).toISOString());
+    }
+    const rawDate = serverInfo && serverInfo.serverUpdatedAt;
+    return rawDate ? formatFileDialogDate(rawDate) : '';
+}
+
+function formatFileDialogEntryDate(entry) {
+    return formatFileDialogDate(
+        entry && (entry.localUpdatedAt || entry.updatedAt || entry.publishedAt || entry.serverUpdatedAt)
+    );
+}
+
+function formatScoreServerDownloadDate(score) {
+    return formatFileDialogDate(score && score.serverDownloadedAt);
+}
+
+function formatScoreLocalChangeDate(score) {
+    if (!score || score.syncState !== 'modified-local') {
+        return '';
+    }
+    return formatFileDialogDate(score.localUpdatedAt || score.updatedAt);
+}
+
+function buildServerVersionNotice(score, serverInfo, serverChanged) {
+    const noticeParts = [];
+    const downloadedDateText = formatScoreServerDownloadDate(score);
+    const serverDateText = formatServerVersionDate(serverInfo);
+    const localDateText = formatScoreLocalChangeDate(score);
+
+    if (downloadedDateText) {
+        noticeParts.push('Vom Server geladen: ' + downloadedDateText);
+    }
+    if (serverChanged) {
+        noticeParts.push(
+            (downloadedDateText ? 'Server seitdem geändert' : 'Server geändert') +
+                (serverDateText ? ': ' + serverDateText : '')
+        );
+    } else {
+        noticeParts.push(downloadedDateText ? 'Server seitdem unverändert' : 'Serverversion unverändert');
+    }
+    if (localDateText) {
+        noticeParts.push('Lokal geändert: ' + localDateText);
+    }
+
+    return noticeParts.join(' · ');
 }
 
 async function findServerScoreInfo(serverPath) {
@@ -981,7 +1024,6 @@ async function updateFileDialogServerNotice() {
                 setFileDialogServerNotice('Diese Serverdatei wird beim Öffnen lokal importiert.', '');
                 return;
             }
-            const serverDateText = formatServerVersionDate(entry);
             const hasTimestampComparison = getServerInfoModifiedTs(entry) > 0 && getScoreServerModifiedTs(localScore) > 0;
             let differs = isServerInfoNewerThanLocal(entry, localScore);
             if (!hasTimestampComparison) {
@@ -995,13 +1037,12 @@ async function updateFileDialogServerNotice() {
             }
             if (differs) {
                 setFileDialogServerNotice(
-                    'Auf dem Server liegt eine neuere Version' +
-                        (serverDateText ? ' vom ' + serverDateText : '') +
-                        '. Beim Öffnen wird die lokale Kopie aktualisiert.',
+                    buildServerVersionNotice(localScore, entry, true) +
+                        ' · Beim Öffnen wird die lokale Kopie aktualisiert.',
                     ''
                 );
             } else {
-                setFileDialogServerNotice('Die lokale Kopie entspricht der Serverversion.', '');
+                setFileDialogServerNotice(buildServerVersionNotice(localScore, entry, false), '');
             }
             return;
         }
@@ -1035,20 +1076,25 @@ async function updateFileDialogServerNotice() {
         }
         if (differs) {
             entry.serverUpdateAvailable = true;
+            entry.latestServerUpdatedAt = serverInfo && serverInfo.serverUpdatedAt
+                ? serverInfo.serverUpdatedAt
+                : '';
+            entry.latestServerModifiedTs = getServerInfoModifiedTs(serverInfo);
             const selectedRow = document.querySelector('#fileDialogList tr.is-selected td:nth-child(2)');
             if (selectedRow) {
                 selectedRow.textContent = getScoreStatusLabel(entry);
             }
-            const serverDateText = formatServerVersionDate(serverInfo);
+            const selectedDateCell = document.querySelector('#fileDialogList tr.is-selected td:nth-child(3)');
+            if (selectedDateCell) {
+                selectedDateCell.textContent = formatFileDialogEntryDate(entry);
+            }
             setFileDialogServerNotice(
-                'Auf dem Server liegt eine neuere Version' +
-                    (serverDateText ? ' vom ' + serverDateText : '') +
-                    ' dieser Datei.',
+                buildServerVersionNotice(entry, serverInfo, true),
                 entry.serverPath,
                 'Serverversion laden'
             );
         } else {
-            setFileDialogServerNotice('Diese lokale Datei ist auf dem Stand der Serverversion.', '');
+            setFileDialogServerNotice(buildServerVersionNotice(entry, serverInfo, false), '');
         }
     } catch (error) {
         if (fileDialogState.serverNoticeRequest === requestId) {
@@ -1150,6 +1196,7 @@ function updateFileDialogControls() {
     const formatWrapEl = document.querySelector('.file-dialog-format');
     const nameEl = document.querySelector('#fileDialogName');
     const fieldsEl = document.querySelector('.file-dialog-fields');
+    const serverNoticeSlotEl = document.querySelector('#fileDialogServerNoticeSlot');
     const folderNameEl = document.querySelector('#fileDialogFolderName');
     const sourceButtons = document.querySelectorAll('.file-dialog-source');
     const isExportMode = fileDialogState.mode === 'export';
@@ -1185,6 +1232,9 @@ function updateFileDialogControls() {
     }
     if (fieldsEl) {
         fieldsEl.hidden = fileDialogState.mode === 'open';
+    }
+    if (serverNoticeSlotEl) {
+        serverNoticeSlotEl.hidden = fileDialogState.mode !== 'open';
     }
     if (folderNameEl) {
         folderNameEl.textContent = fileDialogState.source === 'server' ? 'Server' : fileDialogState.folderName;
@@ -1264,11 +1314,9 @@ function renderFileDialogList() {
             statusCell.textContent = fileDialogState.source === 'server' ? 'Server' : getScoreStatusLabel(entry);
         }
         const dateCell = document.createElement('td');
-        dateCell.textContent = formatFileDialogDate(
-            entry.serverUpdateAvailable && entry.latestServerUpdatedAt
-                ? entry.latestServerUpdatedAt
-                : (entry.updatedAt || entry.localUpdatedAt || entry.publishedAt || entry.serverUpdatedAt)
-        );
+        dateCell.textContent = fileDialogState.source === 'server'
+            ? formatServerVersionDate(entry)
+            : formatFileDialogEntryDate(entry);
 
         rowEl.append(nameCell, statusCell, dateCell);
         rowEl.addEventListener('click', function () {
@@ -2071,6 +2119,11 @@ const sheetQuickPlayState = {
     isPlaying: false,
     activeHighlightTimers: []
 };
+let sheetQuickPlayRefreshTimer = null;
+let sheetQuickPlayMutationObserver = null;
+let sheetQuickPlayEditorPointerActive = false;
+let sheetQuickPlayRefreshPending = false;
+let sheetQuickPlayLiveRefreshInitialized = false;
 
 const zeilenProBlatt = 10;
 let zeilenAnzahl = 10;
@@ -2847,23 +2900,144 @@ function buildSheetQuickPlayConfiguredSections(preparedPatterns) {
 }
 
 function renderSheetQuickPlaySelectors(readResult) {
+    const previouslySelectedBarIndexes = new Set();
+    const previouslySelectedIds = new Set(sheetQuickPlayState.selectedPatternIds);
+    sheetQuickPlayState.patternLibrary.forEach(function (pattern) {
+        if (!pattern || !previouslySelectedIds.has(pattern.id) || !Array.isArray(pattern.bars)) {
+            return;
+        }
+        pattern.bars.forEach(function (bar) {
+            if (bar && Number.isFinite(Number(bar.sourceBarIndex))) {
+                previouslySelectedBarIndexes.add(Number(bar.sourceBarIndex));
+            }
+        });
+    });
+
     stopSheetQuickPlay();
     removeCanvasElements('.sheet-quick-play-overlay');
     const syncOptions = buildCurrentTimelineSyncOptions();
     const resolvedReadResult = readResult || callPHPScript_lesen(zeilenAnzahl, {
         showAlert: false,
-        updateQuickPlaySelectors: false
+        updateQuickPlaySelectors: false,
+        logResults: false
     });
     syncTimelineStateFromReadResultIfNeeded(resolvedReadResult, syncOptions);
-    sheetQuickPlayState.patternLibrary = Array.isArray(timelineState.sourcePatterns)
+    const sourcePatterns = Array.isArray(timelineState.sourcePatterns)
         ? timelineState.sourcePatterns.slice()
         : [];
+    const coveredBarIndexes = new Set();
+    sourcePatterns.forEach(function (pattern) {
+        (Array.isArray(pattern && pattern.bars) ? pattern.bars : []).forEach(function (bar) {
+            if (bar && Number.isFinite(Number(bar.sourceBarIndex))) {
+                coveredBarIndexes.add(Number(bar.sourceBarIndex));
+            }
+        });
+    });
+
+    const draftBarStates = [];
+    const draftPatterns = [];
+    const rhythmBars = Array.isArray(resolvedReadResult && resolvedReadResult.rhythmBars)
+        ? resolvedReadResult.rhythmBars
+        : [];
+    rhythmBars.forEach(function (bar) {
+        if (!bar || coveredBarIndexes.has(Number(bar.index))) {
+            return;
+        }
+        const barNotes = Array.isArray(bar.notes) ? bar.notes.slice() : [];
+        const hasNotes = barNotes.some(isSheetQuickPlayPlayableNote);
+        const hasContent = hasNotes ||
+            Boolean(String(bar.instrument || '').trim()) ||
+            Boolean(String(bar.label || '').trim()) ||
+            (Array.isArray(bar.controls) && bar.controls.length > 0);
+        if (!hasContent) {
+            return;
+        }
+
+        const sourceInstrumentName = String(bar.effectiveInstrument || bar.instrument || '').trim();
+        const targetInstruments = normalizeSheetQuickPlayTargetInstrument(sourceInstrumentName);
+        const canPlayDraft = hasNotes && targetInstruments.length > 0;
+        draftBarStates.push({
+            sourceBarIndex: Number(bar.index),
+            canPlay: canPlayDraft
+        });
+        if (!canPlayDraft) {
+            return;
+        }
+
+        const draftId = 'sheet-quick-play-draft-bar-' + Number(bar.index);
+        const labelText = String(bar.effectiveLabel || bar.label || '').trim();
+        const labelInfo = typeof getPlayerLabelInfo === 'function'
+            ? getPlayerLabelInfo(labelText)
+            : { type: '', raw: '' };
+        draftPatterns.push({
+            id: draftId,
+            sourceKey: draftId,
+            instrument: typeof normalizePatternInstrumentName === 'function'
+                ? normalizePatternInstrumentName(sourceInstrumentName)
+                : sourceInstrumentName,
+            sourceInstrument: sourceInstrumentName,
+            labelType: labelInfo.type || 'Begleitung',
+            labelName: labelInfo.raw || ('Takt ' + Number(bar.index)),
+            name: sourceInstrumentName + ' / Takt ' + Number(bar.index),
+            defaultTargets: targetInstruments.slice(),
+            isQuickPlayDraft: true,
+            bars: [{
+                sourceBarIndex: Number(bar.index),
+                patternSourceKey: draftId,
+                patternBarIndex: 0,
+                label: labelInfo.type || 'Begleitung',
+                repeat: {
+                    start: cloneTimelineRepeatMarkers(bar.repeat && bar.repeat.start),
+                    end: cloneTimelineRepeatMarkers(bar.repeat && bar.repeat.end)
+                },
+                controls: Array.isArray(bar.controls) ? bar.controls.map(function (control) {
+                    return Object.assign({}, control);
+                }) : [],
+                notes: barNotes
+            }]
+        });
+    });
+
+    sheetQuickPlayState.patternLibrary = sourcePatterns.concat(draftPatterns);
 
     const availablePatternIds = new Set(sheetQuickPlayState.patternLibrary.map(function (pattern) {
         return pattern.id;
     }));
-    sheetQuickPlayState.selectedPatternIds = sheetQuickPlayState.selectedPatternIds.filter(function (patternId) {
-        return availablePatternIds.has(patternId);
+    sheetQuickPlayState.selectedPatternIds = sheetQuickPlayState.patternLibrary
+        .filter(function (pattern) {
+            if (!pattern) {
+                return false;
+            }
+            if (availablePatternIds.has(pattern.id) && previouslySelectedIds.has(pattern.id)) {
+                return true;
+            }
+            return Array.isArray(pattern.bars) && pattern.bars.some(function (bar) {
+                return bar && previouslySelectedBarIndexes.has(Number(bar.sourceBarIndex));
+            });
+        })
+        .map(function (pattern) {
+            return pattern.id;
+        });
+
+    const playableDraftBarIndexes = new Set(draftPatterns.map(function (pattern) {
+        return Number(pattern.bars[0].sourceBarIndex);
+    }));
+    draftBarStates.forEach(function (draftBarState) {
+        if (playableDraftBarIndexes.has(draftBarState.sourceBarIndex)) {
+            return;
+        }
+        const bounds = getSheetBarBounds(draftBarState.sourceBarIndex);
+        s.rect(bounds.x + 1, bounds.y + 25, 14, 14).attr({
+            class: 'sheet-quick-play-overlay sheet-quick-play-hitarea is-disabled',
+            fill: '#f2f0eb',
+            opacity: 0.62,
+            stroke: '#aaa49a',
+            strokeWidth: 1,
+            rx: 3,
+            ry: 3,
+            cursor: 'not-allowed',
+            'aria-disabled': 'true'
+        });
     });
 
     sheetQuickPlayState.patternLibrary.forEach(function (pattern) {
@@ -2909,6 +3083,114 @@ function renderSheetQuickPlaySelectors(readResult) {
 
     updateSheetQuickPlaySelectionClasses();
     window.requestAnimationFrame(positionSheetQuickPlayControls);
+}
+
+function isSheetQuickPlayOverlayNode(node) {
+    const element = node && node.nodeType === 1 ? node : (node ? node.parentElement : null);
+    return Boolean(element && (
+        element.matches('.sheet-quick-play-overlay') ||
+        element.closest('.sheet-quick-play-overlay')
+    ));
+}
+
+function isSheetQuickPlayEditorNode(node, includeDescendants) {
+    const element = node && node.nodeType === 1 ? node : (node ? node.parentElement : null);
+    if (!element || isSheetQuickPlayOverlayNode(element)) {
+        return false;
+    }
+    const editorSelector = '.shp, .instrument-chooser, .function-chooser';
+    if (element.matches(editorSelector) || element.closest(editorSelector)) {
+        return true;
+    }
+    return Boolean(includeDescendants && element.querySelector && element.querySelector(editorSelector));
+}
+
+function sheetQuickPlayMutationAffectsEditor(mutation) {
+    if (!mutation) {
+        return false;
+    }
+    if (mutation.type === 'attributes' || mutation.type === 'characterData') {
+        return isSheetQuickPlayEditorNode(mutation.target, mutation.type === 'attributes');
+    }
+    if (mutation.type !== 'childList') {
+        return false;
+    }
+    if (isSheetQuickPlayEditorNode(mutation.target, false)) {
+        return true;
+    }
+    return Array.prototype.some.call(mutation.addedNodes || [], function (node) {
+        return isSheetQuickPlayEditorNode(node, true);
+    }) || Array.prototype.some.call(mutation.removedNodes || [], function (node) {
+        return isSheetQuickPlayEditorNode(node, true);
+    });
+}
+
+function scheduleSheetQuickPlaySelectorRefresh(delay) {
+    sheetQuickPlayRefreshPending = true;
+    if (sheetQuickPlayEditorPointerActive) {
+        return;
+    }
+    if (sheetQuickPlayRefreshTimer !== null) {
+        window.clearTimeout(sheetQuickPlayRefreshTimer);
+    }
+    sheetQuickPlayRefreshTimer = window.setTimeout(function () {
+        sheetQuickPlayRefreshTimer = null;
+        if (sheetQuickPlayEditorPointerActive || !sheetQuickPlayRefreshPending) {
+            return;
+        }
+        sheetQuickPlayRefreshPending = false;
+        renderSheetQuickPlaySelectors();
+    }, Math.max(0, Number(delay) || 0));
+}
+
+function initializeSheetQuickPlayLiveRefresh() {
+    if (sheetQuickPlayLiveRefreshInitialized || !s || !s.node || typeof MutationObserver === 'undefined') {
+        return;
+    }
+    sheetQuickPlayLiveRefreshInitialized = true;
+    sheetQuickPlayMutationObserver = new MutationObserver(function (mutations) {
+        if (!mutations.some(sheetQuickPlayMutationAffectsEditor)) {
+            return;
+        }
+        scheduleSheetQuickPlaySelectorRefresh(120);
+    });
+    sheetQuickPlayMutationObserver.observe(s.node, {
+        subtree: true,
+        childList: true,
+        characterData: true,
+        attributes: true,
+        attributeFilter: ['transform', 'text', 'data-notes', 'display']
+    });
+
+    const beginEditorPointerInteraction = function (event) {
+        if (isSheetQuickPlayOverlayNode(event && event.target)) {
+            return;
+        }
+        sheetQuickPlayEditorPointerActive = true;
+        if (sheetQuickPlayRefreshTimer !== null) {
+            window.clearTimeout(sheetQuickPlayRefreshTimer);
+            sheetQuickPlayRefreshTimer = null;
+            sheetQuickPlayRefreshPending = true;
+        }
+    };
+    const finishEditorPointerInteraction = function () {
+        if (!sheetQuickPlayEditorPointerActive) {
+            return;
+        }
+        sheetQuickPlayEditorPointerActive = false;
+        if (sheetQuickPlayRefreshPending) {
+            scheduleSheetQuickPlaySelectorRefresh(60);
+        }
+    };
+
+    s.node.addEventListener('pointerdown', beginEditorPointerInteraction, true);
+    s.node.addEventListener('mousedown', beginEditorPointerInteraction, true);
+    s.node.addEventListener('touchstart', beginEditorPointerInteraction, true);
+    window.addEventListener('pointerup', finishEditorPointerInteraction, true);
+    window.addEventListener('pointercancel', finishEditorPointerInteraction, true);
+    window.addEventListener('mouseup', finishEditorPointerInteraction, true);
+    window.addEventListener('touchend', finishEditorPointerInteraction, true);
+    window.addEventListener('touchcancel', finishEditorPointerInteraction, true);
 }
 
 function buildSheetQuickPlayPayload() {
@@ -3005,6 +3287,8 @@ function toggleSheetQuickPlay() {
     }
     startSheetQuickPlay();
 }
+
+initializeSheetQuickPlayLiveRefresh();
 
 function getSheetLinePageIndex(lineIndex) {
     return Math.floor(Math.max(0, Number(lineIndex) || 0) / zeilenProBlatt);
@@ -5049,7 +5333,7 @@ function getMobileSheetLayoutConfig() {
             beatNumberOffset: 3,
             beatDivisor: 3,
             beatWrapAt: 3,
-            noteStartRel: 21.25,
+            noteStartRel: 42.5,
             noteStepRel: 21.25,
             syllables: ['Ja', 'Pi', 'Du']
         };
@@ -5663,9 +5947,11 @@ function callPHPScript_lesen(anzahl, options) {
     window.lastReadRepeatBoundaries = repeatBoundaries;
     window.lastReadRepeatRanges = repeatRanges;
     notenText = buildBarSummary(rhythmBars) + '\n' + buildRepeatRangeSummary(repeatRanges);
-    console.log('readRhythmBars', rhythmBars);
-    console.log('readRepeatBoundaries', repeatBoundaries);
-    console.log('readRepeatRanges', repeatRanges);
+    if (readOptions.logResults !== false) {
+        console.log('readRhythmBars', rhythmBars);
+        console.log('readRepeatBoundaries', repeatBoundaries);
+        console.log('readRepeatRanges', repeatRanges);
+    }
     if (shouldShowAlert) {
         alert(notenText);
     }
@@ -6158,6 +6444,7 @@ async function openLocalScore(scoreId) {
 async function importServerScore(serverPath, serverInfo) {
     const resolvedServerInfo = serverInfo || await findServerScoreInfo(serverPath);
     const serverScore = await serverLibrary.importScore(serverPath);
+    const serverDownloadedAt = new Date().toISOString();
     const serverUpdatedAt = resolvedServerInfo && resolvedServerInfo.serverUpdatedAt
         ? resolvedServerInfo.serverUpdatedAt
         : serverScore.serverUpdatedAt;
@@ -6170,14 +6457,13 @@ async function importServerScore(serverPath, serverInfo) {
                 getScoreServerModifiedTs(existingScore) > 0 &&
                 serverModifiedTs > getScoreServerModifiedTs(existingScore);
             if (!contentDiffers && !timestampIsNewer) {
-                if (serverModifiedTs > 0 && getScoreServerModifiedTs(existingScore) === 0) {
-                    return localLibrary.saveScore(Object.assign({}, existingScore, {
-                        serverUpdatedAt: serverUpdatedAt || existingScore.serverUpdatedAt || '',
-                        serverModifiedTs: serverModifiedTs,
-                        serverVersion: serverUpdatedAt || existingScore.serverVersion || ''
-                    }));
-                }
-                return existingScore;
+                return localLibrary.updateScoreMetadata(existingScore.id, {
+                    serverDownloadedAt: serverDownloadedAt,
+                    serverUpdatedAt: serverUpdatedAt || existingScore.serverUpdatedAt || '',
+                    serverModifiedTs: serverModifiedTs || getScoreServerModifiedTs(existingScore),
+                    serverVersion: serverUpdatedAt || existingScore.serverVersion || '',
+                    serverUpdateAvailable: false
+                });
             }
             if (existingScore.syncState === 'modified-local') {
                 const shouldReplace = confirm(
@@ -6198,6 +6484,7 @@ async function importServerScore(serverPath, serverInfo) {
                 isPublished: true,
                 serverPath: serverScore.serverPath,
                 syncState: 'published',
+                serverDownloadedAt: serverDownloadedAt,
                 serverUpdatedAt: serverUpdatedAt || '',
                 serverModifiedTs: serverModifiedTs,
                 serverVersion: serverUpdatedAt || '',
@@ -6214,6 +6501,7 @@ async function importServerScore(serverPath, serverInfo) {
             isPublished: true,
             serverPath: serverScore.serverPath,
             syncState: 'published',
+            serverDownloadedAt: serverDownloadedAt,
             serverUpdatedAt: serverUpdatedAt || '',
             serverModifiedTs: serverModifiedTs,
             serverVersion: serverUpdatedAt || ''
@@ -6999,6 +7287,42 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         return currentProfileKey === 'tenaer' ? 'Profil 12/8' : 'Profil 9/8';
     }
+    function getSwingProfileInputIds(profileIndex) {
+        return [
+            'timelineSwingAnchor' + (profileIndex + 1),
+            'practiceSwingAnchor' + (profileIndex + 1)
+        ];
+    }
+    function setSwingProfileAnchorValue(profileIndex, rawValue) {
+        const currentProfileKey = getCurrentTimelineSwingProfileKey();
+        const nextProfiles = normalizeAllTimelineSwingProfiles(timelineState.swingProfile);
+        const currentProfile = normalizeTimelineSwingProfile(
+            nextProfiles[currentProfileKey],
+            currentProfileKey
+        );
+        if (profileIndex < 0 || profileIndex >= currentProfile.length) {
+            return {
+                changed: false,
+                value: 0
+            };
+        }
+
+        const nextValue = normalizeSwingProfileValue(rawValue);
+        const changed = currentProfile[profileIndex] !== nextValue;
+        currentProfile[profileIndex] = nextValue;
+        nextProfiles[currentProfileKey] = currentProfile;
+        timelineState.swingProfile = nextProfiles;
+        getSwingProfileInputIds(profileIndex).forEach(function (inputId) {
+            const inputEl = document.querySelector('#' + inputId);
+            if (inputEl) {
+                inputEl.value = nextValue;
+            }
+        });
+        return {
+            changed: changed,
+            value: nextValue
+        };
+    }
     function renderPracticeSwingProfilePreview() {
         const previewEl = document.querySelector('#practiceSwingProfilePreview');
         const titleEl = document.querySelector('#practiceSwingProfileTitle');
@@ -7084,7 +7408,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 stroke: profileIndex > 0 ? '#8fb39d' : '#e1e1e1',
                 'stroke-width': profileIndex > 0 ? 2 : 1
             });
-            addSvgElement('line', {
+            const shiftedLineEl = addSvgElement('line', {
                 x1: shiftedX,
                 y1: noteY - 22,
                 x2: shiftedX,
@@ -7092,19 +7416,104 @@ document.addEventListener('DOMContentLoaded', function () {
                 stroke: '#9ab9a7',
                 'stroke-width': 2
             });
-            addSvgElement('circle', {
+            const noteCircleEl = addSvgElement('circle', {
                 cx: shiftedX,
                 cy: noteY,
                 r: 7,
-                fill: '#111'
+                fill: '#111',
+                stroke: 'transparent',
+                'stroke-width': 14,
+                'paint-order': 'stroke',
+                class: 'swing-profile-note'
             });
-            addSvgElement('text', {
+            const noteLabelEl = addSvgElement('text', {
                 x: shiftedX,
                 y: noteY - 30,
                 'text-anchor': 'middle',
                 'font-size': 12,
                 fill: '#333'
-            }).textContent = 'S' + (profileIndex + 1);
+            });
+            noteLabelEl.textContent = 'S' + (profileIndex + 1);
+
+            let activePointerId = null;
+            let dragChanged = false;
+            let historyRecorded = false;
+
+            function getPreviewPointerX(event) {
+                const screenMatrix = svgEl.getScreenCTM();
+                if (!screenMatrix || typeof svgEl.createSVGPoint !== 'function') {
+                    return neutralX;
+                }
+                const point = svgEl.createSVGPoint();
+                point.x = Number(event.clientX) || 0;
+                point.y = Number(event.clientY) || 0;
+                return point.matrixTransform(screenMatrix.inverse()).x;
+            }
+
+            function updateDraggedNote(event) {
+                if (activePointerId === null || event.pointerId !== activePointerId) {
+                    return;
+                }
+                event.preventDefault();
+                const maxShift = stepWidth * 0.5;
+                const pointerX = getPreviewPointerX(event);
+                const clampedX = Math.max(
+                    neutralX - maxShift,
+                    Math.min(neutralX + maxShift, pointerX)
+                );
+                const rawValue = Math.round(((clampedX - neutralX) / stepWidth) * 100);
+                const previousValue = normalizeTimelineSwingProfile(
+                    timelineState.swingProfile && timelineState.swingProfile[currentProfileKey],
+                    currentProfileKey
+                )[profileIndex];
+                if (previousValue !== rawValue && !historyRecorded) {
+                    recordArrangementHistorySnapshot();
+                    historyRecorded = true;
+                }
+                const updateResult = setSwingProfileAnchorValue(profileIndex, rawValue);
+                if (!updateResult.changed) {
+                    return;
+                }
+                dragChanged = true;
+                const renderedX = neutralX + (updateResult.value / 100) * stepWidth;
+                shiftedLineEl.setAttribute('x1', renderedX);
+                shiftedLineEl.setAttribute('x2', renderedX);
+                noteCircleEl.setAttribute('cx', renderedX);
+                noteLabelEl.setAttribute('x', renderedX);
+            }
+
+            function finishDraggedNote(event) {
+                if (activePointerId === null || event.pointerId !== activePointerId) {
+                    return;
+                }
+                if (typeof noteCircleEl.releasePointerCapture === 'function' &&
+                        typeof noteCircleEl.hasPointerCapture === 'function' &&
+                        noteCircleEl.hasPointerCapture(activePointerId)) {
+                    noteCircleEl.releasePointerCapture(activePointerId);
+                }
+                activePointerId = null;
+                noteCircleEl.classList.remove('is-dragging');
+                if (dragChanged) {
+                    notifyTimingControlsChanged();
+                }
+            }
+
+            noteCircleEl.addEventListener('pointerdown', function (event) {
+                if (activePointerId !== null) {
+                    return;
+                }
+                event.preventDefault();
+                activePointerId = event.pointerId;
+                dragChanged = false;
+                historyRecorded = false;
+                noteCircleEl.classList.add('is-dragging');
+                if (typeof noteCircleEl.setPointerCapture === 'function') {
+                    noteCircleEl.setPointerCapture(activePointerId);
+                }
+            });
+            noteCircleEl.addEventListener('pointermove', updateDraggedNote);
+            noteCircleEl.addEventListener('pointerup', finishDraggedNote);
+            noteCircleEl.addEventListener('pointercancel', finishDraggedNote);
         });
 
         addSvgElement('text', {
@@ -7394,8 +7803,10 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             inputEl.addEventListener('input', function (event) {
                 const currentProfileKey = getCurrentTimelineSwingProfileKey();
-                const nextProfiles = normalizeAllTimelineSwingProfiles(timelineState.swingProfile);
-                const currentProfile = normalizeTimelineSwingProfile(nextProfiles[currentProfileKey], currentProfileKey);
+                const currentProfile = normalizeTimelineSwingProfile(
+                    timelineState.swingProfile && timelineState.swingProfile[currentProfileKey],
+                    currentProfileKey
+                );
                 if (inputIndex >= currentProfile.length) {
                     return;
                 }
@@ -7403,9 +7814,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (currentProfile[inputIndex] !== nextValue) {
                     recordArrangementHistorySnapshot();
                 }
-                currentProfile[inputIndex] = nextValue;
-                nextProfiles[currentProfileKey] = currentProfile;
-                timelineState.swingProfile = nextProfiles;
+                setSwingProfileAnchorValue(inputIndex, nextValue);
                 notifyTimingControlsChanged();
                 if (typeof renderTimelinePanel === 'function') {
                     renderTimelinePanel();
@@ -7677,27 +8086,7 @@ function get_value(e) {
     }
 
     if (getSelectedFileSource() === 'server' || selectedFromUrl) {
-        serverLibrary.importScore(selectedFileName).then(function (serverScore) {
-            return localLibrary.findScoreByServerPath(serverScore.serverPath).then(function (existingScore) {
-                if (existingScore) {
-                    return existingScore;
-                }
-
-                return localLibrary.saveScore({
-                    title: serverScore.title,
-                    folderId: localLibrary.rootFolderId,
-                    format: serverScore.format,
-                    content: serverScore.content,
-                    isPublished: true,
-                    serverPath: serverScore.serverPath,
-                    syncState: 'published'
-                });
-            });
-        }).then(function (savedScore) {
-            loadRhythmContent(savedScore.title, savedScore.content, savedScore.id);
-            setSelectedFileSource('local');
-            refreshFileList();
-        }).catch(function (error) {
+        importServerScore(selectedFileName).catch(function (error) {
             console.error('Serverdatei konnte nicht importiert werden', error);
             alert('Fehler beim Laden vom Server: ' + error.message);
         });

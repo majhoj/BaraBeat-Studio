@@ -3068,9 +3068,12 @@ function buildSwingStepOffsets(profileValues, activeSwingFactor) {
 
   const anchorStep = 1 / anchors.length;
   const anchorFractions = anchors.map(function (profileValue, profileIndex) {
-    return (profileIndex * anchorStep) + ((Number(profileValue) || 0) / 100 * swingScale);
+    return (profileIndex * anchorStep) +
+      ((Number(profileValue) || 0) / 100 * anchorStep * swingScale);
   });
-  anchorFractions.push(1 + ((Number(anchors[0]) || 0) / 100 * swingScale));
+  anchorFractions.push(
+    1 + ((Number(anchors[0]) || 0) / 100 * anchorStep * swingScale)
+  );
   const stepOffsets = [];
 
   for (let segmentIndex = 0; segmentIndex < anchorFractions.length - 1; segmentIndex++) {
@@ -3097,11 +3100,12 @@ function getTenaerSwingStepOffsets(activeSwingFactor) {
 function getNeunaerSwingStepOffsets(activeSwingFactor) {
   const profileValues = Array.isArray(swingProfile.neunaer) ? swingProfile.neunaer : [0, 15, 10];
   const swingScale = Math.max(0, Math.min(100, activeSwingFactor)) / 100;
+  const anchorStep = 1 / 3;
   const anchors = [
-    0 + ((Number(profileValues[0]) || 0) / 100 * swingScale),
-    (1 / 3) + ((Number(profileValues[1]) || 0) / 100 * swingScale),
-    (2 / 3) + ((Number(profileValues[2]) || 0) / 100 * swingScale),
-    1 + ((Number(profileValues[0]) || 0) / 100 * swingScale)
+    0 + ((Number(profileValues[0]) || 0) / 100 * anchorStep * swingScale),
+    (1 / 3) + ((Number(profileValues[1]) || 0) / 100 * anchorStep * swingScale),
+    (2 / 3) + ((Number(profileValues[2]) || 0) / 100 * anchorStep * swingScale),
+    1 + ((Number(profileValues[0]) || 0) / 100 * anchorStep * swingScale)
   ];
   return [
     anchors[0],

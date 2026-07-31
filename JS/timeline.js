@@ -69,7 +69,7 @@ function normalizeSwingProfileValue(rawValue) {
     if (!Number.isFinite(numericValue)) {
         return 0;
     }
-    return Math.max(-100, Math.min(100, Math.round(numericValue)));
+    return Math.max(-50, Math.min(50, Math.round(numericValue)));
 }
 
 function getCurrentTimelineSwingProfileKey() {
