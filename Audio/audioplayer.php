@@ -1896,6 +1896,7 @@ function normalizeTimelineTargetInstrument(instrumentName) {
     Sangban: 'Sangban',
     Doundoun: 'Doundoun',
     Dununba: 'Doundoun',
+    Dundunba: 'Doundoun',
     Dreierbass: 'Dreierbass',
     'Bässe': 'Bässe'
   };

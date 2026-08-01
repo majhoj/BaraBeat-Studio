@@ -336,7 +336,7 @@ function normalizePatternInstrumentName(instrumentName) {
     if (normalizedName === 'Bässe') {
         return 'Bässe';
     }
-    if (normalizedName === 'Dununba') {
+    if (normalizedName === 'Dununba' || normalizedName === 'Dundunba') {
         return 'Doundoun';
     }
     return normalizedName;

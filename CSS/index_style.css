@@ -3633,16 +3633,33 @@ body.is-timeline-dragging .timeline-dropzone-inline {
     }
 
     .practice-scroller-label {
-        align-items: flex-start;
+        flex-direction: row;
+        align-items: baseline;
+        gap: 4px;
         padding: 0 9px 3px;
         font-size: 13px;
         text-align: left;
         overflow: hidden;
         text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .practice-scroller-label-name {
+        flex: 0 0 auto;
+        overflow: visible;
     }
 
     .practice-scroller-label-pattern {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
         font-size: 10px;
+        white-space: nowrap;
+    }
+
+    .practice-scroller-label-pattern::before {
+        content: "/";
+        margin-right: 4px;
     }
 
     .practice-scroller-lane-wrap {

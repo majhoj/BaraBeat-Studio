@@ -219,11 +219,19 @@ function findLinkedFunctionChooser(instrumentChooserGruppe) {
   return bestFunctionChooser;
 }
 
+function normalizeDoundounInstrumentName(instrumentName) {
+  let normalizedName = String(instrumentName || "").trim();
+  if (normalizedName === "Dununba" || normalizedName === "Dundunba") {
+    return "Doundoun";
+  }
+  return instrumentName;
+}
+
 function createInstrumentChooser(s, x, y, startText = "Instrument", startFill = "gray") {
   return createMenuChooser(s, x, y, {
     chooserClass: "instrument-chooser",
     labelClass: "instrument-label",
-    startText: startText,
+    startText: normalizeDoundounInstrumentName(startText),
     startFill: startFill,
     menuWidth: 120,
     options: [
@@ -234,7 +242,7 @@ function createInstrumentChooser(s, x, y, startText = "Instrument", startFill = 
       "Bässe",
       "Kenkeni",
       "Sangban",
-      "Dununba",
+      "Doundoun",
       "Dreierbass",
       "Leer",
     ],
@@ -245,7 +253,7 @@ function createInstrumentChooser(s, x, y, startText = "Instrument", startFill = 
           setChooserText(linkedFunctionChooser, "Leer");
         }
       }
-      return name;
+      return normalizeDoundounInstrumentName(name);
     },
   });
 }
@@ -729,7 +737,7 @@ function bindChooserInteraction(chooserGruppe, chooserText, menuGruppe, onSelect
 
 function bindInstrumentChooserInteraction(chooserGruppe, instrumentText, menuGruppe) {
   bindChooserInteraction(chooserGruppe, instrumentText, menuGruppe, function (name) {
-    return name;
+    return normalizeDoundounInstrumentName(name);
   });
 }
 
@@ -746,6 +754,11 @@ function rewireInstrumentChooser(chooserGruppe) {
   if (!menuGruppe || menuGruppe.type !== "g") {
     return;
   }
+
+  instrumentText.attr({ text: normalizeDoundounInstrumentName(instrumentText.attr("text")) });
+  menuGruppe.selectAll("text").forEach(function (menuText) {
+    menuText.attr({ text: normalizeDoundounInstrumentName(menuText.attr("text")) });
+  });
 
   chooserGruppe.undrag();
   instrumentText.unclick();

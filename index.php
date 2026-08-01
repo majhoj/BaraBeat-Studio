@@ -2556,6 +2556,7 @@ function normalizeSheetQuickPlayTargetInstrument(instrumentName) {
         Sangban: ['Sangban'],
         Doundoun: ['Doundoun'],
         Dununba: ['Doundoun'],
+        Dundunba: ['Doundoun'],
         Dreierbass: ['Dreierbass'],
         'Bässe': ['Kenkeni', 'Sangban', 'Doundoun'],
         Shekere: ['Shekere']
@@ -4784,7 +4785,7 @@ function applyRepeatMarkersToBars(rhythmBars, repeatBoundaries) {
 }
 
 function mergePercussionNote(currentSymbol, noteId, instrumentName) {
-    if (instrumentName == 'Kenkeni' || instrumentName == 'Sangban' || instrumentName == 'Doundoun' || instrumentName == 'Dununba' || instrumentName == 'Bässe') {
+    if (instrumentName == 'Kenkeni' || instrumentName == 'Sangban' || instrumentName == 'Doundoun' || instrumentName == 'Dununba' || instrumentName == 'Dundunba' || instrumentName == 'Bässe') {
         if (noteId == 'slap' && currentSymbol == 'f') {
             return 'Bell';
         }
@@ -4995,7 +4996,8 @@ function mapInstrumentNameForPlayer(instrumentName) {
         'Djembe 1': 'Djembe_1',
         'Djembe 2': 'Djembe_2',
         'Djembe 3': 'Djembe_3',
-        'Dununba': 'Doundoun'
+        'Dununba': 'Doundoun',
+        'Dundunba': 'Doundoun'
     };
     if (!instrumentName || instrumentName === 'Leer') {
         return '';

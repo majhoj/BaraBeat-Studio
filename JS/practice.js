@@ -1767,6 +1767,7 @@ function normalizePracticeTargetInstrument(instrumentName) {
         Sangban: ['Sangban'],
         Doundoun: ['Doundoun'],
         Dununba: ['Doundoun'],
+        Dundunba: ['Doundoun'],
         Dreierbass: ['Dreierbass'],
         'Bässe': ['Kenkeni', 'Sangban', 'Doundoun']
     };
