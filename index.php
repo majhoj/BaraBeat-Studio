@@ -2727,10 +2727,6 @@ function buildSheetQuickPlayPatternGroups(preparedPatterns) {
     return groups;
 }
 
-function isSheetQuickPlayAccompanimentPattern(pattern) {
-    return (pattern && (pattern.labelType || pattern.label || '')) === 'Begleitung';
-}
-
 function trimSheetQuickPlayStandalonePickupNotes(pickupNotes) {
     const notes = Array.isArray(pickupNotes) ? pickupNotes : [];
     const firstPlayableIndex = notes.findIndex(isSheetQuickPlayPlayableNote);
@@ -2797,10 +2793,6 @@ function buildSheetQuickPlayConfiguredSections(preparedPatterns) {
         );
         const hostSection = sections.slice().reverse().find(sheetQuickPlaySectionHasNotes);
         const hasHostSection = Boolean(hostSection);
-        const accompanimentPatternCount = group.filter(function (groupEntry) {
-            return isSheetQuickPlayAccompanimentPattern(groupEntry && groupEntry.pattern);
-        }).length;
-
         group.forEach(function (groupEntry) {
             const pattern = groupEntry.pattern;
             const targetInstruments = groupEntry.targetInstruments;
@@ -2841,7 +2833,7 @@ function buildSheetQuickPlayConfiguredSections(preparedPatterns) {
             if (labelName && labelNames.indexOf(labelName) === -1) {
                 labelNames.push(labelName);
             }
-            if (accompanimentPatternCount > 1 && label === 'Begleitung' && mainNotes.length > 0) {
+            if (label === 'Begleitung' && mainNotes.length > 0) {
                 parallelAccompanimentLoops.push({
                     targetInstruments: targetInstruments.slice(),
                     notes: mainNotes.slice()
@@ -2852,7 +2844,7 @@ function buildSheetQuickPlayConfiguredSections(preparedPatterns) {
                 if (!section.trackNotes[instrumentName]) {
                     return;
                 }
-                const shouldIgnoreOutForAccompanimentLoop = label === 'Begleitung' && accompanimentPatternCount > 1;
+                const shouldIgnoreOutForAccompanimentLoop = label === 'Begleitung';
                 if (!shouldIgnoreOutForAccompanimentLoop &&
                         outStep !== null &&
                         outStep !== undefined &&
@@ -7139,9 +7131,11 @@ document.addEventListener('DOMContentLoaded', function () {
         clearPracticeAudioPlayer();
         renderPracticePanel();
     });
-    function setPracticePatternColumnsCollapsed(collapsed) {
+    function setInitialPracticePatternColumnStates() {
+        const isMobileViewport = isMobilePracticeViewport();
         document.querySelectorAll('#practicePatternChooser .practice-column, #practicePatternChooser .practice-settings-column').forEach(function (columnEl) {
             const toggleEl = columnEl.querySelector('.practice-column-toggle');
+            const collapsed = isMobileViewport || columnEl.classList.contains('practice-settings-column');
             columnEl.classList.toggle('is-collapsed', collapsed);
             if (toggleEl) {
                 toggleEl.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
@@ -7153,7 +7147,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const nextExpanded = !practiceState.patternChooserExpanded;
         practiceState.patternChooserExpanded = nextExpanded;
         if (nextExpanded) {
-            setPracticePatternColumnsCollapsed(isMobilePracticeViewport());
+            setInitialPracticePatternColumnStates();
         }
         renderPracticePanel();
     }

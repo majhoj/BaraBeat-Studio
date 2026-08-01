@@ -56,7 +56,7 @@
     updateNetworkState();
 
     if (!('serviceWorker' in navigator)) {
-      setOfflineStatus('Dieser Browser unterstützt den Offline-Modus nicht.', 'unsupported');
+      setOfflineStatus('Dieser Browser unterstützt den Offline-Modus nicht.', 'unsupported', 3500);
       return;
     }
 
