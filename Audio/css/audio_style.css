@@ -78,6 +78,10 @@ body.embedded-player {
   overflow: hidden;
 }
 
+body.embedded-player .standalone-player-only {
+  display: none;
+}
+
 h2 {
   font-size: 1.2em;
 }

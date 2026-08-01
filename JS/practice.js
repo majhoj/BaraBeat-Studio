@@ -795,7 +795,7 @@ function applyPracticeScenario(scenarioId) {
     applyPracticeSettingsMetadata(scenario.settings, timelineState.sourcePatterns, timelineState.sourceHash);
     renderPracticePanel();
     if (typeof notifyPracticeSelectionChanged === 'function') {
-        notifyPracticeSelectionChanged();
+        notifyPracticeSelectionChanged({ forcePlayerReload: true });
     }
     updatePracticeScenarioMetadata();
 }

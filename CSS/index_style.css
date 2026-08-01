@@ -286,6 +286,31 @@ html {
     display: none;
 }
 
+.offline-status {
+    position: fixed;
+    top: 68px;
+    left: 50%;
+    z-index: 12000;
+    max-width: min(88vw, 460px);
+    padding: 8px 12px;
+    transform: translateX(-50%);
+    border: 1px solid #b9d8c7;
+    border-radius: 6px;
+    background: #f6fbf8;
+    box-shadow: 0 3px 12px rgba(33, 52, 42, 0.18);
+    color: #315f48;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-align: center;
+}
+
+.offline-status[data-state="error"],
+.offline-status[data-state="unsupported"] {
+    border-color: #dfb4ae;
+    background: #fff7f5;
+    color: #8a342b;
+}
+
 .mobile-sheet-view {
     display: none;
 }

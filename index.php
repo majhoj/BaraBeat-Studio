@@ -7,6 +7,7 @@ $jsSel = @filemtime(__DIR__ . '/JS/selection_drag_7.js') ?: 1;
 $jsFn = @filemtime(__DIR__ . '/JS/functions.js') ?: 1;
 $jsTimeline = @filemtime(__DIR__ . '/JS/timeline.js') ?: 1;
 $jsPractice = @filemtime(__DIR__ . '/JS/practice.js') ?: 1;
+$jsOffline = @filemtime(__DIR__ . '/JS/offline.js') ?: 1;
 $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
 $faviconSvg = @filemtime(__DIR__ . '/Assets/favicon.svg') ?: 1;
 $faviconPng = @filemtime(__DIR__ . '/Assets/favicon-32.png') ?: 1;
@@ -16,7 +17,13 @@ $faviconPng = @filemtime(__DIR__ . '/Assets/favicon-32.png') ?: 1;
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title><BaraBeat-Studio></title>
+    <meta name="theme-color" content="#745332">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="BaraBeat">
+    <title>BaraBeat-Studio</title>
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="apple-touch-icon" href="Assets/apple-touch-icon.png">
     <link rel="icon" href="Assets/favicon.svg?v=<?php echo $faviconSvg; ?>" type="image/svg+xml">
     <link rel="icon" href="Assets/favicon-32.png?v=<?php echo $faviconPng; ?>" type="image/png" sizes="32x32">
     <script src="JS/snapNEU.svg.js?v=<?php echo $jsSnap; ?>"></script>
@@ -27,6 +34,7 @@ $faviconPng = @filemtime(__DIR__ . '/Assets/favicon-32.png') ?: 1;
     <script src="JS/functions.js?v=<?php echo $jsFn; ?>"></script>
     <script src="JS/timeline.js?v=<?php echo $jsTimeline; ?>"></script>
     <script src="JS/practice.js?v=<?php echo $jsPractice; ?>"></script>
+    <script src="JS/offline.js?v=<?php echo $jsOffline; ?>" defer></script>
     <link rel="stylesheet" href="CSS/index_style.css?v=<?php echo $cssIndex; ?>">
 </head>
 
@@ -118,6 +126,8 @@ $faviconPng = @filemtime(__DIR__ . '/Assets/favicon-32.png') ?: 1;
             <input type="hidden" size="40" id="iofield" name="iofield" />
         </form>
     </nav>
+
+    <div id="offlineStatus" class="offline-status" role="status" aria-live="polite" hidden></div>
 
     <section id="mobileStartInfo" class="mobile-start-info" aria-live="polite">
         <h1>BaraBeat Studio</h1>
@@ -1357,6 +1367,15 @@ function renderFileDialogList() {
 async function refreshFileDialogEntries() {
     try {
         if (fileDialogState.source === 'server') {
+            if (navigator.onLine === false) {
+                fileDialogState.entries = [];
+                fileDialogState.selectedId = null;
+                fileDialogState.filter = 'all';
+                fileDialogState.folderName = 'Server (offline)';
+                setFileDialogServerNotice('Offline sind die lokal gespeicherten Notenblätter verfügbar.', '');
+                renderFileDialogList();
+                return;
+            }
             fileDialogState.entries = (await serverLibrary.listScores()).map(function (entry) {
                 return Object.assign({ entryType: 'score' }, entry);
             });
@@ -5138,6 +5157,55 @@ function buildPlayerRowsFromRhythmBars(rhythmBars, repeatRanges) {
 }
 
 function openAudioTestTarget(playerRows, targetName, embedded) {
+    const launchKey = 'barabeat-player-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+    const launchData = {
+        playerRows: playerRows,
+        embedded: Boolean(embedded),
+        uiTheme: document.body.dataset.uiTheme || ''
+    };
+
+    window.barabeatAudioLaunchPayloads = window.barabeatAudioLaunchPayloads || {};
+    window.barabeatAudioLaunchPayloads[launchKey] = launchData;
+    window.consumeBarabeatAudioLaunchPayload = function (key) {
+        const payload = window.barabeatAudioLaunchPayloads && window.barabeatAudioLaunchPayloads[key];
+        if (payload) {
+            delete window.barabeatAudioLaunchPayloads[key];
+        }
+        return payload || null;
+    };
+
+    try {
+        localStorage.setItem(launchKey, JSON.stringify(launchData));
+    } catch (error) {
+        console.warn('Playerdaten konnten nicht zwischengespeichert werden', error);
+    }
+
+    // A changing fragment alone does not reload an existing iframe. Keep the
+    // launch key in the fragment, but also vary the query so every payload gets
+    // a fresh player document (the service worker ignores this query offline).
+    const encodedLaunchKey = encodeURIComponent(launchKey);
+    const launchUrl = 'Audio/audioplayer.php?launchReload=' + encodedLaunchKey + '#launch=' + encodedLaunchKey;
+    const frameEl = Array.from(document.querySelectorAll('iframe[name]')).find(function (candidateEl) {
+        return candidateEl.name === targetName;
+    });
+    if (frameEl) {
+        frameEl.src = launchUrl;
+        return;
+    }
+
+    const openedWindow = window.open(launchUrl, targetName || '_blank');
+    if (openedWindow) {
+        return;
+    }
+
+    delete window.barabeatAudioLaunchPayloads[launchKey];
+    try {
+        localStorage.removeItem(launchKey);
+    } catch (error) {
+        // Storage may be unavailable in private browsing.
+    }
+
+    // Keep the previous online fallback for browsers that block window.open().
     const form = document.createElement('form');
     form.action = 'Audio/audioplayer.php';
     form.method = 'POST';
@@ -6102,13 +6170,20 @@ function clearTimelineAudioPlayer() {
     }
 }
 
-function notifyPracticeSelectionChanged() {
+function notifyPracticeSelectionChanged(options) {
+    const changeOptions = options && typeof options === 'object' ? options : {};
     if (typeof updateTimelineMetadataNode === 'function') {
         updateTimelineMetadataNode();
     }
 
     if (typeof hasPracticePatternSelection === 'function' && !hasPracticePatternSelection()) {
         clearPracticeAudioPlayer();
+        return;
+    }
+
+    if (changeOptions.forcePlayerReload) {
+        practiceAudioPlaybackState = 'stopped';
+        schedulePracticeAudioRefresh(0);
         return;
     }
 

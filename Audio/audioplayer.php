@@ -1,5 +1,5 @@
 <?php
-$myObject = $_POST["myObj"] ?? "[]";
+$myObject = $_POST["myObj"] ?? "";
 $embedded = ($_POST["embedded"] ?? "") === "1";
 $uiTheme = $_POST["uiTheme"] ?? "";
 $uiThemeClass = $uiTheme === "playful" ? "audio-theme-playful" : ($uiTheme === "earth" ? "audio-theme-earth" : "");
@@ -7,8 +7,67 @@ $playerJs = @filemtime(__DIR__ . '/js/instrument_2.js') ?: 1;
 $playerCss = @filemtime(__DIR__ . '/css/audio_style.css') ?: 1;
 ?>
 <script>
-  const obj = <?php echo $myObject; ?>;
-  const embeddedPlayer = <?php echo $embedded ? 'true' : 'false'; ?>;
+  const postedObjectString = <?php echo json_encode($myObject, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
+  const postedEmbeddedPlayer = <?php echo $embedded ? 'true' : 'false'; ?>;
+  const postedUiTheme = <?php echo json_encode($uiTheme, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
+  const playerLaunchParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+  const playerLaunchKey = playerLaunchParams.get('launch') || '';
+
+  function readPlayerLaunchData() {
+      if (!playerLaunchKey) {
+          return null;
+      }
+
+      const launchSources = [window.parent, window.opener];
+      for (let index = 0; index < launchSources.length; index++) {
+          const sourceWindow = launchSources[index];
+          try {
+              if (sourceWindow && sourceWindow !== window && typeof sourceWindow.consumeBarabeatAudioLaunchPayload === 'function') {
+                  const launchData = sourceWindow.consumeBarabeatAudioLaunchPayload(playerLaunchKey);
+                  if (launchData) {
+                      try {
+                          localStorage.removeItem(playerLaunchKey);
+                      } catch (error) {
+                          // Storage may be unavailable in private browsing.
+                      }
+                      return launchData;
+                  }
+              }
+          } catch (error) {
+              // A cross-origin opener is ignored; localStorage remains as fallback.
+          }
+      }
+
+      try {
+          const storedLaunchData = localStorage.getItem(playerLaunchKey);
+          if (storedLaunchData) {
+              localStorage.removeItem(playerLaunchKey);
+              return JSON.parse(storedLaunchData);
+          }
+      } catch (error) {
+          console.warn('Playerdaten konnten nicht aus dem Speicher gelesen werden', error);
+      }
+      return null;
+  }
+
+  let postedObject = [];
+  if (postedObjectString) {
+      try {
+          postedObject = JSON.parse(postedObjectString);
+      } catch (error) {
+          console.error('Playerdaten aus dem Formular sind ungültig', error);
+      }
+  }
+  const playerLaunchData = readPlayerLaunchData();
+  const obj = playerLaunchData && Array.isArray(playerLaunchData.playerRows)
+      ? playerLaunchData.playerRows
+      : postedObject;
+  const embeddedPlayer = playerLaunchData
+      ? Boolean(playerLaunchData.embedded)
+      : postedEmbeddedPlayer;
+  const playerUiTheme = playerLaunchData && typeof playerLaunchData.uiTheme === 'string'
+      ? playerLaunchData.uiTheme
+      : postedUiTheme;
   const myObjectString = JSON.stringify(obj);
 
   function close_window() {
@@ -21,7 +80,7 @@ $playerCss = @filemtime(__DIR__ . '/css/audio_style.css') ?: 1;
   <meta charset="utf-8">
   <meta http-equiv="x-ua-compatible" content="ie=edge">
   <script>
-    document.write("<title>" + obj[0].Name + "</title>");
+    document.title = obj[0] && obj[0].Name ? obj[0].Name : 'BaraBeat Player';
   </script>
 
   <meta name="description" content="Making an instrument with the Web Audio API">
@@ -39,6 +98,11 @@ a:link {
 </style>
 
 <body class="<?php echo trim(($embedded ? 'embedded-player ' : '') . $uiThemeClass); ?>">
+<script>
+  document.body.classList.toggle('embedded-player', embeddedPlayer);
+  document.body.classList.toggle('audio-theme-playful', playerUiTheme === 'playful');
+  document.body.classList.toggle('audio-theme-earth', playerUiTheme === 'earth');
+</script>
 
 <div class="loading">
   <p>Loading...</p>
@@ -46,20 +110,17 @@ a:link {
 
 <div id="sequencer">
   <section class="controls-main">
-    <?php if (!$embedded) { ?>
-    <div class="player-title">
+    <div class="player-title standalone-player-only">
       <script>
-        document.write('<a href="javascript:close_window();">X</a>' + obj[0].Name);
+        document.write('<a href="javascript:close_window();">X</a>' + (obj[0] && obj[0].Name ? obj[0].Name : 'BaraBeat Player'));
       </script>
     </div>
-    <?php } ?>
     <div class="player-controls">
       <label for="bpm">BPM</label>
       <input name="bpm" id="bpm" type="range" min="30" max="180" value="100" step="1" />
       <span id="bpmval">100</span>
-      <?php if (!$embedded) { ?>
-      <label for="soloTrack">Stimme</label>
-      <select id="soloTrack">
+      <label for="soloTrack" class="standalone-player-only">Stimme</label>
+      <select id="soloTrack" class="standalone-player-only">
         <option value="">Alle</option>
         <option value="Kenkeni">Kenkeni</option>
         <option value="Sangban">Sangban</option>
@@ -69,7 +130,6 @@ a:link {
         <option value="Djembe_2">Djembe 2</option>
         <option value="Djembe_3">Djembe 3</option>
       </select>
-      <?php } ?>
       <button type="button" id="exportWavButton" class="secondary-button">Export WAV</button>
       <button data-playing="false">&nbsp;</button>
     </div>
