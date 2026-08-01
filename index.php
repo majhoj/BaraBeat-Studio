@@ -113,6 +113,7 @@ $faviconPng = @filemtime(__DIR__ . '/Assets/favicon-32.png') ?: 1;
         </details>
         <button type="button" id="mobileArrangementPlayerButton" class="mobile-menu-action" hidden>Arrangement abspielen</button>
         <button type="button" id="mobilePatternChooserButton" class="mobile-menu-action" hidden>Patternauswahl öffnen</button>
+        <button type="button" id="mobileBluetoothLatencyButton" class="mobile-menu-action" hidden aria-label="Bluetooth-Latenz einstellen">Latenz</button>
         <form action="" name="uploadForm" class="hidden-upload-form">
             <input type="hidden" size="40" id="iofield" name="iofield" />
         </form>
@@ -236,10 +237,6 @@ $faviconPng = @filemtime(__DIR__ . '/Assets/favicon-32.png') ?: 1;
                         Tempo
                         <input type="number" id="timelineTempo" min="30" max="180" step="1" value="100" />
                     </label>
-                    <label class="timeline-swing-control" for="timelineSwingFactor">
-                        Swing
-                        <input type="number" id="timelineSwingFactor" min="0" max="100" step="1" value="0" />
-                    </label>
                     <button type="button" id="timelineSwingProfileButton">Swing-Profil</button>
                     <button type="button" id="timelineFeelProfileButton">Feel</button>
                     <button type="button" id="timelineVolumeButton">Lautstärke</button>
@@ -307,10 +304,6 @@ $faviconPng = @filemtime(__DIR__ . '/Assets/favicon-32.png') ?: 1;
                         <label class="timeline-tempo-control" for="practiceTempo">
                             Tempo
                             <input type="number" id="practiceTempo" min="30" max="180" step="1" value="100" />
-                        </label>
-                        <label class="timeline-swing-control" for="practiceSwingFactor">
-                            Swing
-                            <input type="number" id="practiceSwingFactor" min="0" max="100" step="1" value="0" />
                         </label>
                         <button type="button" id="practiceSwingProfileButton">Swing-Profil</button>
                         <button type="button" id="practiceFeelProfileButton">Feel</button>
@@ -481,6 +474,23 @@ $faviconPng = @filemtime(__DIR__ . '/Assets/favicon-32.png') ?: 1;
             <footer class="swing-profile-dialog-footer">
                 <button type="button" id="practiceTempoRampResetButton">Zurücksetzen</button>
                 <button type="button" id="practiceTempoRampDoneButton" class="primary">Fertig</button>
+            </footer>
+        </section>
+    </div>
+
+    <div id="practiceBluetoothLatencyDialog" class="swing-profile-dialog-backdrop" hidden>
+        <section class="swing-profile-dialog practice-bluetooth-latency-dialog" role="dialog" aria-modal="true" aria-labelledby="practiceBluetoothLatencyTitle">
+            <header class="swing-profile-dialog-header">
+                <h2 id="practiceBluetoothLatencyTitle">Bluetooth-Latenz</h2>
+                <button type="button" id="practiceBluetoothLatencyCloseButton" aria-label="Bluetooth-Latenz schließen">Schließen</button>
+            </header>
+            <div class="practice-bluetooth-latency-controls">
+                <label for="mobilePracticeAudioLatencyRange">Verzögerung in ms</label>
+                <input type="range" id="mobilePracticeAudioLatencyRange" min="0" max="1000" step="10" value="30" />
+                <input type="number" id="mobilePracticeAudioLatency" min="0" max="1000" step="10" value="30" inputmode="numeric" />
+            </div>
+            <footer class="swing-profile-dialog-footer">
+                <button type="button" id="practiceBluetoothLatencyDoneButton" class="primary">Fertig</button>
             </footer>
         </section>
     </div>
@@ -1976,7 +1986,6 @@ function clear_all() {
     timelineState.sheetLoop = false;
     timelineState.sheetLoopCount = false;
     timelineState.tempo = 100;
-    timelineState.swingFactor = 0;
     timelineState.shekereBeatEnabled = false;
     timelineState.swingProfile = normalizeAllTimelineSwingProfiles();
     timelineState.feelOffsets = normalizeTimelineFeelOffsets();
@@ -3208,7 +3217,6 @@ function buildSheetQuickPlayPayload() {
             patternId: pattern.id,
             patternSourceKey: pattern.sourceKey,
             handMode: '',
-            swingFactor: null,
             sectionTempo: null,
             targetInstruments: Array.isArray(pattern.defaultTargets) ? pattern.defaultTargets.slice() : []
         };
@@ -5226,6 +5234,7 @@ function updateMobileArrangementButtonVisibility() {
 
     let hasArrangement = false;
     if (isMobilePracticeViewport() &&
+            !practiceState.visible &&
             Array.isArray(timelineState.sourcePatterns) &&
             timelineState.sourcePatterns.length > 0 &&
             Array.isArray(timelineState.entries) &&
@@ -6000,6 +6009,10 @@ function refreshPracticeAudioPlayer() {
     if (!isPracticeAudioModeActive()) {
         return;
     }
+    if (typeof hasPracticePatternSelection === 'function' && !hasPracticePatternSelection()) {
+        clearPracticeAudioPlayer();
+        return;
+    }
 
     try {
         const audioTest = buildAudioTestPayload(true);
@@ -6090,6 +6103,11 @@ function clearTimelineAudioPlayer() {
 function notifyPracticeSelectionChanged() {
     if (typeof updateTimelineMetadataNode === 'function') {
         updateTimelineMetadataNode();
+    }
+
+    if (typeof hasPracticePatternSelection === 'function' && !hasPracticePatternSelection()) {
+        clearPracticeAudioPlayer();
+        return;
     }
 
     if (isPracticeAudioModeActive() && practiceAudioPlaybackState === 'playing') {
@@ -6203,12 +6221,14 @@ function clearPracticeAudioPlayer() {
     window.clearTimeout(practiceAudioRefreshTimer);
     practiceAudioPlaybackState = 'stopped';
     if (playerPanelEl) {
-        playerPanelEl.hidden = false;
+        playerPanelEl.hidden = true;
     }
     if (playerFrameEl) {
         playerFrameEl.src = 'about:blank';
     }
-    if (typeof clearPracticeScrollerPlayback === 'function') {
+    if (typeof renderPracticeScrollerFromPayload === 'function') {
+        renderPracticeScrollerFromPayload([{ PracticeSections: [] }]);
+    } else if (typeof clearPracticeScrollerPlayback === 'function') {
         clearPracticeScrollerPlayback();
     }
 }
@@ -7219,13 +7239,24 @@ document.addEventListener('DOMContentLoaded', function () {
             recordArrangementHistorySnapshot();
         }
         practiceState.audioLatencyMs = normalizedValue;
+        if (isMobilePracticeViewport() && typeof storePracticeAudioLatency === 'function') {
+            storePracticeAudioLatency(normalizedValue);
+        }
         const audioLatencyEl = document.querySelector('#practiceAudioLatency');
         const audioLatencyRangeEl = document.querySelector('#practiceAudioLatencyRange');
+        const mobileAudioLatencyEl = document.querySelector('#mobilePracticeAudioLatency');
+        const mobileAudioLatencyRangeEl = document.querySelector('#mobilePracticeAudioLatencyRange');
         if (audioLatencyEl) {
             audioLatencyEl.value = practiceState.audioLatencyMs;
         }
         if (audioLatencyRangeEl) {
             audioLatencyRangeEl.value = practiceState.audioLatencyMs;
+        }
+        if (mobileAudioLatencyEl) {
+            mobileAudioLatencyEl.value = practiceState.audioLatencyMs;
+        }
+        if (mobileAudioLatencyRangeEl) {
+            mobileAudioLatencyRangeEl.value = practiceState.audioLatencyMs;
         }
         if (typeof updateTimelineMetadataNode === 'function') {
             updateTimelineMetadataNode();
@@ -7236,6 +7267,27 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     document.querySelector('#practiceAudioLatencyRange').addEventListener('input', function (event) {
         updatePracticeAudioLatencyControl(event.target.value);
+    });
+    document.querySelector('#mobilePracticeAudioLatency').addEventListener('input', function (event) {
+        updatePracticeAudioLatencyControl(event.target.value);
+    });
+    document.querySelector('#mobilePracticeAudioLatencyRange').addEventListener('input', function (event) {
+        updatePracticeAudioLatencyControl(event.target.value);
+    });
+    function openPracticeBluetoothLatencyDialog() {
+        updatePracticeAudioLatencyControl(practiceState.audioLatencyMs);
+        document.querySelector('#practiceBluetoothLatencyDialog').hidden = false;
+    }
+    function closePracticeBluetoothLatencyDialog() {
+        document.querySelector('#practiceBluetoothLatencyDialog').hidden = true;
+    }
+    document.querySelector('#mobileBluetoothLatencyButton').addEventListener('click', openPracticeBluetoothLatencyDialog);
+    document.querySelector('#practiceBluetoothLatencyCloseButton').addEventListener('click', closePracticeBluetoothLatencyDialog);
+    document.querySelector('#practiceBluetoothLatencyDoneButton').addEventListener('click', closePracticeBluetoothLatencyDialog);
+    document.querySelector('#practiceBluetoothLatencyDialog').addEventListener('click', function (event) {
+        if (event.target && event.target.id === 'practiceBluetoothLatencyDialog') {
+            closePracticeBluetoothLatencyDialog();
+        }
     });
     document.querySelector('#practiceH2HRestMute').addEventListener('change', function (event) {
         const nextValue = Boolean(event.target.checked);
@@ -7521,7 +7573,7 @@ document.addEventListener('DOMContentLoaded', function () {
             y: 28,
             'font-size': 13,
             fill: '#333'
-        }).textContent = profileTitle + ' Vorschau bei Swing 100%';
+        }).textContent = profileTitle + ' Vorschau';
         addSvgElement('text', {
             x: left,
             y: 136,
@@ -7617,12 +7669,6 @@ document.addEventListener('DOMContentLoaded', function () {
             const inputEl = document.querySelector('#' + inputId);
             if (inputEl) {
                 inputEl.value = normalizeTimelineTempo(timelineState.tempo);
-            }
-        });
-        ['timelineSwingFactor', 'practiceSwingFactor'].forEach(function (inputId) {
-            const inputEl = document.querySelector('#' + inputId);
-            if (inputEl) {
-                inputEl.value = normalizeTimelineSwingFactor(timelineState.swingFactor);
             }
         });
         ['timelineShekereBeat', 'practiceShekereBeat'].forEach(function (inputId) {
@@ -7733,20 +7779,6 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             timelineState.tempo = nextValue;
             event.target.value = String(nextValue);
-            notifyTimingControlsChanged();
-        });
-    });
-    ['timelineSwingFactor', 'practiceSwingFactor'].forEach(function (inputId) {
-        const inputEl = document.querySelector('#' + inputId);
-        if (!inputEl) {
-            return;
-        }
-        inputEl.addEventListener('input', function (event) {
-            const nextValue = normalizeTimelineSwingFactor(event.target.value);
-            if (timelineState.swingFactor !== nextValue) {
-                recordArrangementHistorySnapshot();
-            }
-            timelineState.swingFactor = nextValue;
             notifyTimingControlsChanged();
         });
     });
@@ -8027,9 +8059,6 @@ function onSVGLoaded(data) {
         timelineState.tempo = normalizeTimelineTempo(
             persistedTimelineMetadata ? persistedTimelineMetadata.tempo : 100
         );
-        timelineState.swingFactor = normalizeTimelineSwingFactor(
-            persistedTimelineMetadata ? persistedTimelineMetadata.swingFactor : 0
-        );
         timelineState.shekereBeatEnabled = Boolean(
             persistedTimelineMetadata && persistedTimelineMetadata.shekereBeatEnabled
         );
@@ -8041,7 +8070,6 @@ function onSVGLoaded(data) {
         );
         syncTimelineStateFromReadResult(readResult, {
             tempo: timelineState.tempo,
-            swingFactor: timelineState.swingFactor,
             shekereBeatEnabled: timelineState.shekereBeatEnabled,
             swingProfile: timelineState.swingProfile,
             feelOffsets: timelineState.feelOffsets,

@@ -20,7 +20,6 @@ const practiceState = {
     instrumentVolumes: {},
     instrumentToneVolumes: {},
     patternHandModes: {},
-    patternSwingFactors: {},
     patternRepeatCounts: {},
     patternTargetInstruments: {},
     patternChooserExpanded: false,
@@ -153,7 +152,8 @@ const practiceScrollerState = {
     timerEndsAt: null,
     repeatCount: 1,
     practiceDurationSeconds: 0,
-    tempoRampLeadInCycles: 0
+    tempoRampLeadInCycles: 0,
+    visualSegmentRotations: Object.create(null)
 };
 
 function isPracticeScrollerCompactViewport() {
@@ -170,7 +170,9 @@ function getPracticeScrollerVisualLoopCopies() {
 }
 
 function getPracticeScrollerSectionVisualRepeatCopies(baseVisualLoopCopies) {
-    const minimumCopies = 4;
+    // Keep enough real copies to fill the complete viewport around the
+    // playhead. Higher repeat counts still use the bounded visual ring.
+    const minimumCopies = isPracticeScrollerCompactViewport() ? 7 : 10;
     return Math.max(minimumCopies, Math.max(1, Number(baseVisualLoopCopies) || 1));
 }
 
@@ -208,6 +210,38 @@ function normalizePracticeAudioLatency(rawValue) {
     }
     return Math.max(0, Math.min(1000, Math.round(numericValue)));
 }
+
+function getStoredPracticeAudioLatency() {
+    try {
+        const storedValue = window.localStorage.getItem('barabeat.practiceAudioLatencyMs');
+        return storedValue === null ? null : normalizePracticeAudioLatency(storedValue);
+    } catch (error) {
+        return null;
+    }
+}
+
+function storePracticeAudioLatency(rawValue) {
+    try {
+        window.localStorage.setItem(
+            'barabeat.practiceAudioLatencyMs',
+            String(normalizePracticeAudioLatency(rawValue))
+        );
+    } catch (error) {
+        // Safari may deny local storage in private or restricted contexts.
+    }
+}
+
+function getEffectivePracticeAudioLatency(metadataValue) {
+    if (isPracticeScrollerCompactViewport()) {
+        const storedValue = getStoredPracticeAudioLatency();
+        if (storedValue !== null) {
+            return storedValue;
+        }
+    }
+    return normalizePracticeAudioLatency(metadataValue);
+}
+
+practiceState.audioLatencyMs = getEffectivePracticeAudioLatency(practiceState.audioLatencyMs);
 
 function normalizePracticeInstrumentVolume(rawValue) {
     const numericValue = Number(rawValue);
@@ -271,20 +305,6 @@ function normalizePracticeTimerMinutes(rawValue) {
 
 function normalizePracticeHandMode(rawValue) {
     return rawValue === 'h2h' || rawValue === 'hoh' ? rawValue : 'auto';
-}
-
-function normalizePracticePatternSwingFactor(rawValue) {
-    if (rawValue === null || rawValue === undefined || rawValue === '') {
-        return null;
-    }
-    if (typeof normalizeTimelineSwingFactor === 'function') {
-        return normalizeTimelineSwingFactor(rawValue);
-    }
-    const numericValue = Number(rawValue);
-    if (!Number.isFinite(numericValue)) {
-        return null;
-    }
-    return Math.max(0, Math.min(100, Math.round(numericValue)));
 }
 
 function normalizePracticePatternRepeatCount(rawValue) {
@@ -357,17 +377,6 @@ function getPracticePatternTargetsBySourceKey(patternTargets) {
     }, {});
 }
 
-function getPracticePatternSwingFactorsBySourceKey(patternSwingFactors) {
-    return Object.keys(patternSwingFactors || {}).reduce(function (factorBySourceKey, patternId) {
-        const pattern = findPatternById(patternId);
-        const normalizedFactor = normalizePracticePatternSwingFactor(patternSwingFactors[patternId]);
-        if (pattern && pattern.sourceKey && normalizedFactor !== null) {
-            factorBySourceKey[pattern.sourceKey] = normalizedFactor;
-        }
-        return factorBySourceKey;
-    }, {});
-}
-
 function getPracticePatternRepeatCountsBySourceKey(patternRepeatCounts) {
     return Object.keys(patternRepeatCounts || {}).reduce(function (countBySourceKey, patternId) {
         const pattern = findPatternById(patternId);
@@ -429,28 +438,6 @@ function getPracticePatternTargetsFromMetadata(patternTargets, patternTargetsByS
             resolvedTargets[pattern.id] = rawTarget;
         }
         return resolvedTargets;
-    }, {});
-}
-
-function getPracticePatternSwingFactorsFromMetadata(patternSwingFactors, patternSwingFactorsBySourceKey, patternLibrary) {
-    const patterns = Array.isArray(patternLibrary) ? patternLibrary : timelineState.sourcePatterns;
-    const factorById = patternSwingFactors && typeof patternSwingFactors === 'object' ? patternSwingFactors : {};
-    const factorBySourceKey = patternSwingFactorsBySourceKey && typeof patternSwingFactorsBySourceKey === 'object'
-        ? patternSwingFactorsBySourceKey
-        : {};
-
-    return patterns.reduce(function (resolvedFactors, pattern) {
-        if (!pattern || !pattern.id) {
-            return resolvedFactors;
-        }
-        const rawFactor = factorBySourceKey[pattern.sourceKey] !== undefined
-            ? factorBySourceKey[pattern.sourceKey]
-            : factorById[pattern.id];
-        const normalizedFactor = normalizePracticePatternSwingFactor(rawFactor);
-        if (normalizedFactor !== null) {
-            resolvedFactors[pattern.id] = normalizedFactor;
-        }
-        return resolvedFactors;
     }, {});
 }
 
@@ -530,8 +517,6 @@ function buildPracticeSettingsMetadata() {
         soloPatternSourceKeys: getPracticePatternSourceKeys(practiceState.soloPatternIds),
         patternHandModes: Object.assign({}, practiceState.patternHandModes),
         patternHandModesBySourceKey: getPracticePatternHandModesBySourceKey(practiceState.patternHandModes),
-        patternSwingFactors: Object.assign({}, practiceState.patternSwingFactors),
-        patternSwingFactorsBySourceKey: getPracticePatternSwingFactorsBySourceKey(practiceState.patternSwingFactors),
         patternRepeatCounts: Object.assign({}, practiceState.patternRepeatCounts),
         patternRepeatCountsBySourceKey: getPracticePatternRepeatCountsBySourceKey(practiceState.patternRepeatCounts),
         patternTargetInstruments: persistedPatternTargets,
@@ -555,11 +540,14 @@ function normalizePracticeScenario(rawScenario, index) {
     const rawSettings = rawScenario.settings && typeof rawScenario.settings === 'object'
         ? rawScenario.settings
         : rawScenario;
+    const normalizedSettings = Object.assign({}, rawSettings);
+    delete normalizedSettings.patternSwingFactors;
+    delete normalizedSettings.patternSwingFactorsBySourceKey;
     const scenarioId = String(rawScenario.id || '').trim() || createPracticeScenarioId();
     return {
         id: scenarioId,
         name: normalizePracticeScenarioName(rawScenario.name, index),
-        settings: Object.assign({}, rawSettings)
+        settings: normalizedSettings
     };
 }
 
@@ -596,7 +584,6 @@ function resetPracticeForSource(sourceHash) {
     practiceState.accompanimentPatternIds = [];
     practiceState.soloPatternIds = [];
     practiceState.patternTargetInstruments = {};
-    practiceState.patternSwingFactors = {};
     practiceState.patternRepeatCounts = {};
     practiceState.instrumentVolumes = {};
     practiceState.instrumentToneVolumes = {};
@@ -610,7 +597,7 @@ function applyPracticeSettingsMetadata(metadata, patternLibrary, sourceHash) {
     practiceState.accompanimentStart = normalizePracticeStartMode(metadata.accompanimentStart);
     practiceState.accompanimentBetweenPatterns = Boolean(metadata.accompanimentBetweenPatterns);
     practiceState.pauseAccompanimentForLeadInPatterns = Boolean(metadata.pauseAccompanimentForLeadInPatterns);
-    practiceState.audioLatencyMs = normalizePracticeAudioLatency(metadata.audioLatencyMs);
+    practiceState.audioLatencyMs = getEffectivePracticeAudioLatency(metadata.audioLatencyMs);
     practiceState.h2hRestMute = Boolean(metadata.h2hRestMute);
     practiceState.instrumentVolumes = normalizePracticeInstrumentVolumes(metadata.instrumentVolumes);
     practiceState.instrumentToneVolumes = normalizePracticeInstrumentToneVolumes(metadata.instrumentToneVolumes);
@@ -641,11 +628,6 @@ function applyPracticeSettingsMetadata(metadata, patternLibrary, sourceHash) {
     practiceState.patternTargetInstruments = getPracticePatternTargetsFromMetadata(
         metadata.patternTargetInstruments,
         metadata.patternTargetInstrumentsBySourceKey,
-        patternLibrary
-    );
-    practiceState.patternSwingFactors = getPracticePatternSwingFactorsFromMetadata(
-        metadata.patternSwingFactors,
-        metadata.patternSwingFactorsBySourceKey,
         patternLibrary
     );
     practiceState.patternRepeatCounts = getPracticePatternRepeatCountsFromMetadata(
@@ -838,14 +820,6 @@ function syncPracticeSelectionsWithPatternLibrary() {
             delete practiceState.patternHandModes[patternId];
         }
     });
-    Object.keys(practiceState.patternSwingFactors).forEach(function (patternId) {
-        const normalizedFactor = normalizePracticePatternSwingFactor(practiceState.patternSwingFactors[patternId]);
-        if (availableIds.indexOf(patternId) === -1 || normalizedFactor === null) {
-            delete practiceState.patternSwingFactors[patternId];
-        } else {
-            practiceState.patternSwingFactors[patternId] = normalizedFactor;
-        }
-    });
     Object.keys(practiceState.patternRepeatCounts).forEach(function (patternId) {
         const normalizedCount = normalizePracticePatternRepeatCount(practiceState.patternRepeatCounts[patternId]);
         if (availableIds.indexOf(patternId) === -1 || normalizedCount === null) {
@@ -868,33 +842,9 @@ function syncPracticeSelectionsWithPatternLibrary() {
     });
 }
 
-function ensurePracticeDefaultSelections() {
-    if (practiceState.defaultsApplied ||
-            practiceState.accompanimentPatternIds.length > 0 ||
-            practiceState.soloPatternIds.length > 0) {
-        return;
-    }
-
-    const accompanimentPatternIds = timelineState.sourcePatterns
-        .filter(function (pattern) {
-            return pattern && pattern.labelType === 'Begleitung';
-        })
-        .map(function (pattern) {
-            return pattern.id;
-        });
-
-    if (accompanimentPatternIds.length > 0) {
-        practiceState.accompanimentPatternIds = accompanimentPatternIds;
-    } else {
-        practiceState.soloPatternIds = timelineState.sourcePatterns
-            .filter(function (pattern) {
-                return pattern && pattern.id;
-            })
-            .map(function (pattern) {
-                return pattern.id;
-            });
-    }
-    practiceState.defaultsApplied = true;
+function hasPracticePatternSelection() {
+    return practiceState.accompanimentPatternIds.length > 0 ||
+        practiceState.soloPatternIds.length > 0;
 }
 
 function togglePracticePatternSelection(listName, patternId, selected) {
@@ -1188,40 +1138,6 @@ function createPracticePatternRow(pattern, listName) {
             patternControlsEl.appendChild(repeatCountEl);
         }
 
-        const swingFactorEl = document.createElement('label');
-        swingFactorEl.className = 'practice-pattern-swing-factor';
-        swingFactorEl.appendChild(document.createTextNode('Swing'));
-        const swingInputEl = document.createElement('input');
-        swingInputEl.type = 'number';
-        swingInputEl.min = '0';
-        swingInputEl.max = '100';
-        swingInputEl.step = '1';
-        swingInputEl.placeholder = typeof normalizeTimelineSwingFactor === 'function'
-            ? String(normalizeTimelineSwingFactor(timelineState.swingFactor))
-            : '0';
-        const patternSwingFactor = normalizePracticePatternSwingFactor(practiceState.patternSwingFactors[pattern.id]);
-        swingInputEl.value = patternSwingFactor === null ? '' : String(patternSwingFactor);
-        swingInputEl.addEventListener('click', function (event) {
-            event.stopPropagation();
-        });
-        swingInputEl.addEventListener('change', function () {
-            const normalizedFactor = normalizePracticePatternSwingFactor(swingInputEl.value);
-            const previousFactor = normalizePracticePatternSwingFactor(practiceState.patternSwingFactors[pattern.id]);
-            if (previousFactor !== normalizedFactor && typeof recordArrangementHistorySnapshot === 'function') {
-                recordArrangementHistorySnapshot();
-            }
-            if (normalizedFactor === null) {
-                delete practiceState.patternSwingFactors[pattern.id];
-                swingInputEl.value = '';
-            } else {
-                practiceState.patternSwingFactors[pattern.id] = normalizedFactor;
-                swingInputEl.value = String(normalizedFactor);
-            }
-            notifyPracticePatternOrderChanged();
-        });
-        swingFactorEl.appendChild(swingInputEl);
-        patternControlsEl.appendChild(swingFactorEl);
-
         const targetOptions = getPracticeTargetOptionsForPattern(pattern);
         if (targetOptions.length > 0) {
             const targetEl = document.createElement('select');
@@ -1305,6 +1221,8 @@ function updatePracticeInputs() {
     const pauseAccompanimentForLeadInPatternsEl = document.getElementById('practicePauseAccompanimentForLeadInPatterns');
     const audioLatencyEl = document.getElementById('practiceAudioLatency');
     const audioLatencyRangeEl = document.getElementById('practiceAudioLatencyRange');
+    const mobileAudioLatencyEl = document.getElementById('mobilePracticeAudioLatency');
+    const mobileAudioLatencyRangeEl = document.getElementById('mobilePracticeAudioLatencyRange');
     const h2hRestMuteEl = document.getElementById('practiceH2HRestMute');
     const repeatControlEl = document.getElementById('practiceRepeatCountControl');
     const repeatIsDisabled = practiceState.timerMinutes > 0;
@@ -1343,6 +1261,12 @@ function updatePracticeInputs() {
     if (audioLatencyRangeEl) {
         audioLatencyRangeEl.value = practiceState.audioLatencyMs;
     }
+    if (mobileAudioLatencyEl) {
+        mobileAudioLatencyEl.value = practiceState.audioLatencyMs;
+    }
+    if (mobileAudioLatencyRangeEl) {
+        mobileAudioLatencyRangeEl.value = practiceState.audioLatencyMs;
+    }
     if (h2hRestMuteEl) {
         h2hRestMuteEl.checked = Boolean(practiceState.h2hRestMute);
     }
@@ -1370,12 +1294,12 @@ function renderPracticePanel() {
     const chooserEl = document.getElementById('practicePatternChooser');
     const chooserToggleEl = document.getElementById('practicePatternChooserToggle');
     const mobileChooserToggleEl = document.getElementById('mobilePatternChooserButton');
+    const mobileBluetoothLatencyButtonEl = document.getElementById('mobileBluetoothLatencyButton');
     if (!panelEl || !titleEl) {
         return;
     }
 
     syncPracticeSelectionsWithPatternLibrary();
-    ensurePracticeDefaultSelections();
     panelEl.hidden = !practiceState.visible;
     document.body.classList.toggle('is-practice-mode-visible', practiceState.visible);
     titleEl.innerHTML = '<span class="practice-title-label">Übungsmodus:</span> ' +
@@ -1401,10 +1325,19 @@ function renderPracticePanel() {
     }
     if (mobileChooserToggleEl) {
         mobileChooserToggleEl.hidden = !practiceState.visible;
-        mobileChooserToggleEl.textContent = practiceState.patternChooserExpanded
-            ? 'Patternauswahl schließen'
-            : 'Patternauswahl öffnen';
+        mobileChooserToggleEl.textContent = 'Pattern';
+        mobileChooserToggleEl.setAttribute(
+            'aria-label',
+            practiceState.patternChooserExpanded ? 'Patternauswahl schließen' : 'Patternauswahl öffnen'
+        );
+        mobileChooserToggleEl.setAttribute('aria-expanded', practiceState.patternChooserExpanded ? 'true' : 'false');
         mobileChooserToggleEl.classList.toggle('is-active', practiceState.patternChooserExpanded);
+    }
+    if (mobileBluetoothLatencyButtonEl) {
+        mobileBluetoothLatencyButtonEl.hidden = !practiceState.visible;
+    }
+    if (typeof updateMobileArrangementButtonVisibility === 'function') {
+        updateMobileArrangementButtonVisibility();
     }
 
     if (panelEl.hidden) {
@@ -1435,7 +1368,6 @@ function createPracticeEntry(pattern, parallelGroupId, blockId, repeatCount, isL
         handMode: pattern.instrument === 'Djembe'
             ? normalizePracticeHandMode(practiceState.patternHandModes[pattern.id])
             : '',
-        swingFactor: normalizePracticePatternSwingFactor(practiceState.patternSwingFactors[pattern.id]),
         targetInstruments: getPracticePatternPlaybackTargets(pattern)
     };
 }
@@ -1494,8 +1426,11 @@ function insertPracticePatternAfterLabel(patterns, patternToInsert, labelType) {
     return nextPatterns;
 }
 
-function getPracticeCyclePatterns(soloPatterns) {
+function getPracticeCyclePatterns(soloPatterns, hasAccompaniment) {
     let cyclePatterns = (Array.isArray(soloPatterns) ? soloPatterns : []).filter(Boolean);
+    if (!hasAccompaniment) {
+        return cyclePatterns;
+    }
     const hasCall = cyclePatterns.some(function (pattern) {
         return pattern && pattern.labelType === 'Call';
     });
@@ -1555,7 +1490,10 @@ function buildPracticeEntries(options) {
     const leadInCycleCount = Math.max(0, Math.min(repeatCycles, Math.round(Number(buildOptions.leadInCycleCount) || 0)));
     const accompanimentPatterns = getPracticePatternsByIds(practiceState.accompanimentPatternIds);
     const soloPatterns = getPracticePatternsByIds(practiceState.soloPatternIds);
-    const cycleSoloPatterns = getPracticeCyclePatterns(soloPatterns);
+    if (accompanimentPatterns.length === 0 && soloPatterns.length === 0) {
+        return [];
+    }
+    const cycleSoloPatterns = getPracticeCyclePatterns(soloPatterns, accompanimentPatterns.length > 0);
     const hasSelectedPracticePatterns = soloPatterns.length > 0;
     const accompanimentOnlyLoops = !hasSelectedPracticePatterns && accompanimentPatterns.length > 0
         ? Math.max(1, practiceState.loopsWithoutSolo)
@@ -1675,9 +1613,6 @@ function buildPracticeBlocksFromEntries(entries) {
             patternId: entry.patternId,
             patternSourceKey: entry.patternSourceKey,
             handMode: entry.handMode || '',
-            swingFactor: entry.swingFactor === null || entry.swingFactor === undefined
-                ? null
-                : entry.swingFactor,
             isPracticeTarget: Boolean(entry.isPracticeTarget),
             suppressPlayback: Boolean(entry.suppressPlayback),
             repeatCount: normalizePracticeCount(entry.repeatCount, 1, 1, 32),
@@ -2235,7 +2170,6 @@ function createPracticeSection(block, blockIndex, sectionSuffix) {
             label: 'Begleitung',
             labelName: '',
             runtimeKey: 'practice-js::' + block.id + safeSuffix + '::' + blockIndex,
-            swingFactor: null,
             sectionTempo: block.sectionTempo === null || block.sectionTempo === undefined
                 ? null
                 : normalizePracticeTempo(block.sectionTempo, timelineState.tempo),
@@ -2260,7 +2194,6 @@ function clonePracticeSection(section, sectionSuffix) {
         label: section.label,
         labelName: section.labelName,
         runtimeKey: section.runtimeKey + safeSuffix,
-        swingFactor: section.swingFactor,
         sectionTempo: section.sectionTempo === null || section.sectionTempo === undefined
             ? null
             : normalizePracticeTempo(section.sectionTempo, timelineState.tempo),
@@ -2816,6 +2749,14 @@ function buildPracticeSectionsFromEntries(entries) {
             const rawPatternPickupEndStep = pattern.labelType !== 'Begleitung'
                 ? getPracticePatternPickupEndStep(pattern, rawPatternNotes.length)
                 : 0;
+            const safePatternInStep = patternInStep === null || patternInStep === undefined
+                ? null
+                : Math.max(0, Math.min(rawPatternNotes.length - 1, Math.round(Number(patternInStep) || 0)));
+            const pickupWrapsToPatternStart = rawPatternPickupEndStep > 0 &&
+                rawPatternPickupEndStep >= rawPatternNotes.length &&
+                safePatternInStep !== null &&
+                safePatternInStep > 0;
+            const rawPatternMainStartStep = pickupWrapsToPatternStart ? 0 : rawPatternPickupEndStep;
             const shouldUseAccompanimentSegment = isAccompanimentEntry &&
                 blockPracticeLength > 0 &&
                 rawPatternNotes.length > blockPracticeLength;
@@ -2830,7 +2771,9 @@ function buildPracticeSectionsFromEntries(entries) {
                     ? getPracticeLoopedSegment(rawPatternNotes, 0, blockPracticeLength, 'f')
                     : rawPatternNotes.slice();
             if (!shouldUseAccompanimentSegment && rawPatternPickupEndStep > 0) {
-                patternNotes = patternNotes.slice(rawPatternPickupEndStep);
+                patternNotes = pickupWrapsToPatternStart
+                    ? patternNotes.slice(0, safePatternInStep)
+                    : patternNotes.slice(rawPatternPickupEndStep);
             }
             if (entry.suppressPlayback) {
                 patternNotes = Array(patternNotes.length).fill('f');
@@ -2846,11 +2789,13 @@ function buildPracticeSectionsFromEntries(entries) {
                 )
                 : shiftPracticeBarStartStepsAfterOffset(
                     rawPatternBarStartSteps,
-                    rawPatternPickupEndStep,
+                    rawPatternMainStartStep,
                     patternNotes.length
                 );
             let effectivePatternOutStep = patternOutStep !== null && patternOutStep !== undefined
-                ? Math.max(0, Math.round(Number(patternOutStep) || 0) - rawPatternPickupEndStep)
+                ? pickupWrapsToPatternStart && Number(patternOutStep) >= safePatternInStep
+                    ? null
+                    : Math.max(0, Math.round(Number(patternOutStep) || 0) - rawPatternMainStartStep)
                 : patternOutStep;
             if (shouldLoopTargetAccompaniment &&
                     effectivePatternOutStep !== null &&
@@ -2898,9 +2843,6 @@ function buildPracticeSectionsFromEntries(entries) {
                     }
                     addPracticeTrackPatternLabel(pickupSection.trackPatternLabels, instrumentName, labelName);
                 });
-                if (pickupSection.swingFactor === null && entry.swingFactor !== null && entry.swingFactor !== undefined) {
-                    pickupSection.swingFactor = entry.swingFactor;
-                }
             }
 
             targetInstruments.forEach(function (instrumentName) {
@@ -2934,9 +2876,6 @@ function buildPracticeSectionsFromEntries(entries) {
                 }
             });
 
-            if (section.swingFactor === null && entry.swingFactor !== null && entry.swingFactor !== undefined) {
-                section.swingFactor = entry.swingFactor;
-            }
         });
 
         section.label = labels.indexOf('Begleitung') !== -1 ? 'Begleitung' : (labels[0] || 'Begleitung');
@@ -4006,6 +3945,7 @@ function renderPracticeScrollerFromPayload(playerPayload) {
     practiceScrollerState.playbackEvents = [];
     practiceScrollerState.playbackAnchor = null;
     practiceScrollerState.activeCells = [];
+    practiceScrollerState.visualSegmentRotations = Object.create(null);
     closePracticeInstrumentVolumePopover();
 
     const flattened = flattenPracticeScrollerSections(sections, {
@@ -4208,6 +4148,18 @@ function normalizePracticeScrollerPlaybackStep(playbackStep) {
     if (practiceScrollerState.totalSteps <= 0 || playbackSegments.length === 0 || playbackTotalSteps <= 0) {
         return rawStep;
     }
+    const playbackContext = getPracticeScrollerPlaybackSegmentContext(rawStep);
+    if (!playbackContext) {
+        return Math.min(rawStep, practiceScrollerState.totalSteps - 1);
+    }
+
+    return playbackContext.visualSegmentStart + playbackContext.visualLocalStep;
+}
+
+function getPracticeScrollerPlaybackSegmentContext(playbackStep) {
+    const rawStep = Math.max(0, Number(playbackStep) || 0);
+    const playbackSegments = practiceScrollerState.playbackSegments || [];
+    const playbackTotalSteps = practiceScrollerState.playbackTotalSteps || 0;
     const playbackLoopStart = practiceScrollerState.playbackLoopStart || 0;
     const playbackLoopLength = practiceScrollerState.playbackLoopLength || 0;
     const visualLoopStart = practiceScrollerState.visualCycleSteps || 0;
@@ -4220,7 +4172,7 @@ function normalizePracticeScrollerPlaybackStep(playbackStep) {
             normalizedPlaybackStep < segment.playbackStart + segment.playbackLength;
     });
     if (!matchedSegment || matchedSegment.visualLength <= 0) {
-        return Math.min(rawStep, practiceScrollerState.totalSteps - 1);
+        return null;
     }
 
     const localPlaybackStep = normalizedPlaybackStep - matchedSegment.playbackStart;
@@ -4233,8 +4185,61 @@ function normalizePracticeScrollerPlaybackStep(playbackStep) {
     const segmentVisualStart = rawStep >= playbackTotalSteps
         ? Math.max(0, matchedSegment.visualStart - practiceScrollerState.loopStartStep)
         : matchedSegment.visualStart;
-    return baseVisualStart + segmentVisualStart +
-        getPracticeScrollerSegmentVisualStep(matchedSegment, localPlaybackStep);
+    return {
+        segment: matchedSegment,
+        localPlaybackStep: localPlaybackStep,
+        visualSegmentStart: baseVisualStart + segmentVisualStart,
+        visualLocalStep: getPracticeScrollerSegmentVisualStep(matchedSegment, localPlaybackStep)
+    };
+}
+
+function getPracticeScrollerSegmentCarouselInfo(segment, localPlaybackStep) {
+    const safeSegment = segment || {};
+    const sectionLength = Math.max(0, Number(safeSegment.sectionLength) || 0);
+    const repeatCount = Math.max(1, Number(safeSegment.repeatCount) || 1);
+    const visualRepeatCount = Math.max(1, Number(safeSegment.visualRepeatCount) || 1);
+    if (sectionLength <= 0 || repeatCount <= visualRepeatCount || visualRepeatCount < 3) {
+        return null;
+    }
+
+    const playbackRepeatIndex = Math.min(
+        repeatCount - 1,
+        Math.floor(Math.max(0, Number(localPlaybackStep) || 0) / sectionLength)
+    );
+    const normalCopyCount = visualRepeatCount - 1;
+    const playheadRatio = isPracticeScrollerCompactViewport()
+        ? 0.24
+        : practiceScrollerState.playheadRatio;
+    const activeCopyIndex = Math.max(
+        1,
+        Math.min(normalCopyCount - 2, Math.floor(normalCopyCount * playheadRatio))
+    );
+    const rightGuardCopyCount = normalCopyCount - activeCopyIndex - 1;
+    const trailingPlaybackStart = Math.max(
+        activeCopyIndex + 1,
+        repeatCount - 1 - rightGuardCopyCount
+    );
+    const isFinalRepeat = playbackRepeatIndex === repeatCount - 1;
+    const physicalRepeatIndex = playbackRepeatIndex <= activeCopyIndex
+        ? playbackRepeatIndex
+        : isFinalRepeat
+            ? visualRepeatCount - 1
+            : playbackRepeatIndex >= trailingPlaybackStart
+                ? normalCopyCount - (repeatCount - 1 - playbackRepeatIndex)
+                : activeCopyIndex;
+    const desiredRotation = playbackRepeatIndex <= activeCopyIndex
+        ? 0
+        : Math.max(
+            0,
+            Math.min(playbackRepeatIndex, trailingPlaybackStart - 1) - activeCopyIndex
+        );
+
+    return {
+        sectionLength: sectionLength,
+        normalCopyCount: normalCopyCount,
+        physicalRepeatIndex: physicalRepeatIndex,
+        desiredRotation: desiredRotation
+    };
 }
 
 function getPracticeScrollerSegmentVisualStep(segment, localPlaybackStep) {
@@ -4249,30 +4254,60 @@ function getPracticeScrollerSegmentVisualStep(segment, localPlaybackStep) {
         return 0;
     }
     if (repeatCount <= visualRepeatCount) {
-        return Math.min(visualLength - 1, safeLocalStep);
+        // The fractional interval after the final note still belongs to the
+        // section. Keeping it lets the lane travel smoothly to the first
+        // note of the following section instead of pausing for one step.
+        return Math.min(visualLength, safeLocalStep);
     }
 
-    // Keep dedicated copies for the real first and last repeat; recycle only the middle.
-    const playbackRepeatIndex = Math.min(repeatCount - 1, Math.floor(safeLocalStep / sectionLength));
+    const carouselInfo = getPracticeScrollerSegmentCarouselInfo(safeSegment, safeLocalStep);
+    if (!carouselInfo) {
+        return Math.min(visualLength, safeLocalStep);
+    }
     const stepInRepeat = safeLocalStep % sectionLength;
-    let visualRepeatIndex = 0;
-
-    const trailingCopyCount = Math.min(2, Math.max(1, visualRepeatCount - 2));
-    const trailingPlaybackStart = repeatCount - trailingCopyCount;
-
-    if (playbackRepeatIndex === 0) {
-        visualRepeatIndex = 0;
-    } else if (playbackRepeatIndex >= trailingPlaybackStart) {
-        visualRepeatIndex = visualRepeatCount - (repeatCount - playbackRepeatIndex);
-    } else {
-        const reusableCopyCount = Math.max(1, visualRepeatCount - trailingCopyCount - 1);
-        visualRepeatIndex = 1 + ((playbackRepeatIndex - 1) % reusableCopyCount);
-    }
 
     return Math.min(
-        visualLength - 1,
-        (visualRepeatIndex * sectionLength) + stepInRepeat
+        visualLength,
+        (carouselInfo.physicalRepeatIndex * sectionLength) + stepInRepeat
     );
+}
+
+function rotatePracticeScrollerSegmentCopies(scrollerEl, segmentStartStep, carouselInfo) {
+    if (!scrollerEl || !carouselInfo || carouselInfo.normalCopyCount <= 1) {
+        return;
+    }
+
+    const safeSegmentStart = Math.max(0, Math.round(Number(segmentStartStep) || 0));
+    const sectionLength = carouselInfo.sectionLength;
+    const normalCopyCount = carouselInfo.normalCopyCount;
+    const desiredRotation = carouselInfo.desiredRotation % normalCopyCount;
+    const rotationKey = [safeSegmentStart, sectionLength, normalCopyCount].join(':');
+    const currentRotation = Number(practiceScrollerState.visualSegmentRotations[rotationKey]) || 0;
+    const rotationDelta = (desiredRotation - currentRotation + normalCopyCount) % normalCopyCount;
+    if (rotationDelta === 0) {
+        return;
+    }
+
+    const firstChildIndex = getPracticeScrollerPreRollLineSteps() + safeSegmentStart;
+    const movedCellCount = rotationDelta * sectionLength;
+    scrollerEl.querySelectorAll('.practice-scroller-lane').forEach(function (laneEl) {
+        const finalCopyStartIndex = firstChildIndex + normalCopyCount * sectionLength;
+        const insertionReference = laneEl.children[finalCopyStartIndex];
+        if (!insertionReference || laneEl.children.length < finalCopyStartIndex + sectionLength) {
+            return;
+        }
+
+        const movedCells = document.createDocumentFragment();
+        for (let cellIndex = 0; cellIndex < movedCellCount; cellIndex += 1) {
+            const cellEl = laneEl.children[firstChildIndex];
+            if (!cellEl || cellEl === insertionReference) {
+                break;
+            }
+            movedCells.appendChild(cellEl);
+        }
+        laneEl.insertBefore(movedCells, insertionReference);
+    });
+    practiceScrollerState.visualSegmentRotations[rotationKey] = desiredRotation;
 }
 
 function getRenderedPracticeScrollerStep(visualStep) {
@@ -4306,10 +4341,28 @@ function updatePracticeScrollerPosition(playbackStep) {
     const minVisualStep = -practiceScrollerState.visualLeadInSteps;
     const maxVisualStep = Math.max(0, practiceScrollerState.visualTotalSteps - 1);
     const rawStep = Math.max(minVisualStep, Number(playbackStep) || 0);
-    const normalizedStep = rawStep < 0
-        ? rawStep
-        : normalizePracticeScrollerPlaybackStep(rawStep);
+    const playbackContext = rawStep < 0
+        ? null
+        : getPracticeScrollerPlaybackSegmentContext(rawStep);
+    const normalizedStep = playbackContext
+        ? playbackContext.visualSegmentStart + playbackContext.visualLocalStep
+        : rawStep < 0
+            ? rawStep
+            : normalizePracticeScrollerPlaybackStep(rawStep);
     const renderedStep = getRenderedPracticeScrollerStep(normalizedStep);
+    if (playbackContext) {
+        const carouselInfo = getPracticeScrollerSegmentCarouselInfo(
+            playbackContext.segment,
+            playbackContext.localPlaybackStep
+        );
+        if (carouselInfo) {
+            rotatePracticeScrollerSegmentCopies(
+                scrollerEl,
+                getRenderedPracticeScrollerStep(playbackContext.visualSegmentStart),
+                carouselInfo
+            );
+        }
+    }
     const safeStep = Math.max(minVisualStep, Math.min(maxVisualStep, renderedStep));
     const activeStep = Math.max(0, Math.min(maxVisualStep, Math.floor(safeStep)));
     const cellRect = firstCellEl ? firstCellEl.getBoundingClientRect() : null;

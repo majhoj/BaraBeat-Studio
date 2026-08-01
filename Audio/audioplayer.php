@@ -541,7 +541,6 @@ let timelineLoopCount = normalizeTimelineLoopCountValue(
 let timelineLoop = timelineLoopCount === 'loop';
 const initialTempo = Math.max(30, Math.min(180, Number(playerConfig.Tempo) || 100));
 let currentBaseTempo = initialTempo;
-const swingFactor = Math.max(0, Math.min(100, Number(playerConfig.SwingFactor) || 0));
 const rhythmType = String(playerConfig.Rhythmus || '');
 const swingProfile = playerConfig.SwingProfile || {};
 const feelOffsets = playerConfig.FeelOffsets || {};
@@ -725,7 +724,6 @@ function createOrderedSection(label) {
   return {
     label: label,
     labelName: label,
-    swingFactor: null,
     sectionTempo: null,
     tempoStart: null,
     tempoTarget: null,
@@ -1068,9 +1066,6 @@ function mergeTimelineEntryPickupsIntoPreviousSection(sections, entryDataList, o
     });
     if (entryData.labelName && pickupLabelNames.indexOf(entryData.labelName) === -1) {
       pickupLabelNames.push(entryData.labelName);
-    }
-    if (pickupSection.swingFactor === null && entryData.swingFactor !== null && entryData.swingFactor !== undefined) {
-      pickupSection.swingFactor = entryData.swingFactor;
     }
     applyEntryTempoToSection(pickupSection, entryData);
   });
@@ -1763,9 +1758,6 @@ function createSectionFromEntry(label, labelName, entryData) {
   const section = createOrderedSection(label);
   section.labelName = labelName;
   section.runtimeKey = [label, labelName, entryData.entrySignature].join('::');
-  section.swingFactor = entryData.swingFactor === null || entryData.swingFactor === undefined
-    ? null
-    : Math.max(0, Math.min(100, Number(entryData.swingFactor) || 0));
   section.sectionTempo = normalizeSectionTempo(entryData.sectionTempo);
   section.entrySignatures = [entryData.entrySignature];
   section.sectionTargets = entryData.targetInstruments.slice();
@@ -2100,9 +2092,6 @@ function buildTimelineSections(config) {
       entrySignature: entrySignature,
       handMode: String(entry.handMode || ''),
       targetInstruments: targetInstruments,
-      swingFactor: entry.swingFactor === null || entry.swingFactor === undefined
-        ? null
-        : Math.max(0, Math.min(100, Number(entry.swingFactor) || 0)),
       sectionTempo: normalizeSectionTempo(entry.sectionTempo),
       startsContinuingAccompaniment: startsContinuingAccompaniment,
       patternNotes: patternNotes,
@@ -2264,9 +2253,6 @@ function buildTimelineSections(config) {
             if (repeatedSectionLabelNames.indexOf(entryData.labelName) === -1) {
               repeatedSectionLabelNames.push(entryData.labelName);
             }
-            if (repeatedSection.swingFactor === null && entryData.swingFactor !== null && entryData.swingFactor !== undefined) {
-              repeatedSection.swingFactor = entryData.swingFactor;
-            }
             applyEntryTempoToSection(repeatedSection, entryData);
             if (entryData.startsContinuingAccompaniment) {
               entryData.targetInstruments.forEach(function (instrumentName) {
@@ -2361,9 +2347,6 @@ function buildTimelineSections(config) {
         if (sectionLabelNames.indexOf(entryData.labelName) === -1) {
           sectionLabelNames.push(entryData.labelName);
         }
-        if (mergedSection.swingFactor === null && entryData.swingFactor !== null && entryData.swingFactor !== undefined) {
-          mergedSection.swingFactor = entryData.swingFactor;
-        }
         applyEntryTempoToSection(mergedSection, entryData);
         if (entryData.startsContinuingAccompaniment) {
           entryData.targetInstruments.forEach(function (instrumentName) {
@@ -2417,9 +2400,6 @@ function buildTimelineSections(config) {
 
         if (currentCycleSection.labelName !== occurrenceEntry.labelName) {
           currentCycleSection.labelName += ' + ' + occurrenceEntry.labelName;
-        }
-        if (currentCycleSection.swingFactor === null && occurrenceEntry.swingFactor !== null && occurrenceEntry.swingFactor !== undefined) {
-          currentCycleSection.swingFactor = occurrenceEntry.swingFactor;
         }
         applyEntryTempoToSection(currentCycleSection, occurrenceEntry);
         currentCycleSection.entrySignatures.push(occurrenceEntry.entrySignature);
@@ -2523,9 +2503,6 @@ function buildPracticeSections(config) {
         }
       });
 
-      if (mergedSection.swingFactor === null && entry.swingFactor !== null && entry.swingFactor !== undefined) {
-        mergedSection.swingFactor = Math.max(0, Math.min(100, Number(entry.swingFactor) || 0));
-      }
     });
 
     mergedSection.label = sectionLabels.indexOf('Begleitung') !== -1
@@ -2557,11 +2534,6 @@ function buildConfiguredPracticeSections(config) {
     section.runtimeKey = configuredSection && configuredSection.runtimeKey
       ? configuredSection.runtimeKey
       : ['practice-config', sectionIndex, section.labelName].join('::');
-    section.swingFactor = configuredSection &&
-      configuredSection.swingFactor !== null &&
-      configuredSection.swingFactor !== undefined
-        ? Math.max(0, Math.min(100, Number(configuredSection.swingFactor) || 0))
-        : null;
     section.sectionTempo = normalizeSectionTempo(configuredSection && configuredSection.sectionTempo);
     section.practiceTargetInstruments = Array.isArray(configuredSection && configuredSection.practiceTargetInstruments)
       ? configuredSection.practiceTargetInstruments.filter(function (instrumentName) {
@@ -3059,8 +3031,7 @@ async function resumeAndWarmAllInstruments() {
   });
 }
 
-function buildSwingStepOffsets(profileValues, activeSwingFactor) {
-  const swingScale = Math.max(0, Math.min(100, activeSwingFactor)) / 100;
+function buildSwingStepOffsets(profileValues) {
   const anchors = Array.isArray(profileValues) ? profileValues : [];
   if (anchors.length === 0) {
     return [0, 1];
@@ -3069,10 +3040,10 @@ function buildSwingStepOffsets(profileValues, activeSwingFactor) {
   const anchorStep = 1 / anchors.length;
   const anchorFractions = anchors.map(function (profileValue, profileIndex) {
     return (profileIndex * anchorStep) +
-      ((Number(profileValue) || 0) / 100 * anchorStep * swingScale);
+      ((Number(profileValue) || 0) / 100 * anchorStep);
   });
   anchorFractions.push(
-    1 + ((Number(anchors[0]) || 0) / 100 * anchorStep * swingScale)
+    1 + ((Number(anchors[0]) || 0) / 100 * anchorStep)
   );
   const stepOffsets = [];
 
@@ -3087,25 +3058,24 @@ function buildSwingStepOffsets(profileValues, activeSwingFactor) {
   return stepOffsets;
 }
 
-function getBinaerSwingStepOffsets(activeSwingFactor) {
-  const profileValues = Array.isArray(swingProfile.binaer) ? swingProfile.binaer : [6, -5, 6, 10];
-  return buildSwingStepOffsets(profileValues, activeSwingFactor);
+function getBinaerSwingStepOffsets() {
+  const profileValues = Array.isArray(swingProfile.binaer) ? swingProfile.binaer : [0, 0, 0, 0];
+  return buildSwingStepOffsets(profileValues);
 }
 
-function getTenaerSwingStepOffsets(activeSwingFactor) {
-  const profileValues = Array.isArray(swingProfile.tenaer) ? swingProfile.tenaer : [0, -15, -10];
-  return buildSwingStepOffsets(profileValues, activeSwingFactor);
+function getTenaerSwingStepOffsets() {
+  const profileValues = Array.isArray(swingProfile.tenaer) ? swingProfile.tenaer : [0, 0, 0];
+  return buildSwingStepOffsets(profileValues);
 }
 
-function getNeunaerSwingStepOffsets(activeSwingFactor) {
-  const profileValues = Array.isArray(swingProfile.neunaer) ? swingProfile.neunaer : [0, 15, 10];
-  const swingScale = Math.max(0, Math.min(100, activeSwingFactor)) / 100;
+function getNeunaerSwingStepOffsets() {
+  const profileValues = Array.isArray(swingProfile.neunaer) ? swingProfile.neunaer : [0, 0, 0];
   const anchorStep = 1 / 3;
   const anchors = [
-    0 + ((Number(profileValues[0]) || 0) / 100 * anchorStep * swingScale),
-    (1 / 3) + ((Number(profileValues[1]) || 0) / 100 * anchorStep * swingScale),
-    (2 / 3) + ((Number(profileValues[2]) || 0) / 100 * anchorStep * swingScale),
-    1 + ((Number(profileValues[0]) || 0) / 100 * anchorStep * swingScale)
+    0 + ((Number(profileValues[0]) || 0) / 100 * anchorStep),
+    (1 / 3) + ((Number(profileValues[1]) || 0) / 100 * anchorStep),
+    (2 / 3) + ((Number(profileValues[2]) || 0) / 100 * anchorStep),
+    1 + ((Number(profileValues[0]) || 0) / 100 * anchorStep)
   ];
   return [
     anchors[0],
@@ -3343,35 +3313,25 @@ function nextNote() {
   updateDisplayedTempo(stepTempo);
   const stepDuration = getBaseStepDuration(stepTempo);
   let intervalToNextStep = stepDuration;
-  let activeSwingFactor = swingFactor;
-  const sectionContext = getPlaybackSectionContext(globalPlaybackStep);
 
-  if (sectionContext && sectionContext.section.swingFactor !== null && sectionContext.section.swingFactor !== undefined) {
-    activeSwingFactor = sectionContext.section.swingFactor;
-  }
-
-  if (activeSwingFactor > 0) {
-    if (rhythmType === 'binaer') {
-      const stepsPerBeat = 8;
-      const beatDuration = stepDuration * stepsPerBeat;
-      const stepInBeat = globalPlaybackStep % stepsPerBeat;
-      const binaerOffsets = getBinaerSwingStepOffsets(activeSwingFactor);
-      intervalToNextStep = beatDuration * (binaerOffsets[stepInBeat + 1] - binaerOffsets[stepInBeat]);
-    } else if (rhythmType === 'tenaer') {
-      const stepsPerBeat = 6;
-      const beatDuration = stepDuration * stepsPerBeat;
-      const stepInBeat = globalPlaybackStep % stepsPerBeat;
-      const tenaerOffsets = getTenaerSwingStepOffsets(activeSwingFactor);
-      intervalToNextStep = beatDuration * (tenaerOffsets[stepInBeat + 1] - tenaerOffsets[stepInBeat]);
-    } else if (rhythmType === 'neunaer') {
-      const stepsPerBeat = 6;
-      const beatDuration = stepDuration * stepsPerBeat;
-      const stepInBeat = globalPlaybackStep % stepsPerBeat;
-      const neunaerOffsets = getNeunaerSwingStepOffsets(activeSwingFactor);
-      intervalToNextStep = beatDuration * (neunaerOffsets[stepInBeat + 1] - neunaerOffsets[stepInBeat]);
-    } else {
-      intervalToNextStep = stepDuration;
-    }
+  if (rhythmType === 'binaer') {
+    const stepsPerBeat = 8;
+    const beatDuration = stepDuration * stepsPerBeat;
+    const stepInBeat = globalPlaybackStep % stepsPerBeat;
+    const binaerOffsets = getBinaerSwingStepOffsets();
+    intervalToNextStep = beatDuration * (binaerOffsets[stepInBeat + 1] - binaerOffsets[stepInBeat]);
+  } else if (rhythmType === 'tenaer') {
+    const stepsPerBeat = 6;
+    const beatDuration = stepDuration * stepsPerBeat;
+    const stepInBeat = globalPlaybackStep % stepsPerBeat;
+    const tenaerOffsets = getTenaerSwingStepOffsets();
+    intervalToNextStep = beatDuration * (tenaerOffsets[stepInBeat + 1] - tenaerOffsets[stepInBeat]);
+  } else if (rhythmType === 'neunaer') {
+    const stepsPerBeat = 6;
+    const beatDuration = stepDuration * stepsPerBeat;
+    const stepInBeat = globalPlaybackStep % stepsPerBeat;
+    const neunaerOffsets = getNeunaerSwingStepOffsets();
+    intervalToNextStep = beatDuration * (neunaerOffsets[stepInBeat + 1] - neunaerOffsets[stepInBeat]);
   }
 
   nextNoteTime += Math.max(0.001, intervalToNextStep);
@@ -4234,33 +4194,25 @@ function getStepInterval(playbackStep, tempoValue) {
   const stepTempo = getEffectiveTempoForStep(playbackStep);
   const stepDuration = getBaseStepDuration(stepTempo);
   let intervalToNextStep = stepDuration;
-  let activeSwingFactor = swingFactor;
-  const sectionContext = getPlaybackSectionContext(playbackStep);
 
-  if (sectionContext && sectionContext.section.swingFactor !== null && sectionContext.section.swingFactor !== undefined) {
-    activeSwingFactor = sectionContext.section.swingFactor;
-  }
-
-  if (activeSwingFactor > 0) {
-    if (rhythmType === 'binaer') {
-      const stepsPerBeat = 8;
-      const beatDuration = stepDuration * stepsPerBeat;
-      const stepInBeat = playbackStep % stepsPerBeat;
-      const binaerOffsets = getBinaerSwingStepOffsets(activeSwingFactor);
-      intervalToNextStep = beatDuration * (binaerOffsets[stepInBeat + 1] - binaerOffsets[stepInBeat]);
-    } else if (rhythmType === 'tenaer') {
-      const stepsPerBeat = 6;
-      const beatDuration = stepDuration * stepsPerBeat;
-      const stepInBeat = playbackStep % stepsPerBeat;
-      const tenaerOffsets = getTenaerSwingStepOffsets(activeSwingFactor);
-      intervalToNextStep = beatDuration * (tenaerOffsets[stepInBeat + 1] - tenaerOffsets[stepInBeat]);
-    } else if (rhythmType === 'neunaer') {
-      const stepsPerBeat = 6;
-      const beatDuration = stepDuration * stepsPerBeat;
-      const stepInBeat = playbackStep % stepsPerBeat;
-      const neunaerOffsets = getNeunaerSwingStepOffsets(activeSwingFactor);
-      intervalToNextStep = beatDuration * (neunaerOffsets[stepInBeat + 1] - neunaerOffsets[stepInBeat]);
-    }
+  if (rhythmType === 'binaer') {
+    const stepsPerBeat = 8;
+    const beatDuration = stepDuration * stepsPerBeat;
+    const stepInBeat = playbackStep % stepsPerBeat;
+    const binaerOffsets = getBinaerSwingStepOffsets();
+    intervalToNextStep = beatDuration * (binaerOffsets[stepInBeat + 1] - binaerOffsets[stepInBeat]);
+  } else if (rhythmType === 'tenaer') {
+    const stepsPerBeat = 6;
+    const beatDuration = stepDuration * stepsPerBeat;
+    const stepInBeat = playbackStep % stepsPerBeat;
+    const tenaerOffsets = getTenaerSwingStepOffsets();
+    intervalToNextStep = beatDuration * (tenaerOffsets[stepInBeat + 1] - tenaerOffsets[stepInBeat]);
+  } else if (rhythmType === 'neunaer') {
+    const stepsPerBeat = 6;
+    const beatDuration = stepDuration * stepsPerBeat;
+    const stepInBeat = playbackStep % stepsPerBeat;
+    const neunaerOffsets = getNeunaerSwingStepOffsets();
+    intervalToNextStep = beatDuration * (neunaerOffsets[stepInBeat + 1] - neunaerOffsets[stepInBeat]);
   }
 
   return Math.max(0.001, intervalToNextStep);

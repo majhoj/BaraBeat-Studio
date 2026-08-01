@@ -29,7 +29,6 @@ const timelineState = {
     sheetLoop: false,
     sheetLoopCount: false,
     tempo: 100,
-    swingFactor: 0,
     shekereBeatEnabled: false,
     swingProfile: {
         binaer: defaultTimelineSwingProfiles.binaer.slice(),
@@ -39,14 +38,6 @@ const timelineState = {
     feelOffsets: Object.assign({}, defaultTimelineFeelOffsets)
 };
 let timelineActiveDragPayload = null;
-
-function normalizeTimelineSwingFactor(rawValue) {
-    const numericValue = Number(rawValue);
-    if (!Number.isFinite(numericValue)) {
-        return 0;
-    }
-    return Math.max(0, Math.min(100, Math.round(numericValue)));
-}
 
 function normalizeTimelineTempo(rawValue) {
     const numericValue = Number(rawValue);
@@ -644,9 +635,6 @@ function cloneTimelineEntryFromPattern(pattern, overrides) {
         handMode: pattern.instrument === 'Djembe'
             ? String(overrideConfig.handMode || 'auto')
             : '',
-        swingFactor: overrideConfig.swingFactor === null || overrideConfig.swingFactor === undefined
-            ? null
-            : normalizeTimelineSwingFactor(overrideConfig.swingFactor),
         sectionTempo: overrideConfig.sectionTempo === null || overrideConfig.sectionTempo === undefined || overrideConfig.sectionTempo === ''
             ? null
             : normalizeTimelineTempo(overrideConfig.sectionTempo),
@@ -673,7 +661,6 @@ function cloneTimelineEntry(entry) {
             ? null
             : Math.max(0, Math.round(Number(entry.overlayRepeatIndex) || 0)),
         handMode: entry.handMode || 'auto',
-        swingFactor: entry.swingFactor,
         sectionTempo: entry.sectionTempo,
         targetInstruments: Array.isArray(entry.targetInstruments) ? entry.targetInstruments.slice() : []
     });
@@ -907,9 +894,6 @@ function syncTimelineEntriesWithPatternLibrary(patternLibrary, existingEntries, 
             handMode: matchedPattern.instrument === 'Djembe'
                 ? String(entry.handMode || 'auto')
                 : '',
-            swingFactor: entry.swingFactor === null || entry.swingFactor === undefined
-                ? null
-                : normalizeTimelineSwingFactor(entry.swingFactor),
             sectionTempo: entry.sectionTempo === null || entry.sectionTempo === undefined || entry.sectionTempo === ''
                 ? null
                 : normalizeTimelineTempo(entry.sectionTempo),
@@ -955,7 +939,6 @@ function buildTimelinePlayerPayload(patternLibrary, timelineEntries) {
         TimelineLoop: timelineLoopCount === 'loop',
         TimelineLoopCount: timelineLoopCount,
         Tempo: normalizeTimelineTempo(timelineState.tempo),
-        SwingFactor: normalizeTimelineSwingFactor(timelineState.swingFactor),
         ShekereBeatEnabled: Boolean(timelineState.shekereBeatEnabled),
         SwingProfile: normalizeAllTimelineSwingProfiles(timelineState.swingProfile),
         FeelOffsets: normalizeTimelineFeelOffsets(timelineState.feelOffsets),
@@ -1005,9 +988,6 @@ function buildTimelinePlayerPayload(patternLibrary, timelineEntries) {
                 patternId: entry.patternId,
                 patternSourceKey: entry.patternSourceKey,
                 handMode: entry.handMode || '',
-                swingFactor: entry.swingFactor === null || entry.swingFactor === undefined
-                    ? null
-                    : normalizeTimelineSwingFactor(entry.swingFactor),
                 sectionTempo: entry.sectionTempo === null || entry.sectionTempo === undefined || entry.sectionTempo === ''
                     ? null
                     : normalizeTimelineTempo(entry.sectionTempo),
@@ -1040,7 +1020,6 @@ function updateTimelineMetadataNode() {
         sheetLoop: Boolean(timelineState.sheetLoop),
         sheetLoopCount: getResolvedTimelineLoopCount(),
         tempo: normalizeTimelineTempo(timelineState.tempo),
-        swingFactor: normalizeTimelineSwingFactor(timelineState.swingFactor),
         shekereBeatEnabled: Boolean(timelineState.shekereBeatEnabled),
         swingProfile: normalizeAllTimelineSwingProfiles(timelineState.swingProfile),
         feelOffsets: normalizeTimelineFeelOffsets(timelineState.feelOffsets),
@@ -1056,9 +1035,6 @@ function updateTimelineMetadataNode() {
                 patternId: entry.patternId,
                 patternSourceKey: entry.patternSourceKey,
                 handMode: entry.handMode || '',
-                swingFactor: entry.swingFactor === null || entry.swingFactor === undefined
-                    ? null
-                    : normalizeTimelineSwingFactor(entry.swingFactor),
                 sectionTempo: entry.sectionTempo === null || entry.sectionTempo === undefined || entry.sectionTempo === ''
                     ? null
                     : normalizeTimelineTempo(entry.sectionTempo),
@@ -1139,7 +1115,6 @@ function syncTimelineStateFromReadResult(readResult, options) {
     timelineState.sheetLoop = sheetLoopCount === 'loop';
     syncTimelineBlockIdSequence(timelineState.entries);
     timelineState.tempo = normalizeTimelineTempo(syncOptions.tempo ?? timelineState.tempo);
-    timelineState.swingFactor = normalizeTimelineSwingFactor(syncOptions.swingFactor ?? timelineState.swingFactor);
     timelineState.shekereBeatEnabled = Boolean(syncOptions.shekereBeatEnabled);
     timelineState.swingProfile = normalizeAllTimelineSwingProfiles(syncOptions.swingProfile);
     timelineState.feelOffsets = normalizeTimelineFeelOffsets(syncOptions.feelOffsets);
@@ -1171,7 +1146,6 @@ function syncTimelineStateFromReadResultIfNeeded(readResult, options) {
 function buildCurrentTimelineSyncOptions() {
     return {
         tempo: timelineState.tempo,
-        swingFactor: timelineState.swingFactor,
         shekereBeatEnabled: Boolean(timelineState.shekereBeatEnabled),
         swingProfile: normalizeAllTimelineSwingProfiles(timelineState.swingProfile),
         feelOffsets: normalizeTimelineFeelOffsets(timelineState.feelOffsets),
@@ -1184,9 +1158,6 @@ function buildCurrentTimelineSyncOptions() {
                 patternId: entry.patternId,
                 patternSourceKey: entry.patternSourceKey,
                 handMode: entry.handMode || '',
-                swingFactor: entry.swingFactor === null || entry.swingFactor === undefined
-                    ? null
-                    : normalizeTimelineSwingFactor(entry.swingFactor),
                 sectionTempo: entry.sectionTempo === null || entry.sectionTempo === undefined || entry.sectionTempo === ''
                     ? null
                     : normalizeTimelineTempo(entry.sectionTempo),
@@ -1361,9 +1332,6 @@ function buildTimelineDisplayGroups(entries, patternLibrary) {
         const targetSignature = getTimelineTargetSignature(entry.targetInstruments);
         const pattern = patternById[entry.patternId] || null;
         const labelName = pattern ? (pattern.labelName || pattern.name || '') : '';
-        const swingSignature = entry.swingFactor === null || entry.swingFactor === undefined
-            ? ''
-            : String(normalizeTimelineSwingFactor(entry.swingFactor));
         const handSignature = pattern && pattern.instrument === 'Djembe'
             ? String(entry.handMode || 'auto')
             : '';
@@ -1376,7 +1344,6 @@ function buildTimelineDisplayGroups(entries, patternLibrary) {
         if (previousGroup &&
             previousGroup.labelName === labelName &&
             previousGroup.targetSignature === targetSignature &&
-            previousGroup.swingSignature === swingSignature &&
             previousGroup.handSignature === handSignature &&
             previousGroup.sectionTempoSignature === sectionTempoSignature &&
             previousGroup.blockId === blockId &&
@@ -1391,7 +1358,6 @@ function buildTimelineDisplayGroups(entries, patternLibrary) {
             patternId: entry.patternId,
             labelName: labelName,
             targetSignature: targetSignature,
-            swingSignature: swingSignature,
             handSignature: handSignature,
             sectionTempoSignature: sectionTempoSignature,
             blockId: blockId,
@@ -1412,15 +1378,10 @@ function getTimelineEntryCloneSignature(entry) {
     }
 
     const targetSignature = getTimelineTargetSignature(entry.targetInstruments);
-    const swingSignature = entry.swingFactor === null || entry.swingFactor === undefined
-        ? ''
-        : String(normalizeTimelineSwingFactor(entry.swingFactor));
-
     return [
         entry.patternId || '',
         entry.patternSourceKey || '',
         entry.handMode || '',
-        swingSignature,
         targetSignature
     ].join('::');
 }
@@ -2091,7 +2052,6 @@ function insertTimelineEntryAtIndex(payload, targetIndex) {
             return cloneTimelineEntryFromPattern(sourcePattern, {
                 blockId: newBlockId,
                 handMode: entry.handMode || 'auto',
-                swingFactor: entry.swingFactor,
                 targetInstruments: Array.isArray(entry.targetInstruments) ? entry.targetInstruments.slice() : []
             });
         }).filter(Boolean);
@@ -2239,7 +2199,6 @@ function insertTimelineEntryParallelToRow(payload, rowGroups) {
                 blockId: newBlockId,
                 parallelGroupId: parallelGroupId,
                 handMode: entry.handMode || 'auto',
-                swingFactor: entry.swingFactor,
                 targetInstruments: Array.isArray(entry.targetInstruments) ? entry.targetInstruments.slice() : []
             });
         }).filter(Boolean);
@@ -2297,7 +2256,6 @@ function insertTimelineOverlayIntoRepeatSlot(payload, rowGroups, repeatIndex) {
             parallelGroupId: parallelGroupId,
             overlayRepeatIndex: normalizedRepeatIndex,
             handMode: sourceEntry.handMode || 'auto',
-            swingFactor: sourceEntry.swingFactor,
             targetInstruments: Array.isArray(sourceEntry.targetInstruments) ? sourceEntry.targetInstruments.slice() : []
         });
     }
@@ -2431,9 +2389,6 @@ function renderTimelinePatternLibrary() {
                     return {
                         patternId: entry.patternId,
                         handMode: entry.handMode || 'auto',
-                        swingFactor: entry.swingFactor === null || entry.swingFactor === undefined
-                            ? null
-                            : normalizeTimelineSwingFactor(entry.swingFactor),
                         targetInstruments: Array.isArray(entry.targetInstruments) ? entry.targetInstruments.slice() : []
                     };
                 })
@@ -2465,7 +2420,6 @@ function renderTimelinePatternLibrary() {
                 return cloneTimelineEntryFromPattern(sourcePattern, {
                     blockId: newBlockId,
                     handMode: entry.handMode || 'auto',
-                    swingFactor: entry.swingFactor,
                     targetInstruments: Array.isArray(entry.targetInstruments) ? entry.targetInstruments.slice() : []
                 });
             });
@@ -2688,39 +2642,6 @@ function createTimelineEntryChip(group, rowGroups, patternDisplayInfo) {
         summaryEl.className = 'timeline-card-summary';
         detailBodyEl.appendChild(summaryEl);
     }
-
-    const swingWrap = document.createElement('div');
-    swingWrap.className = 'timeline-entry-targets';
-    const swingLabelEl = document.createElement('label');
-    swingLabelEl.appendChild(document.createTextNode('Swing'));
-    const swingInputEl = document.createElement('input');
-    swingInputEl.type = 'number';
-    swingInputEl.min = '0';
-    swingInputEl.max = '100';
-    swingInputEl.step = '1';
-    swingInputEl.placeholder = String(normalizeTimelineSwingFactor(timelineState.swingFactor));
-    swingInputEl.value = entry.swingFactor === null || entry.swingFactor === undefined
-        ? ''
-        : String(normalizeTimelineSwingFactor(entry.swingFactor));
-    swingInputEl.classList.add('timeline-input-compact');
-    swingInputEl.addEventListener('change', function () {
-        const normalizedValue = swingInputEl.value === ''
-            ? null
-            : normalizeTimelineSwingFactor(swingInputEl.value);
-        if (group.entries.some(function (groupEntry) {
-            return (groupEntry.swingFactor === null || groupEntry.swingFactor === undefined ? null : normalizeTimelineSwingFactor(groupEntry.swingFactor)) !== normalizedValue;
-        }) && typeof recordArrangementHistorySnapshot === 'function') {
-            recordArrangementHistorySnapshot();
-        }
-        group.entries.forEach(function (groupEntry) {
-            groupEntry.swingFactor = normalizedValue;
-        });
-        swingInputEl.value = normalizedValue === null ? '' : String(normalizedValue);
-        updateTimelineMetadataNode();
-    });
-    swingLabelEl.appendChild(swingInputEl);
-    swingWrap.appendChild(swingLabelEl);
-    detailBodyEl.appendChild(swingWrap);
 
     if (pattern.instrument === 'Djembe') {
         const handWrap = document.createElement('div');
@@ -3053,8 +2974,6 @@ function renderTimelinePanel() {
     const titleEl = document.getElementById('timelineTitle');
     const tempoInputEl = document.getElementById('timelineTempo');
     const practiceTempoInputEl = document.getElementById('practiceTempo');
-    const swingInputEl = document.getElementById('timelineSwingFactor');
-    const practiceSwingInputEl = document.getElementById('practiceSwingFactor');
     const shekereBeatEl = document.getElementById('timelineShekereBeat');
     const practiceShekereBeatEl = document.getElementById('practiceShekereBeat');
     const feelInputMap = {
@@ -3110,12 +3029,6 @@ function renderTimelinePanel() {
     }
     if (practiceTempoInputEl) {
         practiceTempoInputEl.value = normalizeTimelineTempo(timelineState.tempo);
-    }
-    if (swingInputEl) {
-        swingInputEl.value = normalizeTimelineSwingFactor(timelineState.swingFactor);
-    }
-    if (practiceSwingInputEl) {
-        practiceSwingInputEl.value = normalizeTimelineSwingFactor(timelineState.swingFactor);
     }
     if (shekereBeatEl) {
         shekereBeatEl.setAttribute('aria-pressed', timelineState.shekereBeatEnabled ? 'true' : 'false');
