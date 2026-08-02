@@ -180,9 +180,14 @@ function notifyEmbeddedPlaybackStep(playbackStep, scheduledTime) {
   if (!embeddedPlayer || !window.parent || window.parent === window || !instr || !instr._audioCtx) {
     return;
   }
+  const sectionContext = getPlaybackSectionContext(playbackStep);
   window.parent.postMessage({
     type: 'barabeat-audio-step',
     playbackStep: playbackStep,
+    runtimeKey: sectionContext && sectionContext.section
+      ? String(sectionContext.section.runtimeKey || '')
+      : '',
+    localStep: sectionContext ? Math.max(0, Number(sectionContext.localStep) || 0) : 0,
     delayMs: Math.max(0, (scheduledTime - instr._audioCtx.currentTime) * 1000)
   }, window.location.origin);
 }

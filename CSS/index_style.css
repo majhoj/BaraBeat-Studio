@@ -565,6 +565,12 @@ html {
     stroke-width: 2.2;
 }
 
+.sheet-quick-play-note-active,
+.sheet-quick-play-note-active * {
+    fill: #d8533f !important;
+    stroke: #d8533f !important;
+}
+
 .sheet-quick-play-hitarea.is-selected {
     fill: #f6b35f;
     stroke: #8d4e16;

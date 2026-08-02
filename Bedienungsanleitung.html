@@ -253,7 +253,7 @@
   <header>
     <div class="wrap">
       <h1>BaraBeat-Studio</h1>
-      <p>Bedienungsanleitung für Noteneditor, Übungsmodus, Audioplayer und Arrangement-Timeline.</p>
+      <p>Bedienungsanleitung für Noteneditor, Sofort-Spielen, Übungsmodus, Audioplayer und Arrangement.</p>
     </div>
   </header>
 
@@ -273,7 +273,7 @@
       <a href="#mobil">Smartphone-Nutzung</a>
       <a href="#tipps">Typische Abläufe</a>
       <a href="#probleme">Fehlersuche</a>
-      <p class="toc-note">Diese Anleitung beschreibt den aktuellen Arbeitsstand des BaraBeat-Studio.</p>
+      <p class="toc-note">Diese Anleitung beschreibt den Arbeitsstand von August 2026.</p>
     </nav>
 
     <article>
@@ -287,12 +287,13 @@
             <li>Über <strong>Datei</strong> ein vorhandenes Notenblatt öffnen oder über <strong>Notenblatt</strong> ein neues Blatt anlegen.</li>
             <li>Mit den Choosern Instrument und Patternart setzen, zum Beispiel <em>Djembe 1</em> und <em>Begleitpattern</em>.</li>
             <li>Noten aus der Palette auf das Notenblatt ziehen.</li>
+            <li>Ein Pattern direkt im Notenblatt markieren und mit dem Play-Button vorhören.</li>
             <li>Über <strong>Werkzeuge → Üben</strong> den Übungsmodus öffnen oder über <strong>Werkzeuge → Arrangieren</strong> eine Timeline bauen.</li>
             <li>Mit dem Audioplayer abspielen, Tempo einstellen und bei Bedarf WAV exportieren.</li>
           </ol>
         </div>
 
-        <p>Auf Smartphones ist die Oberfläche bewusst stärker auf Öffnen, Abspielen und Üben ausgerichtet. Die eigentliche Notenbearbeitung ist dort nicht der Schwerpunkt.</p>
+        <p>Auf Smartphones ist die Oberfläche bewusst auf Öffnen, Anzeigen, Abspielen und Üben ausgerichtet. Die mobile Notenblattansicht ist derzeit eine reine Ansicht und noch kein Editor.</p>
       </section>
 
       <section id="oberflaeche">
@@ -338,7 +339,9 @@
         <h3>Öffnen</h3>
         <ul>
           <li><strong>Lokal</strong> zeigt Dateien, die im Browser gespeichert wurden.</li>
-          <li><strong>Server</strong> zeigt Notenblätter aus dem Ordner <code>Noten/</code>. Die Serverliste enthält Änderungszeiten und kann anzeigen, wenn auf dem Server eine neuere Version als die lokal geladene Datei liegt.</li>
+          <li><strong>Server</strong> zeigt Notenblätter aus dem Ordner <code>Noten/</code>. Die Serverliste wird beim Öffnen des Dialogs neu eingelesen.</li>
+          <li>Beim Laden vom Server merkt sich BaraBeat-Studio den Ladezeitpunkt und die Version der Serverdatei. Wurde sie danach auf dem Server verändert, erscheint <strong>Server seitdem geändert</strong>. Eine eigene lokale Bearbeitung wird zusätzlich mit <strong>Lokal geändert</strong> und ihrem Zeitpunkt ausgewiesen.</li>
+          <li>Der Hinweis oberhalb der Dateiliste bietet bei Bedarf <strong>Serverversion laden</strong>.</li>
           <li>Auf Smartphones ist die Dateiansicht vereinfacht, damit Öffnen und Löschen lokaler Dateien gut erreichbar bleiben.</li>
         </ul>
 
@@ -394,6 +397,16 @@
 
         <h3>Rhythmusname</h3>
         <p>Der Rhythmusname steht oben im Notenblatt. Er kann direkt im Feld geändert werden. Beim ersten Öffnen wird der zuletzt geladene Titel wiederhergestellt, wenn der Browser diese Information noch kennt.</p>
+
+        <h3>Sofort-Spielen im Notenblatt</h3>
+        <p>Rechts neben dem Rhythmusnamen stehen eine Tempoangabe und ein Play-Button. Kleine Auswahlfelder vor den Pattern markieren, was direkt aus dem Editor vorgespielt werden soll. Die Felder werden aktiv, sobald ein Takt durch Instrument, Patternname oder Noten als spielbar erkannt wird; ein vorheriges Speichern und Neuladen ist nicht nötig.</p>
+        <ul>
+          <li>Ein ausgewähltes Pattern wird als Loop gespielt, bis du auf Stopp klickst.</li>
+          <li>Mehrere Pattern verschiedener Instrumente laufen parallel.</li>
+          <li>Mehrere Pattern desselben Instruments laufen nacheinander.</li>
+          <li>Eine ausgewählte Begleitung läuft durch, während ein zusätzliches Solo parallel gespielt wird. Ein Out der Begleitung wird dabei für den nahtlosen Loop ignoriert.</li>
+          <li>Die jeweils klingenden Noten werden im Notenblatt kurz farblich hervorgehoben.</li>
+        </ul>
       </section>
 
       <section id="zeichen">
@@ -457,7 +470,7 @@
         <div class="hint">
           <strong>Out bei Begleitpattern:</strong> Im Arrangement kann ein Out in einer Begleitung ein bewusstes Aussteigen markieren. Im Übungsmodus wird ein Out in einem Begleitpattern normalerweise ignoriert, damit Loops durchlaufen. Es kann aber greifen, wenn die Begleitung ausdrücklich vor Call/Intro stoppen soll oder wenn ein als Übungsteil gespieltes Begleitpattern im letzten Durchlauf vor dem nächsten Call/Intro aussteigen soll.
         </div>
-        <p>Das Triolen-/Quartolenzeichen wird in Palette und Legende rhythmusabhängig angezeigt. Die kompakte Darstellung besteht aus drei Punkten und einem Buchstaben: <strong>T</strong> für Triole oder <strong>Q</strong> für Quartole.</p>
+        <p>Das Triolen-/Quartolenzeichen wird in Palette und Legende rhythmusabhängig angezeigt. Die kompakte Darstellung besteht aus drei Punkten und einem Buchstaben: <strong>T</strong> für Triole oder <strong>Q</strong> für Quartole. Nach einem Klick auf das Zeichen wählst du für jeden Einzelschlag den gewünschten Ton aus. Das fertig zusammengesetzte Zeichen wird anschließend neben der Palette erzeugt und kann auf das Notenblatt gezogen werden.</p>
       </section>
 
       <section id="auswahl">
@@ -519,7 +532,7 @@
         </ul>
 
         <h3>Bluetooth-Latenz</h3>
-        <p>Im Übungsmodus gibt es den Regler <strong>Latenz für Bluetooth ms</strong>. Damit kann die Anzeige gegenüber dem Ton verschoben werden, damit rote Linie und hörbarer Schlag auch bei Bluetooth-Kopfhörern zusammenpassen.</p>
+        <p>Im Übungsmodus gibt es den Regler <strong>Latenz für Bluetooth ms</strong>. Damit kann die Anzeige gegenüber dem Ton verschoben werden, damit rote Linie und hörbarer Schlag auch bei Bluetooth-Kopfhörern zusammenpassen. Auf dem iPhone ist die Einstellung über den Menüpunkt <strong>Latenz</strong> erreichbar und wird auf dem Gerät gespeichert.</p>
 
         <h3>Laufende Noten</h3>
         <p>Unter dem Player laufen die gerade gespielten Noten von rechts nach links unter einer festen roten Linie hindurch. Der Schlag erklingt, wenn das Symbol die rote Linie erreicht. Taktlinien, Patternhinterlegung, Instrumentenname und Patternname helfen bei der Orientierung.</p>
@@ -537,11 +550,12 @@
           <li><strong>Begleitung auswählen</strong> für Pattern, die parallel als Grundrhythmus laufen.</li>
           <li><strong>Übungsteile auswählen</strong> für Calls, Intros, Soli, Echauffements, Pausen und Begleitpattern, die geübt werden sollen.</li>
         </ul>
-        <p>Auf dem Desktop werden diese Bereiche beim Öffnen ausgeklappt angezeigt. Auf Smartphones bleiben sie zunächst eingeklappt, damit der Player und die laufenden Noten im Vordergrund bleiben.</p>
+        <p>Auf dem Desktop ist <strong>Einstellungen</strong> beim Öffnen zunächst eingeklappt; <strong>Begleitung auswählen</strong> und <strong>Übungsteile auswählen</strong> sind ausgeklappt. Auf Smartphones bleiben alle drei Bereiche zunächst eingeklappt, damit Player und laufende Noten im Vordergrund bleiben.</p>
 
         <h3>Übungsszenarien</h3>
         <p>Für ein Notenblatt können mehrere Übungsszenarien gespeichert werden. Ein Szenario enthält die aktuellen Übungseinstellungen, ausgewählte Begleitungen und Übungsteile, Reihenfolge, Wiederholungen, Timer, Tempoaufbau, Lautstärken und weitere Werte. Die Szenarien werden mit dem Notenblatt gespeichert.</p>
         <p>Das aktive Szenario kann oben neben <strong>Übungsmodus</strong> oder in der Patternauswahl gewählt werden. Die Auswahl ist alphabetisch sortiert. <strong>Aktuelle Einstellungen</strong> bedeutet, dass gerade kein gespeichertes Szenario aktiv ist.</p>
+        <p>Mit <strong>Neu</strong> speicherst du die aktuelle Konfiguration unter einem neuen Namen. <strong>Speichern</strong> aktualisiert das ausgewählte Szenario, <strong>Löschen</strong> entfernt es. Diese Aktionen aktualisieren zugleich die lokal gespeicherte Fassung des Notenblatts.</p>
 
         <h3>Begleitung startet</h3>
         <p>Die Begleitung kann sofort, nach Call, nach Intro oder nach Call und Intro starten. Wenn Call oder Intro bereits im Übungsteil ausgewählt sind, werden sie nicht doppelt hinzugefügt. Pausen und ShortBars werden berücksichtigt, damit die Begleitungen danach wieder gemeinsam starten.</p>
@@ -570,7 +584,7 @@
         <p>Ein Klick auf den Instrumentennamen bei den laufenden Noten öffnet die Lautstärke für dieses Instrument. Dort kann auch ein weiteres Overlay für einzelne Tonarten geöffnet werden, damit zum Beispiel Bass, Tone, Slap oder Mute relativ zueinander angepasst werden können.</p>
 
         <h3>Shekere-Beat</h3>
-        <p>Der Shekere-Beat kann in Üben und Arrangement zugeschaltet werden. Er betont den Beat und kann als Orientierung oder Einzähler genutzt werden. Die Shekere besitzt eine eigene Lautstärkeeinstellung.</p>
+        <p>Vor dem Start einer Übung zählt die Shekere vier Beats vor. Über <strong>Shekere Beat</strong> kann sie zusätzlich während der Wiedergabe jeden Beat betonen. Die Funktion steht in Üben und Arrangement zur Verfügung; die Shekere besitzt eine eigene Lautstärkeeinstellung.</p>
       </section>
 
       <section id="arrangement">
@@ -617,7 +631,7 @@
         <p>Zusätzlich können die verschiedenen Schläge eines Instruments relativ zueinander eingestellt werden, zum Beispiel Bass, Tone, Slap, Mute oder gedämpfte Schläge. Das ist hilfreich, wenn Samples unterschiedlich laut aufgenommen wurden.</p>
 
         <h3>Swing</h3>
-        <p>Über <strong>Swing-Profil</strong> öffnet sich ein Overlay, in dem die Verschiebung der Unterteilungen sichtbar gemacht und eingestellt werden kann. Das Profil gilt gemeinsam für alle Pattern des Notenblatts; separate Swing-Werte pro Pattern gibt es nicht.</p>
+        <p>Über <strong>Swing-Profil</strong> öffnet sich ein Overlay, in dem die Verschiebung der Unterteilungen sichtbar gemacht und eingestellt werden kann. Die Notensymbole lassen sich dazu auch direkt horizontal ziehen; der maximale Versatz ist auf 50&nbsp;% des Abstands zur benachbarten Rasterposition begrenzt. Das Profil gilt gemeinsam für alle Pattern des Notenblatts; separate Swing-Werte pro Pattern gibt es nicht.</p>
 
         <h3>Feel</h3>
         <p>Das Feel-Overlay verschiebt einzelne Instrumente in Millisekunden nach vorne oder hinten. Die Instrumentennamen werden ausgeschrieben, damit klar ist, welche Spur angepasst wird.</p>
@@ -629,13 +643,17 @@
 
       <section id="mobil">
         <h2>11. Nutzung auf Smartphones</h2>
-        <p>Auf Smartphones ist BaraBeat-Studio vor allem zum Öffnen, Anzeigen, Üben und Abspielen gedacht. Die Notenbearbeitung und die Abschnittstimeline sind auf kleinen Displays nur eingeschränkt sinnvoll.</p>
+        <p>Auf Smartphones ist BaraBeat-Studio zum Öffnen, Anzeigen, Üben und Abspielen gedacht. Die Notenbearbeitung und das Erstellen eines Arrangements stehen dort derzeit nicht zur Verfügung.</p>
+
+        <h3>Mobile Bedienung</h3>
+        <p>Die Menüleiste zeigt die für das Smartphone wichtigen Befehle. Im Übungsmodus sind zusätzlich <strong>Patternauswahl</strong> und <strong>Latenz</strong> erreichbar. Enthält das geladene Notenblatt bereits ein Arrangement, erscheint außerhalb des Übungsmodus der Befehl <strong>Arrangement abspielen</strong>; er öffnet den Player in einem Overlay.</p>
 
         <h3>Portrait und Landscape</h3>
         <p>Im Portrait-Modus steht die Übungsoberfläche im Vordergrund. Im Landscape-Modus kann das Notenblatt breiter dargestellt werden, damit es besser lesbar ist.</p>
 
         <h3>Mobile Notenblattansicht</h3>
-        <p>Mehrseitige Notenblätter werden seitenweise skaliert, nicht als gesamter Stapel auf eine Displayhöhe gedrückt. Dadurch bleiben mehrseitige Blätter lesbar. In der mobilen Ansicht wird das Notenblatt kompakter als Ein-Takt-Ansicht dargestellt, damit auch auf kleinen Displays mehr Details erkennbar bleiben.</p>
+        <p>Mehrseitige Notenblätter werden seitenweise skaliert, nicht als gesamter Stapel auf eine Displayhöhe gedrückt. Dadurch bleiben mehrseitige Blätter lesbar. In Portrait und Landscape wird jeder Takt in einer eigenen Zeile dargestellt. Mehrtaktige Pattern werden kompakt zusammengefasst; Instrument und Patternname stehen nur am Beginn des Patterns.</p>
+        <p>Bei den laufenden Noten stehen Instrument und Patternname platzsparend in einer Zeile. Die rote Spiellinie wird nur über den eigentlichen Notenzeilen gezeichnet, damit längere Namen lesbar bleiben.</p>
 
         <h3>Offline verwenden</h3>
         <ol>
@@ -645,6 +663,10 @@
           <li>Optional in Safari über <strong>Teilen &gt; Zum Home-Bildschirm</strong> als Web-App hinzufügen.</li>
         </ol>
         <p>Ohne Verbindung können lokale Notenblätter geöffnet, angezeigt und abgespielt werden. Die Serverliste, das erneute Laden vom Server und das Veröffentlichen benötigen weiterhin eine Internetverbindung.</p>
+
+        <div class="warning">
+          <strong>Lokale Daten vor dem Löschen sichern:</strong> Safari und eine zum Home-Bildschirm hinzugefügte BaraBeat-App können getrennte lokale Speicherbereiche verwenden. Wenn du den Home-Screen-Eintrag löschst, können die darin gespeicherten lokalen Notenblätter, Übungsszenarien, Einstellungen und Offline-Daten verloren gehen. Ein erneutes Hinzufügen stellt diese lokalen Daten nicht automatisch wieder her. Speichere wichtige Notenblätter deshalb vorher auf dem Server; darin enthaltene Übungsszenarien werden zusammen mit der Datei gesichert. Serverdateien bleiben vom Löschen des Home-Screen-Eintrags unberührt.
+        </div>
 
         <h3>Leistung und Speicher</h3>
         <p>iOS Safari ist bei Audio und vielen DOM-Elementen empfindlich. Der Player arbeitet deshalb speicherschonend: Wiederholungen werden nicht unnötig vollständig vorgerendert, laufende Noten werden begrenzt aufgebaut und Samples werden möglichst nicht mehrfach gehalten.</p>
@@ -660,6 +682,15 @@
           <li>Noten aus der Palette auf die Notenlinien ziehen.</li>
           <li>Bei Bedarf <strong>In</strong>, <strong>Out</strong>, <strong>Wiederholung</strong>, <strong>ShortBar</strong> oder das Triolen-/Quartolenzeichen ergänzen.</li>
           <li>Speichern.</li>
+        </ol>
+
+        <h3>Ein Pattern sofort prüfen</h3>
+        <ol>
+          <li>Das Auswahlfeld vor dem gewünschten Pattern aktivieren.</li>
+          <li>Bei Bedarf weitere Pattern auswählen.</li>
+          <li>Oben im Notenblatt das Tempo einstellen.</li>
+          <li>Play drücken. Die Auswahl läuft als Loop und die klingenden Noten werden kurz hervorgehoben.</li>
+          <li>Zum Beenden erneut auf den Button klicken.</li>
         </ol>
 
         <h3>Ein Pattern üben</h3>
@@ -715,6 +746,9 @@
 
         <h3>Ein Sample fehlt</h3>
         <p>Wenn ein Sample fehlt oder nicht geladen werden kann, sollte der Player den Fehler anzeigen. Prüfe in diesem Fall die Schreibweise der Datei im Sound-Ordner und ob die Datei auf dem Server vorhanden ist.</p>
+
+        <h3>Offline-Daten fehlen nach einer Neuinstallation</h3>
+        <p>Wurde die Home-Screen-App gelöscht und neu hinzugefügt, kann iOS einen neuen lokalen Speicherbereich angelegt haben. Öffne die benötigten Notenblätter erneut vom Server. Rein lokal gespeicherte Dateien lassen sich nur wiederherstellen, wenn sie zuvor auf dem Server oder anderweitig gesichert wurden.</p>
       </section>
 
       <section>
@@ -727,7 +761,7 @@
         <p><span class="tag">Overlay</span> Ein Solo, das in einem bestimmten Durchlauf über eine Begleitung gelegt wird.</p>
         <p><span class="tag">ShortBar</span> Ein verkürzter Takt mit optisch markierten Leerstellen.</p>
         <p><span class="tag">Triole / Quartole</span> Eine zusätzliche Unterteilung eines Schlags. Binäre Blätter verwenden Triolen, tenäre und 9/8-Blätter verwenden Quartolen.</p>
-        <p class="footer-note">Stand: Juli 2026. Diese Anleitung kann direkt im Browser geöffnet oder ausgedruckt werden.</p>
+        <p class="footer-note">Stand: August 2026. Diese Anleitung kann direkt im Browser geöffnet oder ausgedruckt werden.</p>
       </section>
     </article>
   </main>

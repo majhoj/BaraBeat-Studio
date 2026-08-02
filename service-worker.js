@@ -20,6 +20,7 @@ const APP_SHELL = [
   './Audio/js/instrument_2.js',
   './Assets/favicon.svg',
   './Assets/favicon-32.png',
+  './apple-touch-icon.png',
   './Assets/apple-touch-icon.png',
   './Assets/pwa-icon-192.png',
   './Assets/pwa-icon-512.png',
