@@ -201,6 +201,35 @@ function notifyEmbeddedPlaybackEndedAt(scheduledTime) {
   });
 }
 
+let sheetQuickPlayDiagnosticPumpCount = 0;
+let lastSheetQuickPlayDiagnosticTime = 0;
+
+function notifySheetQuickPlayDiagnostic(reason, forceUpdate) {
+  if (!isSheetQuickPlayMode || !embeddedPlayer || !window.parent || window.parent === window) {
+    return;
+  }
+  const now = Date.now();
+  if (!forceUpdate && now - lastSheetQuickPlayDiagnosticTime < 250) {
+    return;
+  }
+  lastSheetQuickPlayDiagnosticTime = now;
+  const audioContext = instr && instr._audioCtx ? instr._audioCtx : window.sharedAudioContext;
+  const contextTime = audioContext ? Number(audioContext.currentTime) || 0 : 0;
+  window.parent.postMessage({
+    type: 'barabeat-sheet-quick-play-diagnostic',
+    reason: reason || '',
+    contextState: audioContext ? audioContext.state : 'fehlt',
+    playbackStep: Math.max(0, Number(globalPlaybackStep) || 0),
+    loopLength: Math.max(0, Number(orderedFallbackLoopLength) || 0),
+    oneShotLength: Math.max(0, Number(oneShotLength) || 0),
+    pumpCount: sheetQuickPlayDiagnosticPumpCount,
+    contextTime: contextTime.toFixed(2),
+    nextNoteDelta: (Math.max(0, Number(nextNoteTime) || 0) - contextTime).toFixed(2),
+    playing: Boolean(isPlaying),
+    externalScheduler: Boolean(usesSheetQuickPlayExternalScheduler)
+  }, window.location.origin);
+}
+
 function updateLoadingStatus(message) {
   console.log(message);
   if (loadingEl) {
@@ -224,6 +253,12 @@ updateLoadingStatus('Player startet...');
 const playerConfig = Array.isArray(obj) && obj.length > 0 ? obj[0] : {};
 const isPracticeMode = Boolean(playerConfig.PracticeMode);
 const isSheetQuickPlayMode = Boolean(playerConfig.SheetQuickPlayMode);
+const usesSheetQuickPlayExternalScheduler = isSheetQuickPlayMode &&
+  Boolean(playerConfig.SheetQuickPlayExternalScheduler);
+document.body.classList.toggle('sheet-quick-play-player', isSheetQuickPlayMode);
+if (isSheetQuickPlayMode) {
+  playButton.setAttribute('aria-label', 'Ausgewählte Pattern abspielen oder stoppen');
+}
 const allPracticeTrackNames = ['Kenkeni', 'Sangban', 'Doundoun', 'Dreierbass', 'Djembe_1', 'Djembe_2', 'Djembe_3', 'Shekere'];
 const practiceInstrumentToneVolumeKeys = {
   Kenkeni: ['open', 'muffled', 'bell', 'klick'],
@@ -434,6 +469,9 @@ Promise.all(allInstrumentReadyPromises.concat([practiceCountInReadyPromise]))
     exportWavButton.disabled = false;
     if (loadingEl) {
       loadingEl.style.display = 'none';
+    }
+    if (isSheetQuickPlayMode) {
+      notifyEmbeddedPlaybackState('ready');
     }
   })
   .catch(function (error) {
@@ -4193,7 +4231,9 @@ function scheduler() {
     nextNote();
   }
 
-  timerID = window.setTimeout(scheduler, lookahead);
+  if (!usesSheetQuickPlayExternalScheduler) {
+    timerID = window.setTimeout(scheduler, lookahead);
+  }
 }
 
 function scheduleCurrentStep(time) {
@@ -4744,57 +4784,146 @@ function stopAllActiveSources(stopTime) {
   activePracticeCountInSources = [];
 }
 
-playButton.addEventListener('click', async (ev) => {
-  if (!audioIsReady) {
-    updateLoadingStatus('Audiodateien werden noch geladen...');
+let hasCreatedSheetQuickPlayGestureContext = false;
+
+function createSheetQuickPlayGestureAudioContext() {
+  if (!usesSheetQuickPlayExternalScheduler || hasCreatedSheetQuickPlayGestureContext) {
     return;
   }
 
-  isPlaying = !isPlaying;
+  const AudioContextConstructor = window.AudioContext || window.webkitAudioContext;
+  if (typeof AudioContextConstructor !== 'function') {
+    return;
+  }
+
+  configureBarabeatAudioSession();
+  const previousAudioContext = window.sharedAudioContext;
+  const gestureAudioContext = new AudioContextConstructor();
+  window.sharedAudioContext = gestureAudioContext;
+  allInstruments.forEach(function (instrumentInstance) {
+    instrumentInstance.replaceAudioContext(gestureAudioContext);
+  });
+  hasCreatedSheetQuickPlayGestureContext = true;
+
+  if (previousAudioContext && previousAudioContext !== gestureAudioContext &&
+      typeof previousAudioContext.close === 'function') {
+    const closeResult = previousAudioContext.close();
+    if (closeResult && typeof closeResult.catch === 'function') {
+      closeResult.catch(function () {
+        // Closing the preload context is only a memory cleanup.
+      });
+    }
+  }
+}
+
+async function startAudioPlayback() {
+  if (!audioIsReady) {
+    updateLoadingStatus('Audiodateien werden noch geladen...');
+    return false;
+  }
 
   if (isPlaying) {
-    try {
-      await resumeAndWarmAllInstruments();
-      if (!hasWaitedAfterFirstResume) {
-        await new Promise(resolve => window.setTimeout(resolve, 260));
-        hasWaitedAfterFirstResume = true;
-      }
-      if (!hasPrimedAudioOutput) {
-        await new Promise(resolve => window.setTimeout(resolve, 120));
-        hasPrimedAudioOutput = true;
-      }
-    } catch (err) {
-      console.error('AudioContext resume fehlgeschlagen:', err);
-    }
-
-    globalPlaybackStep = 0;
-    resetDjembeHandStates();
-
-    const dTime = instr._audioCtx.currentTime;
-    const effectivePracticeLeadInDelay = isPracticeMode
-      ? Math.max(practiceLeadInDelay, getPracticeCountInDuration())
-      : practiceLeadInDelay;
-    nextNoteTime = dTime + playerStartDelay + effectivePracticeLeadInDelay;
-    schedulePracticeCountIn(nextNoteTime);
-    practiceStopAudioTime = practiceDurationSeconds > 0
-      ? nextNoteTime + practiceDurationSeconds
-      : 0;
-    practiceTimerFinalLoopStartStep = null;
-
-    ev.target.dataset.playing = 'true';
-    notifyEmbeddedPlaybackState('playing', {
-      leadInMs: Math.max(0, (playerStartDelay + effectivePracticeLeadInDelay) * 1000)
-    });
-    scheduler();
-  } else {
-    window.clearTimeout(timerID);
-    stopAllActiveSources(instr._audioCtx.currentTime);
-    practiceStopAudioTime = 0;
-    practiceTimerFinalLoopStartStep = null;
-    ev.target.dataset.playing = 'false';
-    notifyEmbeddedPlaybackState('stopped');
+    return true;
   }
+
+  // Mobile Safari may report a preloaded context as running while its clock
+  // remains at zero. Create the playback context inside the real tap instead.
+  createSheetQuickPlayGestureAudioContext();
+
+  isPlaying = true;
+  try {
+    // Keep resume() in the direct call chain of the user's tap. Safari may
+    // reject it when playback is started through a synthetic button click.
+    await resumeAndWarmAllInstruments();
+    if (!hasWaitedAfterFirstResume) {
+      await new Promise(resolve => window.setTimeout(resolve, 260));
+      hasWaitedAfterFirstResume = true;
+    }
+    if (!hasPrimedAudioOutput) {
+      await new Promise(resolve => window.setTimeout(resolve, 120));
+      hasPrimedAudioOutput = true;
+    }
+  } catch (err) {
+    isPlaying = false;
+    console.error('AudioContext resume fehlgeschlagen:', err);
+    updateLoadingStatus('Audio konnte nicht gestartet werden.');
+    return false;
+  }
+
+  globalPlaybackStep = 0;
+  resetDjembeHandStates();
+
+  const dTime = instr._audioCtx.currentTime;
+  const effectivePracticeLeadInDelay = isPracticeMode
+    ? Math.max(practiceLeadInDelay, getPracticeCountInDuration())
+    : practiceLeadInDelay;
+  nextNoteTime = dTime + playerStartDelay + effectivePracticeLeadInDelay;
+  schedulePracticeCountIn(nextNoteTime);
+  practiceStopAudioTime = practiceDurationSeconds > 0
+    ? nextNoteTime + practiceDurationSeconds
+    : 0;
+  practiceTimerFinalLoopStartStep = null;
+
+  playButton.dataset.playing = 'true';
+  notifyEmbeddedPlaybackState('playing', {
+    leadInMs: Math.max(0, (playerStartDelay + effectivePracticeLeadInDelay) * 1000)
+  });
+  notifySheetQuickPlayDiagnostic('Start', true);
+  if (!usesSheetQuickPlayExternalScheduler) {
+    scheduler();
+  }
+  return true;
+}
+
+function stopAudioPlayback() {
+  if (!isPlaying) {
+    return true;
+  }
+
+  isPlaying = false;
+  window.clearTimeout(timerID);
+  stopAllActiveSources(instr._audioCtx.currentTime);
+  practiceStopAudioTime = 0;
+  practiceTimerFinalLoopStartStep = null;
+  playButton.dataset.playing = 'false';
+  notifyEmbeddedPlaybackState('stopped');
+  notifySheetQuickPlayDiagnostic('Stop', true);
+  return true;
+}
+
+playButton.addEventListener('click', function () {
+  if (isPlaying) {
+    stopAudioPlayback();
+    return;
+  }
+  startAudioPlayback();
 });
+
+window.startEmbeddedPlaybackFromParent = function () {
+  if (!isSheetQuickPlayMode || !audioIsReady) {
+    return false;
+  }
+  startAudioPlayback();
+  return true;
+};
+
+window.stopEmbeddedPlaybackFromParent = function () {
+  if (!isSheetQuickPlayMode) {
+    return false;
+  }
+  return stopAudioPlayback();
+};
+
+window.pumpEmbeddedPlaybackSchedulerFromParent = function () {
+  if (!usesSheetQuickPlayExternalScheduler || !isPlaying) {
+    notifySheetQuickPlayDiagnostic('Pump beendet', true);
+    return false;
+  }
+  sheetQuickPlayDiagnosticPumpCount += 1;
+  scheduler();
+  notifySheetQuickPlayDiagnostic('Läuft', false);
+  return isPlaying;
+};
 
 exportWavButton.addEventListener('click', function () {
   exportCurrentArrangementAsWav().catch(function (error) {

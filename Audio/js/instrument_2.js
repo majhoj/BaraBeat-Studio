@@ -177,6 +177,35 @@ class Instrumente {
     this._activeSources = [];
   }
 
+  replaceAudioContext(audioContext) {
+    if (!audioContext || audioContext === this._audioCtx) {
+      return;
+    }
+
+    try {
+      if (this._panNode) {
+        this._panNode.disconnect();
+      }
+      if (this._outputNode) {
+        this._outputNode.disconnect();
+      }
+    } catch (error) {
+      // The old graph may already be disconnected.
+    }
+
+    this._audioCtx = audioContext;
+    this._activeSources = [];
+    this._outputNode = this._audioCtx.createGain();
+    this._panNode = typeof this._audioCtx.createStereoPanner === 'function'
+      ? this._audioCtx.createStereoPanner()
+      : null;
+    if (this._panNode) {
+      this._panNode.pan.value = Math.max(-1, Math.min(1, this._pan));
+      this._panNode.connect(this._outputNode);
+    }
+    this._outputNode.connect(this._audioCtx.destination);
+  }
+
   warmUpSamples() {
     const warmUpTime = this._audioCtx.currentTime + 0.02;
 

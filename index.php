@@ -144,7 +144,7 @@ $appleTouchIcon = @filemtime(__DIR__ . '/apple-touch-icon.png') ?: 1;
                 <h2 id="mobileArrangementTitle">Arrangement</h2>
                 <button type="button" id="mobileArrangementCloseButton">Schließen</button>
             </header>
-            <iframe id="mobileArrangementAudioFrame" name="mobileArrangementAudioFrame" title="Audioplayer Arrangement mobil"></iframe>
+            <iframe id="mobileArrangementAudioFrame" name="mobileArrangementAudioFrame" title="Audioplayer Arrangement mobil" allow="autoplay"></iframe>
         </section>
     </div>
 
@@ -236,7 +236,7 @@ $appleTouchIcon = @filemtime(__DIR__ . '/apple-touch-icon.png') ?: 1;
         <input type="number" id="sheetQuickPlayTempo" min="30" max="180" step="1" value="100" />
         <button type="button" id="sheetQuickPlayButton" aria-pressed="false" title="Ausgewählte Pattern abspielen">▶</button>
     </div>
-    <iframe id="sheetQuickPlayFrame" name="sheetQuickPlayFrame" class="sheet-quick-play-frame" title="Notenblatt Vorhörspieler"></iframe>
+    <iframe id="sheetQuickPlayFrame" name="sheetQuickPlayFrame" class="sheet-quick-play-frame" title="Notenblatt Vorhörspieler" allow="autoplay"></iframe>
 
     <div id="timelinePanel" hidden>
         <div class="timeline-sticky-region">
@@ -258,7 +258,7 @@ $appleTouchIcon = @filemtime(__DIR__ . '/apple-touch-icon.png') ?: 1;
                 </div>
             </div>
             <section class="timeline-player-panel" hidden>
-                <iframe id="timelineAudioFrame" name="timelineAudioFrame" title="Audioplayer Arrangement"></iframe>
+                <iframe id="timelineAudioFrame" name="timelineAudioFrame" title="Audioplayer Arrangement" allow="autoplay"></iframe>
             </section>
         </div>
         <div class="timeline-panel-body">
@@ -410,7 +410,7 @@ $appleTouchIcon = @filemtime(__DIR__ . '/apple-touch-icon.png') ?: 1;
             </section>
         </div>
         <section class="practice-player-panel">
-            <iframe id="practiceAudioFrame" name="practiceAudioFrame" title="Audioplayer Übungsmodus"></iframe>
+            <iframe id="practiceAudioFrame" name="practiceAudioFrame" title="Audioplayer Übungsmodus" allow="autoplay"></iframe>
             <div id="practiceScroller" class="practice-scroller" hidden>
                 <div class="practice-scroller-head">
                     <strong>Laufende Noten</strong>
@@ -2149,7 +2149,12 @@ const sheetQuickPlayState = {
     isPlaying: false,
     activeHighlightTimers: [],
     highlightSectionsByRuntimeKey: {},
-    noteElementsByPosition: {}
+    noteElementsByPosition: {},
+    mobileNoteElementsByPosition: {},
+    preparedSignature: '',
+    frameReady: false,
+    preparationTimer: null,
+    schedulerTimer: null
 };
 let sheetQuickPlayRefreshTimer = null;
 let sheetQuickPlayMutationObserver = null;
@@ -2197,6 +2202,9 @@ function positionSheetQuickPlayControls() {
     if (!controlsEl || !s || !s.node) {
         return;
     }
+    if (isMobilePracticeViewport()) {
+        return;
+    }
 
     const svgBounds = s.node.getBoundingClientRect();
     const scrollX = window.pageXOffset || document.documentElement.scrollLeft || 0;
@@ -2205,25 +2213,96 @@ function positionSheetQuickPlayControls() {
     controlsEl.style.top = (svgBounds.top + scrollY + 44) + 'px';
 }
 
-function getSheetQuickPlayTempo() {
-    const tempoInputEl = document.getElementById('sheetQuickPlayTempo');
+function setSheetQuickPlayTempo(tempoValue) {
     const tempo = typeof normalizeTimelineTempo === 'function'
-        ? normalizeTimelineTempo(tempoInputEl ? tempoInputEl.value : timelineState.tempo)
-        : Math.max(30, Math.min(180, Math.round(Number(tempoInputEl ? tempoInputEl.value : 100) || 100)));
-    if (tempoInputEl) {
-        tempoInputEl.value = tempo;
-    }
+        ? normalizeTimelineTempo(tempoValue)
+        : Math.max(30, Math.min(180, Math.round(Number(tempoValue) || 100)));
+    ['sheetQuickPlayTempo', 'mobileSheetQuickPlayTempo'].forEach(function (inputId) {
+        const inputEl = document.getElementById(inputId);
+        if (inputEl) {
+            inputEl.value = tempo;
+        }
+    });
     return tempo;
 }
 
+function getSheetQuickPlayTempo() {
+    const desktopTempoEl = document.getElementById('sheetQuickPlayTempo');
+    const mobileTempoEl = document.getElementById('mobileSheetQuickPlayTempo');
+    const preferredTempoEl = isMobilePracticeViewport() && mobileTempoEl
+        ? mobileTempoEl
+        : desktopTempoEl;
+    return setSheetQuickPlayTempo(preferredTempoEl ? preferredTempoEl.value : timelineState.tempo);
+}
+
 function setSheetQuickPlayButtonState(isPlaying) {
-    const buttonEl = document.getElementById('sheetQuickPlayButton');
     sheetQuickPlayState.isPlaying = Boolean(isPlaying);
-    if (buttonEl) {
+    ['sheetQuickPlayButton', 'mobileSheetQuickPlayButton'].forEach(function (buttonId) {
+        const buttonEl = document.getElementById(buttonId);
+        if (!buttonEl) {
+            return;
+        }
         buttonEl.textContent = sheetQuickPlayState.isPlaying ? '■' : '▶';
         buttonEl.setAttribute('aria-pressed', sheetQuickPlayState.isPlaying ? 'true' : 'false');
         buttonEl.classList.toggle('is-playing', sheetQuickPlayState.isPlaying);
+        buttonEl.title = sheetQuickPlayState.isPlaying
+            ? 'Sofort-Spielen stoppen'
+            : 'Ausgewählte Pattern abspielen';
+    });
+    updateSheetQuickPlayButtonAvailability();
+}
+
+function updateSheetQuickPlayButtonAvailability() {
+    const mobileButtonEl = document.getElementById('mobileSheetQuickPlayButton');
+    if (!mobileButtonEl) {
+        positionMobileSheetQuickPlayFrame();
+        return;
     }
+    const hasSelection = sheetQuickPlayState.selectedPatternIds.length > 0;
+    const isLoading = hasSelection && !sheetQuickPlayState.frameReady && !sheetQuickPlayState.isPlaying;
+    mobileButtonEl.disabled = !sheetQuickPlayState.isPlaying && (!hasSelection || !sheetQuickPlayState.frameReady);
+    mobileButtonEl.classList.toggle('is-loading', isLoading);
+    if (isLoading) {
+        mobileButtonEl.textContent = '…';
+        mobileButtonEl.title = 'Sounds werden geladen';
+    } else {
+        mobileButtonEl.textContent = sheetQuickPlayState.isPlaying ? '■' : '▶';
+        mobileButtonEl.title = sheetQuickPlayState.isPlaying
+            ? 'Sofort-Spielen stoppen'
+            : 'Ausgewählte Pattern abspielen';
+    }
+    positionMobileSheetQuickPlayFrame();
+}
+
+function positionMobileSheetQuickPlayFrame() {
+    const frameEl = document.getElementById('sheetQuickPlayFrame');
+    const buttonEl = document.getElementById('mobileSheetQuickPlayButton');
+    const shouldKeepFrameInViewport = Boolean(
+        frameEl &&
+        buttonEl &&
+        isMobilePracticeViewport() &&
+        sheetQuickPlayState.selectedPatternIds.length > 0
+    );
+
+    if (!frameEl || !shouldKeepFrameInViewport) {
+        if (frameEl) {
+            frameEl.classList.remove('is-mobile-active');
+            frameEl.classList.remove('is-mobile-control');
+            frameEl.style.removeProperty('left');
+            frameEl.style.removeProperty('top');
+            frameEl.style.removeProperty('width');
+            frameEl.style.removeProperty('height');
+        }
+        return;
+    }
+
+    const buttonBounds = buttonEl.getBoundingClientRect();
+    frameEl.style.left = buttonBounds.left + 'px';
+    frameEl.style.top = buttonBounds.top + 'px';
+    frameEl.style.width = buttonBounds.width + 'px';
+    frameEl.style.height = buttonBounds.height + 'px';
+    frameEl.classList.add('is-mobile-active');
+    frameEl.classList.toggle('is-mobile-control', sheetQuickPlayState.frameReady);
 }
 
 function getSheetQuickPlaySelectedPatterns() {
@@ -2253,6 +2332,10 @@ function clearSheetQuickPlayHighlights() {
         if (noteEl.node) {
             noteEl.node.__sheetQuickPlayHighlightTimer = null;
         }
+    });
+    document.querySelectorAll('.mobile-sheet-note.sheet-quick-play-note-active').forEach(function (noteEl) {
+        noteEl.classList.remove('sheet-quick-play-note-active');
+        noteEl.__sheetQuickPlayHighlightTimer = null;
     });
 }
 
@@ -2292,6 +2375,21 @@ function rebuildSheetQuickPlayNoteElementMap() {
     sheetQuickPlayState.noteElementsByPosition = elementMap;
 }
 
+function rebuildMobileSheetQuickPlayNoteElementMap() {
+    const elementMap = {};
+    document.querySelectorAll('.mobile-sheet-note[data-source-bar-index][data-source-step-index]').forEach(function (noteEl) {
+        const key = getSheetQuickPlayPositionKey(
+            noteEl.dataset.sourceBarIndex,
+            noteEl.dataset.sourceStepIndex
+        );
+        if (!elementMap[key]) {
+            elementMap[key] = [];
+        }
+        elementMap[key].push(noteEl);
+    });
+    sheetQuickPlayState.mobileNoteElementsByPosition = elementMap;
+}
+
 function scheduleSheetQuickPlayNoteHighlights(message) {
     const runtimeKey = String(message && message.runtimeKey || '');
     const section = runtimeKey
@@ -2324,6 +2422,19 @@ function scheduleSheetQuickPlayNoteHighlights(message) {
                 noteEl.node.__sheetQuickPlayHighlightTimer = clearTimerId;
                 sheetQuickPlayState.activeHighlightTimers.push(clearTimerId);
             });
+            const mobileNoteElements = sheetQuickPlayState.mobileNoteElementsByPosition[key] || [];
+            mobileNoteElements.forEach(function (noteEl) {
+                if (noteEl.__sheetQuickPlayHighlightTimer) {
+                    window.clearTimeout(noteEl.__sheetQuickPlayHighlightTimer);
+                }
+                noteEl.classList.add('sheet-quick-play-note-active');
+                const clearTimerId = window.setTimeout(function () {
+                    noteEl.classList.remove('sheet-quick-play-note-active');
+                    noteEl.__sheetQuickPlayHighlightTimer = null;
+                }, 150);
+                noteEl.__sheetQuickPlayHighlightTimer = clearTimerId;
+                sheetQuickPlayState.activeHighlightTimers.push(clearTimerId);
+            });
         });
     }, Math.max(0, Number(message && message.delayMs) || 0));
     sheetQuickPlayState.activeHighlightTimers.push(startTimerId);
@@ -2340,6 +2451,15 @@ function updateSheetQuickPlaySelectionClasses() {
             overlayEl.removeClass('is-selected');
         }
     });
+    document.querySelectorAll('.mobile-sheet-bar[data-pattern-id]').forEach(function (cardEl) {
+        cardEl.classList.toggle('is-quick-play-selected', selectedSet.has(cardEl.dataset.patternId));
+    });
+    document.querySelectorAll('.mobile-sheet-pattern-toggle[data-pattern-id]').forEach(function (buttonEl) {
+        const isSelected = selectedSet.has(buttonEl.dataset.patternId);
+        buttonEl.classList.toggle('is-selected', isSelected);
+        buttonEl.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+        buttonEl.textContent = isSelected ? '✓' : '';
+    });
 }
 
 function selectSheetQuickPlayPattern(patternId) {
@@ -2355,6 +2475,12 @@ function selectSheetQuickPlayPattern(patternId) {
     }
     sheetQuickPlayState.selectedPatternIds = selectedIds;
     updateSheetQuickPlaySelectionClasses();
+    if (isMobilePracticeViewport()) {
+        if (sheetQuickPlayState.isPlaying) {
+            stopSheetQuickPlay();
+        }
+        scheduleSheetQuickPlayPreparation();
+    }
 }
 
 function buildSheetQuickPlayRepeatRanges(patternBars) {
@@ -3449,6 +3575,7 @@ function buildSheetQuickPlayPayload() {
         payload[0].TimelineLoop = true;
         payload[0].TimelineLoopCount = 'loop';
         payload[0].SheetQuickPlayMode = true;
+        payload[0].SheetQuickPlayExternalScheduler = isMobilePracticeViewport();
         payload[0].Tempo = getSheetQuickPlayTempo();
         payload[0].PracticeSections = configuredSections.map(function (section) {
             const playerSection = Object.assign({}, section);
@@ -3460,6 +3587,58 @@ function buildSheetQuickPlayPayload() {
     }
     window.lastSheetQuickPlayPayload = payload;
     return payload;
+}
+
+function getSheetQuickPlayPreparationSignature() {
+    return sheetQuickPlayState.selectedPatternIds.join('|') + '@' + String(getSheetQuickPlayTempo());
+}
+
+function prepareSheetQuickPlayPlayer() {
+    sheetQuickPlayState.preparationTimer = null;
+    if (!isMobilePracticeViewport()) {
+        return;
+    }
+    const frameEl = document.getElementById('sheetQuickPlayFrame');
+    const signature = getSheetQuickPlayPreparationSignature();
+    if (!frameEl || sheetQuickPlayState.selectedPatternIds.length === 0) {
+        if (frameEl) {
+            frameEl.src = 'about:blank';
+        }
+        sheetQuickPlayState.preparedSignature = '';
+        sheetQuickPlayState.frameReady = false;
+        updateSheetQuickPlayButtonAvailability();
+        return;
+    }
+
+    const payload = buildSheetQuickPlayPayload();
+    if (!payload) {
+        sheetQuickPlayState.preparedSignature = '';
+        sheetQuickPlayState.frameReady = false;
+        updateSheetQuickPlayButtonAvailability();
+        return;
+    }
+
+    sheetQuickPlayState.preparedSignature = signature;
+    sheetQuickPlayState.frameReady = false;
+    frameEl.onload = null;
+    updateSheetQuickPlayButtonAvailability();
+    openAudioTestFrame(payload, frameEl.name || 'sheetQuickPlayFrame');
+}
+
+function scheduleSheetQuickPlayPreparation(delay) {
+    if (!isMobilePracticeViewport()) {
+        return;
+    }
+    if (sheetQuickPlayState.preparationTimer !== null) {
+        window.clearTimeout(sheetQuickPlayState.preparationTimer);
+    }
+    sheetQuickPlayState.frameReady = false;
+    sheetQuickPlayState.preparedSignature = '';
+    updateSheetQuickPlayButtonAvailability();
+    sheetQuickPlayState.preparationTimer = window.setTimeout(
+        prepareSheetQuickPlayPlayer,
+        Math.max(0, Number(delay) || 120)
+    );
 }
 
 function requestSheetQuickPlayStart(frameEl) {
@@ -3485,21 +3664,84 @@ function requestSheetQuickPlayStart(frameEl) {
     tryStart();
 }
 
-function stopSheetQuickPlay() {
+function clearSheetQuickPlaySchedulerPump() {
+    if (sheetQuickPlayState.schedulerTimer !== null) {
+        window.clearInterval(sheetQuickPlayState.schedulerTimer);
+        sheetQuickPlayState.schedulerTimer = null;
+    }
+}
+
+function startSheetQuickPlaySchedulerPump() {
+    clearSheetQuickPlaySchedulerPump();
+    if (!isMobilePracticeViewport()) {
+        return;
+    }
+
+    const pumpScheduler = function () {
+        const frameEl = document.getElementById('sheetQuickPlayFrame');
+        const pumpFromParent = frameEl && frameEl.contentWindow
+            ? frameEl.contentWindow.pumpEmbeddedPlaybackSchedulerFromParent
+            : null;
+        if (typeof pumpFromParent !== 'function' || pumpFromParent() === false) {
+            clearSheetQuickPlaySchedulerPump();
+        }
+    };
+
+    pumpScheduler();
+    if (sheetQuickPlayState.isPlaying) {
+        sheetQuickPlayState.schedulerTimer = window.setInterval(pumpScheduler, 20);
+    }
+}
+
+function stopSheetQuickPlay(options) {
+    const stopOptions = options && typeof options === 'object' ? options : {};
+    const preservePreparedPlayer = Boolean(stopOptions.preservePreparedPlayer);
+    clearSheetQuickPlaySchedulerPump();
     const frameEl = document.getElementById('sheetQuickPlayFrame');
     if (frameEl && frameEl.contentDocument) {
-        const playButtonEl = frameEl.contentDocument.querySelector('[data-playing]');
-        if (playButtonEl && playButtonEl.dataset.playing === 'true') {
-            playButtonEl.click();
+        const stopFromParent = frameEl.contentWindow && frameEl.contentWindow.stopEmbeddedPlaybackFromParent;
+        if (typeof stopFromParent === 'function') {
+            stopFromParent();
+        } else {
+            const playButtonEl = frameEl.contentDocument.querySelector('[data-playing]');
+            if (playButtonEl && playButtonEl.dataset.playing === 'true') {
+                playButtonEl.click();
+            }
         }
-        frameEl.src = 'about:blank';
+        if (!preservePreparedPlayer) {
+            frameEl.src = 'about:blank';
+        }
+    }
+    if (sheetQuickPlayState.preparationTimer !== null) {
+        window.clearTimeout(sheetQuickPlayState.preparationTimer);
+        sheetQuickPlayState.preparationTimer = null;
     }
     clearSheetQuickPlayHighlights();
-    sheetQuickPlayState.highlightSectionsByRuntimeKey = {};
+    if (!preservePreparedPlayer) {
+        sheetQuickPlayState.highlightSectionsByRuntimeKey = {};
+        sheetQuickPlayState.preparedSignature = '';
+        sheetQuickPlayState.frameReady = false;
+    }
     setSheetQuickPlayButtonState(false);
 }
 
 function startSheetQuickPlay() {
+    if (isMobilePracticeViewport()) {
+        const frameEl = document.getElementById('sheetQuickPlayFrame');
+        const signature = getSheetQuickPlayPreparationSignature();
+        const startFromParent = frameEl && frameEl.contentWindow
+            ? frameEl.contentWindow.startEmbeddedPlaybackFromParent
+            : null;
+        if (sheetQuickPlayState.frameReady &&
+                sheetQuickPlayState.preparedSignature === signature &&
+                typeof startFromParent === 'function' &&
+                startFromParent()) {
+            setSheetQuickPlayButtonState(true);
+            return;
+        }
+        scheduleSheetQuickPlayPreparation(0);
+        return;
+    }
     renderSheetQuickPlaySelectors();
     const payload = buildSheetQuickPlayPayload();
     const frameEl = document.getElementById('sheetQuickPlayFrame');
@@ -3516,7 +3758,7 @@ function startSheetQuickPlay() {
 
 function toggleSheetQuickPlay() {
     if (sheetQuickPlayState.isPlaying) {
-        stopSheetQuickPlay();
+        stopSheetQuickPlay({ preservePreparedPlayer: isMobilePracticeViewport() });
         return;
     }
     startSheetQuickPlay();
@@ -5887,9 +6129,36 @@ function trimMobileSheetBars(rhythmBars) {
     return lastContentIndex >= 0 ? bars.slice(0, lastContentIndex + 1) : [];
 }
 
+function getSheetQuickPlayPatternForSourceBar(sourceBarIndex) {
+    const normalizedBarIndex = Number(sourceBarIndex);
+    return sheetQuickPlayState.patternLibrary.find(function (pattern) {
+        return pattern && Array.isArray(pattern.bars) && pattern.bars.some(function (patternBar) {
+            return Number(patternBar && patternBar.sourceBarIndex) === normalizedBarIndex;
+        });
+    }) || null;
+}
+
+function isFirstSheetQuickPlayPatternBar(pattern, sourceBarIndex) {
+    if (!pattern || !Array.isArray(pattern.bars) || pattern.bars.length === 0) {
+        return false;
+    }
+    const firstSourceBarIndex = pattern.bars.reduce(function (lowestIndex, patternBar) {
+        const patternBarIndex = Number(patternBar && patternBar.sourceBarIndex);
+        return Number.isFinite(patternBarIndex) ? Math.min(lowestIndex, patternBarIndex) : lowestIndex;
+    }, Infinity);
+    return Number(sourceBarIndex) === firstSourceBarIndex;
+}
+
 function createMobileSheetBarElement(bar, barIndex, previousBar, nextBar) {
     const cardEl = document.createElement('article');
     cardEl.className = 'mobile-sheet-bar';
+
+    const sourceBarIndex = Number(bar && bar.index) || (barIndex + 1);
+    const quickPlayPattern = getSheetQuickPlayPatternForSourceBar(sourceBarIndex);
+    const quickPlayPatternId = quickPlayPattern && quickPlayPattern.id ? String(quickPlayPattern.id) : '';
+    if (quickPlayPatternId) {
+        cardEl.dataset.patternId = quickPlayPatternId;
+    }
 
     const titleEl = document.createElement('div');
     titleEl.className = 'mobile-sheet-bar-title';
@@ -5919,8 +6188,25 @@ function createMobileSheetBarElement(bar, barIndex, previousBar, nextBar) {
     titleEl.textContent = isContinuationBar
         ? ''
         : (instrumentText + (labelText ? ' / ' + labelText : ''));
-    if (titleEl.textContent) {
-        cardEl.appendChild(titleEl);
+    if (titleEl.textContent || (quickPlayPatternId && isFirstSheetQuickPlayPatternBar(quickPlayPattern, sourceBarIndex))) {
+        const titleRowEl = document.createElement('div');
+        titleRowEl.className = 'mobile-sheet-bar-heading';
+        if (quickPlayPatternId && isFirstSheetQuickPlayPatternBar(quickPlayPattern, sourceBarIndex)) {
+            const selectButtonEl = document.createElement('button');
+            selectButtonEl.type = 'button';
+            selectButtonEl.className = 'mobile-sheet-pattern-toggle';
+            selectButtonEl.dataset.patternId = quickPlayPatternId;
+            selectButtonEl.setAttribute('aria-label', (titleEl.textContent || 'Pattern') + ' auswählen');
+            selectButtonEl.setAttribute('aria-pressed', 'false');
+            selectButtonEl.addEventListener('click', function () {
+                selectSheetQuickPlayPattern(quickPlayPatternId);
+            });
+            titleRowEl.appendChild(selectButtonEl);
+        }
+        if (titleEl.textContent) {
+            titleRowEl.appendChild(titleEl);
+        }
+        cardEl.appendChild(titleRowEl);
     }
 
     const svgEl = createMobileSheetSvgElement('svg', {
@@ -5997,7 +6283,13 @@ function createMobileSheetBarElement(bar, barIndex, previousBar, nextBar) {
             rightX,
             layoutConfig.noteStartRel + stepIndex * layoutConfig.noteStepRel
         );
-        appendMobileSheetNote(svgEl, noteValue, noteX + noteCenterOffsetX, noteY, beatWidth);
+        const noteGroupEl = createMobileSheetSvgElement('g', {
+            class: 'mobile-sheet-note',
+            'data-source-bar-index': sourceBarIndex,
+            'data-source-step-index': stepIndex
+        });
+        appendMobileSheetNote(noteGroupEl, noteValue, noteX + noteCenterOffsetX, noteY, beatWidth);
+        svgEl.appendChild(noteGroupEl);
     });
 
     (Array.isArray(bar.controls) ? bar.controls : []).forEach(function (control) {
@@ -6018,6 +6310,7 @@ function renderMobileSheetView(readResult) {
     if (!viewEl) {
         return;
     }
+    sheetQuickPlayState.mobileNoteElementsByPosition = {};
     if (!isMobilePracticeViewport() || !document.body.classList.contains('has-loaded-score')) {
         document.body.classList.remove('has-mobile-sheet-view');
         viewEl.hidden = true;
@@ -6037,15 +6330,58 @@ function renderMobileSheetView(readResult) {
     }
     document.body.classList.add('has-mobile-sheet-view');
 
+    const headerEl = document.createElement('div');
+    headerEl.className = 'mobile-sheet-header';
     const headingEl = document.createElement('h2');
     headingEl.textContent = titel && typeof titel.attr === 'function' ? titel.attr('text') : 'Notenblatt';
-    viewEl.appendChild(headingEl);
+    headerEl.appendChild(headingEl);
+
+    const controlsEl = document.createElement('div');
+    controlsEl.className = 'mobile-sheet-quick-play-controls';
+    controlsEl.setAttribute('aria-label', 'Sofort-Spielen');
+    const tempoLabelEl = document.createElement('label');
+    tempoLabelEl.setAttribute('for', 'mobileSheetQuickPlayTempo');
+    tempoLabelEl.textContent = 'BPM';
+    const tempoInputEl = document.createElement('input');
+    tempoInputEl.type = 'number';
+    tempoInputEl.id = 'mobileSheetQuickPlayTempo';
+    tempoInputEl.min = '30';
+    tempoInputEl.max = '180';
+    tempoInputEl.step = '1';
+    tempoInputEl.inputMode = 'numeric';
+    tempoInputEl.value = String(getSheetQuickPlayTempo());
+    tempoInputEl.addEventListener('change', function () {
+        setSheetQuickPlayTempo(tempoInputEl.value);
+        if (sheetQuickPlayState.isPlaying) {
+            stopSheetQuickPlay();
+        }
+        scheduleSheetQuickPlayPreparation(0);
+    });
+    const playButtonEl = document.createElement('button');
+    playButtonEl.type = 'button';
+    playButtonEl.id = 'mobileSheetQuickPlayButton';
+    playButtonEl.setAttribute('aria-pressed', 'false');
+    playButtonEl.addEventListener('click', toggleSheetQuickPlay);
+    controlsEl.appendChild(tempoLabelEl);
+    controlsEl.appendChild(tempoInputEl);
+    controlsEl.appendChild(playButtonEl);
+    headerEl.appendChild(controlsEl);
+    const diagnosticEl = document.createElement('div');
+    diagnosticEl.id = 'mobileSheetQuickPlayDiagnostic';
+    diagnosticEl.className = 'mobile-sheet-quick-play-diagnostic';
+    diagnosticEl.textContent = 'Sofort-Spieler bereit zum Laden';
+    headerEl.appendChild(diagnosticEl);
+    viewEl.appendChild(headerEl);
+
     rhythmBars.forEach(function (bar, barIndex) {
         if (!bar) {
             return;
         }
         viewEl.appendChild(createMobileSheetBarElement(bar, barIndex, rhythmBars[barIndex - 1], rhythmBars[barIndex + 1]));
     });
+    rebuildMobileSheetQuickPlayNoteElementMap();
+    updateSheetQuickPlaySelectionClasses();
+    setSheetQuickPlayButtonState(sheetQuickPlayState.isPlaying);
 }
 
 function isPracticeAudioModeActive() {
@@ -6455,12 +6791,39 @@ function handleEmbeddedAudioPlayerMessage(event) {
     }
 
     if (isSheetQuickPlayFrame) {
+        if (message.type === 'barabeat-sheet-quick-play-diagnostic') {
+            window.lastSheetQuickPlayDiagnostic = message;
+            const diagnosticEl = document.getElementById('mobileSheetQuickPlayDiagnostic');
+            if (diagnosticEl) {
+                diagnosticEl.textContent = [
+                    'ctx ' + String(message.contextState || '?'),
+                    'Schritt ' + String(message.playbackStep),
+                    'Loop ' + String(message.loopLength),
+                    'Pump ' + String(message.pumpCount),
+                    'Zeit ' + String(message.contextTime),
+                    'Delta ' + String(message.nextNoteDelta),
+                    String(message.reason || '')
+                ].filter(Boolean).join(' · ');
+            }
+            return;
+        }
         if (message.type === 'barabeat-audio-step') {
             scheduleSheetQuickPlayNoteHighlights(message);
             return;
         }
         if (message.type === 'barabeat-audio-state') {
+            if (message.state === 'ready') {
+                sheetQuickPlayState.frameReady = true;
+                updateSheetQuickPlayButtonAvailability();
+                return;
+            }
+            if (message.state === 'playing') {
+                setSheetQuickPlayButtonState(true);
+                startSheetQuickPlaySchedulerPump();
+                return;
+            }
             if (message.state !== 'playing') {
+                clearSheetQuickPlaySchedulerPump();
                 setSheetQuickPlayButtonState(false);
                 clearSheetQuickPlayHighlights();
             }
@@ -7303,6 +7666,8 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     window.addEventListener('resize', positionSheetQuickPlayControls);
     window.addEventListener('scroll', positionSheetQuickPlayControls, { passive: true });
+    window.addEventListener('resize', positionMobileSheetQuickPlayFrame);
+    window.addEventListener('scroll', positionMobileSheetQuickPlayFrame, { passive: true });
     document.querySelector('#themeClearButton').addEventListener('click', function () {
         setUiTheme('');
     });
