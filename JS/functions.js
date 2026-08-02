@@ -227,6 +227,25 @@ function normalizeDoundounInstrumentName(instrumentName) {
   return instrumentName;
 }
 
+function getInstrumentChooserOptions() {
+  return [
+    "Djembe",
+    "Djembe 1",
+    "Djembe 2",
+    "Djembe 3",
+    "Bässe",
+    "Kenkeni",
+    "Sangban",
+    "Doundoun",
+    "Dreierbass",
+    "Leer",
+  ];
+}
+
+function getFunctionChooserOptions() {
+  return ["Call", "Intro", "Echauffement", "Begleitpattern", "Solo", "Outro", "Leer"];
+}
+
 function createInstrumentChooser(s, x, y, startText = "Instrument", startFill = "gray") {
   return createMenuChooser(s, x, y, {
     chooserClass: "instrument-chooser",
@@ -234,18 +253,7 @@ function createInstrumentChooser(s, x, y, startText = "Instrument", startFill = 
     startText: normalizeDoundounInstrumentName(startText),
     startFill: startFill,
     menuWidth: 120,
-    options: [
-      "Djembe",
-      "Djembe 1",
-      "Djembe 2",
-      "Djembe 3",
-      "Bässe",
-      "Kenkeni",
-      "Sangban",
-      "Doundoun",
-      "Dreierbass",
-      "Leer",
-    ],
+    options: getInstrumentChooserOptions(),
     onSelect: function (name, chooserGruppe) {
       if (name === "Leer") {
         let linkedFunctionChooser = findLinkedFunctionChooser(chooserGruppe);
@@ -265,7 +273,7 @@ function createFunctionChooser(s, x, y, startText = "Funktion", startFill = "gra
     startText: startText,
     startFill: startFill,
     menuWidth: 140,
-    options: ["Call", "Intro", "Echauffement", "Begleitpattern", "Solo", "Outro", "Leer"],
+    options: getFunctionChooserOptions(),
     onSelect: function (name, chooserGruppe, chooserText) {
       if (name !== "Solo" && name !== "Begleitpattern") {
         return name;

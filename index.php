@@ -86,7 +86,7 @@ $appleTouchIcon = @filemtime(__DIR__ . '/apple-touch-icon.png') ?: 1;
                 <button type="button" id="exportFileDialogButton">Exportieren...</button>
             </div>
         </details>
-        <details class="app-menu">
+        <details class="app-menu" id="scoreSheetMenu">
             <summary>Notenblatt</summary>
             <div class="app-menu-panel">
                 <button type="button" id="button4">Binäres Notenblatt</button>
@@ -1873,6 +1873,9 @@ function closeTupletDialog() {
     if (dialogEl) {
         dialogEl.hidden = true;
     }
+    if (typeof mobileSheetEditorState !== 'undefined') {
+        mobileSheetEditorState.pendingTupletTarget = null;
+    }
 }
 
 function renderTupletDialogControls(display) {
@@ -1936,6 +1939,21 @@ function insertTupletFromDialog() {
     }
     recordHistorySnapshot();
     insertedElement = createTupletElementFromPalette(noteTypes, type);
+    const mobileTarget = typeof mobileSheetEditorState !== 'undefined'
+        ? mobileSheetEditorState.pendingTupletTarget
+        : null;
+    if (mobileTarget) {
+        const targetPosition = getMobileSheetSourcePosition(
+            mobileTarget.sourceBarIndex,
+            mobileTarget.sourceStepIndex,
+            type,
+            mobileTarget.instrumentName
+        );
+        moveSheetElementAnchorTo(insertedElement, targetPosition.x, targetPosition.y, false);
+        closeTupletDialog();
+        refreshMobileSheetEditorView();
+        return;
+    }
     closeTupletDialog();
 }
 
@@ -2132,6 +2150,7 @@ function drawRhythmSheet(config) {
     renderSheetQuickPlaySelectors();
 
     if (shouldResetTitle) {
+        document.body.classList.add('has-loaded-score');
         currentScoreId = null;
         setSelectedFileSource('local');
         rememberLastLoadedScore('');
@@ -2277,9 +2296,12 @@ function updateSheetQuickPlayButtonAvailability() {
 function positionMobileSheetQuickPlayFrame() {
     const frameEl = document.getElementById('sheetQuickPlayFrame');
     const buttonEl = document.getElementById('mobileSheetQuickPlayButton');
+    const tempoInputEl = document.getElementById('mobileSheetQuickPlayTempo');
+    const isTempoInputFocused = Boolean(tempoInputEl && document.activeElement === tempoInputEl);
     const shouldKeepFrameInViewport = Boolean(
         frameEl &&
         buttonEl &&
+        !isTempoInputFocused &&
         isMobilePracticeViewport() &&
         sheetQuickPlayState.selectedPatternIds.length > 0
     );
@@ -3833,7 +3855,10 @@ function updateSheetCanvasDimensions() {
 function updateSheetPageControls() {
     const deleteButtonEl = document.getElementById('deleteSheetPageButton');
     if (deleteButtonEl) {
-        deleteButtonEl.disabled = getSheetPageCount(zeilenAnzahl) <= 1;
+        const mobileReadOnlyViewport = typeof isMobilePracticeViewport === 'function' &&
+            isMobilePracticeViewport() &&
+            !(typeof isMobileLandscapeViewport === 'function' && isMobileLandscapeViewport());
+        deleteButtonEl.disabled = mobileReadOnlyViewport || getSheetPageCount(zeilenAnzahl) <= 1;
     }
 }
 
@@ -3852,6 +3877,9 @@ function redrawCurrentSheetFromSnapshot(snapshot, syncOptions) {
     setRhythmTitle(snapshot.title || 'Unbenannt');
     syncStateAfterHistoryRestore(syncOptions || buildCurrentTimelineSyncOptions());
     renderSheetQuickPlaySelectors();
+    if (isMobilePracticeViewport()) {
+        renderMobileSheetView();
+    }
 }
 
 function removeElementsOutsideSheetLineCount(lineCount) {
@@ -4547,7 +4575,8 @@ function schedulePaletteViewportFollow() {
 }
 
 // Kartusche zeichnen
-paletteGroup = s.g(paletteFrame, ton, bass, slap, ton_g, slap_g, flam_ton, flam_slap, flam_bass_slap, In, Out, ShortBar, Triplet, text_z_g, repeatMarkerGroup);
+paletteGroup = s.g(paletteFrame, ton, bass, slap, ton_g, slap_g, flam_ton, flam_slap, flam_bass_slap, In, Out, ShortBar, Triplet, text_z_g, repeatMarkerGroup)
+    .addClass('editor-palette');
 paletteBaseBounds = paletteGroup.getBBox();
 paletteGroup.drag(move1, sel_start, stop1);
 
@@ -5248,9 +5277,7 @@ function applyRepeatMarkersToBars(rhythmBars, repeatBoundaries) {
         const endBar = rhythmBars[boundary.index - 1];
 
         if (startBar && boundary.startMarkers.length > 0) {
-            startBar.repeat.start = boundary.startMarkers.filter(function (marker) {
-                return !(boundary.index === 0 && marker.count === 'continue');
-            }).map(function (marker) {
+            startBar.repeat.start = boundary.startMarkers.map(function (marker) {
                 return marker.count;
             });
         }
@@ -5714,12 +5741,18 @@ function isMobileLandscapeViewport() {
         Math.min(window.innerWidth || 0, window.innerHeight || 0) <= 760;
 }
 
+function isMobileSheetReaderViewport() {
+    return isMobilePracticeViewport();
+}
+
 function updateMobilePracticeModeAvailability() {
     const mobilePracticeViewport = isMobilePracticeViewport();
     const mobileLandscapeViewport = isMobileLandscapeViewport();
+    const mobileReadOnlyViewport = mobilePracticeViewport && !mobileLandscapeViewport;
+    const wasMobileLandscapeEditor = document.body.classList.contains('is-mobile-landscape-edit');
     const orientationNoticeEl = document.getElementById('mobileOrientationNotice');
     document.body.classList.toggle('is-mobile-practice-viewport', mobilePracticeViewport);
-    document.body.classList.toggle('is-mobile-landscape-blocked', mobileLandscapeViewport);
+    document.body.classList.toggle('is-mobile-landscape-edit', mobileLandscapeViewport);
     if (orientationNoticeEl) {
         orientationNoticeEl.hidden = true;
         orientationNoticeEl.setAttribute('aria-hidden', 'true');
@@ -5740,8 +5773,10 @@ function updateMobilePracticeModeAvailability() {
         if (!buttonEl) {
             return;
         }
-        buttonEl.disabled = mobilePracticeViewport;
-        if (mobilePracticeViewport) {
+        buttonEl.disabled = buttonId === 'button11'
+            ? mobilePracticeViewport
+            : mobileReadOnlyViewport;
+        if (buttonEl.disabled) {
             buttonEl.title = 'Auf Smartphones ist nur Üben/Abspielen aktiv.';
         } else {
             buttonEl.removeAttribute('title');
@@ -5754,8 +5789,24 @@ function updateMobilePracticeModeAvailability() {
         clearTimelineAudioPlayer();
         renderTimelinePanel();
     }
-    renderMobileSheetView();
+    let currentMobileReadResult = null;
+    const shouldRefreshMobileSheet = (wasMobileLandscapeEditor && mobileReadOnlyViewport) ||
+        (!wasMobileLandscapeEditor && mobileLandscapeViewport);
+    if (shouldRefreshMobileSheet && document.body.classList.contains('has-loaded-score')) {
+        try {
+            currentMobileReadResult = callPHPScript_lesen(zeilenAnzahl, {
+                showAlert: false,
+                logResults: false
+            });
+        } catch (error) {
+            console.warn('Mobile Notenansicht konnte nach dem Bearbeiten nicht aktualisiert werden', error);
+        }
+    }
+    renderMobileSheetView(currentMobileReadResult);
     updateMobileArrangementButtonVisibility();
+    if (mobileLandscapeViewport && typeof schedulePaletteViewportFollow === 'function') {
+        window.requestAnimationFrame(schedulePaletteViewportFollow);
+    }
 }
 
 function getCurrentTimelineArrangementPayload() {
@@ -6047,7 +6098,18 @@ function getMobileSheetRepeatText(repeatValues) {
     return '';
 }
 
-function appendMobileSheetRepeatMarker(svgEl, x, y, repeatText) {
+function appendMobileSheetRepeatMarker(svgEl, x, y, repeatText, includeHitbox) {
+    if (includeHitbox) {
+        svgEl.appendChild(createMobileSheetSvgElement('rect', {
+            x: x - 12,
+            y: y - 20,
+            width: 24,
+            height: 48,
+            fill: '#fff',
+            opacity: 0.001,
+            class: 'mobile-sheet-repeat-hitbox'
+        }));
+    }
     svgEl.appendChild(createMobileSheetSvgElement('circle', {
         cx: x,
         cy: y - 6,
@@ -6170,11 +6232,1110 @@ function isFirstSheetQuickPlayPatternBar(pattern, sourceBarIndex) {
     return Number(sourceBarIndex) === firstSourceBarIndex;
 }
 
+const mobileSheetEditorState = {
+    activeTool: '',
+    pendingTupletTarget: null,
+    selectedSourceElements: [],
+    movingChooserSourceBarIndex: null
+};
+
+const mobileSheetEditorTools = [
+    { id: 'tone', label: 'Tone' },
+    { id: 'bass', label: 'Bass' },
+    { id: 'slap', label: 'Slap oder Glocke' },
+    { id: 'tone_muffled', label: 'Gedämpfter Tone' },
+    { id: 'slap_muffled', label: 'Gedämpfter Slap oder Klick' },
+    { id: 'tone_flam', label: 'Flam mit Tones' },
+    { id: 'slap_flam', label: 'Flam mit Slaps' },
+    { id: 'bass_slap_flam', label: 'Flam mit Bass und Slap' },
+    { id: 'in', label: 'In' },
+    { id: 'out', label: 'Out' },
+    { id: 'shortbar', label: 'ShortBar' },
+    { id: 'wiederholung', label: 'Wiederholung' },
+    { id: 'tuplet', label: 'Triole oder Quartole' },
+    { id: 'edit_text', label: 'Textfeld einsetzen' },
+    { id: 'chooser', label: 'Instrument und Funktion einsetzen' },
+    { id: 'select', label: 'Noten auswählen' },
+    { id: 'duplicate', label: 'Auswahl duplizieren' },
+    { id: 'delete', label: 'Element löschen' }
+];
+
+function createMobileSheetEditorToolIcon(toolId) {
+    const svgEl = createMobileSheetSvgElement('svg', {
+        viewBox: '0 0 30 30',
+        width: 30,
+        height: 30,
+        'aria-hidden': 'true',
+        focusable: 'false'
+    });
+    svgEl.classList.add('mobile-sheet-editor-tool-icon');
+
+    if (['tone', 'bass', 'slap', 'tone_muffled', 'slap_muffled', 'tone_flam', 'slap_flam', 'bass_slap_flam'].indexOf(toolId) !== -1) {
+        appendMobileSheetNote(svgEl, toolId, 15, 10, 20);
+        return svgEl;
+    }
+    if (toolId === 'in' || toolId === 'out') {
+        appendMobileSheetControlMarker(svgEl, { type: toolId }, 15, 5, -5);
+        return svgEl;
+    }
+    if (toolId === 'shortbar') {
+        svgEl.appendChild(createMobileSheetSvgElement('line', {
+            x1: 15,
+            y1: 3,
+            x2: 15,
+            y2: 27,
+            stroke: '#111',
+            'stroke-width': 4,
+            'stroke-dasharray': '1 5',
+            'stroke-linecap': 'round'
+        }));
+        return svgEl;
+    }
+    if (toolId === 'wiederholung') {
+        appendMobileSheetRepeatMarker(svgEl, 15, 15, '');
+        return svgEl;
+    }
+    if (toolId === 'tuplet') {
+        [9, 15, 21].forEach(function (dotX) {
+            svgEl.appendChild(createMobileSheetSvgElement('circle', {
+                cx: dotX,
+                cy: 9,
+                r: 2.5,
+                fill: '#111'
+            }));
+        });
+        svgEl.appendChild(createMobileSheetSvgElement('text', {
+            x: 15,
+            y: 25,
+            'font-size': 11,
+            'font-family': 'sans-serif',
+            'font-weight': 'bold',
+            'text-anchor': 'middle',
+            fill: '#111'
+        })).textContent = getCurrentTupletDisplay().letter;
+        return svgEl;
+    }
+
+    if (toolId === 'chooser') {
+        svgEl.appendChild(createMobileSheetSvgElement('rect', {
+            x: 4,
+            y: 4,
+            width: 22,
+            height: 22,
+            rx: 3,
+            fill: '#fff',
+            stroke: '#111',
+            'stroke-width': 1.4
+        }));
+        svgEl.appendChild(createMobileSheetSvgElement('text', {
+            x: 8,
+            y: 13,
+            'font-size': 8,
+            'font-family': 'sans-serif',
+            'font-weight': 'bold',
+            fill: '#111'
+        })).textContent = 'I';
+        svgEl.appendChild(createMobileSheetSvgElement('text', {
+            x: 8,
+            y: 23,
+            'font-size': 8,
+            'font-family': 'sans-serif',
+            'font-weight': 'bold',
+            fill: '#111'
+        })).textContent = 'F';
+        [11, 21].forEach(function (triangleY) {
+            svgEl.appendChild(createMobileSheetSvgElement('path', {
+                d: 'M18 ' + (triangleY - 2) + ' L23 ' + (triangleY - 2) + ' L20.5 ' + (triangleY + 1) + ' Z',
+                fill: '#111'
+            }));
+        });
+        return svgEl;
+    }
+
+    if (toolId === 'edit_text') {
+        svgEl.appendChild(createMobileSheetSvgElement('rect', {
+            x: 6,
+            y: 5,
+            width: 18,
+            height: 20,
+            rx: 1,
+            fill: '#fff',
+            stroke: '#111',
+            'stroke-width': 1.4
+        }));
+        svgEl.appendChild(createMobileSheetSvgElement('text', {
+            x: 15,
+            y: 21,
+            'font-size': 15,
+            'font-family': 'sans-serif',
+            'font-weight': 'bold',
+            'text-anchor': 'middle',
+            fill: '#111'
+        })).textContent = 'T';
+        return svgEl;
+    }
+
+    if (toolId === 'select') {
+        svgEl.appendChild(createMobileSheetSvgElement('rect', {
+            x: 5,
+            y: 6,
+            width: 20,
+            height: 18,
+            rx: 1,
+            fill: 'none',
+            stroke: '#111',
+            'stroke-width': 1.6,
+            'stroke-dasharray': '3 2'
+        }));
+        return svgEl;
+    }
+
+    if (toolId === 'duplicate') {
+        svgEl.appendChild(createMobileSheetSvgElement('rect', {
+            x: 10,
+            y: 6,
+            width: 14,
+            height: 14,
+            rx: 1,
+            fill: '#fff',
+            stroke: '#111',
+            'stroke-width': 1.7
+        }));
+        svgEl.appendChild(createMobileSheetSvgElement('rect', {
+            x: 6,
+            y: 10,
+            width: 14,
+            height: 14,
+            rx: 1,
+            fill: '#fff',
+            stroke: '#111',
+            'stroke-width': 1.7
+        }));
+        return svgEl;
+    }
+
+    svgEl.appendChild(createMobileSheetSvgElement('path', {
+        d: 'M10 9h10l-1 16h-8L10 9zm2-4h6l1 2h4v2H7V7h4l1-2zm1 7v10m4-10v10',
+        fill: 'none',
+        stroke: '#111',
+        'stroke-width': 1.8,
+        'stroke-linecap': 'round',
+        'stroke-linejoin': 'round'
+    }));
+    return svgEl;
+}
+
+function setMobileSheetEditorTool(toolId) {
+    mobileSheetEditorState.activeTool = mobileSheetEditorState.activeTool === toolId ? '' : toolId;
+    updateMobileSheetEditorPaletteState();
+}
+
+function getMobileSheetSelectedSourceElements() {
+    mobileSheetEditorState.selectedSourceElements = mobileSheetEditorState.selectedSourceElements.filter(function (element) {
+        return element && element.node && element.node.parentNode;
+    });
+    return mobileSheetEditorState.selectedSourceElements;
+}
+
+function updateMobileSheetEditorPaletteState() {
+    const hasSelection = getMobileSheetSelectedSourceElements().length > 0;
+    const movingChooserSourceBarIndex = Number(mobileSheetEditorState.movingChooserSourceBarIndex);
+    const isChooserMoveActive = Number.isFinite(movingChooserSourceBarIndex) && movingChooserSourceBarIndex > 0;
+    document.body.classList.toggle(
+        'is-mobile-selection-tool-active',
+        isMobileLandscapeViewport() && mobileSheetEditorState.activeTool === 'select'
+    );
+    document.body.classList.toggle(
+        'is-mobile-chooser-tool-active',
+        isMobileLandscapeViewport() && mobileSheetEditorState.activeTool === 'chooser'
+    );
+    document.body.classList.toggle(
+        'is-mobile-chooser-move-active',
+        isMobileLandscapeViewport() && isChooserMoveActive
+    );
+    document.querySelectorAll('.mobile-sheet-bar[data-source-bar-index]').forEach(function (barEl) {
+        barEl.classList.toggle(
+            'is-mobile-chooser-move-source',
+            isChooserMoveActive && Number(barEl.dataset.sourceBarIndex) === movingChooserSourceBarIndex
+        );
+    });
+    document.querySelectorAll('.mobile-sheet-chooser-target').forEach(function (targetEl) {
+        targetEl.textContent = isChooserMoveActive
+            ? 'Chooser hierher verschieben'
+            : 'Instrument und Funktion hier einsetzen';
+    });
+    document.querySelectorAll('.mobile-sheet-editor-tool').forEach(function (buttonEl) {
+        const isActive = buttonEl.dataset.toolId === mobileSheetEditorState.activeTool;
+        buttonEl.classList.toggle('is-active', isActive);
+        buttonEl.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+        if (buttonEl.dataset.toolId === 'duplicate') {
+            buttonEl.disabled = !hasSelection;
+        }
+    });
+}
+
+function createMobileSheetEditorPalette() {
+    const paletteEl = document.createElement('div');
+    paletteEl.className = 'mobile-sheet-editor-palette';
+    paletteEl.setAttribute('role', 'toolbar');
+    paletteEl.setAttribute('aria-label', 'Notenpalette');
+
+    mobileSheetEditorTools.forEach(function (tool) {
+        const buttonEl = document.createElement('button');
+        buttonEl.type = 'button';
+        buttonEl.className = 'mobile-sheet-editor-tool';
+        buttonEl.dataset.toolId = tool.id;
+        buttonEl.appendChild(createMobileSheetEditorToolIcon(tool.id));
+        buttonEl.title = tool.label;
+        buttonEl.setAttribute('aria-label', tool.label);
+        buttonEl.setAttribute('aria-pressed', mobileSheetEditorState.activeTool === tool.id ? 'true' : 'false');
+        buttonEl.classList.toggle('is-active', mobileSheetEditorState.activeTool === tool.id);
+        if (tool.id === 'duplicate') {
+            buttonEl.disabled = getMobileSheetSelectedSourceElements().length === 0;
+        }
+        buttonEl.addEventListener('click', function () {
+            if (tool.id === 'delete' && getMobileSheetSelectedSourceElements().length > 0) {
+                deleteMobileSheetEditorSelection();
+                return;
+            }
+            if (tool.id === 'duplicate') {
+                duplicateMobileSheetEditorSelection();
+                return;
+            }
+            setMobileSheetEditorTool(tool.id);
+        });
+        paletteEl.appendChild(buttonEl);
+    });
+    return paletteEl;
+}
+
+function getMobileSheetSourcePosition(sourceBarIndex, sourceStepIndex, elementId, instrumentName) {
+    const zeroBasedBarIndex = Math.max(0, Math.round(Number(sourceBarIndex) || 1) - 1);
+    const lineIndex = Math.floor(zeroBasedBarIndex / 2);
+    const isRightBar = zeroBasedBarIndex % 2 === 1;
+    const stepIndex = Math.max(0, Math.min(getMobileSheetStepsPerBar() - 1, Math.round(Number(sourceStepIndex) || 0)));
+    let firstStepX;
+    let stepX;
+    if (rhythm === 'binaer') {
+        firstStepX = isRightBar ? 550 : 125;
+        stepX = 12.5;
+    } else if (rhythm === 'neunaer') {
+        firstStepX = isRightBar ? 567.5 : 142.5;
+        stepX = 21.25;
+    } else {
+        firstStepX = isRightBar ? 562 : 133;
+        stepX = 16.5;
+    }
+
+    let yOffset = 0;
+    const normalizedInstrument = String(instrumentName || '');
+    if (normalizedInstrument === 'Dreierbass') {
+        yOffset = elementId === 'slap' || elementId === 'slap_muffled'
+            ? -28
+            : (elementId === 'tone' || elementId === 'tone_muffled' ? -12 : 4);
+    } else if (['Kenkeni', 'Sangban', 'Doundoun', 'Dununba', 'Dundunba', 'Bässe'].indexOf(normalizedInstrument) !== -1) {
+        yOffset = elementId === 'slap' || elementId === 'slap_muffled' ? -18 : 4;
+    }
+
+    return {
+        x: firstStepX + stepIndex * stepX,
+        y: getSheetLineBaseY(lineIndex) + 65 + yOffset
+    };
+}
+
+function moveSheetElementAnchorTo(element, targetX, targetY, preserveY) {
+    if (!element || typeof element.transform !== 'function') {
+        return;
+    }
+    const sourcePosition = getElementReadPosition(element);
+    const transformState = element.transform();
+    const localMatrix = transformState && transformState.localMatrix ? transformState.localMatrix : null;
+    const currentX = localMatrix ? localMatrix.e : 0;
+    const currentY = localMatrix ? localMatrix.f : 0;
+    const deltaX = Number(targetX) - Number(sourcePosition.x);
+    const deltaY = preserveY ? 0 : Number(targetY) - Number(sourcePosition.y);
+    element.transform('t' + (currentX + deltaX) + ',' + (currentY + deltaY));
+}
+
+function getMobileSheetSourceElements(sourceBarIndex, sourceStepIndex, elementType) {
+    const normalizedBarIndex = Math.max(1, Math.round(Number(sourceBarIndex) || 1));
+    const normalizedStepIndex = Math.max(0, Math.round(Number(sourceStepIndex) || 0));
+    if (elementType === 'note') {
+        rebuildSheetQuickPlayNoteElementMap();
+        return (sheetQuickPlayState.noteElementsByPosition[
+            getSheetQuickPlayPositionKey(normalizedBarIndex, normalizedStepIndex)
+        ] || []).slice();
+    }
+
+    const readConfig = getReadRhythmConfig();
+    const result = [];
+    s.selectAll('.shp').forEach(function (element) {
+        if (element.attr('id') !== elementType) {
+            return;
+        }
+        const elementPosition = getElementReadPosition(element);
+        const positionInfo = getBarIndexFromPosition(elementPosition.x, elementPosition.y, readConfig, zeilenAnzahl);
+        if (controlElementIds.includes(elementType) && elementType !== 'wiederholung') {
+            positionInfo.rawLineSlotIndex = getControlLineSlotIndex(elementPosition.x, readConfig, elementType);
+            positionInfo.lineSlotIndex = positionInfo.rawLineSlotIndex;
+            if (positionInfo.lineSlotIndex > readConfig.stepsPerBar) {
+                positionInfo.lineSlotIndex -= Number(readConfig.gapSlotCount) || 2;
+            }
+            positionInfo.barIndex = positionInfo.lineIndex * 2 +
+                (positionInfo.rawLineSlotIndex > readConfig.stepsPerBar + (Number(readConfig.gapSlotCount) || 2) ? 1 : 0);
+        }
+        const stepIndex = getStepIndexWithinBar(positionInfo.lineSlotIndex, readConfig.stepsPerBar);
+        if (positionInfo.barIndex + 1 === normalizedBarIndex && stepIndex === normalizedStepIndex) {
+            result.push(element);
+        }
+    });
+    return result;
+}
+
+function getMobileSheetSourceNoteDescriptor(element) {
+    if (!element || typeof element.attr !== 'function') {
+        return null;
+    }
+    const elementId = element.attr('id');
+    if (!noteElementIds.includes(elementId) && !tupletElementIds.includes(elementId)) {
+        return null;
+    }
+    const readConfig = getReadRhythmConfig();
+    const elementPosition = getElementReadPosition(element);
+    const positionInfo = getBarIndexFromPosition(
+        elementPosition.x,
+        elementPosition.y,
+        readConfig,
+        zeilenAnzahl
+    );
+    const stepIndex = getStepIndexWithinBar(positionInfo.lineSlotIndex, readConfig.stepsPerBar);
+    if (stepIndex === null || stepIndex < 0 || stepIndex >= readConfig.stepsPerBar) {
+        return null;
+    }
+    return {
+        sourceBarIndex: positionInfo.barIndex + 1,
+        sourceStepIndex: stepIndex
+    };
+}
+
+function getMobileSheetSelectionPositionKeys() {
+    const keys = new Set();
+    getMobileSheetSelectedSourceElements().forEach(function (element) {
+        const descriptor = getMobileSheetSourceNoteDescriptor(element);
+        if (descriptor) {
+            keys.add(getSheetQuickPlayPositionKey(descriptor.sourceBarIndex, descriptor.sourceStepIndex));
+        }
+    });
+    return keys;
+}
+
+function updateMobileSheetSelectionClasses() {
+    const selectedKeys = getMobileSheetSelectionPositionKeys();
+    document.querySelectorAll('.mobile-sheet-note[data-source-bar-index][data-source-step-index]').forEach(function (noteEl) {
+        const key = getSheetQuickPlayPositionKey(noteEl.dataset.sourceBarIndex, noteEl.dataset.sourceStepIndex);
+        noteEl.classList.toggle('is-mobile-editor-selected', selectedKeys.has(key));
+    });
+    updateMobileSheetEditorPaletteState();
+}
+
+function setMobileSheetSelectionFromNoteElements(noteElements) {
+    rebuildSheetQuickPlayNoteElementMap();
+    const selectedElements = [];
+    const selectedNodes = new Set();
+    noteElements.forEach(function (noteEl) {
+        const key = getSheetQuickPlayPositionKey(noteEl.dataset.sourceBarIndex, noteEl.dataset.sourceStepIndex);
+        (sheetQuickPlayState.noteElementsByPosition[key] || []).forEach(function (sourceElement) {
+            if (!sourceElement || !sourceElement.node || selectedNodes.has(sourceElement.node)) {
+                return;
+            }
+            selectedNodes.add(sourceElement.node);
+            selectedElements.push(sourceElement);
+        });
+    });
+    mobileSheetEditorState.selectedSourceElements = selectedElements;
+    updateMobileSheetSelectionClasses();
+}
+
+function deleteMobileSheetEditorSelection() {
+    const selectedElements = getMobileSheetSelectedSourceElements().slice();
+    if (selectedElements.length === 0) {
+        return;
+    }
+    recordHistorySnapshot();
+    selectedElements.forEach(function (element) {
+        element.remove();
+    });
+    mobileSheetEditorState.selectedSourceElements = [];
+    refreshMobileSheetEditorView();
+}
+
+function duplicateMobileSheetEditorSelection() {
+    const selectedElements = getMobileSheetSelectedSourceElements().slice();
+    const descriptors = selectedElements.map(getMobileSheetSourceNoteDescriptor);
+    if (selectedElements.length === 0 || descriptors.some(function (descriptor) { return !descriptor; })) {
+        return;
+    }
+
+    const selectedSteps = descriptors.map(function (descriptor) { return descriptor.sourceStepIndex; });
+    const minimumStep = Math.min.apply(Math, selectedSteps);
+    const maximumStep = Math.max.apply(Math, selectedSteps);
+    const lastStep = getMobileSheetStepsPerBar() - 1;
+    const stepOffset = maximumStep < lastStep ? 1 : (minimumStep > 0 ? -1 : 0);
+    const clonedElements = [];
+
+    recordHistorySnapshot();
+    selectedElements.forEach(function (element, elementIndex) {
+        const descriptor = descriptors[elementIndex];
+        const clone = element.clone().attr({
+            class: 'shp',
+            id: element.attr('id')
+        });
+        s.append(clone);
+        clone.drag(move, sel_start, stop_m);
+        const targetPosition = getMobileSheetSourcePosition(
+            descriptor.sourceBarIndex,
+            descriptor.sourceStepIndex + stepOffset,
+            element.attr('id'),
+            ''
+        );
+        moveSheetElementAnchorTo(clone, targetPosition.x, targetPosition.y, true);
+        clonedElements.push(clone);
+    });
+
+    mobileSheetEditorState.selectedSourceElements = clonedElements;
+    refreshMobileSheetEditorView();
+}
+
+function getMobileSheetRepeatSourceElements(sourceBarIndex, repeatSide) {
+    const expectedBoundaryIndex = repeatSide === 'start'
+        ? Math.max(0, Number(sourceBarIndex) - 1)
+        : Math.max(1, Number(sourceBarIndex));
+    const result = [];
+    s.selectAll('#wiederholung').forEach(function (element) {
+        const position = getElementReadPosition(element);
+        const target = getRepeatTarget(position.x, position.y, zeilenAnzahl);
+        if (target && target.boundaryIndex === expectedBoundaryIndex && target.repeatSide === repeatSide) {
+            result.push(element);
+        }
+    });
+    return result;
+}
+
+function refreshMobileSheetEditorView() {
+    const scrollPosition = {
+        x: window.scrollX || 0,
+        y: window.scrollY || 0,
+        anchorBarIndex: '',
+        anchorTop: 0
+    };
+    const visibleBarEl = Array.from(document.querySelectorAll('.mobile-sheet-bar[data-source-bar-index]'))
+        .find(function (barEl) {
+            const bounds = barEl.getBoundingClientRect();
+            return bounds.bottom > 0 && bounds.top < window.innerHeight;
+        });
+    if (visibleBarEl) {
+        scrollPosition.anchorBarIndex = visibleBarEl.dataset.sourceBarIndex || '';
+        scrollPosition.anchorTop = visibleBarEl.getBoundingClientRect().top;
+    }
+
+    const readResult = callPHPScript_lesen(zeilenAnzahl, {
+        showAlert: false,
+        updateQuickPlaySelectors: false,
+        logResults: false
+    });
+    renderSheetQuickPlaySelectors(readResult);
+    renderMobileSheetView(readResult);
+
+    window.requestAnimationFrame(function () {
+        window.scrollTo(scrollPosition.x, scrollPosition.y);
+        window.requestAnimationFrame(function () {
+            if (!scrollPosition.anchorBarIndex) {
+                return;
+            }
+            const restoredBarEl = document.querySelector(
+                '.mobile-sheet-bar[data-source-bar-index="' + scrollPosition.anchorBarIndex + '"]'
+            );
+            if (!restoredBarEl) {
+                return;
+            }
+            const topDifference = restoredBarEl.getBoundingClientRect().top - scrollPosition.anchorTop;
+            if (Math.abs(topDifference) > 0.5) {
+                window.scrollBy(0, topDifference);
+            }
+        });
+    });
+}
+
+function getMobileSheetStepFromPointer(svgEl, clientX) {
+    const metrics = svgEl && svgEl.__mobileSheetEditorMetrics;
+    if (!metrics || !svgEl.createSVGPoint || !svgEl.getScreenCTM()) {
+        return 0;
+    }
+    const point = svgEl.createSVGPoint();
+    point.x = clientX;
+    point.y = 0;
+    const localPoint = point.matrixTransform(svgEl.getScreenCTM().inverse());
+    return Math.max(0, Math.min(
+        getMobileSheetStepsPerBar() - 1,
+        Math.round((localPoint.x - metrics.firstNoteX) / metrics.noteStepX)
+    ));
+}
+
+function getMobileSheetChooserText(chooserElement) {
+    const textNode = chooserElement && typeof chooserElement.select === 'function'
+        ? chooserElement.select('text')
+        : null;
+    return textNode ? String(textNode.attr('text') || '').trim() : '';
+}
+
+function isMobileSheetChooserPlaceholder(chooserElement, placeholderText) {
+    const chooserText = getMobileSheetChooserText(chooserElement);
+    return !chooserText || chooserText === placeholderText;
+}
+
+function setMobileSheetChooserMoveSource(sourceBarIndex) {
+    const normalizedSourceBarIndex = Number(sourceBarIndex);
+    mobileSheetEditorState.activeTool = '';
+    mobileSheetEditorState.movingChooserSourceBarIndex =
+        Number(mobileSheetEditorState.movingChooserSourceBarIndex) === normalizedSourceBarIndex
+            ? null
+            : normalizedSourceBarIndex;
+    updateMobileSheetEditorPaletteState();
+}
+
+function deleteMobileSheetBarChoosers(sourceBarIndex) {
+    const chooserByType = getMobileSheetBarChoosers(sourceBarIndex);
+    const chooserElements = [chooserByType.instrument, chooserByType.label].filter(Boolean);
+    if (chooserElements.length === 0) {
+        return;
+    }
+    recordHistorySnapshot();
+    chooserElements.forEach(function (chooserElement) {
+        chooserElement.remove();
+    });
+    mobileSheetEditorState.movingChooserSourceBarIndex = null;
+    refreshMobileSheetEditorView();
+}
+
+function moveMobileSheetBarChoosers(targetBarIndex) {
+    const sourceBarIndex = Number(mobileSheetEditorState.movingChooserSourceBarIndex);
+    const normalizedTargetBarIndex = Number(targetBarIndex);
+    if (!Number.isFinite(sourceBarIndex) || sourceBarIndex < 1 || sourceBarIndex === normalizedTargetBarIndex) {
+        mobileSheetEditorState.movingChooserSourceBarIndex = null;
+        updateMobileSheetEditorPaletteState();
+        return;
+    }
+
+    const sourceChoosers = getMobileSheetBarChoosers(sourceBarIndex);
+    if (!sourceChoosers.instrument && !sourceChoosers.label) {
+        mobileSheetEditorState.movingChooserSourceBarIndex = null;
+        updateMobileSheetEditorPaletteState();
+        return;
+    }
+
+    const targetChoosers = getMobileSheetBarChoosers(normalizedTargetBarIndex);
+    const targetHasInstrument = targetChoosers.instrument &&
+        !isMobileSheetChooserPlaceholder(targetChoosers.instrument, 'Instrument');
+    const targetHasLabel = targetChoosers.label &&
+        !isMobileSheetChooserPlaceholder(targetChoosers.label, 'Funktion');
+    if (targetHasInstrument || targetHasLabel) {
+        return;
+    }
+
+    recordHistorySnapshot();
+    [targetChoosers.instrument, targetChoosers.label].filter(Boolean).forEach(function (chooserElement) {
+        chooserElement.remove();
+    });
+
+    const zeroBasedTargetBarIndex = Math.max(0, normalizedTargetBarIndex - 1);
+    const targetBounds = getSheetBarBounds(normalizedTargetBarIndex);
+    const chooserY = getSheetLineBaseY(Math.floor(zeroBasedTargetBarIndex / 2)) - 32;
+    if (sourceChoosers.instrument) {
+        sourceChoosers.instrument.transform('t' + (targetBounds.x + 24) + ',' + chooserY);
+    }
+    if (sourceChoosers.label) {
+        sourceChoosers.label.transform('t' + (targetBounds.x + 165) + ',' + chooserY);
+    }
+    mobileSheetEditorState.movingChooserSourceBarIndex = null;
+    refreshMobileSheetEditorView();
+}
+
+function insertMobileSheetBarChoosers(sourceBarIndex) {
+    const chooserByType = getMobileSheetBarChoosers(sourceBarIndex);
+    const instrumentValue = getMobileSheetChooserText(chooserByType.instrument);
+    const labelValue = getMobileSheetChooserText(chooserByType.label);
+    const needsInstrument = !chooserByType.instrument || !instrumentValue || instrumentValue === 'Instrument';
+    const needsLabel = !chooserByType.label || !labelValue || labelValue === 'Funktion';
+
+    if (!needsInstrument && !needsLabel) {
+        mobileSheetEditorState.activeTool = '';
+        updateMobileSheetEditorPaletteState();
+        return;
+    }
+
+    recordHistorySnapshot();
+    const zeroBasedBarIndex = Math.max(0, Number(sourceBarIndex) - 1);
+    const bounds = getSheetBarBounds(sourceBarIndex);
+    const chooserY = getSheetLineBaseY(Math.floor(zeroBasedBarIndex / 2)) - 32;
+    if (!chooserByType.instrument) {
+        createInstrumentChooser(s, bounds.x + 24, chooserY, 'Leer', 'gray')
+            .addClass('shp')
+            .attr({ id: nextInstrumentChooserId() });
+    } else if (needsInstrument) {
+        setChooserText(chooserByType.instrument, 'Leer', 'gray');
+    }
+    if (!chooserByType.label) {
+        createFunctionChooser(s, bounds.x + 165, chooserY, 'Leer', 'gray')
+            .addClass('shp')
+            .attr({ id: nextFunctionChooserId() });
+    } else if (needsLabel) {
+        setChooserText(chooserByType.label, 'Leer', 'gray');
+    }
+    mobileSheetEditorState.activeTool = '';
+    refreshMobileSheetEditorView();
+}
+
+function insertMobileSheetEditorElement(toolId, sourceBarIndex, sourceStepIndex, instrumentName, localX, staffMetrics) {
+    if (toolId === 'chooser') {
+        insertMobileSheetBarChoosers(sourceBarIndex);
+        return;
+    }
+    const targetPosition = getMobileSheetSourcePosition(sourceBarIndex, sourceStepIndex, toolId, instrumentName);
+    const templateMap = {
+        tone: ton_c,
+        bass: bass_c,
+        slap: slap_c,
+        tone_muffled: ton_g_c,
+        slap_muffled: slap_g_c,
+        tone_flam: flam_ton_c,
+        slap_flam: flam_slap_c,
+        bass_slap_flam: flam_bass_slap_c,
+        in: In_c,
+        out: Out_c,
+        shortbar: ShortBar_c
+    };
+
+    if (toolId === 'tuplet') {
+        mobileSheetEditorState.pendingTupletTarget = {
+            sourceBarIndex: sourceBarIndex,
+            sourceStepIndex: sourceStepIndex,
+            instrumentName: instrumentName
+        };
+        openTupletDialog();
+        return;
+    }
+
+    if (toolId === 'edit_text') {
+        const textValue = prompt('Text für das Notenblatt:', '');
+        if (textValue != null && String(textValue).trim()) {
+            recordHistorySnapshot();
+            createEditableTextElement(targetPosition.x, targetPosition.y, String(textValue).trim());
+            refreshMobileSheetEditorView();
+        }
+        return;
+    }
+
+    recordHistorySnapshot();
+    if (toolId === 'wiederholung') {
+        const zeroBasedBarIndex = Math.max(0, Number(sourceBarIndex) - 1);
+        const isRightBar = zeroBasedBarIndex % 2 === 1;
+        const useEndBoundary = localX >= (staffMetrics.staffStartX + staffMetrics.staffEndX) / 2;
+        const startBoundaryLineX = isRightBar ? 525 : 100;
+        const endBoundaryLineX = isRightBar ? 950 : 525;
+        const boundaryX = useEndBoundary
+            ? endBoundaryLineX - 6
+            : startBoundaryLineX + 8;
+        const repeatElement = createPaletteClone(repeatMarkerLegendClone, 'wiederholung', repeatMarkerGridOffsetX, 2);
+        moveSheetElementAnchorTo(repeatElement, boundaryX, getSheetLineBaseY(Math.floor(zeroBasedBarIndex / 2)) + 57, false);
+        repeatElement.dblclick(cycleRepeatCount);
+        refreshMobileSheetEditorView();
+        return;
+    }
+
+    const templateElement = templateMap[toolId];
+    if (!templateElement) {
+        return;
+    }
+    const element = createPaletteClone(templateElement, toolId, gridSizeX, toolId === 'in' ? -2 : 0);
+    moveSheetElementAnchorTo(element, targetPosition.x, targetPosition.y, false);
+    if (toolId === 'shortbar') {
+        updateShortBarMarkerVisual(element);
+        snapElementToVerticalTarget(element);
+    }
+    refreshMobileSheetEditorView();
+}
+
+function getMobileSheetBarChoosers(sourceBarIndex) {
+    const readConfig = getReadRhythmConfig();
+    const chooserByType = { instrument: null, label: null };
+    s.selectAll(chooserSelector).forEach(function (chooserElement) {
+        const position = getElementReadPosition(chooserElement);
+        const info = getBarIndexForMetaElement(position.x, position.y, readConfig, zeilenAnzahl);
+        if (info.barIndex + 1 !== Number(sourceBarIndex)) {
+            return;
+        }
+        chooserByType[isInstrumentChooserNode(chooserElement) ? 'instrument' : 'label'] = chooserElement;
+    });
+    return chooserByType;
+}
+
+async function setMobileSheetBarChooserValue(sourceBarIndex, chooserType, rawValue) {
+    const chooserByType = getMobileSheetBarChoosers(sourceBarIndex);
+    let nextValue = String(rawValue || '').trim();
+    if (!nextValue) {
+        return false;
+    }
+
+    if (chooserType === 'label' && (nextValue === 'Solo' || nextValue === 'Begleitpattern')) {
+        const currentChooser = chooserByType.label;
+        const currentTextNode = currentChooser ? currentChooser.select('text') : null;
+        const promptText = 'Bezeichnung für "' + nextValue + '" anpassen.\n' +
+            'Zum Beispiel: "Solo 1", "1. Solo", "Begleitpattern 2".';
+        const configuredValue = await requestChooserLabel(
+            getChooserLabelSeed(nextValue, currentTextNode),
+            promptText
+        );
+        if (configuredValue == null) {
+            return false;
+        }
+        nextValue = configuredValue;
+    }
+
+    recordHistorySnapshot();
+    const zeroBasedBarIndex = Math.max(0, Number(sourceBarIndex) - 1);
+    const bounds = getSheetBarBounds(sourceBarIndex);
+    const chooserY = getSheetLineBaseY(Math.floor(zeroBasedBarIndex / 2)) - 32;
+
+    if (chooserType === 'instrument') {
+        if (chooserByType.instrument) {
+            setChooserText(chooserByType.instrument, normalizeDoundounInstrumentName(nextValue));
+        } else {
+            createInstrumentChooser(s, bounds.x + 24, chooserY, nextValue, 'black')
+                .addClass('shp')
+                .attr({ id: nextInstrumentChooserId() });
+        }
+        if (nextValue === 'Leer' && chooserByType.label) {
+            setChooserText(chooserByType.label, 'Leer');
+        }
+    } else if (chooserByType.label) {
+        setChooserText(chooserByType.label, nextValue);
+    } else {
+        createFunctionChooser(s, bounds.x + 165, chooserY, nextValue, 'black')
+            .addClass('shp')
+            .attr({ id: nextFunctionChooserId() });
+    }
+    refreshMobileSheetEditorView();
+    return true;
+}
+
+function createMobileSheetChooserSelect(sourceBarIndex, chooserType, currentValue) {
+    const options = chooserType === 'instrument'
+        ? getInstrumentChooserOptions()
+        : getFunctionChooserOptions();
+    const selectEl = document.createElement('select');
+    selectEl.className = 'mobile-sheet-chooser-select mobile-sheet-chooser-' + chooserType;
+    selectEl.setAttribute('aria-label', chooserType === 'instrument' ? 'Instrument auswählen' : 'Pattern auswählen');
+
+    const selectedValue = chooserType === 'instrument'
+        ? String(normalizeDoundounInstrumentName(currentValue) || '').trim()
+        : String(currentValue || '').trim();
+    if (selectedValue && options.indexOf(selectedValue) === -1) {
+        const currentOptionEl = document.createElement('option');
+        currentOptionEl.value = selectedValue;
+        currentOptionEl.textContent = selectedValue;
+        selectEl.appendChild(currentOptionEl);
+    }
+    options.forEach(function (optionValue) {
+        const optionEl = document.createElement('option');
+        optionEl.value = optionValue;
+        optionEl.textContent = optionValue;
+        selectEl.appendChild(optionEl);
+    });
+    selectEl.value = selectedValue || 'Leer';
+
+    selectEl.addEventListener('click', function (event) {
+        event.stopPropagation();
+    });
+    selectEl.addEventListener('change', async function (event) {
+        event.stopPropagation();
+        const previousValue = selectedValue;
+        const changed = await setMobileSheetBarChooserValue(sourceBarIndex, chooserType, selectEl.value);
+        if (!changed) {
+            selectEl.value = previousValue;
+        }
+    });
+    return selectEl;
+}
+
+function bindMobileSheetNoteEditor(noteGroupEl, svgEl, sourceBarIndex, sourceStepIndex) {
+    if (!isMobileLandscapeViewport()) {
+        return;
+    }
+    let startClientX = 0;
+    let currentClientX = 0;
+    let startLocalX = 0;
+    let dragging = false;
+
+    function getLocalX(clientX) {
+        const point = svgEl.createSVGPoint();
+        point.x = clientX;
+        point.y = 0;
+        return point.matrixTransform(svgEl.getScreenCTM().inverse()).x;
+    }
+
+    noteGroupEl.addEventListener('pointerdown', function (event) {
+        if (mobileSheetEditorState.activeTool) {
+            return;
+        }
+        startClientX = event.clientX;
+        currentClientX = event.clientX;
+        startLocalX = getLocalX(event.clientX);
+        dragging = false;
+        noteGroupEl.setPointerCapture(event.pointerId);
+        event.preventDefault();
+    });
+    noteGroupEl.addEventListener('pointermove', function (event) {
+        if (!noteGroupEl.hasPointerCapture(event.pointerId)) {
+            return;
+        }
+        currentClientX = event.clientX;
+        const clientDeltaX = currentClientX - startClientX;
+        const localDeltaX = getLocalX(currentClientX) - startLocalX;
+        if (Math.abs(clientDeltaX) > 3) {
+            dragging = true;
+            noteGroupEl.classList.add('is-mobile-editor-dragging');
+            noteGroupEl.setAttribute('transform', 'translate(' + localDeltaX + ' 0)');
+        }
+        event.preventDefault();
+    });
+    noteGroupEl.addEventListener('pointerup', function (event) {
+        if (noteGroupEl.hasPointerCapture(event.pointerId)) {
+            noteGroupEl.releasePointerCapture(event.pointerId);
+        }
+        noteGroupEl.classList.remove('is-mobile-editor-dragging');
+        noteGroupEl.removeAttribute('transform');
+        if (!dragging) {
+            return;
+        }
+        const targetStepIndex = getMobileSheetStepFromPointer(svgEl, currentClientX);
+        if (targetStepIndex !== Number(sourceStepIndex)) {
+            const sourceElements = getMobileSheetSourceElements(sourceBarIndex, sourceStepIndex, 'note');
+            if (sourceElements.length > 0) {
+                recordHistorySnapshot();
+                const targetPosition = getMobileSheetSourcePosition(sourceBarIndex, targetStepIndex, '', '');
+                sourceElements.forEach(function (element) {
+                    moveSheetElementAnchorTo(element, targetPosition.x, targetPosition.y, true);
+                });
+                refreshMobileSheetEditorView();
+            }
+        }
+        event.preventDefault();
+    });
+}
+
+function bindMobileSheetSelectionEditor(svgEl) {
+    if (!isMobileLandscapeViewport()) {
+        return;
+    }
+    let pointerId = null;
+    let interactionMode = '';
+    let startPoint = null;
+    let currentPoint = null;
+    let selectionRectEl = null;
+    let startTargetNoteEl = null;
+
+    function getLocalPoint(event) {
+        const point = svgEl.createSVGPoint();
+        point.x = event.clientX;
+        point.y = event.clientY;
+        return point.matrixTransform(svgEl.getScreenCTM().inverse());
+    }
+
+    function removeSelectionPreview() {
+        if (selectionRectEl) {
+            selectionRectEl.remove();
+            selectionRectEl = null;
+        }
+        svgEl.querySelectorAll('.mobile-sheet-note.is-mobile-editor-selected').forEach(function (noteEl) {
+            noteEl.removeAttribute('transform');
+        });
+    }
+
+    function finishSelectionInteraction(event, cancelled) {
+        if (pointerId === null || event.pointerId !== pointerId) {
+            return;
+        }
+        if (svgEl.hasPointerCapture(pointerId)) {
+            svgEl.releasePointerCapture(pointerId);
+        }
+        const deltaX = currentPoint && startPoint ? currentPoint.x - startPoint.x : 0;
+        const deltaY = currentPoint && startPoint ? currentPoint.y - startPoint.y : 0;
+        const wasDragged = Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3;
+
+        if (!cancelled && interactionMode === 'select') {
+            const selectedNoteEls = [];
+            if (!wasDragged && startTargetNoteEl) {
+                selectedNoteEls.push(startTargetNoteEl);
+            } else if (startPoint && currentPoint) {
+                const selectionBounds = {
+                    left: Math.min(startPoint.x, currentPoint.x),
+                    right: Math.max(startPoint.x, currentPoint.x),
+                    top: Math.min(startPoint.y, currentPoint.y),
+                    bottom: Math.max(startPoint.y, currentPoint.y)
+                };
+                svgEl.querySelectorAll('.mobile-sheet-note').forEach(function (noteEl) {
+                    const noteBounds = noteEl.getBBox();
+                    const intersects = noteBounds.x + noteBounds.width >= selectionBounds.left &&
+                        noteBounds.x <= selectionBounds.right &&
+                        noteBounds.y + noteBounds.height >= selectionBounds.top &&
+                        noteBounds.y <= selectionBounds.bottom;
+                    if (intersects) {
+                        selectedNoteEls.push(noteEl);
+                    }
+                });
+            }
+            setMobileSheetSelectionFromNoteElements(selectedNoteEls);
+        } else if (!cancelled && interactionMode === 'move' && wasDragged) {
+            const selectedElements = getMobileSheetSelectedSourceElements().slice();
+            const descriptors = selectedElements.map(getMobileSheetSourceNoteDescriptor);
+            if (selectedElements.length > 0 && !descriptors.some(function (descriptor) { return !descriptor; })) {
+                const requestedStepOffset = Math.round(deltaX / svgEl.__mobileSheetEditorMetrics.noteStepX);
+                const selectedSteps = descriptors.map(function (descriptor) { return descriptor.sourceStepIndex; });
+                const minimumStep = Math.min.apply(Math, selectedSteps);
+                const maximumStep = Math.max.apply(Math, selectedSteps);
+                const stepOffset = Math.max(
+                    -minimumStep,
+                    Math.min(getMobileSheetStepsPerBar() - 1 - maximumStep, requestedStepOffset)
+                );
+                if (stepOffset !== 0) {
+                    recordHistorySnapshot();
+                    selectedElements.forEach(function (element, elementIndex) {
+                        const descriptor = descriptors[elementIndex];
+                        const targetPosition = getMobileSheetSourcePosition(
+                            descriptor.sourceBarIndex,
+                            descriptor.sourceStepIndex + stepOffset,
+                            element.attr('id'),
+                            ''
+                        );
+                        moveSheetElementAnchorTo(element, targetPosition.x, targetPosition.y, true);
+                    });
+                    removeSelectionPreview();
+                    refreshMobileSheetEditorView();
+                }
+            }
+        }
+
+        removeSelectionPreview();
+        pointerId = null;
+        interactionMode = '';
+        startPoint = null;
+        currentPoint = null;
+        startTargetNoteEl = null;
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    svgEl.addEventListener('pointerdown', function (event) {
+        if (mobileSheetEditorState.activeTool !== 'select') {
+            return;
+        }
+        const targetNoteEl = event.target && event.target.closest
+            ? event.target.closest('.mobile-sheet-note')
+            : null;
+        const moveExistingSelection = Boolean(
+            targetNoteEl && targetNoteEl.classList.contains('is-mobile-editor-selected')
+        );
+        pointerId = event.pointerId;
+        interactionMode = moveExistingSelection ? 'move' : 'select';
+        startTargetNoteEl = targetNoteEl;
+        startPoint = getLocalPoint(event);
+        currentPoint = startPoint;
+        svgEl.setPointerCapture(pointerId);
+
+        if (!moveExistingSelection) {
+            mobileSheetEditorState.selectedSourceElements = [];
+            updateMobileSheetSelectionClasses();
+            selectionRectEl = createMobileSheetSvgElement('rect', {
+                x: startPoint.x,
+                y: startPoint.y,
+                width: 0,
+                height: 0,
+                class: 'mobile-sheet-selection-box'
+            });
+            svgEl.appendChild(selectionRectEl);
+        }
+        event.preventDefault();
+        event.stopPropagation();
+    });
+
+    svgEl.addEventListener('pointermove', function (event) {
+        if (pointerId === null || event.pointerId !== pointerId) {
+            return;
+        }
+        currentPoint = getLocalPoint(event);
+        const deltaX = currentPoint.x - startPoint.x;
+        if (interactionMode === 'select' && selectionRectEl) {
+            selectionRectEl.setAttribute('x', Math.min(startPoint.x, currentPoint.x));
+            selectionRectEl.setAttribute('y', Math.min(startPoint.y, currentPoint.y));
+            selectionRectEl.setAttribute('width', Math.abs(deltaX));
+            selectionRectEl.setAttribute('height', Math.abs(currentPoint.y - startPoint.y));
+        } else if (interactionMode === 'move') {
+            svgEl.querySelectorAll('.mobile-sheet-note.is-mobile-editor-selected').forEach(function (noteEl) {
+                noteEl.setAttribute('transform', 'translate(' + deltaX + ' 0)');
+            });
+        }
+        event.preventDefault();
+        event.stopPropagation();
+    });
+
+    svgEl.addEventListener('pointerup', function (event) {
+        finishSelectionInteraction(event, false);
+    });
+    svgEl.addEventListener('pointercancel', function (event) {
+        finishSelectionInteraction(event, true);
+    });
+}
+
+function bindMobileSheetRepeatEditor(repeatGroupEl, sourceBarIndex, repeatSide) {
+    if (!isMobileLandscapeViewport()) {
+        return;
+    }
+    let lastTapTime = 0;
+
+    repeatGroupEl.addEventListener('pointerup', function (event) {
+        if (mobileSheetEditorState.activeTool) {
+            return;
+        }
+        const currentTapTime = Date.now();
+        const isDoubleTap = currentTapTime - lastTapTime > 0 && currentTapTime - lastTapTime < 380;
+        lastTapTime = currentTapTime;
+        if (!isDoubleTap) {
+            return;
+        }
+
+        const sourceElements = getMobileSheetRepeatSourceElements(sourceBarIndex, repeatSide);
+        if (sourceElements.length > 0) {
+            cycleRepeatCount.call(sourceElements[0]);
+            refreshMobileSheetEditorView();
+        }
+        event.preventDefault();
+        event.stopPropagation();
+    });
+    repeatGroupEl.addEventListener('click', function (event) {
+        if (!mobileSheetEditorState.activeTool) {
+            event.stopPropagation();
+        }
+    });
+}
+
 function createMobileSheetBarElement(bar, barIndex, previousBar, nextBar) {
     const cardEl = document.createElement('article');
     cardEl.className = 'mobile-sheet-bar';
 
     const sourceBarIndex = Number(bar && bar.index) || (barIndex + 1);
+    const isLandscapeEditor = isMobileLandscapeViewport();
+    cardEl.dataset.sourceBarIndex = String(sourceBarIndex);
+    cardEl.classList.toggle('is-mobile-sheet-editable', isLandscapeEditor);
     const quickPlayPattern = getSheetQuickPlayPatternForSourceBar(sourceBarIndex);
     const quickPlayPatternId = quickPlayPattern && quickPlayPattern.id ? String(quickPlayPattern.id) : '';
     if (quickPlayPatternId) {
@@ -6190,7 +7351,8 @@ function createMobileSheetBarElement(bar, barIndex, previousBar, nextBar) {
         !bar.label &&
         (bar.effectiveInstrument || '') === (previousBar.effectiveInstrument || '') &&
         (bar.effectiveLabel || '') === (previousBar.effectiveLabel || '');
-    if (isContinuationBar) {
+    const useCompactContinuationLayout = isContinuationBar && !isLandscapeEditor;
+    if (useCompactContinuationLayout) {
         cardEl.classList.add('is-continuation-bar');
         const isFirstContinuationBar = previousBar &&
             (previousBar.instrument || previousBar.label);
@@ -6209,7 +7371,11 @@ function createMobileSheetBarElement(bar, barIndex, previousBar, nextBar) {
     titleEl.textContent = isContinuationBar
         ? ''
         : (instrumentText + (labelText ? ' / ' + labelText : ''));
-    if (titleEl.textContent || (quickPlayPatternId && isFirstSheetQuickPlayPatternBar(quickPlayPattern, sourceBarIndex))) {
+    if (
+        titleEl.textContent ||
+        isLandscapeEditor ||
+        (quickPlayPatternId && isFirstSheetQuickPlayPatternBar(quickPlayPattern, sourceBarIndex))
+    ) {
         const titleRowEl = document.createElement('div');
         titleRowEl.className = 'mobile-sheet-bar-heading';
         if (quickPlayPatternId && isFirstSheetQuickPlayPatternBar(quickPlayPattern, sourceBarIndex)) {
@@ -6224,14 +7390,111 @@ function createMobileSheetBarElement(bar, barIndex, previousBar, nextBar) {
             });
             titleRowEl.appendChild(selectButtonEl);
         }
-        if (titleEl.textContent) {
+        if (titleEl.textContent && !isLandscapeEditor) {
             titleRowEl.appendChild(titleEl);
+        } else if (!isContinuationBar && isLandscapeEditor) {
+            const chooserRowEl = document.createElement('div');
+            chooserRowEl.className = 'mobile-sheet-chooser-row';
+            chooserRowEl.appendChild(createMobileSheetChooserSelect(
+                sourceBarIndex,
+                'instrument',
+                bar.instrument || instrumentText || 'Leer'
+            ));
+            chooserRowEl.appendChild(createMobileSheetChooserSelect(
+                sourceBarIndex,
+                'label',
+                bar.label || labelText || 'Leer'
+            ));
+            const chooserActionsEl = document.createElement('div');
+            chooserActionsEl.className = 'mobile-sheet-chooser-actions';
+            const moveChooserButtonEl = document.createElement('button');
+            moveChooserButtonEl.type = 'button';
+            moveChooserButtonEl.className = 'mobile-sheet-chooser-action';
+            moveChooserButtonEl.textContent = '↕';
+            moveChooserButtonEl.title = 'Chooser verschieben';
+            moveChooserButtonEl.setAttribute('aria-label', 'Chooser aus Takt ' + sourceBarIndex + ' verschieben');
+            moveChooserButtonEl.addEventListener('click', function (event) {
+                event.stopPropagation();
+                setMobileSheetChooserMoveSource(sourceBarIndex);
+            });
+            const deleteChooserButtonEl = document.createElement('button');
+            deleteChooserButtonEl.type = 'button';
+            deleteChooserButtonEl.className = 'mobile-sheet-chooser-action';
+            deleteChooserButtonEl.textContent = '×';
+            deleteChooserButtonEl.title = 'Chooser löschen';
+            deleteChooserButtonEl.setAttribute('aria-label', 'Chooser aus Takt ' + sourceBarIndex + ' löschen');
+            deleteChooserButtonEl.addEventListener('click', function (event) {
+                event.stopPropagation();
+                deleteMobileSheetBarChoosers(sourceBarIndex);
+            });
+            chooserActionsEl.append(moveChooserButtonEl, deleteChooserButtonEl);
+            chooserRowEl.appendChild(chooserActionsEl);
+            titleRowEl.appendChild(chooserRowEl);
+        } else if (isLandscapeEditor) {
+            const chooserTargetEl = document.createElement('button');
+            chooserTargetEl.type = 'button';
+            chooserTargetEl.className = 'mobile-sheet-chooser-target';
+            chooserTargetEl.textContent = 'Instrument und Funktion hier einsetzen';
+            chooserTargetEl.setAttribute('aria-label', 'Instrument und Funktion in Takt ' + sourceBarIndex + ' einsetzen');
+            chooserTargetEl.addEventListener('click', function (event) {
+                event.stopPropagation();
+                if (mobileSheetEditorState.activeTool === 'chooser') {
+                    insertMobileSheetBarChoosers(sourceBarIndex);
+                } else if (mobileSheetEditorState.movingChooserSourceBarIndex) {
+                    moveMobileSheetBarChoosers(sourceBarIndex);
+                }
+            });
+            titleRowEl.appendChild(chooserTargetEl);
         }
         cardEl.appendChild(titleRowEl);
     }
 
+    const barTextEntries = getMobileSheetBarTextEntries(sourceBarIndex);
+    if (barTextEntries.length > 0) {
+        const commentsEl = document.createElement('div');
+        commentsEl.className = 'mobile-sheet-bar-comments';
+        barTextEntries.forEach(function (textEntry) {
+            if (isLandscapeEditor) {
+                const commentInputEl = document.createElement('input');
+                commentInputEl.type = 'text';
+                commentInputEl.className = 'mobile-sheet-bar-comment-input';
+                commentInputEl.value = textEntry.text;
+                commentInputEl.setAttribute('aria-label', 'Kommentar in Takt ' + sourceBarIndex);
+                commentInputEl.autocomplete = 'off';
+                commentInputEl.spellcheck = false;
+                let commentHistoryRecorded = false;
+                commentInputEl.addEventListener('input', function () {
+                    if (!commentHistoryRecorded && commentInputEl.value !== textEntry.text) {
+                        recordHistorySnapshot();
+                        commentHistoryRecorded = true;
+                    }
+                    textEntry.element.attr({ text: commentInputEl.value });
+                });
+                commentInputEl.addEventListener('keydown', function (event) {
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                        commentInputEl.blur();
+                    }
+                });
+                commentInputEl.addEventListener('blur', function () {
+                    if (!commentInputEl.value.trim()) {
+                        textEntry.element.remove();
+                        refreshMobileSheetEditorView();
+                    }
+                });
+                commentsEl.appendChild(commentInputEl);
+            } else {
+                const commentEl = document.createElement('div');
+                commentEl.className = 'mobile-sheet-bar-comment';
+                commentEl.textContent = textEntry.text;
+                commentsEl.appendChild(commentEl);
+            }
+        });
+        cardEl.appendChild(commentsEl);
+    }
+
     const svgEl = createMobileSheetSvgElement('svg', {
-        viewBox: isContinuationBar ? '-20 6 400 112' : '-20 -8 400 120',
+        viewBox: useCompactContinuationLayout ? '-20 6 400 112' : '-20 -8 400 120',
         role: 'img',
         'aria-label': titleEl.textContent
     });
@@ -6252,6 +7515,14 @@ function createMobileSheetBarElement(bar, barIndex, previousBar, nextBar) {
     const staffStartX = getMobileSheetScaledX(leftX, rightX, gridLineStepRel);
     const staffEndX = getMobileSheetScaledX(leftX, rightX, (layoutConfig.centerDividerIndex - 1) * gridLineStepRel);
     const lineColor = '#111';
+    const firstNoteX = getMobileSheetScaledX(leftX, rightX, layoutConfig.noteStartRel) + noteCenterOffsetX;
+    const secondNoteX = getMobileSheetScaledX(leftX, rightX, layoutConfig.noteStartRel + layoutConfig.noteStepRel) + noteCenterOffsetX;
+    svgEl.__mobileSheetEditorMetrics = {
+        firstNoteX: firstNoteX,
+        noteStepX: secondNoteX - firstNoteX,
+        staffStartX: staffStartX,
+        staffEndX: staffEndX
+    };
 
     svgEl.appendChild(createMobileSheetSvgElement('text', {
         x: staffStartX - 22,
@@ -6288,10 +7559,26 @@ function createMobileSheetBarElement(bar, barIndex, previousBar, nextBar) {
     });
 
     if (bar.repeat && Array.isArray(bar.repeat.start) && bar.repeat.start.length > 0) {
-        appendMobileSheetRepeatMarker(svgEl, staffStartX - 11, noteY - 8, getMobileSheetRepeatText(bar.repeat.start));
+        const repeatStartGroupEl = createMobileSheetSvgElement('g', {
+            class: 'mobile-sheet-control',
+            'data-source-bar-index': sourceBarIndex,
+            'data-source-step-index': 0,
+            'data-source-element-type': 'wiederholung'
+        });
+        appendMobileSheetRepeatMarker(repeatStartGroupEl, staffStartX - 11, noteY - 8, getMobileSheetRepeatText(bar.repeat.start), true);
+        svgEl.appendChild(repeatStartGroupEl);
+        bindMobileSheetRepeatEditor(repeatStartGroupEl, sourceBarIndex, 'start');
     }
     if (bar.repeat && Array.isArray(bar.repeat.end) && bar.repeat.end.length > 0) {
-        appendMobileSheetRepeatMarker(svgEl, staffEndX + 11, noteY - 8, getMobileSheetRepeatText(bar.repeat.end));
+        const repeatEndGroupEl = createMobileSheetSvgElement('g', {
+            class: 'mobile-sheet-control',
+            'data-source-bar-index': sourceBarIndex,
+            'data-source-step-index': Math.max(0, getMobileSheetStepsPerBar() - 1),
+            'data-source-element-type': 'wiederholung'
+        });
+        appendMobileSheetRepeatMarker(repeatEndGroupEl, staffEndX + 11, noteY - 8, getMobileSheetRepeatText(bar.repeat.end), true);
+        svgEl.appendChild(repeatEndGroupEl);
+        bindMobileSheetRepeatEditor(repeatEndGroupEl, sourceBarIndex, 'end');
     }
 
     const notes = Array.isArray(bar.notes) ? bar.notes : [];
@@ -6311,6 +7598,7 @@ function createMobileSheetBarElement(bar, barIndex, previousBar, nextBar) {
         });
         appendMobileSheetNote(noteGroupEl, noteValue, noteX + noteCenterOffsetX, noteY, beatWidth);
         svgEl.appendChild(noteGroupEl);
+        bindMobileSheetNoteEditor(noteGroupEl, svgEl, sourceBarIndex, stepIndex);
     });
 
     (Array.isArray(bar.controls) ? bar.controls : []).forEach(function (control) {
@@ -6319,16 +7607,82 @@ function createMobileSheetBarElement(bar, barIndex, previousBar, nextBar) {
             rightX,
             layoutConfig.noteStartRel + (Number(control.stepIndex) || 0) * layoutConfig.noteStepRel
         ) + noteCenterOffsetX;
-        appendMobileSheetControlMarker(svgEl, control, controlX, topY, noteY);
+        const controlGroupEl = createMobileSheetSvgElement('g', {
+            class: 'mobile-sheet-control',
+            'data-source-bar-index': sourceBarIndex,
+            'data-source-step-index': Number(control.stepIndex) || 0,
+            'data-source-element-type': control.type || ''
+        });
+        appendMobileSheetControlMarker(controlGroupEl, control, controlX, topY, noteY);
+        svgEl.appendChild(controlGroupEl);
     });
+
+    if (isLandscapeEditor) {
+        bindMobileSheetSelectionEditor(svgEl);
+        svgEl.addEventListener('click', function (event) {
+            const activeTool = mobileSheetEditorState.activeTool;
+            if (!activeTool) {
+                return;
+            }
+            if (activeTool === 'select') {
+                return;
+            }
+            const sourceNode = event.target && event.target.closest
+                ? event.target.closest('.mobile-sheet-note, .mobile-sheet-control')
+                : null;
+            if (activeTool === 'delete') {
+                if (!sourceNode) {
+                    return;
+                }
+                const sourceType = sourceNode.classList.contains('mobile-sheet-note')
+                    ? 'note'
+                    : String(sourceNode.dataset.sourceElementType || '');
+                if (!sourceType) {
+                    return;
+                }
+                const sourceElements = sourceType === 'wiederholung'
+                    ? getMobileSheetRepeatSourceElements(
+                        sourceNode.dataset.sourceBarIndex,
+                        Number(sourceNode.dataset.sourceStepIndex) === 0 ? 'start' : 'end'
+                    )
+                    : getMobileSheetSourceElements(
+                        sourceNode.dataset.sourceBarIndex,
+                        sourceNode.dataset.sourceStepIndex,
+                        sourceType
+                    );
+                if (sourceElements.length > 0) {
+                    recordHistorySnapshot();
+                    sourceElements.forEach(function (element) { element.remove(); });
+                    refreshMobileSheetEditorView();
+                }
+                event.preventDefault();
+                return;
+            }
+
+            const stepIndex = getMobileSheetStepFromPointer(svgEl, event.clientX);
+            const svgPoint = svgEl.createSVGPoint();
+            svgPoint.x = event.clientX;
+            svgPoint.y = event.clientY;
+            const localPoint = svgPoint.matrixTransform(svgEl.getScreenCTM().inverse());
+            insertMobileSheetEditorElement(
+                activeTool,
+                sourceBarIndex,
+                stepIndex,
+                instrumentText,
+                localPoint.x,
+                svgEl.__mobileSheetEditorMetrics
+            );
+            event.preventDefault();
+        });
+    }
 
     cardEl.appendChild(svgEl);
     return cardEl;
 }
 
-function getMobileSheetHeaderSubtitle() {
+function getMobileSheetHeaderSubtitleEntry() {
     if (!s || !titel || typeof s.selectAll !== 'function') {
-        return '';
+        return null;
     }
 
     const titleBounds = titel.getBBox();
@@ -6348,6 +7702,7 @@ function getMobileSheetHeaderSubtitle() {
             return;
         }
         candidates.push({
+            element: textEl,
             text: text,
             x: Number(bounds.x) || centerX
         });
@@ -6356,7 +7711,59 @@ function getMobileSheetHeaderSubtitle() {
     candidates.sort(function (left, right) {
         return left.x - right.x;
     });
-    return candidates.length > 0 ? candidates[0].text : '';
+    return candidates.length > 0 ? candidates[0] : null;
+}
+
+function getMobileSheetHeaderSubtitle() {
+    const subtitleEntry = getMobileSheetHeaderSubtitleEntry();
+    return subtitleEntry ? subtitleEntry.text : '';
+}
+
+function getMobileSheetEditableTextAnchor(textElement) {
+    const translate = typeof getElementTranslate === 'function'
+        ? getElementTranslate(textElement)
+        : { x: 0, y: 0 };
+    const bounds = textElement && typeof textElement.getBBox === 'function'
+        ? textElement.getBBox()
+        : { x: 0, y: 0 };
+    const attributeX = Number(textElement && textElement.attr('x'));
+    const attributeY = Number(textElement && textElement.attr('y'));
+    return {
+        x: (Number.isFinite(attributeX) ? attributeX : Number(bounds.x) || 0) + (Number(translate.x) || 0),
+        y: (Number.isFinite(attributeY) ? attributeY : Number(bounds.y) || 0) + (Number(translate.y) || 0)
+    };
+}
+
+function getMobileSheetBarTextEntries(sourceBarIndex) {
+    if (!s || typeof s.selectAll !== 'function') {
+        return [];
+    }
+    const headerSubtitleEntry = getMobileSheetHeaderSubtitleEntry();
+    const readConfig = getReadRhythmConfig();
+    const normalizedBarIndex = Number(sourceBarIndex);
+    const entries = [];
+    s.selectAll('#edit_text').forEach(function (textElement) {
+        if (
+            headerSubtitleEntry &&
+            headerSubtitleEntry.element &&
+            headerSubtitleEntry.element.node === textElement.node
+        ) {
+            return;
+        }
+        const text = String(textElement.attr('text') || '').trim();
+        if (!text) {
+            return;
+        }
+        const anchor = getMobileSheetEditableTextAnchor(textElement);
+        const positionInfo = getBarIndexFromPosition(anchor.x, anchor.y, readConfig, zeilenAnzahl);
+        if (positionInfo.barIndex + 1 === normalizedBarIndex) {
+            entries.push({ element: textElement, text: text, x: anchor.x });
+        }
+    });
+    entries.sort(function (left, right) {
+        return left.x - right.x;
+    });
+    return entries;
 }
 
 function renderMobileSheetView(readResult) {
@@ -6365,7 +7772,7 @@ function renderMobileSheetView(readResult) {
         return;
     }
     sheetQuickPlayState.mobileNoteElementsByPosition = {};
-    if (!isMobilePracticeViewport() || !document.body.classList.contains('has-loaded-score')) {
+    if (!isMobileSheetReaderViewport() || !document.body.classList.contains('has-loaded-score')) {
         document.body.classList.remove('has-mobile-sheet-view');
         viewEl.hidden = true;
         viewEl.innerHTML = '';
@@ -6373,9 +7780,13 @@ function renderMobileSheetView(readResult) {
     }
 
     const sourceReadResult = readResult || (window.lastReadRhythmBars ? { rhythmBars: window.lastReadRhythmBars } : null);
-    const rhythmBars = sourceReadResult && Array.isArray(sourceReadResult.rhythmBars)
-        ? trimMobileSheetBars(sourceReadResult.rhythmBars)
+    const sourceRhythmBars = sourceReadResult && Array.isArray(sourceReadResult.rhythmBars)
+        ? sourceReadResult.rhythmBars
         : [];
+    const trimmedRhythmBars = trimMobileSheetBars(sourceRhythmBars);
+    const rhythmBars = isMobileLandscapeViewport()
+        ? sourceRhythmBars
+        : (trimmedRhythmBars.length > 0 ? trimmedRhythmBars : sourceRhythmBars.slice(0, 1));
     viewEl.innerHTML = '';
     viewEl.hidden = rhythmBars.length === 0;
     if (rhythmBars.length === 0) {
@@ -6386,9 +7797,39 @@ function renderMobileSheetView(readResult) {
 
     const headerEl = document.createElement('div');
     headerEl.className = 'mobile-sheet-header';
-    const headingEl = document.createElement('h2');
-    headingEl.textContent = titel && typeof titel.attr === 'function' ? titel.attr('text') : 'Notenblatt';
-    headerEl.appendChild(headingEl);
+    const currentRhythmTitle = titel && typeof titel.attr === 'function'
+        ? String(titel.attr('text') || '')
+        : '';
+    if (isMobileLandscapeViewport()) {
+        const titleInputEl = document.createElement('input');
+        titleInputEl.type = 'text';
+        titleInputEl.className = 'mobile-sheet-title-input';
+        titleInputEl.value = isDefaultTitleText(currentRhythmTitle) ? '' : currentRhythmTitle;
+        titleInputEl.placeholder = defaultRhythmTitle;
+        titleInputEl.setAttribute('aria-label', 'Rhythmusname');
+        titleInputEl.autocomplete = 'off';
+        titleInputEl.spellcheck = false;
+        let titleHistoryRecorded = false;
+        titleInputEl.addEventListener('input', function () {
+            const nextTitle = titleInputEl.value.trim();
+            if (!titleHistoryRecorded && nextTitle !== currentRhythmTitle) {
+                recordHistorySnapshot();
+                titleHistoryRecorded = true;
+            }
+            setRhythmTitle(nextTitle);
+        });
+        titleInputEl.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                titleInputEl.blur();
+            }
+        });
+        headerEl.appendChild(titleInputEl);
+    } else {
+        const headingEl = document.createElement('h2');
+        headingEl.textContent = currentRhythmTitle || 'Notenblatt';
+        headerEl.appendChild(headingEl);
+    }
 
     const controlsEl = document.createElement('div');
     controlsEl.className = 'mobile-sheet-quick-play-controls';
@@ -6404,6 +7845,13 @@ function renderMobileSheetView(readResult) {
     tempoInputEl.step = '1';
     tempoInputEl.inputMode = 'numeric';
     tempoInputEl.value = String(getSheetQuickPlayTempo());
+    tempoInputEl.addEventListener('focus', function () {
+        positionMobileSheetQuickPlayFrame();
+    });
+    tempoInputEl.addEventListener('blur', function () {
+        window.requestAnimationFrame(positionMobileSheetQuickPlayFrame);
+        window.setTimeout(positionMobileSheetQuickPlayFrame, 300);
+    });
     tempoInputEl.addEventListener('change', function () {
         setSheetQuickPlayTempo(tempoInputEl.value);
         if (sheetQuickPlayState.isPlaying) {
@@ -6420,14 +7868,62 @@ function renderMobileSheetView(readResult) {
     controlsEl.appendChild(tempoInputEl);
     controlsEl.appendChild(playButtonEl);
     headerEl.appendChild(controlsEl);
-    const subtitle = getMobileSheetHeaderSubtitle();
-    if (subtitle) {
+    const subtitleEntry = getMobileSheetHeaderSubtitleEntry();
+    const subtitle = subtitleEntry ? subtitleEntry.text : '';
+    if (isMobileLandscapeViewport()) {
+        const subtitleInputEl = document.createElement('input');
+        subtitleInputEl.type = 'text';
+        subtitleInputEl.className = 'mobile-sheet-comment-input';
+        subtitleInputEl.value = subtitle;
+        subtitleInputEl.placeholder = 'Kommentar zum Rhythmus';
+        subtitleInputEl.setAttribute('aria-label', 'Kommentar zum Rhythmus');
+        subtitleInputEl.autocomplete = 'off';
+        subtitleInputEl.spellcheck = false;
+        let subtitleElement = subtitleEntry ? subtitleEntry.element : null;
+        let subtitleHistoryRecorded = false;
+        subtitleInputEl.addEventListener('input', function () {
+            const nextSubtitle = subtitleInputEl.value;
+            if (!subtitleHistoryRecorded && nextSubtitle !== subtitle) {
+                recordHistorySnapshot();
+                subtitleHistoryRecorded = true;
+            }
+            if (!subtitleElement && nextSubtitle.trim()) {
+                const titleBounds = titel.getBBox();
+                const titleY = Number(titel.attr('y')) || Number(titleBounds.cy) || 48;
+                const titleStartX = Number(titleBounds.x) || 40;
+                const titleEndX = Number(titleBounds.x2) || (titleStartX + (Number(titleBounds.width) || 0));
+                const commentX = Math.min(
+                    sheetWidth - 220,
+                    Math.max(titleEndX + 24, titleStartX + 240)
+                );
+                subtitleElement = createEditableTextElement(commentX, titleY, nextSubtitle);
+            } else if (subtitleElement) {
+                subtitleElement.attr({ text: nextSubtitle });
+            }
+        });
+        subtitleInputEl.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                subtitleInputEl.blur();
+            }
+        });
+        subtitleInputEl.addEventListener('blur', function () {
+            if (subtitleElement && !subtitleInputEl.value.trim()) {
+                subtitleElement.remove();
+                subtitleElement = null;
+            }
+        });
+        headerEl.appendChild(subtitleInputEl);
+    } else if (subtitle) {
         const subtitleEl = document.createElement('div');
         subtitleEl.className = 'mobile-sheet-subtitle';
         subtitleEl.textContent = subtitle;
         headerEl.appendChild(subtitleEl);
     }
     viewEl.appendChild(headerEl);
+    if (isMobileLandscapeViewport()) {
+        viewEl.appendChild(createMobileSheetEditorPalette());
+    }
 
     rhythmBars.forEach(function (bar, barIndex) {
         if (!bar) {
@@ -6437,6 +7933,7 @@ function renderMobileSheetView(readResult) {
     });
     rebuildMobileSheetQuickPlayNoteElementMap();
     updateSheetQuickPlaySelectionClasses();
+    updateMobileSheetSelectionClasses();
     setSheetQuickPlayButtonState(sheetQuickPlayState.isPlaying);
 }
 
@@ -7650,14 +9147,23 @@ document.addEventListener('DOMContentLoaded', function () {
     document.querySelector('#button4').addEventListener('click', function () {
         recordHistorySnapshot();
         viererNoten();
+        if (isMobileLandscapeViewport()) {
+            refreshMobileSheetEditorView();
+        }
     });
     document.querySelector('#button5').addEventListener('click', function () {
         recordHistorySnapshot();
         dreierNoten();
+        if (isMobileLandscapeViewport()) {
+            refreshMobileSheetEditorView();
+        }
     });
     document.querySelector('#button8').addEventListener('click', function () {
         recordHistorySnapshot();
         neunerNoten();
+        if (isMobileLandscapeViewport()) {
+            refreshMobileSheetEditorView();
+        }
     });
     document.querySelector('#addSheetPageButton').addEventListener('click', addSheetPage);
     document.querySelector('#deleteSheetPageButton').addEventListener('click', deleteSheetPage);
@@ -7708,6 +9214,10 @@ document.addEventListener('DOMContentLoaded', function () {
     window.addEventListener('scroll', positionSheetQuickPlayControls, { passive: true });
     window.addEventListener('resize', positionMobileSheetQuickPlayFrame);
     window.addEventListener('scroll', positionMobileSheetQuickPlayFrame, { passive: true });
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', positionMobileSheetQuickPlayFrame);
+        window.visualViewport.addEventListener('scroll', positionMobileSheetQuickPlayFrame, { passive: true });
+    }
     document.querySelector('#themeClearButton').addEventListener('click', function () {
         setUiTheme('');
     });
