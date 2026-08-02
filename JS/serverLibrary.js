@@ -18,10 +18,19 @@
     return formData;
   }
 
+  function getFreshEndpointUrl(endpoint) {
+    const separator = String(endpoint || "").indexOf("?") === -1 ? "?" : "&";
+    return ENDPOINT_BASE + endpoint + separator + "_=" + Date.now();
+  }
+
   async function postEndpoint(endpoint, payload) {
-    const response = await fetch(ENDPOINT_BASE + endpoint, {
+    const response = await fetch(getFreshEndpointUrl(endpoint), {
       method: "POST",
-      body: encodeForm(payload)
+      body: encodeForm(payload),
+      cache: "no-store",
+      headers: {
+        "Cache-Control": "no-cache"
+      }
     });
 
     if (!response.ok) {
@@ -32,9 +41,13 @@
   }
 
   async function postJsonEndpoint(endpoint, payload) {
-    const response = await fetch(ENDPOINT_BASE + endpoint, {
+    const response = await fetch(getFreshEndpointUrl(endpoint), {
       method: "POST",
-      body: encodeForm(payload)
+      body: encodeForm(payload),
+      cache: "no-store",
+      headers: {
+        "Cache-Control": "no-cache"
+      }
     });
     const responseText = await response.text();
     let data = null;

@@ -3348,12 +3348,19 @@ body.is-timeline-dragging .timeline-dropzone-inline {
     }
 
     .mobile-sheet-header {
+        position: sticky;
+        top: calc(45px + env(safe-area-inset-top));
+        z-index: 12;
         display: flex;
         flex-wrap: wrap;
         align-items: center;
         justify-content: space-between;
         gap: 10px;
-        margin-bottom: 8px;
+        margin: -12px -12px 8px;
+        padding: 10px 12px 8px;
+        border-bottom: 1px solid #d0e4d7;
+        background: rgba(251, 254, 252, 0.98);
+        box-shadow: 0 3px 8px rgba(49, 90, 66, 0.08);
     }
 
     .mobile-sheet-view .mobile-sheet-header h2 {
@@ -3361,6 +3368,16 @@ body.is-timeline-dragging .timeline-dropzone-inline {
         min-width: 0;
         margin: 0;
         overflow-wrap: anywhere;
+    }
+
+    .mobile-sheet-subtitle {
+        flex: 1 0 100%;
+        margin-top: -5px;
+        color: #65776d;
+        font-size: 12px;
+        font-weight: 500;
+        line-height: 1.3;
+        text-align: left;
     }
 
     .mobile-sheet-quick-play-controls {
@@ -3413,14 +3430,6 @@ body.is-timeline-dragging .timeline-dropzone-inline {
     .mobile-sheet-quick-play-controls button.is-loading {
         font-size: 18px;
         letter-spacing: 0;
-    }
-
-    .mobile-sheet-quick-play-diagnostic {
-        flex: 1 0 100%;
-        min-height: 13px;
-        color: #65776d;
-        font: 500 10px/1.3 var(--ui-font);
-        text-align: right;
     }
 
     .mobile-sheet-view[hidden],

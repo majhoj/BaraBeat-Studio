@@ -201,35 +201,6 @@ function notifyEmbeddedPlaybackEndedAt(scheduledTime) {
   });
 }
 
-let sheetQuickPlayDiagnosticPumpCount = 0;
-let lastSheetQuickPlayDiagnosticTime = 0;
-
-function notifySheetQuickPlayDiagnostic(reason, forceUpdate) {
-  if (!isSheetQuickPlayMode || !embeddedPlayer || !window.parent || window.parent === window) {
-    return;
-  }
-  const now = Date.now();
-  if (!forceUpdate && now - lastSheetQuickPlayDiagnosticTime < 250) {
-    return;
-  }
-  lastSheetQuickPlayDiagnosticTime = now;
-  const audioContext = instr && instr._audioCtx ? instr._audioCtx : window.sharedAudioContext;
-  const contextTime = audioContext ? Number(audioContext.currentTime) || 0 : 0;
-  window.parent.postMessage({
-    type: 'barabeat-sheet-quick-play-diagnostic',
-    reason: reason || '',
-    contextState: audioContext ? audioContext.state : 'fehlt',
-    playbackStep: Math.max(0, Number(globalPlaybackStep) || 0),
-    loopLength: Math.max(0, Number(orderedFallbackLoopLength) || 0),
-    oneShotLength: Math.max(0, Number(oneShotLength) || 0),
-    pumpCount: sheetQuickPlayDiagnosticPumpCount,
-    contextTime: contextTime.toFixed(2),
-    nextNoteDelta: (Math.max(0, Number(nextNoteTime) || 0) - contextTime).toFixed(2),
-    playing: Boolean(isPlaying),
-    externalScheduler: Boolean(usesSheetQuickPlayExternalScheduler)
-  }, window.location.origin);
-}
-
 function updateLoadingStatus(message) {
   console.log(message);
   if (loadingEl) {
@@ -4868,7 +4839,6 @@ async function startAudioPlayback() {
   notifyEmbeddedPlaybackState('playing', {
     leadInMs: Math.max(0, (playerStartDelay + effectivePracticeLeadInDelay) * 1000)
   });
-  notifySheetQuickPlayDiagnostic('Start', true);
   if (!usesSheetQuickPlayExternalScheduler) {
     scheduler();
   }
@@ -4887,7 +4857,6 @@ function stopAudioPlayback() {
   practiceTimerFinalLoopStartStep = null;
   playButton.dataset.playing = 'false';
   notifyEmbeddedPlaybackState('stopped');
-  notifySheetQuickPlayDiagnostic('Stop', true);
   return true;
 }
 
@@ -4916,12 +4885,9 @@ window.stopEmbeddedPlaybackFromParent = function () {
 
 window.pumpEmbeddedPlaybackSchedulerFromParent = function () {
   if (!usesSheetQuickPlayExternalScheduler || !isPlaying) {
-    notifySheetQuickPlayDiagnostic('Pump beendet', true);
     return false;
   }
-  sheetQuickPlayDiagnosticPumpCount += 1;
   scheduler();
-  notifySheetQuickPlayDiagnostic('Läuft', false);
   return isPlaying;
 };
 

@@ -1,4 +1,8 @@
 <?php
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+header('Expires: 0');
+
 $dateiname = basename($_POST["b"] ?? "");
 
 if ($dateiname === "" || !preg_match('/\.(bbs|txt)$/i', $dateiname)) {

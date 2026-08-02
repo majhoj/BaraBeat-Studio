@@ -2583,10 +2583,26 @@ function expandSheetQuickPlayBars(patternBars, repeatRangesToApply, startBarInde
 
 function buildSheetQuickPlayPreparedPattern(pattern, patternIndex) {
     const sourceBars = Array.isArray(pattern && pattern.bars) ? pattern.bars : [];
-    const repeatRanges = buildSheetQuickPlayRepeatRanges(sourceBars).filter(function (repeatRange) {
-        return !(repeatRange.startBar === 1 && repeatRange.endBar === sourceBars.length);
+    const repeatRanges = buildSheetQuickPlayRepeatRanges(sourceBars);
+    const hasInControl = sourceBars.some(function (bar) {
+        return (Array.isArray(bar && bar.controls) ? bar.controls : []).some(function (control) {
+            return control && control.type === 'in';
+        });
     });
-    const expandedBars = expandSheetQuickPlayBars(sourceBars, repeatRanges, 1, sourceBars.length);
+    const fullPatternRepeatRanges = hasInControl ? [] : repeatRanges.filter(function (repeatRange) {
+        return repeatRange.startBar === 1 && repeatRange.endBar === sourceBars.length;
+    });
+    const expandedBars = expandSheetQuickPlayBars(
+        sourceBars,
+        repeatRanges.filter(function (repeatRange) {
+            return fullPatternRepeatRanges.indexOf(repeatRange) === -1;
+        }),
+        1,
+        sourceBars.length
+    );
+    const sectionRepeatCount = fullPatternRepeatRanges.reduce(function (repeatCount, repeatRange) {
+        return repeatCount * (Math.max(0, Math.round(Number(repeatRange.count) || 0)) + 1);
+    }, 1);
     let keptInControl = false;
     let inStep = null;
     let stepOffset = 0;
@@ -2646,6 +2662,7 @@ function buildSheetQuickPlayPreparedPattern(pattern, patternIndex) {
             originalBarCount: sourceBars.length,
             preparedBarCount: preparedBars.length
         },
+        quickPlaySectionRepeatCount: sectionRepeatCount,
         bars: preparedBars
     });
 }
@@ -3083,6 +3100,10 @@ function buildSheetQuickPlayConfiguredSections(preparedPatterns) {
         group.forEach(function (groupEntry) {
             const pattern = groupEntry.pattern;
             const targetInstruments = groupEntry.targetInstruments;
+            section.repeatCount = Math.max(
+                section.repeatCount,
+                Math.max(1, Math.round(Number(pattern.quickPlaySectionRepeatCount) || 1))
+            );
             const patternNotes = getSheetQuickPlayPatternNotes(pattern);
             const patternHighlightRefs = getSheetQuickPlayPatternHighlightRefs(pattern);
             const inStep = getSheetQuickPlayPatternInStep(pattern);
@@ -6305,6 +6326,39 @@ function createMobileSheetBarElement(bar, barIndex, previousBar, nextBar) {
     return cardEl;
 }
 
+function getMobileSheetHeaderSubtitle() {
+    if (!s || !titel || typeof s.selectAll !== 'function') {
+        return '';
+    }
+
+    const titleBounds = titel.getBBox();
+    const titleCenterY = Number(titleBounds.cy) || Number(titel.attr('y')) || 0;
+    const titleStartX = Number(titleBounds.x) || Number(titel.attr('x')) || 0;
+    const candidates = [];
+
+    s.selectAll('#edit_text').forEach(function (textEl) {
+        const text = String(textEl.attr('text') || '').trim();
+        if (!text) {
+            return;
+        }
+        const bounds = textEl.getBBox();
+        const centerX = Number(bounds.cx) || 0;
+        const centerY = Number(bounds.cy) || 0;
+        if (Math.abs(centerY - titleCenterY) > 48 || centerX <= titleStartX + 80) {
+            return;
+        }
+        candidates.push({
+            text: text,
+            x: Number(bounds.x) || centerX
+        });
+    });
+
+    candidates.sort(function (left, right) {
+        return left.x - right.x;
+    });
+    return candidates.length > 0 ? candidates[0].text : '';
+}
+
 function renderMobileSheetView(readResult) {
     const viewEl = document.getElementById('mobileSheetView');
     if (!viewEl) {
@@ -6366,11 +6420,13 @@ function renderMobileSheetView(readResult) {
     controlsEl.appendChild(tempoInputEl);
     controlsEl.appendChild(playButtonEl);
     headerEl.appendChild(controlsEl);
-    const diagnosticEl = document.createElement('div');
-    diagnosticEl.id = 'mobileSheetQuickPlayDiagnostic';
-    diagnosticEl.className = 'mobile-sheet-quick-play-diagnostic';
-    diagnosticEl.textContent = 'Sofort-Spieler bereit zum Laden';
-    headerEl.appendChild(diagnosticEl);
+    const subtitle = getMobileSheetHeaderSubtitle();
+    if (subtitle) {
+        const subtitleEl = document.createElement('div');
+        subtitleEl.className = 'mobile-sheet-subtitle';
+        subtitleEl.textContent = subtitle;
+        headerEl.appendChild(subtitleEl);
+    }
     viewEl.appendChild(headerEl);
 
     rhythmBars.forEach(function (bar, barIndex) {
@@ -6791,22 +6847,6 @@ function handleEmbeddedAudioPlayerMessage(event) {
     }
 
     if (isSheetQuickPlayFrame) {
-        if (message.type === 'barabeat-sheet-quick-play-diagnostic') {
-            window.lastSheetQuickPlayDiagnostic = message;
-            const diagnosticEl = document.getElementById('mobileSheetQuickPlayDiagnostic');
-            if (diagnosticEl) {
-                diagnosticEl.textContent = [
-                    'ctx ' + String(message.contextState || '?'),
-                    'Schritt ' + String(message.playbackStep),
-                    'Loop ' + String(message.loopLength),
-                    'Pump ' + String(message.pumpCount),
-                    'Zeit ' + String(message.contextTime),
-                    'Delta ' + String(message.nextNoteDelta),
-                    String(message.reason || '')
-                ].filter(Boolean).join(' · ');
-            }
-            return;
-        }
         if (message.type === 'barabeat-audio-step') {
             scheduleSheetQuickPlayNoteHighlights(message);
             return;

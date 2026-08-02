@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'barabeat-studio-offline-v1';
+const CACHE_NAME = 'barabeat-studio-offline-v2';
 const APP_SHELL = [
   './',
   './index.php',
@@ -142,7 +142,7 @@ function isServerOnlyRequest(relativePath) {
 async function networkFirst(request, fallbackPath) {
   const cache = await caches.open(CACHE_NAME);
   try {
-    return await cacheResponse(cache, request);
+    return await cacheResponse(cache, request, { cache: 'no-store' });
   } catch (error) {
     const cachedResponse = await cache.match(request, { ignoreSearch: true });
     if (cachedResponse) {
