@@ -1,7 +1,9 @@
 <?php
 require_once __DIR__ . '/PHP/access_control.php';
+require_once __DIR__ . '/PHP/edition_config.php';
 barabeat_require_access('page');
 
+$jsEdition = @filemtime(__DIR__ . '/JS/edition.js') ?: 1;
 $jsSnap = @filemtime(__DIR__ . '/JS/snapNEU.svg.js') ?: 1;
 $jsJq = @filemtime(__DIR__ . '/JS/jquery.min.js') ?: 1;
 $jsLocalLibrary = @filemtime(__DIR__ . '/JS/localLibrary.js') ?: 1;
@@ -15,6 +17,11 @@ $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
 $faviconSvg = @filemtime(__DIR__ . '/Assets/favicon.svg') ?: 1;
 $faviconPng = @filemtime(__DIR__ . '/Assets/favicon-32.png') ?: 1;
 $appleTouchIcon = @filemtime(__DIR__ . '/apple-touch-icon.png') ?: 1;
+$accessConfig = barabeat_access_config();
+$canManageTemporaryAccess = !empty($accessConfig['enabled']) && barabeat_access_is_authenticated();
+$temporaryAccessUntil = barabeat_access_window_until();
+$temporaryAccessRemaining = max(0, $temporaryAccessUntil - time());
+$accessCsrfToken = $canManageTemporaryAccess ? barabeat_access_csrf_token() : '';
 ?>
 <!doctype html>
 <html>
@@ -31,6 +38,8 @@ $appleTouchIcon = @filemtime(__DIR__ . '/apple-touch-icon.png') ?: 1;
     <link rel="apple-touch-icon-precomposed" sizes="180x180" href="apple-touch-icon.png?v=<?php echo $appleTouchIcon; ?>">
     <link rel="icon" href="Assets/favicon.svg?v=<?php echo $faviconSvg; ?>" type="image/svg+xml">
     <link rel="icon" href="Assets/favicon-32.png?v=<?php echo $faviconPng; ?>" type="image/png" sizes="32x32">
+    <script>window.BaraBeatEditionConfig = <?php echo barabeat_edition_config_json(); ?>;</script>
+    <script src="JS/edition.js?v=<?php echo $jsEdition; ?>"></script>
     <script src="JS/snapNEU.svg.js?v=<?php echo $jsSnap; ?>"></script>
     <script src="JS/jquery.min.js?v=<?php echo $jsJq; ?>"></script>
     <script src="JS/localLibrary.js?v=<?php echo $jsLocalLibrary; ?>"></script>
@@ -88,6 +97,9 @@ $appleTouchIcon = @filemtime(__DIR__ . '/apple-touch-icon.png') ?: 1;
                 <button type="button" id="saveAsFileDialogButton">Speichern als...</button>
                 <button type="button" id="exportFileDialogButton">Exportieren...</button>
                 <a class="app-menu-link mobile-manual-link" href="Bedienungsanleitung.php">Bedienungsanleitung</a>
+                <?php if ($canManageTemporaryAccess): ?>
+                    <button type="button" id="temporaryAccessButton">Zugang 5 Min öffnen</button>
+                <?php endif; ?>
                 <button type="button" id="accessLogoutButton">Abmelden</button>
             </div>
         </details>
@@ -9391,6 +9403,81 @@ async function logoutBarabeat() {
     window.location.assign('index.php?barabeat_logout=1');
 }
 
+const temporaryAccessControlState = {
+    csrfToken: <?php echo json_encode($accessCsrfToken); ?>,
+    deadlineMs: Date.now() + (<?php echo (int) $temporaryAccessRemaining; ?> * 1000),
+    busy: false
+};
+
+function getTemporaryAccessRemainingSeconds() {
+    return Math.max(0, Math.ceil((temporaryAccessControlState.deadlineMs - Date.now()) / 1000));
+}
+
+function formatTemporaryAccessRemaining(seconds) {
+    const safeSeconds = Math.max(0, Number(seconds) || 0);
+    const minutes = Math.floor(safeSeconds / 60);
+    const restSeconds = Math.floor(safeSeconds % 60);
+    return minutes + ':' + String(restSeconds).padStart(2, '0');
+}
+
+function updateTemporaryAccessButton() {
+    const buttonEl = document.getElementById('temporaryAccessButton');
+    if (!buttonEl) {
+        return;
+    }
+
+    const remainingSeconds = getTemporaryAccessRemainingSeconds();
+    buttonEl.classList.toggle('is-open', remainingSeconds > 0);
+    buttonEl.disabled = temporaryAccessControlState.busy;
+    if (temporaryAccessControlState.busy) {
+        buttonEl.textContent = 'Zugang wird geändert ...';
+    } else if (remainingSeconds > 0) {
+        buttonEl.textContent = 'Zugang schließen (' + formatTemporaryAccessRemaining(remainingSeconds) + ')';
+    } else {
+        buttonEl.textContent = 'Zugang 5 Min öffnen';
+    }
+}
+
+async function toggleTemporaryAccessWindow() {
+    if (temporaryAccessControlState.busy) {
+        return;
+    }
+
+    const isOpen = getTemporaryAccessRemainingSeconds() > 0;
+    if (!isOpen && !window.confirm('Der Passwortschutz wird für alle Besucher und automatisierten Webzugriffe fünf Minuten deaktiviert. Fortfahren?')) {
+        return;
+    }
+
+    temporaryAccessControlState.busy = true;
+    updateTemporaryAccessButton();
+    try {
+        const formData = new URLSearchParams();
+        formData.set('action', isOpen ? 'close' : 'open');
+        formData.set('csrf', temporaryAccessControlState.csrfToken);
+        const response = await fetch('PHP/access_window.php', {
+            method: 'POST',
+            credentials: 'same-origin',
+            cache: 'no-store',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+            },
+            body: formData.toString()
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+            throw new Error(result.message || 'Der Zugang konnte nicht geändert werden.');
+        }
+
+        temporaryAccessControlState.deadlineMs = Date.now() + (Math.max(0, Number(result.remainingSeconds) || 0) * 1000);
+        showAutoDismissMessage(result.message || 'Der Zugang wurde geändert.', 3500);
+    } catch (error) {
+        window.alert(error && error.message ? error.message : 'Der Zugang konnte nicht geändert werden.');
+    } finally {
+        temporaryAccessControlState.busy = false;
+        updateTemporaryAccessButton();
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function () {
     initializeUiTheme();
     updateMobilePracticeModeAvailability();
@@ -9457,6 +9544,12 @@ document.addEventListener('DOMContentLoaded', function () {
         openFileDialog('export');
     });
     document.querySelector('#accessLogoutButton').addEventListener('click', logoutBarabeat);
+    const temporaryAccessButtonEl = document.getElementById('temporaryAccessButton');
+    if (temporaryAccessButtonEl) {
+        temporaryAccessButtonEl.addEventListener('click', toggleTemporaryAccessWindow);
+        updateTemporaryAccessButton();
+        window.setInterval(updateTemporaryAccessButton, 1000);
+    }
     document.querySelector('#fileDialogCancelButton').addEventListener('click', closeFileDialog);
     document.querySelector('#fileDialogConfirmButton').addEventListener('click', confirmFileDialog);
     document.querySelector('#fileDialogRefreshButton').addEventListener('click', refreshFileDialogEntries);

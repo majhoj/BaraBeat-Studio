@@ -497,6 +497,18 @@ html {
     cursor: not-allowed;
 }
 
+.app-menu-panel #temporaryAccessButton.is-open {
+    border-color: #a86b17;
+    background: #fff0cf;
+    color: #6c4613;
+}
+
+body[data-ui-theme="earth"] .app-menu-panel #temporaryAccessButton.is-open {
+    border-color: #e2b872;
+    background: #8b5a2b;
+    color: #fff7e8;
+}
+
 .mobile-manual-link {
     display: none !important;
 }

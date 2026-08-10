@@ -13,6 +13,8 @@ function barabeat_access_config()
         'session_name' => 'barabeat_access',
         'session_lifetime' => 60 * 60 * 24 * 365 * 5,
         'idle_timeout' => 0,
+        'temporary_access_duration' => 5 * 60,
+        'temporary_access_state_file' => dirname(__DIR__) . '/Noten/.barabeat_access_window.php',
     ];
 
     $localConfigPath = __DIR__ . '/access_config.local.php';
@@ -28,7 +30,78 @@ function barabeat_access_config()
         $config['password_hash'] = trim($environmentHash);
     }
 
+    $environmentWindowFile = getenv('BARABEAT_ACCESS_WINDOW_FILE');
+    if (is_string($environmentWindowFile) && trim($environmentWindowFile) !== '') {
+        $config['temporary_access_state_file'] = trim($environmentWindowFile);
+    }
+
     return $config;
+}
+
+function barabeat_access_window_state_file()
+{
+    $config = barabeat_access_config();
+    return (string) ($config['temporary_access_state_file'] ?? '');
+}
+
+function barabeat_access_window_until()
+{
+    $stateFile = barabeat_access_window_state_file();
+    if ($stateFile === '' || !is_file($stateFile)) {
+        return 0;
+    }
+
+    $stateContent = @file_get_contents($stateFile);
+    if (!is_string($stateContent) || !preg_match('/BARABEAT_ACCESS_UNTIL=(\d+)/', $stateContent, $matches)) {
+        return 0;
+    }
+
+    $accessUntil = (int) $matches[1];
+    if ($accessUntil <= time()) {
+        @unlink($stateFile);
+        return 0;
+    }
+
+    return $accessUntil;
+}
+
+function barabeat_access_window_is_open()
+{
+    return barabeat_access_window_until() > time();
+}
+
+function barabeat_access_open_window($durationSeconds = null)
+{
+    $config = barabeat_access_config();
+    $configuredDuration = (int) ($config['temporary_access_duration'] ?? 300);
+    $duration = $durationSeconds === null ? $configuredDuration : (int) $durationSeconds;
+    $duration = max(60, min(30 * 60, $duration));
+    $stateFile = barabeat_access_window_state_file();
+    if ($stateFile === '' || !is_dir(dirname($stateFile))) {
+        return 0;
+    }
+
+    $accessUntil = time() + $duration;
+    $stateContent = "<?php\nhttp_response_code(404);\nexit;\n/* BARABEAT_ACCESS_UNTIL=" . $accessUntil . " */\n";
+    if (@file_put_contents($stateFile, $stateContent, LOCK_EX) === false) {
+        return 0;
+    }
+
+    @chmod($stateFile, 0600);
+    clearstatcache(true, $stateFile);
+    return $accessUntil;
+}
+
+function barabeat_access_close_window()
+{
+    $stateFile = barabeat_access_window_state_file();
+    if ($stateFile === '' || !is_file($stateFile)) {
+        return true;
+    }
+
+    $closed = @unlink($stateFile);
+    clearstatcache(true, $stateFile);
+    return $closed;
 }
 
 function barabeat_access_is_https()
@@ -334,6 +407,14 @@ function barabeat_require_access($responseType = 'page')
         barabeat_access_logout();
         header('Location: ' . barabeat_access_base_path() . 'index.php', true, 303);
         exit;
+    }
+
+    if (barabeat_access_window_is_open()) {
+        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+        header('Pragma: no-cache');
+        header('X-Robots-Tag: noindex, nofollow, noarchive');
+        header('X-BaraBeat-Temporary-Access: active');
+        return;
     }
 
     $loginError = barabeat_access_handle_login();

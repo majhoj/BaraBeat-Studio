@@ -1,15 +1,18 @@
 <?php
 require_once __DIR__ . '/../PHP/access_control.php';
+require_once __DIR__ . '/../PHP/edition_config.php';
 barabeat_require_access('page');
 
 $myObject = $_POST["myObj"] ?? "";
 $embedded = ($_POST["embedded"] ?? "") === "1";
 $uiTheme = $_POST["uiTheme"] ?? "";
 $uiThemeClass = $uiTheme === "playful" ? "audio-theme-playful" : ($uiTheme === "earth" ? "audio-theme-earth" : "");
+$editionJs = @filemtime(__DIR__ . '/../JS/edition.js') ?: 1;
 $playerJs = @filemtime(__DIR__ . '/js/instrument_2.js') ?: 1;
 $playerCss = @filemtime(__DIR__ . '/css/audio_style.css') ?: 1;
 ?>
 <script>
+  window.BaraBeatEditionConfig = <?php echo barabeat_edition_config_json(); ?>;
   const postedObjectString = <?php echo json_encode($myObject, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
   const postedEmbeddedPlayer = <?php echo $embedded ? 'true' : 'false'; ?>;
   const postedUiTheme = <?php echo json_encode($uiTheme, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
@@ -77,6 +80,7 @@ $playerCss = @filemtime(__DIR__ . '/css/audio_style.css') ?: 1;
       window.close();
   }
 </script>
+<script src="../JS/edition.js?v=<?php echo $editionJs; ?>"></script>
 <!DOCTYPE html>
 <html>
 <head>

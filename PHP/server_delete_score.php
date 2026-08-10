@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/access_control.php';
+require_once __DIR__ . '/edition_config.php';
 barabeat_require_access('json');
 
 header('Content-Type: application/json; charset=UTF-8');

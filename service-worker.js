@@ -1,11 +1,12 @@
 'use strict';
 
-const CACHE_NAME = 'barabeat-studio-offline-v3-access';
+const CACHE_NAME = 'barabeat-studio-offline-v4-editions';
 const APP_SHELL = [
   './',
   './index.php',
   './manifest.webmanifest',
   './CSS/index_style.css',
+  './JS/edition.js',
   './JS/snapNEU.svg.js',
   './JS/jquery.min.js',
   './JS/localLibrary.js',
