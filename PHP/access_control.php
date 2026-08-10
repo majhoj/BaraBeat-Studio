@@ -54,6 +54,30 @@ function barabeat_access_base_path()
     return ($directory === '/' ? '/' : rtrim($directory, '/') . '/');
 }
 
+function barabeat_access_set_cookie($name, $value, $expires, array $cookieParams)
+{
+    if (PHP_VERSION_ID >= 70300) {
+        return setcookie($name, $value, [
+            'expires' => $expires,
+            'path' => $cookieParams['path'] ?? '/',
+            'domain' => $cookieParams['domain'] ?? '',
+            'secure' => !empty($cookieParams['secure']),
+            'httponly' => !empty($cookieParams['httponly']),
+            'samesite' => $cookieParams['samesite'] ?? 'Lax',
+        ]);
+    }
+
+    return setcookie(
+        $name,
+        $value,
+        $expires,
+        $cookieParams['path'] ?? '/',
+        $cookieParams['domain'] ?? '',
+        !empty($cookieParams['secure']),
+        !empty($cookieParams['httponly'])
+    );
+}
+
 function barabeat_access_start_session()
 {
     if (session_status() === PHP_SESSION_ACTIVE) {
@@ -67,13 +91,23 @@ function barabeat_access_start_session()
     ini_set('session.use_only_cookies', '1');
     ini_set('session.gc_maxlifetime', (string) $sessionLifetime);
     session_name((string) ($config['session_name'] ?? 'barabeat_access'));
-    session_set_cookie_params([
-        'lifetime' => $sessionLifetime,
-        'path' => barabeat_access_base_path(),
-        'secure' => barabeat_access_is_https(),
-        'httponly' => true,
-        'samesite' => 'Lax',
-    ]);
+    if (PHP_VERSION_ID >= 70300) {
+        session_set_cookie_params([
+            'lifetime' => $sessionLifetime,
+            'path' => barabeat_access_base_path(),
+            'secure' => barabeat_access_is_https(),
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ]);
+    } else {
+        session_set_cookie_params(
+            $sessionLifetime,
+            barabeat_access_base_path(),
+            '',
+            barabeat_access_is_https(),
+            true
+        );
+    }
     session_start();
 }
 
@@ -86,14 +120,13 @@ function barabeat_access_refresh_session_cookie()
     $config = barabeat_access_config();
     $sessionLifetime = max(3600, (int) ($config['session_lifetime'] ?? 0));
     $cookieParams = session_get_cookie_params();
-    setcookie(session_name(), session_id(), [
-        'expires' => time() + $sessionLifetime,
-        'path' => $cookieParams['path'] ?? barabeat_access_base_path(),
-        'domain' => $cookieParams['domain'] ?? '',
-        'secure' => !empty($cookieParams['secure']),
-        'httponly' => true,
-        'samesite' => $cookieParams['samesite'] ?? 'Lax',
-    ]);
+    $cookieParams['samesite'] = $cookieParams['samesite'] ?? 'Lax';
+    barabeat_access_set_cookie(
+        session_name(),
+        session_id(),
+        time() + $sessionLifetime,
+        $cookieParams
+    );
 }
 
 function barabeat_access_password_version($passwordHash)
@@ -145,14 +178,13 @@ function barabeat_access_logout()
 
     if (ini_get('session.use_cookies')) {
         $cookieParams = session_get_cookie_params();
-        setcookie(session_name(), '', [
-            'expires' => time() - 42000,
-            'path' => $cookieParams['path'] ?? '/',
-            'domain' => $cookieParams['domain'] ?? '',
-            'secure' => !empty($cookieParams['secure']),
-            'httponly' => !empty($cookieParams['httponly']),
-            'samesite' => $cookieParams['samesite'] ?? 'Lax',
-        ]);
+        $cookieParams['samesite'] = $cookieParams['samesite'] ?? 'Lax';
+        barabeat_access_set_cookie(
+            session_name(),
+            '',
+            time() - 42000,
+            $cookieParams
+        );
     }
 
     session_destroy();
