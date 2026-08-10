@@ -11,8 +11,8 @@ function barabeat_access_config()
         'enabled' => true,
         'password_hash' => '',
         'session_name' => 'barabeat_access',
-        'session_lifetime' => 60 * 60 * 24 * 30,
-        'idle_timeout' => 60 * 60 * 24 * 30,
+        'session_lifetime' => 60 * 60 * 24 * 365 * 5,
+        'idle_timeout' => 0,
     ];
 
     $localConfigPath = __DIR__ . '/access_config.local.php';
@@ -65,6 +65,7 @@ function barabeat_access_start_session()
 
     ini_set('session.use_strict_mode', '1');
     ini_set('session.use_only_cookies', '1');
+    ini_set('session.gc_maxlifetime', (string) $sessionLifetime);
     session_name((string) ($config['session_name'] ?? 'barabeat_access'));
     session_set_cookie_params([
         'lifetime' => $sessionLifetime,
@@ -74,6 +75,25 @@ function barabeat_access_start_session()
         'samesite' => 'Lax',
     ]);
     session_start();
+}
+
+function barabeat_access_refresh_session_cookie()
+{
+    if (session_status() !== PHP_SESSION_ACTIVE || !ini_get('session.use_cookies')) {
+        return;
+    }
+
+    $config = barabeat_access_config();
+    $sessionLifetime = max(3600, (int) ($config['session_lifetime'] ?? 0));
+    $cookieParams = session_get_cookie_params();
+    setcookie(session_name(), session_id(), [
+        'expires' => time() + $sessionLifetime,
+        'path' => $cookieParams['path'] ?? barabeat_access_base_path(),
+        'domain' => $cookieParams['domain'] ?? '',
+        'secure' => !empty($cookieParams['secure']),
+        'httponly' => true,
+        'samesite' => $cookieParams['samesite'] ?? 'Lax',
+    ]);
 }
 
 function barabeat_access_password_version($passwordHash)
@@ -94,17 +114,18 @@ function barabeat_access_is_authenticated()
     $expectedVersion = barabeat_access_password_version($passwordHash);
     $authenticatedVersion = (string) ($_SESSION['barabeat_access_version'] ?? '');
     $lastSeen = (int) ($_SESSION['barabeat_access_last_seen'] ?? 0);
-    $idleTimeout = max(3600, (int) ($config['idle_timeout'] ?? 0));
+    $idleTimeout = (int) ($config['idle_timeout'] ?? 0);
 
     if ($authenticatedVersion === '' || !hash_equals($expectedVersion, $authenticatedVersion)) {
         return false;
     }
-    if ($lastSeen <= 0 || time() - $lastSeen > $idleTimeout) {
+    if ($lastSeen <= 0 || ($idleTimeout > 0 && time() - $lastSeen > $idleTimeout)) {
         unset($_SESSION['barabeat_access_version'], $_SESSION['barabeat_access_last_seen']);
         return false;
     }
 
     $_SESSION['barabeat_access_last_seen'] = time();
+    barabeat_access_refresh_session_cookie();
     return true;
 }
 
@@ -303,4 +324,3 @@ function barabeat_require_access($responseType = 'page')
     }
     exit;
 }
-
