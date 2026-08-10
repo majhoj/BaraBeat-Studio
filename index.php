@@ -87,6 +87,7 @@ $appleTouchIcon = @filemtime(__DIR__ . '/apple-touch-icon.png') ?: 1;
                 <button type="button" id="saveFileDialogButton">Speichern</button>
                 <button type="button" id="saveAsFileDialogButton">Speichern als...</button>
                 <button type="button" id="exportFileDialogButton">Exportieren...</button>
+                <a class="app-menu-link mobile-manual-link" href="Bedienungsanleitung.php">Bedienungsanleitung</a>
                 <button type="button" id="accessLogoutButton">Abmelden</button>
             </div>
         </details>

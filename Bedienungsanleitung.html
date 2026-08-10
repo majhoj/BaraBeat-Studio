@@ -208,6 +208,10 @@
       font-size: 0.95rem;
     }
 
+    .manual-back-link {
+      display: none;
+    }
+
     @media (max-width: 860px) {
       main {
         display: block;
@@ -220,6 +224,100 @@
 
       section {
         padding: 20px;
+      }
+    }
+
+    @media (hover: none) and (pointer: coarse) {
+      .manual-back-link {
+        position: fixed;
+        top: calc(8px + env(safe-area-inset-top));
+        left: 12px;
+        z-index: 30;
+        display: inline-flex;
+        align-items: center;
+        min-height: 42px;
+        padding: 8px 12px;
+        color: #fff;
+        font-weight: 700;
+        line-height: 1.2;
+        text-decoration: none;
+        background: #6f4a2b;
+        border: 1px solid #f0dcc0;
+        border-radius: 8px;
+        box-shadow: 0 4px 14px rgba(43, 36, 27, 0.24);
+      }
+    }
+
+    @media (max-width: 600px) {
+      header {
+        padding: 26px 16px 22px;
+      }
+
+      header .wrap,
+      main {
+        width: calc(100% - 24px);
+      }
+
+      h1 {
+        font-size: 2rem;
+      }
+
+      header p {
+        font-size: 1rem;
+        line-height: 1.45;
+      }
+
+      main {
+        padding: 14px 0 36px;
+      }
+
+      nav {
+        margin-bottom: 14px;
+        padding: 14px 16px;
+        border-radius: 8px;
+      }
+
+      nav a {
+        padding: 8px 0;
+      }
+
+      section {
+        margin-bottom: 14px;
+        padding: 16px;
+        border-radius: 8px;
+      }
+
+      h2 {
+        font-size: 1.32rem;
+      }
+
+      h3 {
+        margin-top: 20px;
+      }
+
+      table {
+        display: block;
+        max-width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      th,
+      td {
+        min-width: 130px;
+        padding: 8px;
+      }
+
+      .hint,
+      .warning,
+      .workflow {
+        padding: 12px;
+      }
+    }
+
+    @media (hover: none) and (pointer: coarse) {
+      header {
+        padding-top: calc(68px + env(safe-area-inset-top));
       }
     }
 
@@ -250,6 +348,7 @@
   </style>
 </head>
 <body>
+  <a id="manualBackLink" class="manual-back-link" href="index.php" aria-label="Zurück zum Notenblatt">← Zurück zum Notenblatt</a>
   <header>
     <div class="wrap">
       <h1>BaraBeat-Studio</h1>
@@ -293,7 +392,7 @@
           </ol>
         </div>
 
-        <p>Auf Smartphones ist die Oberfläche bewusst auf Öffnen, Anzeigen, Abspielen und Üben ausgerichtet. Die mobile Notenblattansicht ist derzeit eine reine Ansicht und noch kein Editor.</p>
+        <p>Auf Smartphones passt sich die Oberfläche an die Ausrichtung an: Im Portrait-Modus kannst du Notenblätter lesen, Pattern sofort abspielen, üben und vorhandene Arrangements wiedergeben. Im Landscape-Modus wird der mobile Noteneditor mit Palette und Notenblatt-Menü aktiviert.</p>
       </section>
 
       <section id="oberflaeche">
@@ -311,7 +410,7 @@
           <tbody>
             <tr>
               <td><strong>Datei</strong></td>
-              <td>Notenblätter öffnen, speichern, lokal verwalten und exportieren.</td>
+              <td>Notenblätter öffnen, speichern, lokal verwalten und exportieren. Auf Smartphones ist hier auch die Bedienungsanleitung erreichbar.</td>
             </tr>
             <tr>
               <td><strong>Notenblatt</strong></td>
@@ -323,10 +422,13 @@
             </tr>
             <tr>
               <td><strong>Werkzeuge</strong></td>
-              <td>Übungsmodus, Arrangement, Bedienungsanleitung und Template-Auswahl öffnen.</td>
+              <td>Auf dem Desktop Übungsmodus, Arrangement, Bedienungsanleitung und Template-Auswahl öffnen.</td>
             </tr>
           </tbody>
         </table>
+
+        <h3>Anmeldung</h3>
+        <p>Ist die Zugangsbeschränkung aktiviert, erscheint vor BaraBeat-Studio eine Passwortabfrage. Die Anmeldung bleibt auf dem jeweiligen Browser beziehungsweise in der Home-Screen-App bestehen, bis du im Menü <strong>Datei → Abmelden</strong> wählst oder die Browserdaten löschst. Auf gemeinsam genutzten Geräten solltest du dich nach der Arbeit abmelden.</p>
 
         <h3>Templates</h3>
         <p>Über <strong>Werkzeuge → Template</strong> kannst du zwischen visuellen Presets wechseln. Vorhanden sind unter anderem <strong>Klar</strong>, <strong>Verspielt</strong> und <strong>Erdig</strong>. Die Templates ändern die optische Stimmung der Oberfläche, nicht die musikalischen Daten.</p>
@@ -349,6 +451,7 @@
         <ul>
           <li><strong>Speichern</strong> überschreibt das aktuell geöffnete Notenblatt.</li>
           <li><strong>Speichern als</strong> ist für neue Namen oder Kopien gedacht.</li>
+          <li>Auf dem iPhone steht <strong>Speichern als</strong> ebenfalls zur Verfügung. Damit können im mobilen Editor erstellte oder geänderte Notenblätter lokal beziehungsweise auf dem Server gesichert werden.</li>
           <li>Bei erfolgreichem Speichern erscheint nur eine kurze Statusmeldung. Fehlermeldungen bleiben sichtbar.</li>
         </ul>
 
@@ -393,13 +496,13 @@
         <p>Ein Notenblatt kann mehrere Seiten haben. Pro Seite werden zehn Zeilen angezeigt. Wenn mehr Zeilen benötigt werden, kannst du über <strong>Blatt hinzufügen</strong> eine weitere Seite anlegen. Die Legende steht auf dem letzten Blatt, rechts unten erscheinen Seitenzahlen wie <code>1/2</code> und <code>2/2</code>.</p>
 
         <h3>Palette</h3>
-        <p>Die Palette enthält Notensymbole, Chooser und Steuerzeichen. Sie bleibt beim Scrollen sichtbar und kann bei Bedarf verschoben werden. Falls sie ungünstig steht, kann sie innerhalb des Blattes wieder erreichbar positioniert werden.</p>
+        <p>Die Palette enthält Notensymbole, Chooser und Steuerzeichen. Auf dem Desktop bleibt sie beim Scrollen sichtbar und kann bei Bedarf verschoben werden. Im mobilen Landscape-Editor liegt sie als horizontal scrollbare Werkzeugleiste am unteren Displayrand.</p>
 
         <h3>Rhythmusname</h3>
         <p>Der Rhythmusname steht oben im Notenblatt. Er kann direkt im Feld geändert werden. Beim ersten Öffnen wird der zuletzt geladene Titel wiederhergestellt, wenn der Browser diese Information noch kennt.</p>
 
         <h3>Sofort-Spielen im Notenblatt</h3>
-        <p>Rechts neben dem Rhythmusnamen stehen eine Tempoangabe und ein Play-Button. Kleine Auswahlfelder vor den Pattern markieren, was direkt aus dem Editor vorgespielt werden soll. Die Felder werden aktiv, sobald ein Takt durch Instrument, Patternname oder Noten als spielbar erkannt wird; ein vorheriges Speichern und Neuladen ist nicht nötig.</p>
+        <p>Neben dem Rhythmusnamen stehen eine Tempoangabe und ein Play-Button. Kleine Auswahlfelder vor den Pattern markieren, was direkt aus dem Notenblatt vorgespielt werden soll. Die Felder werden aktiv, sobald ein Takt durch Instrument, Patternname oder Noten als spielbar erkannt wird; ein vorheriges Speichern und Neuladen ist nicht nötig. Auf dem iPhone bleibt die Kopfzeile mit Rhythmusname und Play-Button beim Scrollen sichtbar.</p>
         <ul>
           <li>Ein ausgewähltes Pattern wird als Loop gespielt, bis du auf Stopp klickst.</li>
           <li>Mehrere Pattern verschiedener Instrumente laufen parallel.</li>
@@ -407,6 +510,9 @@
           <li>Eine ausgewählte Begleitung läuft durch, während ein zusätzliches Solo parallel gespielt wird. Ein Out der Begleitung wird dabei für den nahtlosen Loop ignoriert.</li>
           <li>Die jeweils klingenden Noten werden im Notenblatt kurz farblich hervorgehoben.</li>
         </ul>
+
+        <h3>Ganzes Pattern verschieben</h3>
+        <p>Ein vollständiges Pattern kann einschließlich Noten, Choosern und zusätzlichen Markierungen nach oben oder unten verschoben werden. Dazu dienen die Pfeile am Beginn des Patterns. Die Funktion steht im Desktop-Editor und im mobilen Landscape-Editor zur Verfügung.</p>
       </section>
 
       <section id="zeichen">
@@ -518,6 +624,9 @@
 
         <h3>Raster beim Verschieben</h3>
         <p>Während des Ziehens folgt ein Element flüssig der Maus. Beim Loslassen rastet es an der nächstgelegenen sinnvollen Position ein. Das gilt für Noten, Wiederholungszeichen, In/Out, ShortBar und Chooser.</p>
+
+        <h3>Auswahl auf dem iPhone</h3>
+        <p>Im mobilen Landscape-Editor aktivierst du in der unteren Palette das Auswahlwerkzeug und ziehst anschließend einen Rahmen um die gewünschten Elemente. Die Auswahl kann gemeinsam verschoben, mit dem Duplizieren-Werkzeug kopiert oder mit dem Löschen-Werkzeug entfernt werden. Die normale iOS-Textauswahl ist im Notenbereich unterdrückt, damit Gesten nicht mit dem Editor kollidieren.</p>
       </section>
 
       <section id="audioplayer">
@@ -643,17 +752,39 @@
 
       <section id="mobil">
         <h2>11. Nutzung auf Smartphones</h2>
-        <p>Auf Smartphones ist BaraBeat-Studio zum Öffnen, Anzeigen, Üben und Abspielen gedacht. Die Notenbearbeitung und das Erstellen eines Arrangements stehen dort derzeit nicht zur Verfügung.</p>
+        <p>Auf Smartphones kann BaraBeat-Studio Notenblätter öffnen, anzeigen, sofort abspielen, üben und bearbeiten. Die Anzeige- und Bearbeitungsfunktionen wechseln automatisch mit der Ausrichtung des Geräts. Eine vorhandene Arrangement-Timeline kann mobil abgespielt, aber noch nicht bearbeitet werden.</p>
 
         <h3>Mobile Bedienung</h3>
-        <p>Die Menüleiste zeigt die für das Smartphone wichtigen Befehle. Im Übungsmodus sind zusätzlich <strong>Patternauswahl</strong> und <strong>Latenz</strong> erreichbar. Enthält das geladene Notenblatt bereits ein Arrangement, erscheint außerhalb des Übungsmodus der Befehl <strong>Arrangement abspielen</strong>; er öffnet den Player in einem Overlay.</p>
+        <p>Die Menüleiste zeigt nur die für den aktuellen Modus wichtigen Befehle. Unter <strong>Datei</strong> findest du Öffnen, Speichern, Speichern als, die Bedienungsanleitung und Abmelden. In der mobilen Bedienungsanleitung führt der dauerhaft sichtbare Button <strong>Zurück zum Notenblatt</strong> wieder zur Anwendung. Im Übungsmodus sind zusätzlich <strong>Patternauswahl</strong> und <strong>Latenz</strong> erreichbar. Enthält das geladene Notenblatt bereits ein Arrangement, erscheint außerhalb des Übungsmodus der Befehl <strong>Arrangement abspielen</strong>; er öffnet den Player in einem Overlay.</p>
 
         <h3>Portrait und Landscape</h3>
-        <p>Im Portrait-Modus steht die Übungsoberfläche im Vordergrund. Im Landscape-Modus kann das Notenblatt breiter dargestellt werden, damit es besser lesbar ist.</p>
+        <ul>
+          <li><strong>Portrait:</strong> kompakte Leseansicht mit einem Takt pro Zeile, Sofort-Spielen, Übungsmodus und Wiedergabe vorhandener Arrangements.</li>
+          <li><strong>Landscape:</strong> mobiler Noteneditor mit größerem Taktraster, Notenblatt-Menü und horizontaler Palette.</li>
+        </ul>
 
         <h3>Mobile Notenblattansicht</h3>
-        <p>Mehrseitige Notenblätter werden seitenweise skaliert, nicht als gesamter Stapel auf eine Displayhöhe gedrückt. Dadurch bleiben mehrseitige Blätter lesbar. In Portrait und Landscape wird jeder Takt in einer eigenen Zeile dargestellt. Mehrtaktige Pattern werden kompakt zusammengefasst; Instrument und Patternname stehen nur am Beginn des Patterns.</p>
+        <p>Mehrseitige Notenblätter werden seitenweise dargestellt, nicht als gesamter Stapel auf eine Displayhöhe gedrückt. Dadurch bleiben mehrseitige Blätter lesbar. Jeder Takt steht in einer eigenen Zeile. Mehrtaktige Pattern werden in der Portrait-Ansicht kompakt zusammengefasst; Instrument und Patternname stehen nur am Beginn des Patterns.</p>
         <p>Bei den laufenden Noten stehen Instrument und Patternname platzsparend in einer Zeile. Die rote Spiellinie wird nur über den eigentlichen Notenzeilen gezeichnet, damit längere Namen lesbar bleiben.</p>
+
+        <h3>Noten im Landscape-Modus bearbeiten</h3>
+        <ol>
+          <li>Das iPhone quer halten. Der Landscape-Editor erscheint automatisch.</li>
+          <li>In der unteren Palette ein Noten- oder Steuerzeichen wählen und anschließend auf die gewünschte Rasterposition tippen.</li>
+          <li>Vorhandene Noten und Markierungen können direkt angefasst, verschoben und beim Loslassen am Raster ausgerichtet werden.</li>
+          <li>Mit dem Auswahlwerkzeug einen Rahmen aufziehen. Danach kann die Auswahl gemeinsam verschoben, dupliziert oder gelöscht werden.</li>
+          <li>Mit <strong>Instrument und Funktion einsetzen</strong> erscheinen in einem freien Takt die beiden Chooser. Vorhandene Chooser können über ihre Auswahlfelder geändert, verschoben oder gelöscht werden.</li>
+          <li>Die Pfeile in der Chooser-Zeile verschieben ein vollständiges Pattern mit allen zugehörigen Elementen nach oben oder unten.</li>
+          <li>Der Rhythmusname kann oben direkt eingegeben werden. Das Textwerkzeug setzt zusätzliche Kommentare in einen Takt; vorhandene Texte können im eingeblendeten Eingabefeld geändert werden.</li>
+          <li>Über <strong>Datei → Speichern</strong> oder <strong>Speichern als</strong> die Änderungen sichern.</li>
+        </ol>
+
+        <div class="hint">
+          <strong>Touch-Bedienung:</strong> Die Palette bleibt am unteren Rand sichtbar und kann horizontal gescrollt werden. Ein Doppeltipp auf ein Wiederholungszeichen öffnet wie auf dem Desktop dessen Einstellung. Für Eingabefelder darf die iOS-Tastatur erscheinen; nach dem Schließen bleibt die Notenblattgröße erhalten.
+        </div>
+
+        <h3>Sofort-Spielen auf dem iPhone</h3>
+        <p>Die Auswahlfelder vor den Pattern, BPM und Play stehen auch mobil zur Verfügung. Mehrere Instrumente können parallel laufen; Pattern desselben Instruments werden nacheinander behandelt. Die klingenden Noten werden kurz hervorgehoben. Die Kopfzeile bleibt beim Scrollen sichtbar, damit die Wiedergabe jederzeit gestoppt werden kann.</p>
 
         <h3>Offline verwenden</h3>
         <ol>
@@ -662,7 +793,7 @@
           <li>Gewünschte Notenblätter vorher einmal vom Server laden. Sie liegen anschließend in der lokalen Bibliothek.</li>
           <li>Optional in Safari über <strong>Teilen &gt; Zum Home-Bildschirm</strong> als Web-App hinzufügen.</li>
         </ol>
-        <p>Ohne Verbindung können lokale Notenblätter geöffnet, angezeigt und abgespielt werden. Die Serverliste, das erneute Laden vom Server und das Veröffentlichen benötigen weiterhin eine Internetverbindung.</p>
+        <p>Ohne Verbindung können lokale Notenblätter geöffnet, angezeigt, bearbeitet und abgespielt werden. Lokales Speichern ist ebenfalls möglich. Die Serverliste, das erneute Laden vom Server und das Speichern auf dem Server benötigen weiterhin eine Internetverbindung.</p>
 
         <div class="warning">
           <strong>Lokale Daten vor dem Löschen sichern:</strong> Safari und eine zum Home-Bildschirm hinzugefügte BaraBeat-App können getrennte lokale Speicherbereiche verwenden. Wenn du den Home-Screen-Eintrag löschst, können die darin gespeicherten lokalen Notenblätter, Übungsszenarien, Einstellungen und Offline-Daten verloren gehen. Ein erneutes Hinzufügen stellt diese lokalen Daten nicht automatisch wieder her. Speichere wichtige Notenblätter deshalb vorher auf dem Server; darin enthaltene Übungsszenarien werden zusammen mit der Datei gesichert. Serverdateien bleiben vom Löschen des Home-Screen-Eintrags unberührt.
@@ -682,6 +813,16 @@
           <li>Noten aus der Palette auf die Notenlinien ziehen.</li>
           <li>Bei Bedarf <strong>In</strong>, <strong>Out</strong>, <strong>Wiederholung</strong>, <strong>ShortBar</strong> oder das Triolen-/Quartolenzeichen ergänzen.</li>
           <li>Speichern.</li>
+        </ol>
+
+        <h3>Auf dem iPhone bearbeiten</h3>
+        <ol>
+          <li>Notenblatt öffnen und das iPhone ins Querformat drehen.</li>
+          <li>Bei einem neuen Takt zuerst in der unteren Palette das Chooser-Werkzeug und danach <strong>Instrument und Funktion hier einsetzen</strong> antippen.</li>
+          <li>Instrument und Patternart in den Auswahlfeldern festlegen.</li>
+          <li>In der Palette ein Notenzeichen wählen und auf die gewünschte Position im Takt tippen.</li>
+          <li>Elemente bei Bedarf direkt verschieben oder mit dem Auswahlwerkzeug gemeinsam markieren.</li>
+          <li>Über <strong>Datei → Speichern</strong> beziehungsweise <strong>Speichern als</strong> sichern.</li>
         </ol>
 
         <h3>Ein Pattern sofort prüfen</h3>
@@ -747,6 +888,12 @@
         <h3>Ein Sample fehlt</h3>
         <p>Wenn ein Sample fehlt oder nicht geladen werden kann, sollte der Player den Fehler anzeigen. Prüfe in diesem Fall die Schreibweise der Datei im Sound-Ordner und ob die Datei auf dem Server vorhanden ist.</p>
 
+        <h3>Der mobile Editor erscheint nicht</h3>
+        <p>Der Editor wird auf dem iPhone nur im Querformat aktiviert. Prüfe, ob die Ausrichtungssperre des Geräts ausgeschaltet ist, und drehe das iPhone erneut. Im Hochformat bleibt bewusst die kompakte Lese- und Abspielansicht sichtbar.</p>
+
+        <h3>Auf dem iPhone ist kein Ton zu hören</h3>
+        <p>Prüfe zuerst Lautstärke, Audioausgabe und Bluetooth-Verbindung. BaraBeat-Studio verwendet auf unterstützten Geräten eine Wiedergabe-Audiositzung, damit Audio auch im Stummmodus möglich ist. Nach einem iOS- oder Browserwechsel kann trotzdem ein erneuter Tipp auf Play nötig sein, um die Audioausgabe freizugeben.</p>
+
         <h3>Offline-Daten fehlen nach einer Neuinstallation</h3>
         <p>Wurde die Home-Screen-App gelöscht und neu hinzugefügt, kann iOS einen neuen lokalen Speicherbereich angelegt haben. Öffne die benötigten Notenblätter erneut vom Server. Rein lokal gespeicherte Dateien lassen sich nur wiederherstellen, wenn sie zuvor auf dem Server oder anderweitig gesichert wurden.</p>
       </section>
@@ -765,5 +912,24 @@
       </section>
     </article>
   </main>
+  <script>
+    (function () {
+      var backLink = document.getElementById('manualBackLink');
+      if (!backLink) {
+        return;
+      }
+      backLink.addEventListener('click', function (event) {
+        try {
+          var referrer = document.referrer ? new URL(document.referrer) : null;
+          if (referrer && referrer.origin === window.location.origin && window.history.length > 1) {
+            event.preventDefault();
+            window.history.back();
+          }
+        } catch (error) {
+          // Der normale Link zu index.php bleibt als Fallback erhalten.
+        }
+      });
+    }());
+  </script>
 </body>
 </html>

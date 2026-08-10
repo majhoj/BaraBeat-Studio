@@ -497,6 +497,10 @@ html {
     cursor: not-allowed;
 }
 
+.mobile-manual-link {
+    display: none !important;
+}
+
 .mobile-menu-action {
     display: none;
 }
@@ -3099,6 +3103,10 @@ body.is-timeline-dragging .timeline-dropzone-inline {
     #saveFileDialogButton,
     #saveAsFileDialogButton {
         display: block;
+    }
+
+    .app-menu-panel .mobile-manual-link {
+        display: block !important;
     }
 
     .app-menu summary {
