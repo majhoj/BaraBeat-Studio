@@ -1,4 +1,7 @@
 <?php
+require_once __DIR__ . '/../PHP/access_control.php';
+barabeat_require_access('page');
+
 $myObject = $_POST["myObj"] ?? "";
 $embedded = ($_POST["embedded"] ?? "") === "1";
 $uiTheme = $_POST["uiTheme"] ?? "";

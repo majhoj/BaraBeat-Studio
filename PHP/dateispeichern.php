@@ -1,4 +1,7 @@
 <?php
+require_once __DIR__ . '/access_control.php';
+barabeat_require_access('text');
+
 $inhalt = $_POST["a"] ?? "";
 $dateiname = basename(trim($_POST["b"] ?? ""));
 $dateiname = preg_replace('/\.(bbs|txt)$/i', '', $dateiname);

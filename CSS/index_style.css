@@ -3092,12 +3092,12 @@ body.is-timeline-dragging .timeline-dropzone-inline {
         display: none;
     }
 
-    #saveAsFileDialogButton,
     #exportFileDialogButton {
         display: none;
     }
 
-    #saveFileDialogButton {
+    #saveFileDialogButton,
+    #saveAsFileDialogButton {
         display: block;
     }
 
@@ -4086,6 +4086,13 @@ body.is-timeline-dragging .timeline-dropzone-inline {
     color: #315a42;
     font: 800 19px/1 var(--ui-font);
     touch-action: manipulation;
+}
+
+.mobile-sheet-pattern-move-action:disabled {
+    border-color: #d7ddd9;
+    background: #f3f5f4;
+    color: #a8afaa;
+    opacity: 0.72;
 }
 
 .is-mobile-landscape-edit .mobile-sheet-bar.is-mobile-chooser-move-source {

@@ -1,4 +1,7 @@
 <?php
+require_once __DIR__ . '/PHP/access_control.php';
+barabeat_require_access('page');
+
 $jsSnap = @filemtime(__DIR__ . '/JS/snapNEU.svg.js') ?: 1;
 $jsJq = @filemtime(__DIR__ . '/JS/jquery.min.js') ?: 1;
 $jsLocalLibrary = @filemtime(__DIR__ . '/JS/localLibrary.js') ?: 1;
@@ -84,6 +87,7 @@ $appleTouchIcon = @filemtime(__DIR__ . '/apple-touch-icon.png') ?: 1;
                 <button type="button" id="saveFileDialogButton">Speichern</button>
                 <button type="button" id="saveAsFileDialogButton">Speichern als...</button>
                 <button type="button" id="exportFileDialogButton">Exportieren...</button>
+                <button type="button" id="accessLogoutButton">Abmelden</button>
             </div>
         </details>
         <details class="app-menu" id="scoreSheetMenu">
@@ -110,7 +114,7 @@ $appleTouchIcon = @filemtime(__DIR__ . '/apple-touch-icon.png') ?: 1;
             <div class="app-menu-panel">
                 <button type="button" id="practiceButton">Üben</button>
                 <button type="button" id="button11">Arrangieren</button>
-                <a class="app-menu-link" href="Bedienungsanleitung.html" target="_blank" rel="noopener">Bedienungsanleitung</a>
+                <a class="app-menu-link" href="Bedienungsanleitung.php" target="_blank" rel="noopener">Bedienungsanleitung</a>
                 <details class="app-submenu">
                     <summary>Template</summary>
                     <div class="app-submenu-panel">
@@ -2175,6 +2179,9 @@ const sheetQuickPlayState = {
     preparationTimer: null,
     schedulerTimer: null
 };
+const sheetPatternMoveState = {
+    ranges: []
+};
 let sheetQuickPlayRefreshTimer = null;
 let sheetQuickPlayMutationObserver = null;
 let sheetQuickPlayEditorPointerActive = false;
@@ -2214,6 +2221,254 @@ function getSheetBarBounds(sourceBarIndex) {
         width: 422,
         height: 126
     };
+}
+
+function sheetBarHasOwnContent(bar) {
+    if (!bar) {
+        return false;
+    }
+    return Boolean(
+        String(bar.instrument || '').trim() ||
+        String(bar.label || '').trim() ||
+        (Array.isArray(bar.notes) && bar.notes.some(function (noteValue) {
+            return noteValue && noteValue !== 'f';
+        })) ||
+        (Array.isArray(bar.controls) && bar.controls.length > 0) ||
+        (bar.repeat && (
+            (Array.isArray(bar.repeat.start) && bar.repeat.start.length > 0) ||
+            (Array.isArray(bar.repeat.end) && bar.repeat.end.length > 0)
+        ))
+    );
+}
+
+function getSheetPatternMoveRanges(readResult) {
+    const bars = Array.isArray(readResult && readResult.rhythmBars)
+        ? readResult.rhythmBars
+        : [];
+    const patternStarts = [];
+    let lastContentBarIndex = 0;
+
+    bars.forEach(function (bar) {
+        const barIndex = Number(bar && bar.index) || 0;
+        if (sheetBarHasOwnContent(bar)) {
+            lastContentBarIndex = Math.max(lastContentBarIndex, barIndex);
+        }
+        const instrument = String(bar && bar.instrument || '').trim();
+        const label = String(bar && bar.label || '').trim();
+        if (instrument || label) {
+            patternStarts.push({
+                barIndex: barIndex,
+                instrument: instrument,
+                label: label,
+                isMovable: Boolean(
+                    (instrument && instrument !== 'Leer' && instrument !== 'Instrument') ||
+                    (label && label !== 'Leer' && label !== 'Funktion')
+                )
+            });
+        }
+    });
+
+    return patternStarts.reduce(function (ranges, patternStart, startIndex) {
+        if (!patternStart.isMovable || patternStart.barIndex < 1) {
+            return ranges;
+        }
+        const nextStart = patternStarts[startIndex + 1];
+        const endBarIndex = nextStart
+            ? nextStart.barIndex - 1
+            : lastContentBarIndex;
+        if (endBarIndex < patternStart.barIndex) {
+            return ranges;
+        }
+        ranges.push({
+            id: 'sheet-pattern-range-' + patternStart.barIndex,
+            startBarIndex: patternStart.barIndex,
+            endBarIndex: endBarIndex,
+            instrument: patternStart.instrument,
+            label: patternStart.label
+        });
+        return ranges;
+    }, []);
+}
+
+function getSheetPatternMoveRangeForBar(sourceBarIndex) {
+    const normalizedBarIndex = Number(sourceBarIndex);
+    return sheetPatternMoveState.ranges.find(function (range) {
+        return normalizedBarIndex >= range.startBarIndex && normalizedBarIndex <= range.endBarIndex;
+    }) || null;
+}
+
+function getSheetPatternMoveRangeIndex(rangeId) {
+    return sheetPatternMoveState.ranges.findIndex(function (range) {
+        return range.id === rangeId;
+    });
+}
+
+function getSheetElementMoveBarIndex(element, readConfig, totalBarCount, headerSubtitleElement) {
+    if (!element || typeof element.attr !== 'function') {
+        return null;
+    }
+    if (headerSubtitleElement && headerSubtitleElement.node === element.node) {
+        return null;
+    }
+
+    const elementId = String(element.attr('id') || '');
+    const position = getElementReadPosition(element);
+    let barIndex;
+
+    if (elementId === 'wiederholung') {
+        const repeatTarget = getRepeatTarget(position.x, position.y, zeilenAnzahl);
+        if (!repeatTarget) {
+            return null;
+        }
+        barIndex = repeatTarget.repeatSide === 'start'
+            ? repeatTarget.boundaryIndex + 1
+            : repeatTarget.boundaryIndex;
+    } else if (isInstrumentChooserNode(element) || isFunctionChooserNode(element)) {
+        barIndex = getBarIndexForMetaElement(
+            position.x,
+            position.y,
+            readConfig,
+            zeilenAnzahl
+        ).barIndex + 1;
+    } else {
+        const positionInfo = getBarIndexFromPosition(
+            position.x,
+            position.y,
+            readConfig,
+            zeilenAnzahl
+        );
+        if (elementId === 'shortbar' || elementId === 'in' || elementId === 'out') {
+            positionInfo.rawLineSlotIndex = getControlLineSlotIndex(position.x, readConfig, elementId);
+            positionInfo.lineSlotIndex = positionInfo.rawLineSlotIndex;
+            if (positionInfo.lineSlotIndex > readConfig.stepsPerBar) {
+                positionInfo.lineSlotIndex -= Number(readConfig.gapSlotCount) || 2;
+            }
+            positionInfo.barIndex = positionInfo.lineIndex * 2 + (
+                positionInfo.rawLineSlotIndex > readConfig.stepsPerBar + (Number(readConfig.gapSlotCount) || 2)
+                    ? 1
+                    : 0
+            );
+        }
+        barIndex = positionInfo.barIndex + 1;
+    }
+
+    return barIndex >= 1 && barIndex <= totalBarCount ? barIndex : null;
+}
+
+function translateSheetElementBetweenBars(element, sourceBarIndex, targetBarIndex) {
+    if (!element || sourceBarIndex === targetBarIndex) {
+        return;
+    }
+    const sourceBounds = getSheetBarBounds(sourceBarIndex);
+    const targetBounds = getSheetBarBounds(targetBarIndex);
+    const currentTranslate = typeof getElementTranslate === 'function'
+        ? getElementTranslate(element)
+        : { x: 0, y: 0 };
+    element.transform(
+        't' + (currentTranslate.x + targetBounds.x - sourceBounds.x) + ',' +
+        (currentTranslate.y + targetBounds.y - sourceBounds.y)
+    );
+}
+
+function moveSheetBarBlock(sourceStartBarIndex, sourceEndBarIndex, targetBoundaryBarIndex) {
+    const totalBarCount = normalizeSheetLineCount(zeilenAnzahl) * 2;
+    const startBarIndex = Math.max(1, Math.round(Number(sourceStartBarIndex) || 1));
+    const endBarIndex = Math.min(
+        totalBarCount,
+        Math.max(startBarIndex, Math.round(Number(sourceEndBarIndex) || startBarIndex))
+    );
+    const targetBoundary = Math.max(
+        1,
+        Math.min(totalBarCount + 1, Math.round(Number(targetBoundaryBarIndex) || 1))
+    );
+    if (targetBoundary >= startBarIndex && targetBoundary <= endBarIndex + 1) {
+        return false;
+    }
+
+    if (typeof resetSelectionArtifacts === 'function') {
+        resetSelectionArtifacts();
+    }
+    const barOrder = Array.from({ length: totalBarCount }, function (_, barOffset) {
+        return barOffset + 1;
+    });
+    const movedBars = barOrder.splice(startBarIndex - 1, endBarIndex - startBarIndex + 1);
+    let insertionIndex = targetBoundary - 1;
+    if (targetBoundary > endBarIndex + 1) {
+        insertionIndex -= movedBars.length;
+    }
+    barOrder.splice.apply(barOrder, [insertionIndex, 0].concat(movedBars));
+
+    const targetBarBySourceBar = {};
+    barOrder.forEach(function (sourceBarIndex, targetOffset) {
+        targetBarBySourceBar[sourceBarIndex] = targetOffset + 1;
+    });
+
+    const readConfig = getReadRhythmConfig();
+    const headerSubtitleEntry = typeof getMobileSheetHeaderSubtitleEntry === 'function'
+        ? getMobileSheetHeaderSubtitleEntry()
+        : null;
+    const placements = [];
+    s.selectAll('.shp').forEach(function (element) {
+        const sourceBarIndex = getSheetElementMoveBarIndex(
+            element,
+            readConfig,
+            totalBarCount,
+            headerSubtitleEntry ? headerSubtitleEntry.element : null
+        );
+        if (!sourceBarIndex || targetBarBySourceBar[sourceBarIndex] === sourceBarIndex) {
+            return;
+        }
+        placements.push({
+            element: element,
+            sourceBarIndex: sourceBarIndex,
+            targetBarIndex: targetBarBySourceBar[sourceBarIndex]
+        });
+    });
+
+    if (placements.length === 0) {
+        return false;
+    }
+    recordHistorySnapshot();
+    placements.forEach(function (placement) {
+        translateSheetElementBetweenBars(
+            placement.element,
+            placement.sourceBarIndex,
+            placement.targetBarIndex
+        );
+    });
+    return true;
+}
+
+function moveSheetPatternByDirection(rangeId, direction) {
+    const rangeIndex = getSheetPatternMoveRangeIndex(rangeId);
+    const directionOffset = direction === 'up' ? -1 : 1;
+    const targetRange = sheetPatternMoveState.ranges[rangeIndex + directionOffset];
+    const sourceRange = sheetPatternMoveState.ranges[rangeIndex];
+    if (!sourceRange || !targetRange) {
+        return false;
+    }
+
+    const targetBoundary = direction === 'up'
+        ? targetRange.startBarIndex
+        : targetRange.endBarIndex + 1;
+    if (!moveSheetBarBlock(
+        sourceRange.startBarIndex,
+        sourceRange.endBarIndex,
+        targetBoundary
+    )) {
+        return false;
+    }
+
+    const readResult = callPHPScript_lesen(zeilenAnzahl, {
+        showAlert: false,
+        updateQuickPlaySelectors: false,
+        logResults: false
+    });
+    renderSheetQuickPlaySelectors(readResult);
+    if (isMobileSheetReaderViewport()) {
+        renderMobileSheetView(readResult);
+    }
+    return true;
 }
 
 function positionSheetQuickPlayControls() {
@@ -3288,6 +3543,44 @@ function buildSheetQuickPlayConfiguredSections(preparedPatterns) {
     return sections;
 }
 
+function createSheetPatternMoveOverlayButton(range, direction, disabled) {
+    const bounds = getSheetBarBounds(range.startBarIndex);
+    const isUp = direction === 'up';
+    const buttonX = bounds.x + (isUp ? 1 : 16);
+    const buttonY = bounds.y + 7;
+    const groupEl = s.g().attr({
+        class: 'sheet-quick-play-overlay sheet-pattern-move-overlay' + (disabled ? ' is-disabled' : ''),
+        cursor: disabled ? 'default' : 'pointer',
+        'aria-label': 'Pattern ' + (isUp ? 'nach vorn' : 'nach hinten') + ' verschieben',
+        'aria-disabled': disabled ? 'true' : 'false'
+    });
+    groupEl.add(s.rect(buttonX, buttonY, 13, 14).attr({
+        fill: disabled ? '#f2f0eb' : '#fffaf0',
+        stroke: disabled ? '#aaa49a' : '#b77d43',
+        strokeWidth: 1,
+        rx: 3,
+        ry: 3
+    }));
+    groupEl.add(s.text(buttonX + 6.5, buttonY + 10.5, isUp ? '←' : '→').attr({
+        fill: disabled ? '#aaa49a' : '#70431f',
+        fontSize: 11,
+        fontFamily: 'sans-serif',
+        fontWeight: 'bold',
+        textAnchor: 'middle',
+        pointerEvents: 'none'
+    }));
+    if (!disabled) {
+        groupEl.click(function (event) {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            moveSheetPatternByDirection(range.id, direction);
+        });
+    }
+    return groupEl;
+}
+
 function renderSheetQuickPlaySelectors(readResult) {
     const previouslySelectedBarIndexes = new Set();
     const previouslySelectedIds = new Set(sheetQuickPlayState.selectedPatternIds);
@@ -3310,6 +3603,7 @@ function renderSheetQuickPlaySelectors(readResult) {
         updateQuickPlaySelectors: false,
         logResults: false
     });
+    sheetPatternMoveState.ranges = getSheetPatternMoveRanges(resolvedReadResult);
     syncTimelineStateFromReadResultIfNeeded(resolvedReadResult, syncOptions);
     const sourcePatterns = Array.isArray(timelineState.sourcePatterns)
         ? timelineState.sourcePatterns.slice()
@@ -3468,6 +3762,15 @@ function renderSheetQuickPlaySelectors(readResult) {
                 highlightEl.insertBefore(hitEl);
             }
         });
+    });
+
+    sheetPatternMoveState.ranges.forEach(function (range, rangeIndex) {
+        createSheetPatternMoveOverlayButton(range, 'up', rangeIndex === 0);
+        createSheetPatternMoveOverlayButton(
+            range,
+            'down',
+            rangeIndex === sheetPatternMoveState.ranges.length - 1
+        );
     });
 
     rebuildSheetQuickPlayNoteElementMap();
@@ -7338,6 +7641,13 @@ function createMobileSheetBarElement(bar, barIndex, previousBar, nextBar) {
     cardEl.classList.toggle('is-mobile-sheet-editable', isLandscapeEditor);
     const quickPlayPattern = getSheetQuickPlayPatternForSourceBar(sourceBarIndex);
     const quickPlayPatternId = quickPlayPattern && quickPlayPattern.id ? String(quickPlayPattern.id) : '';
+    const patternMoveRange = getSheetPatternMoveRangeForBar(sourceBarIndex);
+    const patternMoveRangeIndex = patternMoveRange
+        ? getSheetPatternMoveRangeIndex(patternMoveRange.id)
+        : -1;
+    const isPatternMoveStart = Boolean(
+        patternMoveRange && patternMoveRange.startBarIndex === sourceBarIndex
+    );
     if (quickPlayPatternId) {
         cardEl.dataset.patternId = quickPlayPatternId;
     }
@@ -7407,6 +7717,29 @@ function createMobileSheetBarElement(bar, barIndex, previousBar, nextBar) {
             ));
             const chooserActionsEl = document.createElement('div');
             chooserActionsEl.className = 'mobile-sheet-chooser-actions';
+            if (isPatternMoveStart) {
+                ['up', 'down'].forEach(function (direction) {
+                    const isUp = direction === 'up';
+                    const isDisabled = isUp
+                        ? patternMoveRangeIndex <= 0
+                        : patternMoveRangeIndex >= sheetPatternMoveState.ranges.length - 1;
+                    const movePatternButtonEl = document.createElement('button');
+                    movePatternButtonEl.type = 'button';
+                    movePatternButtonEl.className = 'mobile-sheet-chooser-action mobile-sheet-pattern-move-action';
+                    movePatternButtonEl.textContent = isUp ? '↑' : '↓';
+                    movePatternButtonEl.disabled = isDisabled;
+                    movePatternButtonEl.title = 'Ganzes Pattern ' + (isUp ? 'nach oben' : 'nach unten') + ' verschieben';
+                    movePatternButtonEl.setAttribute(
+                        'aria-label',
+                        'Ganzes Pattern ' + (isUp ? 'nach oben' : 'nach unten') + ' verschieben'
+                    );
+                    movePatternButtonEl.addEventListener('click', function (event) {
+                        event.stopPropagation();
+                        moveSheetPatternByDirection(patternMoveRange.id, direction);
+                    });
+                    chooserActionsEl.appendChild(movePatternButtonEl);
+                });
+            }
             const moveChooserButtonEl = document.createElement('button');
             moveChooserButtonEl.type = 'button';
             moveChooserButtonEl.className = 'mobile-sheet-chooser-action';
@@ -9032,6 +9365,31 @@ function closeAppMenus() {
     });
 }
 
+async function logoutBarabeat() {
+    const logoutButtonEl = document.getElementById('accessLogoutButton');
+    if (logoutButtonEl) {
+        logoutButtonEl.disabled = true;
+        logoutButtonEl.textContent = 'Wird abgemeldet ...';
+    }
+
+    try {
+        if ('caches' in window) {
+            const cacheNames = await window.caches.keys();
+            await Promise.all(cacheNames
+                .filter(function (cacheName) {
+                    return cacheName.indexOf('barabeat-studio-offline-') === 0;
+                })
+                .map(function (cacheName) {
+                    return window.caches.delete(cacheName);
+                }));
+        }
+    } catch (error) {
+        console.warn('Offline-Cache konnte beim Abmelden nicht geleert werden', error);
+    }
+
+    window.location.assign('index.php?barabeat_logout=1');
+}
+
 document.addEventListener('DOMContentLoaded', function () {
     initializeUiTheme();
     updateMobilePracticeModeAvailability();
@@ -9097,6 +9455,7 @@ document.addEventListener('DOMContentLoaded', function () {
     document.querySelector('#exportFileDialogButton').addEventListener('click', function () {
         openFileDialog('export');
     });
+    document.querySelector('#accessLogoutButton').addEventListener('click', logoutBarabeat);
     document.querySelector('#fileDialogCancelButton').addEventListener('click', closeFileDialog);
     document.querySelector('#fileDialogConfirmButton').addEventListener('click', confirmFileDialog);
     document.querySelector('#fileDialogRefreshButton').addEventListener('click', refreshFileDialogEntries);
@@ -10184,6 +10543,7 @@ document.addEventListener('DOMContentLoaded', function () {
         '#saveFileDialogButton',
         '#saveAsFileDialogButton',
         '#exportFileDialogButton',
+        '#accessLogoutButton',
         '#button3',
         '#button4',
         '#button5',

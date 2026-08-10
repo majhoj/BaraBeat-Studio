@@ -23,6 +23,13 @@
     return ENDPOINT_BASE + endpoint + separator + "_=" + Date.now();
   }
 
+  function handleExpiredAccess(response) {
+    if (response && response.status === 401 && typeof window !== "undefined") {
+      window.location.assign("index.php");
+      throw new Error("Die Anmeldung ist abgelaufen.");
+    }
+  }
+
   async function postEndpoint(endpoint, payload) {
     const response = await fetch(getFreshEndpointUrl(endpoint), {
       method: "POST",
@@ -32,6 +39,8 @@
         "Cache-Control": "no-cache"
       }
     });
+
+    handleExpiredAccess(response);
 
     if (!response.ok) {
       throw new Error("Serveranfrage fehlgeschlagen: " + response.status);
@@ -49,6 +58,7 @@
         "Cache-Control": "no-cache"
       }
     });
+    handleExpiredAccess(response);
     const responseText = await response.text();
     let data = null;
 

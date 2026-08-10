@@ -1,4 +1,7 @@
 <?php
+require_once __DIR__ . '/PHP/access_control.php';
+barabeat_require_access('json');
+
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, max-age=0');
 

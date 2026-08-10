@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'barabeat-studio-offline-v2';
+const CACHE_NAME = 'barabeat-studio-offline-v3-access';
 const APP_SHELL = [
   './',
   './index.php',
@@ -24,7 +24,7 @@ const APP_SHELL = [
   './Assets/apple-touch-icon.png',
   './Assets/pwa-icon-192.png',
   './Assets/pwa-icon-512.png',
-  './Bedienungsanleitung.html'
+  './Bedienungsanleitung.php'
 ];
 
 function scopedUrl(relativePath) {
@@ -114,7 +114,10 @@ self.addEventListener('message', function (event) {
   if (message.type !== 'barabeat-prepare-offline') {
     return;
   }
-  event.waitUntil(cacheOfflineAudioAssets().then(function () {
+  event.waitUntil(Promise.all([
+    cacheAppShell(),
+    cacheOfflineAudioAssets()
+  ]).then(function () {
     return notifyClient(event.source && event.source.id, { type: 'barabeat-offline-ready' });
   }).catch(function (error) {
     console.error('Offline-Vorbereitung fehlgeschlagen', error);

@@ -1,0 +1,22 @@
+DirectoryIndex index.php
+
+<IfModule mod_autoindex.c>
+    IndexIgnore *
+</IfModule>
+
+<IfModule mod_authz_core.c>
+    <FilesMatch "\.(?:bbs|txt)$">
+        Require all denied
+    </FilesMatch>
+
+    <Files "Bedienungsanleitung.html">
+        Require all denied
+    </Files>
+</IfModule>
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^Noten(?:/|$) - [F,L,NC]
+    RewriteRule ^(?:Backups|test-results)(?:/|$) - [F,L,NC]
+    RewriteRule ^test-67\.php$ - [F,L,NC]
+</IfModule>

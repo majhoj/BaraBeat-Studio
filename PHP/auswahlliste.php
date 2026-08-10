@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/access_control.php';
+barabeat_require_access('text');
 
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
