@@ -124,11 +124,15 @@ function getChooserLabelSeed(name, chooserText) {
     return name;
   }
 
-  if (currentText === name || currentText.indexOf(name) === 0 || currentText.indexOf(name + " ") !== -1) {
-    return currentText;
+  let standardLabels = typeof getFunctionChooserOptions === "function"
+    ? getFunctionChooserOptions()
+    : ["Call", "Intro", "Echauffement", "Begleitpattern", "Solo", "Outro", "Leer"];
+
+  if (standardLabels.indexOf(currentText) !== -1 && currentText !== name) {
+    return name;
   }
 
-  return name;
+  return currentText;
 }
 
 function getChooserPosition(chooserGruppe) {
