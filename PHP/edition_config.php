@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/i18n.php';
+
 /**
  * Zentrale BaraBeat-Editionskonfiguration.
  *
@@ -179,7 +181,7 @@ function barabeat_require_feature($name, $value = null, $message = null)
         'success' => false,
         'feature' => (string) $name,
         'edition' => barabeat_current_edition(),
-        'message' => $message ?: 'Diese Funktion ist in der aktuellen BaraBeat-Edition nicht verfügbar.',
+        'message' => $message ?: barabeat_t('edition.featureUnavailable'),
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 }
@@ -193,6 +195,9 @@ function barabeat_public_edition_config()
         'content' => [
             'demoStartScore' => $deploymentConfig['demoStartScore'] ?? null,
             'demoArrangement' => $deploymentConfig['demoArrangement'] ?? null,
+        ],
+        'messages' => [
+            'featureUnavailable' => barabeat_t('edition.featureUnavailable'),
         ],
         'debug' => !empty($deploymentConfig['debug']),
     ];
@@ -221,4 +226,3 @@ function barabeat_edition_config_json()
  * Auch die fachliche Definition eines Arrangement-Abschnitts bleibt bis zur
  * späteren Begrenzungsphase unverändert.
  */
-

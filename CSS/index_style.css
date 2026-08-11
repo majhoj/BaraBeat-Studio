@@ -127,10 +127,17 @@ body[data-ui-theme="earth"] .app-menu-panel {
 
 body[data-ui-theme="earth"] .app-menu-panel button,
 body[data-ui-theme="earth"] .app-menu-panel .app-menu-link,
+body[data-ui-theme="earth"] .app-menu-language-control,
 body[data-ui-theme="earth"] .app-submenu summary {
     background: #7a5635;
     border-color: #9d7649;
     color: #fff7e8;
+}
+
+body[data-ui-theme="earth"] .app-menu-language-control select {
+    background: #fff7e8;
+    border-color: #c9aa7b;
+    color: #2f271e;
 }
 
 body[data-ui-theme="earth"] .app-menu[open] summary,
@@ -446,9 +453,34 @@ html {
 .app-menu-panel button,
 .app-menu-panel .menu-file-picker,
 .app-menu-panel .app-menu-link,
+.app-menu-language-control,
 .app-submenu {
     width: 100%;
     box-sizing: border-box;
+}
+
+.app-menu-language-control {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(96px, auto);
+    align-items: center;
+    gap: 10px;
+    padding: 7px 8px 7px 11px;
+    border: 1px solid var(--ui-border);
+    border-radius: var(--ui-radius-small);
+    background: var(--ui-soft-bg);
+    color: var(--ui-text);
+    font-size: 14px;
+}
+
+.app-menu-language-control select {
+    min-width: 0;
+    max-width: 130px;
+    padding: 5px 24px 5px 7px;
+    border: 1px solid var(--ui-border-strong);
+    border-radius: var(--ui-radius-small);
+    background: var(--ui-panel-bg);
+    color: var(--ui-text);
+    font: inherit;
 }
 
 .app-menu-panel button,

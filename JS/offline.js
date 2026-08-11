@@ -4,6 +4,12 @@
   const statusElId = 'offlineStatus';
   let statusHideTimer = null;
 
+  function t(key) {
+    return window.BaraBeatI18n && typeof window.BaraBeatI18n.t === 'function'
+      ? window.BaraBeatI18n.t(key)
+      : key;
+  }
+
   function setOfflineStatus(message, state, hideAfterMs) {
     const statusEl = document.getElementById(statusElId);
     if (!statusEl) {
@@ -25,7 +31,7 @@
     const isOnline = navigator.onLine !== false;
     document.body.dataset.networkStatus = isOnline ? 'online' : 'offline';
     if (!isOnline) {
-      setOfflineStatus('Offline: Lokale Notenblätter und der Audioplayer sind verfügbar.', 'offline', 3500);
+      setOfflineStatus(t('offline.available'), 'offline', 3500);
     } else {
       const statusEl = document.getElementById(statusElId);
       if (statusEl && statusEl.dataset.state === 'offline') {
@@ -42,7 +48,7 @@
     if (!worker) {
       return;
     }
-    setOfflineStatus('Offline-Daten werden vorbereitet ...', 'preparing');
+    setOfflineStatus(t('offline.preparing'), 'preparing');
     worker.postMessage({ type: 'barabeat-prepare-offline' });
   }
 
@@ -56,12 +62,12 @@
     updateNetworkState();
 
     if (!('serviceWorker' in navigator)) {
-      setOfflineStatus('Dieser Browser unterstützt den Offline-Modus nicht.', 'unsupported', 3500);
+      setOfflineStatus(t('offline.unsupported'), 'unsupported', 3500);
       return;
     }
 
     if (!window.isSecureContext) {
-      setOfflineStatus('Offline-Installation benötigt HTTPS.', 'unsupported');
+      setOfflineStatus(t('offline.httpsRequired'), 'unsupported');
       return;
     }
 
@@ -71,10 +77,10 @@
         if (navigator.onLine === false) {
           updateNetworkState();
         } else {
-          setOfflineStatus('Offline bereit.', 'ready', 3500);
+          setOfflineStatus(t('offline.ready'), 'ready', 3500);
         }
       } else if (message.type === 'barabeat-offline-error') {
-        setOfflineStatus('Offline-Daten konnten nicht vollständig vorbereitet werden.', 'error');
+        setOfflineStatus(t('offline.prepareFailed'), 'error');
       }
     });
 
@@ -87,7 +93,7 @@
       });
     }).catch(function (error) {
       console.warn('Offline-Modus konnte nicht registriert werden', error);
-      setOfflineStatus('Offline-Modus konnte nicht eingerichtet werden.', 'error');
+      setOfflineStatus(t('offline.setupFailed'), 'error');
     });
   });
 })();

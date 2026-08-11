@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/i18n.php';
+
 function barabeat_access_config()
 {
     static $config = null;
@@ -274,12 +276,12 @@ function barabeat_access_handle_login()
 
     $lockUntil = (int) ($_SESSION['barabeat_access_lock_until'] ?? 0);
     if ($lockUntil > time()) {
-        return 'Zu viele Versuche. Bitte warte noch einen Moment.';
+        return barabeat_t('auth.tooManyAttempts');
     }
 
     $csrfToken = (string) ($_POST['barabeat_csrf'] ?? '');
     if ($csrfToken === '' || !hash_equals(barabeat_access_csrf_token(), $csrfToken)) {
-        return 'Die Anmeldung ist abgelaufen. Bitte versuche es erneut.';
+        return barabeat_t('auth.loginExpired');
     }
 
     $passwordHash = (string) ($config['password_hash'] ?? '');
@@ -303,7 +305,7 @@ function barabeat_access_handle_login()
         $_SESSION['barabeat_access_failures'] = 0;
     }
 
-    return 'Das Zugangspasswort ist nicht richtig.';
+    return barabeat_t('auth.wrongPassword');
 }
 
 function barabeat_access_render_login($errorMessage = '', $configurationMissing = false)
@@ -324,12 +326,12 @@ function barabeat_access_render_login($errorMessage = '', $configurationMissing 
     $csrfToken = htmlspecialchars(barabeat_access_csrf_token(), ENT_QUOTES, 'UTF-8');
     ?>
 <!doctype html>
-<html lang="de">
+<html lang="<?php echo htmlspecialchars(barabeat_language(), ENT_QUOTES, 'UTF-8'); ?>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#6a4a2d">
-    <title>Zugang | BaraBeat Studio</title>
+    <title><?php echo htmlspecialchars(barabeat_t('auth.pageTitle'), ENT_QUOTES, 'UTF-8'); ?></title>
     <style>
         :root { color-scheme: light; font-family: Arial, Helvetica, sans-serif; }
         * { box-sizing: border-box; }
@@ -355,11 +357,11 @@ function barabeat_access_render_login($errorMessage = '', $configurationMissing 
             <img src="<?php echo $logoPath; ?>" alt="BaraBeat Logo">
             <div>
                 <h1>BaraBeat Studio</h1>
-                <p>Geschützter Zugang</p>
+                <p><?php echo htmlspecialchars(barabeat_t('auth.protectedAccess'), ENT_QUOTES, 'UTF-8'); ?></p>
             </div>
         </header>
         <?php if ($configurationMissing): ?>
-            <p class="message config">Der Zugang ist noch nicht auf dem Server konfiguriert.</p>
+            <p class="message config"><?php echo htmlspecialchars(barabeat_t('auth.configurationMissing'), ENT_QUOTES, 'UTF-8'); ?></p>
         <?php else: ?>
             <?php if ($safeError !== ''): ?>
                 <p class="message" role="alert"><?php echo $safeError; ?></p>
@@ -367,9 +369,9 @@ function barabeat_access_render_login($errorMessage = '', $configurationMissing 
             <form method="post" action="<?php echo $formAction; ?>">
                 <input type="hidden" name="barabeat_login" value="1">
                 <input type="hidden" name="barabeat_csrf" value="<?php echo $csrfToken; ?>">
-                <label for="barabeatPassword">Zugangspasswort</label>
+                <label for="barabeatPassword"><?php echo htmlspecialchars(barabeat_t('auth.password'), ENT_QUOTES, 'UTF-8'); ?></label>
                 <input id="barabeatPassword" name="barabeat_password" type="password" autocomplete="current-password" required autofocus>
-                <button type="submit">Anmelden</button>
+                <button type="submit"><?php echo htmlspecialchars(barabeat_t('auth.signIn'), ENT_QUOTES, 'UTF-8'); ?></button>
             </form>
         <?php endif; ?>
     </main>
@@ -395,10 +397,10 @@ function barabeat_require_access($responseType = 'page')
         header('Cache-Control: no-store, max-age=0');
         if ($responseType === 'json') {
             header('Content-Type: application/json; charset=UTF-8');
-            echo json_encode(['success' => false, 'message' => 'Der Zugang ist nicht konfiguriert.'], JSON_UNESCAPED_UNICODE);
+            echo json_encode(['success' => false, 'message' => barabeat_t('auth.notConfigured')], JSON_UNESCAPED_UNICODE);
         } else {
             header('Content-Type: text/plain; charset=UTF-8');
-            echo 'Der Zugang ist nicht konfiguriert.';
+            echo barabeat_t('auth.notConfigured');
         }
         exit;
     }
@@ -430,10 +432,10 @@ function barabeat_require_access($responseType = 'page')
     header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
     if ($responseType === 'json') {
         header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['success' => false, 'message' => 'Anmeldung erforderlich.'], JSON_UNESCAPED_UNICODE);
+        echo json_encode(['success' => false, 'message' => barabeat_t('auth.required')], JSON_UNESCAPED_UNICODE);
     } else {
         header('Content-Type: text/plain; charset=UTF-8');
-        echo 'Anmeldung erforderlich.';
+        echo barabeat_t('auth.required');
     }
     exit;
 }

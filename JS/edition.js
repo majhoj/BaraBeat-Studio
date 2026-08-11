@@ -13,6 +13,9 @@
   const content = sourceConfig.content && typeof sourceConfig.content === 'object'
     ? Object.assign({}, sourceConfig.content)
     : {};
+  const messages = sourceConfig.messages && typeof sourceConfig.messages === 'object'
+    ? Object.assign({}, sourceConfig.messages)
+    : {};
 
   function hasFeature(name) {
     return Object.prototype.hasOwnProperty.call(features, String(name));
@@ -51,10 +54,13 @@
   }
 
   function showUpgradeInfo(featureName, message) {
+    const defaultMessage = global.BaraBeatI18n && typeof global.BaraBeatI18n.t === 'function'
+      ? global.BaraBeatI18n.t('edition.featureUnavailable')
+      : String(messages.featureUnavailable || 'edition.featureUnavailable');
     const detail = {
       edition: edition,
       feature: String(featureName || ''),
-      message: message || 'Diese Funktion ist in der aktuellen BaraBeat-Edition nicht verfügbar.'
+      message: message || defaultMessage
     };
 
     if (typeof global.CustomEvent === 'function') {
@@ -90,4 +96,3 @@
     global.console.info('[BaraBeat Edition]', edition, features);
   }
 })(window);
-

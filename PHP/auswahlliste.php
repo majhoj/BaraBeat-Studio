@@ -22,7 +22,7 @@ sort($dat_array, SORT_NATURAL | SORT_FLAG_CASE);
 echo '<form name="dateiauswahl">';
 //echo '<label id="professorLabel" for="professor"></label>';
 echo '<select id="dateiname" onchange="get_value(this)">';
-echo '<option value="--">Datei laden:</option>';
+echo '<option value="--">' . htmlspecialchars(barabeat_t('file.dialog.load'), ENT_QUOTES, 'UTF-8') . '</option>';
 $i = 0;
 
 

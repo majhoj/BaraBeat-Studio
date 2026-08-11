@@ -18,14 +18,14 @@ $config = barabeat_access_config();
 if (empty($config['enabled']) || !barabeat_access_is_authenticated()) {
     barabeat_access_window_response(401, [
         'success' => false,
-        'message' => 'Zum Ändern des Zugangs ist eine Anmeldung erforderlich.',
+        'message' => barabeat_t('auth.changeRequiresLogin'),
     ]);
 }
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
     barabeat_access_window_response(405, [
         'success' => false,
-        'message' => 'Diese Aktion ist nur per POST möglich.',
+        'message' => barabeat_t('auth.postOnly'),
     ]);
 }
 
@@ -33,7 +33,7 @@ $csrfToken = (string) ($_POST['csrf'] ?? '');
 if ($csrfToken === '' || !hash_equals(barabeat_access_csrf_token(), $csrfToken)) {
     barabeat_access_window_response(403, [
         'success' => false,
-        'message' => 'Die Sitzung ist abgelaufen. Bitte lade die Seite neu.',
+        'message' => barabeat_t('auth.sessionExpired'),
     ]);
 }
 
@@ -43,7 +43,7 @@ if ($action === 'open') {
     if ($accessUntil <= time()) {
         barabeat_access_window_response(500, [
             'success' => false,
-            'message' => 'Das Zugangsfenster konnte auf dem Server nicht gespeichert werden.',
+            'message' => barabeat_t('auth.windowStoreFailed'),
         ]);
     }
 
@@ -51,7 +51,7 @@ if ($action === 'open') {
         'success' => true,
         'open' => true,
         'remainingSeconds' => max(0, $accessUntil - time()),
-        'message' => 'Der Passwortschutz ist für fünf Minuten ausgesetzt.',
+        'message' => barabeat_t('auth.disabledFiveMinutes'),
     ]);
 }
 
@@ -59,7 +59,7 @@ if ($action === 'close') {
     if (!barabeat_access_close_window()) {
         barabeat_access_window_response(500, [
             'success' => false,
-            'message' => 'Das Zugangsfenster konnte nicht geschlossen werden.',
+            'message' => barabeat_t('auth.windowCloseFailed'),
         ]);
     }
 
@@ -67,11 +67,11 @@ if ($action === 'close') {
         'success' => true,
         'open' => false,
         'remainingSeconds' => 0,
-        'message' => 'Der Passwortschutz ist wieder aktiv.',
+        'message' => barabeat_t('auth.activeAgain'),
     ]);
 }
 
 barabeat_access_window_response(400, [
     'success' => false,
-    'message' => 'Unbekannte Zugangsaktion.',
+    'message' => barabeat_t('auth.unknownAction'),
 ]);

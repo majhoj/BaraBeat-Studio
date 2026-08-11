@@ -115,7 +115,13 @@ class Instrumente {
     } catch (error) {
       console.error('Fehler beim Laden der Audiodateien:', error);
       if (loadingIndicator) {
-        loadingIndicator.innerHTML = '<p>Ladefehler: ' + error.message + '</p>';
+        const errorMessage = window.BaraBeatI18n && typeof window.BaraBeatI18n.t === 'function'
+          ? window.BaraBeatI18n.t('error.audioLoad', { message: error.message || '' })
+          : String(error.message || '');
+        const errorParagraph = document.createElement('p');
+        errorParagraph.textContent = errorMessage;
+        loadingIndicator.textContent = '';
+        loadingIndicator.appendChild(errorParagraph);
       }
       throw error;
     }

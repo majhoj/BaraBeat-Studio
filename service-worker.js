@@ -1,11 +1,12 @@
 'use strict';
 
-const CACHE_NAME = 'barabeat-studio-offline-v4-editions';
+const CACHE_NAME = 'barabeat-studio-offline-v6-i18n-phase2';
 const APP_SHELL = [
   './',
   './index.php',
   './manifest.webmanifest',
   './CSS/index_style.css',
+  './JS/i18n.js',
   './JS/edition.js',
   './JS/snapNEU.svg.js',
   './JS/jquery.min.js',
@@ -25,7 +26,9 @@ const APP_SHELL = [
   './Assets/apple-touch-icon.png',
   './Assets/pwa-icon-192.png',
   './Assets/pwa-icon-512.png',
-  './Bedienungsanleitung.php'
+  './Bedienungsanleitung.php',
+  './languages/de.json',
+  './languages/en.json'
 ];
 
 function scopedUrl(relativePath) {

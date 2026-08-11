@@ -8,6 +8,12 @@
 
   let dbPromise = null;
 
+  function t(key, values) {
+    return global.BaraBeatI18n && typeof global.BaraBeatI18n.t === "function"
+      ? global.BaraBeatI18n.t(key, values)
+      : key;
+  }
+
   function nowIso() {
     return new Date().toISOString();
   }
@@ -52,7 +58,7 @@
 
     dbPromise = new Promise(function (resolve, reject) {
       if (!global.indexedDB) {
-        reject(new Error("IndexedDB wird von diesem Browser nicht unterstützt."));
+        reject(new Error(t("error.indexedDbUnsupported")));
         return;
       }
 
@@ -116,7 +122,7 @@
         reject(transaction.error);
       };
       transaction.onabort = function () {
-        reject(transaction.error || new Error("IndexedDB-Transaktion wurde abgebrochen."));
+        reject(transaction.error || new Error(t("error.indexedDbTransactionAborted")));
       };
 
       Promise.resolve()
@@ -164,7 +170,7 @@
 
     const parentFolder = await getByKey("folders", normalizedParentId);
     if (!parentFolder) {
-      throw new Error("Der Zielordner wurde nicht gefunden: " + normalizedParentId);
+      throw new Error(t("error.targetFolderNotFound", { id: normalizedParentId }));
     }
     return parentFolder.path + "/" + name;
   }
@@ -200,12 +206,12 @@
   async function renameFolder(folderId, name) {
     const normalizedFolderId = normalizeParentId(folderId);
     if (normalizedFolderId === ROOT_FOLDER_ID) {
-      throw new Error("Der lokale Hauptordner kann nicht umbenannt werden.");
+      throw new Error(t("error.rootFolderRename"));
     }
 
     const folder = await getByKey("folders", normalizedFolderId);
     if (!folder) {
-      throw new Error("Der Ordner wurde nicht gefunden: " + normalizedFolderId);
+      throw new Error(t("error.folderNotFound", { id: normalizedFolderId }));
     }
 
     const folderName = normalizeName(name, folder.name || "Neuer Ordner");
@@ -224,7 +230,7 @@
 
   async function saveScore(score) {
     if (!score || typeof score !== "object") {
-      throw new Error("saveScore erwartet ein Notenblatt-Objekt.");
+      throw new Error(t("error.scoreObjectExpected"));
     }
 
     const existingScore = score.id ? await getByKey("scores", score.id) : null;
@@ -259,7 +265,7 @@
   async function updateScoreMetadata(scoreId, metadata) {
     const score = await getByKey("scores", scoreId);
     if (!score) {
-      throw new Error("Das Notenblatt wurde nicht gefunden: " + scoreId);
+      throw new Error(t("error.scoreNotFound", { id: scoreId }));
     }
 
     const updatedScore = Object.assign({}, score, metadata || {});
@@ -314,7 +320,7 @@
   async function moveScore(scoreId, folderId) {
     const score = await getByKey("scores", scoreId);
     if (!score) {
-      throw new Error("Das Notenblatt wurde nicht gefunden: " + scoreId);
+      throw new Error(t("error.scoreNotFound", { id: scoreId }));
     }
     return saveScore(Object.assign({}, score, { folderId: normalizeParentId(folderId) }));
   }
@@ -329,22 +335,22 @@
   async function deleteFolder(folderId) {
     const normalizedFolderId = normalizeParentId(folderId);
     if (normalizedFolderId === ROOT_FOLDER_ID) {
-      throw new Error("Der lokale Hauptordner kann nicht gelöscht werden.");
+      throw new Error(t("error.rootFolderDelete"));
     }
 
     const folder = await getByKey("folders", normalizedFolderId);
     if (!folder) {
-      throw new Error("Der Ordner wurde nicht gefunden: " + normalizedFolderId);
+      throw new Error(t("error.folderNotFound", { id: normalizedFolderId }));
     }
 
     const childFolders = await listFolders(normalizedFolderId);
     if (childFolders.length > 0) {
-      throw new Error("Der Ordner enthält Unterordner und kann nicht gelöscht werden.");
+      throw new Error(t("error.folderContainsFolders"));
     }
 
     const childScores = await listScores(normalizedFolderId);
     if (childScores.length > 0) {
-      throw new Error("Der Ordner enthält Notenblätter und kann nicht gelöscht werden.");
+      throw new Error(t("error.folderContainsScores"));
     }
 
     return withStore("folders", "readwrite", async function (stores) {
@@ -356,7 +362,7 @@
   async function markPublished(scoreId, serverPath, publishToken) {
     const score = await getByKey("scores", scoreId);
     if (!score) {
-      throw new Error("Das Notenblatt wurde nicht gefunden: " + scoreId);
+      throw new Error(t("error.scoreNotFound", { id: scoreId }));
     }
 
     const timestamp = nowIso();
@@ -379,7 +385,7 @@
   async function unmarkPublished(scoreId) {
     const score = await getByKey("scores", scoreId);
     if (!score) {
-      throw new Error("Das Notenblatt wurde nicht gefunden: " + scoreId);
+      throw new Error(t("error.scoreNotFound", { id: scoreId }));
     }
 
     const timestamp = nowIso();

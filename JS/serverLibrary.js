@@ -10,6 +10,12 @@
     delete: "server_delete_score.php"
   };
 
+  function t(key, values) {
+    return global.BaraBeatI18n && typeof global.BaraBeatI18n.t === "function"
+      ? global.BaraBeatI18n.t(key, values)
+      : key;
+  }
+
   function encodeForm(payload) {
     const formData = new FormData();
     Object.keys(payload || {}).forEach(function (key) {
@@ -26,7 +32,7 @@
   function handleExpiredAccess(response) {
     if (response && response.status === 401 && typeof window !== "undefined") {
       window.location.assign("index.php");
-      throw new Error("Die Anmeldung ist abgelaufen.");
+      throw new Error(t("error.loginExpired"));
     }
   }
 
@@ -43,7 +49,7 @@
     handleExpiredAccess(response);
 
     if (!response.ok) {
-      throw new Error("Serveranfrage fehlgeschlagen: " + response.status);
+      throw new Error(t("error.serverRequestFailed", { status: response.status }));
     }
 
     return response.text();
@@ -65,11 +71,13 @@
     try {
       data = responseText ? JSON.parse(responseText) : null;
     } catch (error) {
-      throw new Error("Serverantwort konnte nicht gelesen werden.");
+      throw new Error(t("error.serverResponseUnreadable"));
     }
 
     if (!response.ok || !data || data.success === false) {
-      throw new Error(data && data.message ? data.message : "Serveranfrage fehlgeschlagen: " + response.status);
+      throw new Error(data && data.message
+        ? data.message
+        : t("error.serverRequestFailed", { status: response.status }));
     }
 
     return data;
@@ -92,12 +100,13 @@
           const fileName = option.textContent.trim();
           return {
             fileName: fileName,
+            optionValue: option.value,
             serverUpdatedAt: option.getAttribute("data-modified") || "",
             serverModifiedTs: Number(option.getAttribute("data-modified-ts")) || 0
           };
         })
         .filter(function (score) {
-          return score.fileName && score.fileName !== "Datei laden:";
+          return score.fileName && score.optionValue !== "--";
         })
         .map(function (score) {
           return {
@@ -131,7 +140,7 @@
 
   async function publishScore(score) {
     if (!score || typeof score !== "object") {
-      throw new Error("publishScore erwartet ein Notenblatt-Objekt.");
+      throw new Error(t("error.publishScoreObjectExpected"));
     }
 
     const baseName = getPublishBaseName(score);
@@ -143,12 +152,12 @@
 
   async function updatePublishedScore(score) {
     if (!score || typeof score !== "object") {
-      throw new Error("updatePublishedScore erwartet ein Notenblatt-Objekt.");
+      throw new Error(t("error.updateScoreObjectExpected"));
     }
 
     const baseName = getPublishBaseName(score);
     if (!score.publishToken) {
-      throw new Error("Diese lokale Kopie hat kein Publish-Token und kann die Serverdatei nicht aktualisieren.");
+      throw new Error(t("error.localPublishTokenUpdateMissing"));
     }
 
     return postJsonEndpoint(ENDPOINTS.update, {
@@ -161,7 +170,7 @@
   function importScore(serverPath) {
     const fileName = String(serverPath || "").trim();
     if (!fileName) {
-      return Promise.reject(new Error("importScore erwartet einen Serverpfad."));
+      return Promise.reject(new Error(t("error.serverPathExpected")));
     }
 
     return postEndpoint(ENDPOINTS.load, { b: fileName }).then(function (content) {
@@ -179,15 +188,15 @@
 
   async function deletePublishedScore(score) {
     if (!score || typeof score !== "object") {
-      throw new Error("deletePublishedScore erwartet ein Notenblatt-Objekt.");
+      throw new Error(t("error.deleteScoreObjectExpected"));
     }
 
     if (!score.serverPath) {
-      throw new Error("Diese lokale Kopie ist keiner Serverdatei zugeordnet.");
+      throw new Error(t("error.serverFileAssociationMissing"));
     }
 
     if (!score.publishToken) {
-      throw new Error("Diese lokale Kopie hat kein Publish-Token und kann die Serverdatei nicht löschen.");
+      throw new Error(t("error.localPublishTokenDeleteMissing"));
     }
 
     return postJsonEndpoint(ENDPOINTS.delete, {

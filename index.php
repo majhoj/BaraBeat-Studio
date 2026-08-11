@@ -1,8 +1,10 @@
 <?php
+require_once __DIR__ . '/PHP/i18n.php';
 require_once __DIR__ . '/PHP/access_control.php';
 require_once __DIR__ . '/PHP/edition_config.php';
 barabeat_require_access('page');
 
+$jsI18n = @filemtime(__DIR__ . '/JS/i18n.js') ?: 1;
 $jsEdition = @filemtime(__DIR__ . '/JS/edition.js') ?: 1;
 $jsSnap = @filemtime(__DIR__ . '/JS/snapNEU.svg.js') ?: 1;
 $jsJq = @filemtime(__DIR__ . '/JS/jquery.min.js') ?: 1;
@@ -22,9 +24,10 @@ $canManageTemporaryAccess = !empty($accessConfig['enabled']) && barabeat_access_
 $temporaryAccessUntil = barabeat_access_window_until();
 $temporaryAccessRemaining = max(0, $temporaryAccessUntil - time());
 $accessCsrfToken = $canManageTemporaryAccess ? barabeat_access_csrf_token() : '';
+$activeLanguage = barabeat_language();
 ?>
 <!doctype html>
-<html>
+<html lang="<?php echo htmlspecialchars($activeLanguage, ENT_QUOTES, 'UTF-8'); ?>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -38,6 +41,8 @@ $accessCsrfToken = $canManageTemporaryAccess ? barabeat_access_csrf_token() : ''
     <link rel="apple-touch-icon-precomposed" sizes="180x180" href="apple-touch-icon.png?v=<?php echo $appleTouchIcon; ?>">
     <link rel="icon" href="Assets/favicon.svg?v=<?php echo $faviconSvg; ?>" type="image/svg+xml">
     <link rel="icon" href="Assets/favicon-32.png?v=<?php echo $faviconPng; ?>" type="image/png" sizes="32x32">
+    <script>window.BaraBeatI18nConfig = <?php echo barabeat_i18n_config_json(); ?>;</script>
+    <script src="JS/i18n.js?v=<?php echo $jsI18n; ?>"></script>
     <script>window.BaraBeatEditionConfig = <?php echo barabeat_edition_config_json(); ?>;</script>
     <script src="JS/edition.js?v=<?php echo $jsEdition; ?>"></script>
     <script src="JS/snapNEU.svg.js?v=<?php echo $jsSnap; ?>"></script>
@@ -58,7 +63,7 @@ $accessCsrfToken = $canManageTemporaryAccess ? barabeat_access_csrf_token() : ''
     echo "<script>datei_name = " . json_encode($file_name) . ";</script>";
     ?>
 
-    <nav id="appMenuBar" aria-label="Hauptmenü">
+    <nav id="appMenuBar" aria-label="<?php echo htmlspecialchars(barabeat_t('navigation.main'), ENT_QUOTES, 'UTF-8'); ?>" data-i18n-aria-label="navigation.main">
         <div class="app-logo" aria-label="BaraBeat Studio">
             <svg viewBox="0 0 64 64" role="img" aria-hidden="true" focusable="false">
                 <defs>
@@ -90,50 +95,57 @@ $accessCsrfToken = $canManageTemporaryAccess ? barabeat_access_csrf_token() : ''
             </svg>
         </div>
         <details class="app-menu">
-            <summary>Datei</summary>
+            <summary data-i18n="navigation.file"><?php echo htmlspecialchars(barabeat_t('navigation.file'), ENT_QUOTES, 'UTF-8'); ?></summary>
             <div class="app-menu-panel">
-                <button type="button" id="openFileDialogButton">Öffnen...</button>
-                <button type="button" id="saveFileDialogButton">Speichern</button>
-                <button type="button" id="saveAsFileDialogButton">Speichern als...</button>
-                <button type="button" id="exportFileDialogButton">Exportieren...</button>
-                <a class="app-menu-link mobile-manual-link" href="Bedienungsanleitung.php">Bedienungsanleitung</a>
+                <button type="button" id="openFileDialogButton" data-i18n="file.open"><?php echo htmlspecialchars(barabeat_t('file.open'), ENT_QUOTES, 'UTF-8'); ?></button>
+                <button type="button" id="saveFileDialogButton" data-i18n="file.save"><?php echo htmlspecialchars(barabeat_t('file.save'), ENT_QUOTES, 'UTF-8'); ?></button>
+                <button type="button" id="saveAsFileDialogButton" data-i18n="file.saveAs"><?php echo htmlspecialchars(barabeat_t('file.saveAs'), ENT_QUOTES, 'UTF-8'); ?></button>
+                <button type="button" id="exportFileDialogButton" data-i18n="file.export"><?php echo htmlspecialchars(barabeat_t('file.export'), ENT_QUOTES, 'UTF-8'); ?></button>
+                <a class="app-menu-link mobile-manual-link" href="Bedienungsanleitung.php" data-i18n="navigation.manual"><?php echo htmlspecialchars(barabeat_t('navigation.manual'), ENT_QUOTES, 'UTF-8'); ?></a>
+                <label class="app-menu-language-control" for="languageSelect">
+                    <span data-i18n="language.label"><?php echo htmlspecialchars(barabeat_t('language.label'), ENT_QUOTES, 'UTF-8'); ?></span>
+                    <select id="languageSelect" data-barabeat-language-select aria-label="<?php echo htmlspecialchars(barabeat_t('language.label'), ENT_QUOTES, 'UTF-8'); ?>" data-i18n-aria-label="language.label">
+                        <option value="de" data-i18n="language.option.de"<?php echo $activeLanguage === 'de' ? ' selected' : ''; ?>><?php echo htmlspecialchars(barabeat_t('language.option.de'), ENT_QUOTES, 'UTF-8'); ?></option>
+                        <option value="en" data-i18n="language.option.en"<?php echo $activeLanguage === 'en' ? ' selected' : ''; ?>><?php echo htmlspecialchars(barabeat_t('language.option.en'), ENT_QUOTES, 'UTF-8'); ?></option>
+                    </select>
+                </label>
                 <?php if ($canManageTemporaryAccess): ?>
-                    <button type="button" id="temporaryAccessButton">Zugang 5 Min öffnen</button>
+                    <button type="button" id="temporaryAccessButton" data-i18n="auth.temporaryOpen"><?php echo htmlspecialchars(barabeat_t('auth.temporaryOpen'), ENT_QUOTES, 'UTF-8'); ?></button>
                 <?php endif; ?>
-                <button type="button" id="accessLogoutButton">Abmelden</button>
+                <button type="button" id="accessLogoutButton" data-i18n="auth.logout"><?php echo htmlspecialchars(barabeat_t('auth.logout'), ENT_QUOTES, 'UTF-8'); ?></button>
             </div>
         </details>
         <details class="app-menu" id="scoreSheetMenu">
-            <summary>Notenblatt</summary>
+            <summary data-i18n="navigation.score"><?php echo htmlspecialchars(barabeat_t('navigation.score'), ENT_QUOTES, 'UTF-8'); ?></summary>
             <div class="app-menu-panel">
-                <button type="button" id="button4">Binäres Notenblatt</button>
-                <button type="button" id="button5">Tenäres Notenblatt</button>
-                <button type="button" id="button8">Tenäres 9/8 Notenblatt</button>
-                <button type="button" id="addSheetPageButton">Blatt hinzufügen</button>
-                <button type="button" id="deleteSheetPageButton">Blatt löschen</button>
-                <button type="button" id="button3">Noten lesen</button>
+                <button type="button" id="button4" data-i18n="editor.binaryScore"><?php echo htmlspecialchars(barabeat_t('editor.binaryScore'), ENT_QUOTES, 'UTF-8'); ?></button>
+                <button type="button" id="button5" data-i18n="editor.ternaryScore"><?php echo htmlspecialchars(barabeat_t('editor.ternaryScore'), ENT_QUOTES, 'UTF-8'); ?></button>
+                <button type="button" id="button8" data-i18n="editor.nineEightScore"><?php echo htmlspecialchars(barabeat_t('editor.nineEightScore'), ENT_QUOTES, 'UTF-8'); ?></button>
+                <button type="button" id="addSheetPageButton" data-i18n="editor.addPage"><?php echo htmlspecialchars(barabeat_t('editor.addPage'), ENT_QUOTES, 'UTF-8'); ?></button>
+                <button type="button" id="deleteSheetPageButton" data-i18n="editor.deletePage"><?php echo htmlspecialchars(barabeat_t('editor.deletePage'), ENT_QUOTES, 'UTF-8'); ?></button>
+                <button type="button" id="button3" data-i18n="editor.readScore"><?php echo htmlspecialchars(barabeat_t('editor.readScore'), ENT_QUOTES, 'UTF-8'); ?></button>
             </div>
         </details>
         <details class="app-menu">
-            <summary>Einfügen</summary>
+            <summary data-i18n="navigation.insert"><?php echo htmlspecialchars(barabeat_t('navigation.insert'), ENT_QUOTES, 'UTF-8'); ?></summary>
             <div class="app-menu-panel">
-                <button type="button" id="button7">Instrument-Chooser</button>
-                <button type="button" id="button9">Funktions-Chooser</button>
-                <button type="button" id="resetPaletteButton">Palette zurücksetzen</button>
+                <button type="button" id="button7" data-i18n="editor.instrumentChooser"><?php echo htmlspecialchars(barabeat_t('editor.instrumentChooser'), ENT_QUOTES, 'UTF-8'); ?></button>
+                <button type="button" id="button9" data-i18n="editor.functionChooser"><?php echo htmlspecialchars(barabeat_t('editor.functionChooser'), ENT_QUOTES, 'UTF-8'); ?></button>
+                <button type="button" id="resetPaletteButton" data-i18n="editor.resetPalette"><?php echo htmlspecialchars(barabeat_t('editor.resetPalette'), ENT_QUOTES, 'UTF-8'); ?></button>
             </div>
         </details>
         <details class="app-menu" data-mobile-practice-menu="true">
-            <summary><span class="desktop-menu-label">Werkzeuge</span><span class="mobile-menu-label">Üben</span></summary>
+            <summary><span class="desktop-menu-label" data-i18n="navigation.tools"><?php echo htmlspecialchars(barabeat_t('navigation.tools'), ENT_QUOTES, 'UTF-8'); ?></span><span class="mobile-menu-label" data-i18n="navigation.practice"><?php echo htmlspecialchars(barabeat_t('navigation.practice'), ENT_QUOTES, 'UTF-8'); ?></span></summary>
             <div class="app-menu-panel">
-                <button type="button" id="practiceButton">Üben</button>
-                <button type="button" id="button11">Arrangieren</button>
-                <a class="app-menu-link" href="Bedienungsanleitung.php" target="_blank" rel="noopener">Bedienungsanleitung</a>
+                <button type="button" id="practiceButton" data-i18n="navigation.practice"><?php echo htmlspecialchars(barabeat_t('navigation.practice'), ENT_QUOTES, 'UTF-8'); ?></button>
+                <button type="button" id="button11" data-i18n="navigation.arrange"><?php echo htmlspecialchars(barabeat_t('navigation.arrange'), ENT_QUOTES, 'UTF-8'); ?></button>
+                <a class="app-menu-link" href="Bedienungsanleitung.php" target="_blank" rel="noopener" data-i18n="navigation.manual"><?php echo htmlspecialchars(barabeat_t('navigation.manual'), ENT_QUOTES, 'UTF-8'); ?></a>
                 <details class="app-submenu">
-                    <summary>Template</summary>
+                    <summary data-i18n="navigation.template"><?php echo htmlspecialchars(barabeat_t('navigation.template'), ENT_QUOTES, 'UTF-8'); ?></summary>
                     <div class="app-submenu-panel">
-                        <button type="button" id="themeClearButton">Klar</button>
-                        <button type="button" id="themePlayfulButton">Verspielt</button>
-                        <button type="button" id="themeEarthButton">Erdig</button>
+                        <button type="button" id="themeClearButton" data-i18n="editor.theme.clear"><?php echo htmlspecialchars(barabeat_t('editor.theme.clear'), ENT_QUOTES, 'UTF-8'); ?></button>
+                        <button type="button" id="themePlayfulButton" data-i18n="editor.theme.playful"><?php echo htmlspecialchars(barabeat_t('editor.theme.playful'), ENT_QUOTES, 'UTF-8'); ?></button>
+                        <button type="button" id="themeEarthButton" data-i18n="editor.theme.earth"><?php echo htmlspecialchars(barabeat_t('editor.theme.earth'), ENT_QUOTES, 'UTF-8'); ?></button>
                     </div>
                 </details>
             </div>
@@ -150,10 +162,10 @@ $accessCsrfToken = $canManageTemporaryAccess ? barabeat_access_csrf_token() : ''
 
     <section id="mobileStartInfo" class="mobile-start-info" aria-live="polite">
         <h1>BaraBeat Studio</h1>
-        <p>Öffne ein Notenblatt und starte den Übungsmodus. Auf Smartphones ist die Ansicht zum Üben und Abspielen vorbereitet.</p>
+        <p data-i18n="editor.mobileStartText"><?php echo htmlspecialchars(barabeat_t('editor.mobileStartText'), ENT_QUOTES, 'UTF-8'); ?></p>
     </section>
 
-    <section id="mobileSheetView" class="mobile-sheet-view" hidden aria-label="Mobile Notenblattansicht"></section>
+    <section id="mobileSheetView" class="mobile-sheet-view" hidden aria-label="<?php echo htmlspecialchars(barabeat_t('editor.mobileSheetView'), ENT_QUOTES, 'UTF-8'); ?>" data-i18n-aria-label="editor.mobileSheetView"></section>
 
     <div id="mobileArrangementOverlay" class="mobile-arrangement-overlay" hidden>
         <section class="mobile-arrangement-player" role="dialog" aria-modal="true" aria-labelledby="mobileArrangementTitle">
@@ -167,8 +179,8 @@ $accessCsrfToken = $canManageTemporaryAccess ? barabeat_access_csrf_token() : ''
 
     <section id="mobileOrientationNotice" class="mobile-orientation-notice" aria-live="polite" aria-hidden="true">
         <div>
-            <h1>Bitte hochkant drehen</h1>
-            <p>Die Smartphone-Ansicht ist für den Portrait-Modus vorbereitet.</p>
+            <h1 data-i18n="editor.portraitRequired"><?php echo htmlspecialchars(barabeat_t('editor.portraitRequired'), ENT_QUOTES, 'UTF-8'); ?></h1>
+            <p data-i18n="editor.portraitRequiredText"><?php echo htmlspecialchars(barabeat_t('editor.portraitRequiredText'), ENT_QUOTES, 'UTF-8'); ?></p>
         </div>
     </section>
 
@@ -180,80 +192,80 @@ $accessCsrfToken = $canManageTemporaryAccess ? barabeat_access_csrf_token() : ''
                     <span></span>
                     <span></span>
                 </div>
-                <h2 id="fileDialogTitle">Datei</h2>
+                <h2 id="fileDialogTitle" data-i18n="file.dialog.title"><?php echo htmlspecialchars(barabeat_t('file.dialog.title'), ENT_QUOTES, 'UTF-8'); ?></h2>
             </header>
             <div class="file-dialog-main">
-                <aside class="file-dialog-sidebar" aria-label="Quellen">
-                    <div class="file-dialog-sidebar-section">Quellen</div>
-                    <button type="button" class="file-dialog-source is-active" data-source="local">Lokal</button>
-                    <button type="button" class="file-dialog-source" data-source="server">Server</button>
-                    <div class="file-dialog-sidebar-section">Sammlungen</div>
-                    <button type="button" class="file-dialog-filter is-active" data-filter="all">Alle</button>
-                    <button type="button" class="file-dialog-filter" data-filter="published">Veröffentlicht</button>
-                    <button type="button" class="file-dialog-filter" data-filter="local-only">Nur lokal</button>
-                    <button type="button" class="file-dialog-filter" data-filter="modified">Geändert</button>
+                <aside class="file-dialog-sidebar" aria-label="<?php echo htmlspecialchars(barabeat_t('file.dialog.sources'), ENT_QUOTES, 'UTF-8'); ?>" data-i18n-aria-label="file.dialog.sources">
+                    <div class="file-dialog-sidebar-section" data-i18n="file.dialog.sources"><?php echo htmlspecialchars(barabeat_t('file.dialog.sources'), ENT_QUOTES, 'UTF-8'); ?></div>
+                    <button type="button" class="file-dialog-source is-active" data-source="local" data-i18n="common.local"><?php echo htmlspecialchars(barabeat_t('common.local'), ENT_QUOTES, 'UTF-8'); ?></button>
+                    <button type="button" class="file-dialog-source" data-source="server" data-i18n="common.server"><?php echo htmlspecialchars(barabeat_t('common.server'), ENT_QUOTES, 'UTF-8'); ?></button>
+                    <div class="file-dialog-sidebar-section" data-i18n="file.dialog.collections"><?php echo htmlspecialchars(barabeat_t('file.dialog.collections'), ENT_QUOTES, 'UTF-8'); ?></div>
+                    <button type="button" class="file-dialog-filter is-active" data-filter="all" data-i18n="file.dialog.filterAll"><?php echo htmlspecialchars(barabeat_t('file.dialog.filterAll'), ENT_QUOTES, 'UTF-8'); ?></button>
+                    <button type="button" class="file-dialog-filter" data-filter="published" data-i18n="file.dialog.filterPublished"><?php echo htmlspecialchars(barabeat_t('file.dialog.filterPublished'), ENT_QUOTES, 'UTF-8'); ?></button>
+                    <button type="button" class="file-dialog-filter" data-filter="local-only" data-i18n="file.dialog.filterLocalOnly"><?php echo htmlspecialchars(barabeat_t('file.dialog.filterLocalOnly'), ENT_QUOTES, 'UTF-8'); ?></button>
+                    <button type="button" class="file-dialog-filter" data-filter="modified" data-i18n="file.dialog.filterModified"><?php echo htmlspecialchars(barabeat_t('file.dialog.filterModified'), ENT_QUOTES, 'UTF-8'); ?></button>
                 </aside>
                 <div class="file-dialog-content">
                     <div class="file-dialog-fields">
-                        <label for="fileDialogName">Name:</label>
+                        <label for="fileDialogName"><span data-i18n="common.name"><?php echo htmlspecialchars(barabeat_t('common.name'), ENT_QUOTES, 'UTF-8'); ?></span>:</label>
                         <input type="text" id="fileDialogName" autocomplete="off" />
-                        <label for="fileDialogTags">Tags:</label>
+                        <label for="fileDialogTags"><span data-i18n="file.dialog.tags"><?php echo htmlspecialchars(barabeat_t('file.dialog.tags'), ENT_QUOTES, 'UTF-8'); ?></span>:</label>
                         <input type="text" id="fileDialogTags" autocomplete="off" />
                     </div>
                     <div class="file-dialog-toolbar">
-                        <button type="button" id="fileDialogRefreshButton" title="Aktualisieren">↻</button>
-                        <span id="fileDialogFolderName" class="file-dialog-folder-name">Lokal</span>
-                        <input type="search" id="fileDialogSearch" placeholder="Suchen" />
+                        <button type="button" id="fileDialogRefreshButton" title="<?php echo htmlspecialchars(barabeat_t('common.refresh'), ENT_QUOTES, 'UTF-8'); ?>" data-i18n-title="common.refresh">↻</button>
+                        <span id="fileDialogFolderName" class="file-dialog-folder-name" data-i18n="common.local"><?php echo htmlspecialchars(barabeat_t('common.local'), ENT_QUOTES, 'UTF-8'); ?></span>
+                        <input type="search" id="fileDialogSearch" placeholder="<?php echo htmlspecialchars(barabeat_t('common.search'), ENT_QUOTES, 'UTF-8'); ?>" data-i18n-placeholder="common.search" />
                     </div>
                     <div id="fileDialogServerNoticeSlot" class="file-dialog-server-notice-slot">
                         <div id="fileDialogServerNotice" class="file-dialog-server-notice" hidden>
                             <span></span>
-                            <button type="button">Serverversion laden</button>
+                            <button type="button" data-i18n="file.dialog.serverVersionLoad"><?php echo htmlspecialchars(barabeat_t('file.dialog.serverVersionLoad'), ENT_QUOTES, 'UTF-8'); ?></button>
                         </div>
                     </div>
                     <div class="file-dialog-table-wrap">
                         <table class="file-dialog-table">
                             <thead>
                                 <tr>
-                                    <th>Name</th>
-                                    <th>Status</th>
-                                    <th>Geändert</th>
+                                    <th data-i18n="common.name"><?php echo htmlspecialchars(barabeat_t('common.name'), ENT_QUOTES, 'UTF-8'); ?></th>
+                                    <th data-i18n="common.status"><?php echo htmlspecialchars(barabeat_t('common.status'), ENT_QUOTES, 'UTF-8'); ?></th>
+                                    <th data-i18n="common.modified"><?php echo htmlspecialchars(barabeat_t('common.modified'), ENT_QUOTES, 'UTF-8'); ?></th>
                                 </tr>
                             </thead>
                             <tbody id="fileDialogList"></tbody>
                         </table>
-                        <div id="fileDialogEmpty" class="file-dialog-empty" hidden>Keine Dateien gefunden.</div>
+                        <div id="fileDialogEmpty" class="file-dialog-empty" hidden data-i18n="file.dialog.empty"><?php echo htmlspecialchars(barabeat_t('file.dialog.empty'), ENT_QUOTES, 'UTF-8'); ?></div>
                     </div>
                 </div>
             </div>
             <footer class="file-dialog-footer">
                 <div class="file-dialog-left-actions">
-                    <button type="button" id="fileDialogNewFolderButton">Neuer Ordner</button>
-                    <button type="button" id="fileDialogRenameButton">Umbenennen</button>
-                    <button type="button" id="fileDialogDeleteButton">Löschen</button>
-                    <button type="button" id="fileDialogUnpublishButton">Veröffentlichung löschen</button>
+                    <button type="button" id="fileDialogNewFolderButton" data-i18n="file.dialog.newFolder"><?php echo htmlspecialchars(barabeat_t('file.dialog.newFolder'), ENT_QUOTES, 'UTF-8'); ?></button>
+                    <button type="button" id="fileDialogRenameButton" data-i18n="common.rename"><?php echo htmlspecialchars(barabeat_t('common.rename'), ENT_QUOTES, 'UTF-8'); ?></button>
+                    <button type="button" id="fileDialogDeleteButton" data-i18n="common.delete"><?php echo htmlspecialchars(barabeat_t('common.delete'), ENT_QUOTES, 'UTF-8'); ?></button>
+                    <button type="button" id="fileDialogUnpublishButton" data-i18n="file.dialog.deletePublication"><?php echo htmlspecialchars(barabeat_t('file.dialog.deletePublication'), ENT_QUOTES, 'UTF-8'); ?></button>
                 </div>
                 <label class="file-dialog-format" for="fileDialogFormat">
-                    Format:
+                    <span data-i18n="common.format"><?php echo htmlspecialchars(barabeat_t('common.format'), ENT_QUOTES, 'UTF-8'); ?></span>:
                     <select id="fileDialogFormat">
                         <option value="svg">SVG</option>
                         <option value="pdf">PDF</option>
                     </select>
                 </label>
                 <div class="file-dialog-actions">
-                    <button type="button" id="fileDialogCancelButton">Abbrechen</button>
-                    <button type="button" id="fileDialogConfirmButton" class="primary">Öffnen</button>
+                    <button type="button" id="fileDialogCancelButton" data-i18n="common.cancel"><?php echo htmlspecialchars(barabeat_t('common.cancel'), ENT_QUOTES, 'UTF-8'); ?></button>
+                    <button type="button" id="fileDialogConfirmButton" class="primary" data-i18n="common.open"><?php echo htmlspecialchars(barabeat_t('common.open'), ENT_QUOTES, 'UTF-8'); ?></button>
                 </div>
             </footer>
         </section>
     </div>
 
-    <div id="sheetQuickPlayControls" class="sheet-quick-play-controls" aria-label="Direktes Abspielen vom Notenblatt">
-        <label for="sheetQuickPlayTempo">Tempo</label>
+    <div id="sheetQuickPlayControls" class="sheet-quick-play-controls" aria-label="<?php echo htmlspecialchars(barabeat_t('editor.quickPlay.aria'), ENT_QUOTES, 'UTF-8'); ?>" data-i18n-aria-label="editor.quickPlay.aria">
+        <label for="sheetQuickPlayTempo" data-i18n="editor.quickPlay.tempo"><?php echo htmlspecialchars(barabeat_t('editor.quickPlay.tempo'), ENT_QUOTES, 'UTF-8'); ?></label>
         <input type="number" id="sheetQuickPlayTempo" min="30" max="180" step="1" value="100" />
-        <button type="button" id="sheetQuickPlayButton" aria-pressed="false" title="Ausgewählte Pattern abspielen">▶</button>
+        <button type="button" id="sheetQuickPlayButton" aria-pressed="false" title="<?php echo htmlspecialchars(barabeat_t('editor.quickPlay.playSelected'), ENT_QUOTES, 'UTF-8'); ?>" data-i18n-title="editor.quickPlay.playSelected">▶</button>
     </div>
-    <iframe id="sheetQuickPlayFrame" name="sheetQuickPlayFrame" class="sheet-quick-play-frame" title="Notenblatt Vorhörspieler" allow="autoplay"></iframe>
+    <iframe id="sheetQuickPlayFrame" name="sheetQuickPlayFrame" class="sheet-quick-play-frame" title="<?php echo htmlspecialchars(barabeat_t('editor.quickPlay.frameTitle'), ENT_QUOTES, 'UTF-8'); ?>" data-i18n-title="editor.quickPlay.frameTitle" allow="autoplay"></iframe>
 
     <div id="timelinePanel" hidden>
         <div class="timeline-sticky-region">
@@ -537,9 +549,13 @@ $accessCsrfToken = $canManageTemporaryAccess ? barabeat_access_csrf_token() : ''
         </section>
     </div>
 
-    <script>
+<script>
 // Bearbeitungsfunktionen
 var edit_title, edit_text;
+
+function uiText(key, values) {
+    return window.BaraBeatI18n.t(key, values);
+}
 
 // Layout- und Rasterzustand
 var y = 172,
@@ -698,7 +714,7 @@ function startInlineRhythmTitleEdit() {
     editorEl.type = 'text';
     editorEl.value = isDefaultTitleText(currentTitle) ? '' : currentTitle;
     editorEl.placeholder = defaultRhythmTitle;
-    editorEl.setAttribute('aria-label', 'Rhythmusname');
+    editorEl.setAttribute('aria-label', uiText('editor.rhythmName'));
     editorEl.style.position = 'absolute';
     editorEl.style.left = (titleBounds.left + scrollX - 4) + 'px';
     editorEl.style.top = (titleBounds.top + scrollY - 4) + 'px';
@@ -752,7 +768,7 @@ edit_title = function () {
 
 edit_text = function () {
     const text_a = this.attr('text');
-    const text_i = prompt('Gib hier bitte den gewünschten Text ein!', text_a);
+    const text_i = prompt(uiText('editor.editTextPrompt'), text_a);
     if (text_i == null) {
         return;
     }
@@ -829,12 +845,12 @@ function escapeHtml(value) {
 
 function buildLocalFileListMarkup(scores) {
     let markup = '<select id="dateiname" onchange="get_value(this)">';
-    markup += '<option value="">Lokale Datei laden:</option>';
+    markup += '<option value="">' + escapeHtml(uiText('file.dialog.localLoad')) + '</option>';
     scores.forEach(function (score) {
         const statusLabel = score.syncState === 'modified-local'
             ? ' *'
             : score.isPublished
-                ? ' veröffentlicht'
+                ? ' ' + uiText('file.status.published')
                 : '';
         markup += '<option value="' + escapeHtml(score.id) + '">' +
             escapeHtml(score.title + statusLabel) +
@@ -846,7 +862,7 @@ function buildLocalFileListMarkup(scores) {
 
 function buildServerFileListMarkup(scores) {
     let markup = '<select id="dateiname" onchange="get_value(this)">';
-    markup += '<option value="">Server-Datei laden:</option>';
+    markup += '<option value="">' + escapeHtml(uiText('file.dialog.serverLoad')) + '</option>';
     scores.forEach(function (score) {
         markup += '<option value="' + escapeHtml(score.serverPath || score.fileName) + '">' +
             escapeHtml(score.fileName || score.serverPath || score.title) +
@@ -880,7 +896,9 @@ async function refreshFileList() {
         updateSelectionMarkup(buildLocalFileListMarkup(localScores));
     } catch (error) {
         console.error('Dateiliste konnte nicht geladen werden', error);
-        updateSelectionMarkup('<select id="dateiname"><option>Fehler beim Laden</option></select>');
+        updateSelectionMarkup('<select id="dateiname"><option>' +
+            escapeHtml(uiText('file.error.listLoad', { message: error.message || '' })) +
+            '</option></select>');
     }
 }
 
@@ -889,15 +907,17 @@ function getScoreStatusLabel(score) {
         return '';
     }
     if (score.serverUpdateAvailable) {
-        return score.syncState === 'modified-local' ? 'Konflikt' : 'Server geändert';
+        return score.syncState === 'modified-local'
+            ? uiText('file.status.conflict')
+            : uiText('file.status.serverChanged');
     }
     if (score.syncState === 'modified-local') {
-        return 'Geändert';
+        return uiText('file.status.modified');
     }
     if (score.isPublished) {
-        return 'Veröffentlicht';
+        return uiText('file.status.published');
     }
-    return 'Lokal';
+    return uiText('file.status.local');
 }
 
 function normalizeScoreContentForCompare(content) {
@@ -956,18 +976,22 @@ function buildServerVersionNotice(score, serverInfo, serverChanged) {
     const localDateText = formatScoreLocalChangeDate(score);
 
     if (downloadedDateText) {
-        noticeParts.push('Vom Server geladen: ' + downloadedDateText);
+        noticeParts.push(uiText('file.notice.downloadedFromServer', { date: downloadedDateText }));
     }
     if (serverChanged) {
         noticeParts.push(
-            (downloadedDateText ? 'Server seitdem geändert' : 'Server geändert') +
-                (serverDateText ? ': ' + serverDateText : '')
+            uiText(
+                downloadedDateText ? 'file.notice.serverChangedSince' : 'file.notice.serverChanged',
+                { date: serverDateText ? ': ' + serverDateText : '' }
+            )
         );
     } else {
-        noticeParts.push(downloadedDateText ? 'Server seitdem unverändert' : 'Serverversion unverändert');
+        noticeParts.push(uiText(
+            downloadedDateText ? 'file.notice.serverUnchangedSince' : 'file.notice.serverVersionUnchanged'
+        ));
     }
     if (localDateText) {
-        noticeParts.push('Lokal geändert: ' + localDateText);
+        noticeParts.push(uiText('file.notice.locallyChanged', { date: localDateText }));
     }
 
     return noticeParts.join(' · ');
@@ -1028,7 +1052,7 @@ function setFileDialogServerNotice(message, serverPath, actionLabel) {
     }
     fileDialogState.serverNoticePath = serverPath || '';
     if (actionButton) {
-        actionButton.textContent = actionLabel || 'Serverversion laden';
+        actionButton.textContent = actionLabel || uiText('file.dialog.serverVersionLoad');
         actionButton.hidden = !serverPath;
     }
     noticeEl.hidden = false;
@@ -1060,13 +1084,13 @@ async function updateFileDialogServerNotice() {
                 return;
             }
             if (!localScore) {
-                setFileDialogServerNotice('Diese Serverdatei wird beim Öffnen lokal importiert.', '');
+                setFileDialogServerNotice(uiText('file.notice.serverImportOnOpen'), '');
                 return;
             }
             const hasTimestampComparison = getServerInfoModifiedTs(entry) > 0 && getScoreServerModifiedTs(localScore) > 0;
             let differs = isServerInfoNewerThanLocal(entry, localScore);
             if (!hasTimestampComparison) {
-                setFileDialogServerNotice('Prüfe lokale Kopie gegen Serverversion ...', '');
+                setFileDialogServerNotice(uiText('file.notice.checkingLocalCopy'), '');
                 const serverScore = await serverLibrary.importScore(serverPath);
                 if (fileDialogState.serverNoticeRequest !== requestId) {
                     return;
@@ -1077,7 +1101,7 @@ async function updateFileDialogServerNotice() {
             if (differs) {
                 setFileDialogServerNotice(
                     buildServerVersionNotice(localScore, entry, true) +
-                        ' · Beim Öffnen wird die lokale Kopie aktualisiert.',
+                        ' · ' + uiText('file.notice.localCopyWillUpdate'),
                     ''
                 );
             } else {
@@ -1090,7 +1114,7 @@ async function updateFileDialogServerNotice() {
             return;
         }
 
-        setFileDialogServerNotice('Prüfe Serverversion ...', '');
+        setFileDialogServerNotice(uiText('file.notice.checkingServer'), '');
         const serverInfo = entry.latestServerModifiedTs
             ? {
                 serverPath: entry.serverPath,
@@ -1130,7 +1154,7 @@ async function updateFileDialogServerNotice() {
             setFileDialogServerNotice(
                 buildServerVersionNotice(entry, serverInfo, true),
                 entry.serverPath,
-                'Serverversion laden'
+                uiText('file.dialog.serverVersionLoad')
             );
         } else {
             setFileDialogServerNotice(buildServerVersionNotice(entry, serverInfo, false), '');
@@ -1138,7 +1162,7 @@ async function updateFileDialogServerNotice() {
     } catch (error) {
         if (fileDialogState.serverNoticeRequest === requestId) {
             console.warn('Serverversion konnte nicht geprüft werden', error);
-            setFileDialogServerNotice('Serverversion konnte im Moment nicht geprüft werden.', '');
+            setFileDialogServerNotice(uiText('file.notice.checkUnavailable'), '');
         }
     }
 }
@@ -1151,7 +1175,7 @@ function formatFileDialogDate(value) {
     if (Number.isNaN(dateValue.getTime())) {
         return '';
     }
-    return dateValue.toLocaleDateString('de-DE', {
+    return dateValue.toLocaleDateString(window.BaraBeatI18n.getLocale(), {
         day: '2-digit',
         month: '2-digit',
         year: 'numeric',
@@ -1162,25 +1186,25 @@ function formatFileDialogDate(value) {
 
 function getFileDialogTitle(mode) {
     if (mode === 'saveAs') {
-        return 'Speichern als';
+        return uiText('file.dialog.saveAs');
     }
     if (mode === 'save') {
-        return 'Speichern unter';
+        return uiText('file.dialog.saveUnder');
     }
     if (mode === 'export') {
-        return 'Exportieren';
+        return uiText('file.dialog.export');
     }
-    return 'Öffnen';
+    return uiText('file.dialog.open');
 }
 
 function getFileDialogConfirmLabel(mode, format) {
     if (mode === 'save' || mode === 'saveAs') {
-        return 'Speichern';
+        return uiText('common.save');
     }
     if (mode === 'export') {
-        return 'Exportieren';
+        return uiText('common.export');
     }
-    return 'Öffnen';
+    return uiText('common.open');
 }
 
 function getFileDialogEntryId(entry) {
@@ -1276,7 +1300,11 @@ function updateFileDialogControls() {
         serverNoticeSlotEl.hidden = fileDialogState.mode !== 'open';
     }
     if (folderNameEl) {
-        folderNameEl.textContent = fileDialogState.source === 'server' ? 'Server' : fileDialogState.folderName;
+        folderNameEl.textContent = fileDialogState.source === 'server'
+            ? uiText(navigator.onLine === false ? 'file.status.serverOffline' : 'file.status.server')
+            : (fileDialogState.folderId === localLibrary.rootFolderId
+                ? uiText('file.status.local')
+                : fileDialogState.folderName);
     }
     sourceButtons.forEach(function (buttonEl) {
         buttonEl.disabled = isExportMode;
@@ -1346,11 +1374,13 @@ function renderFileDialogList() {
         nameCell.textContent = entry.title || entry.name || entry.fileName || entry.serverPath || '';
         const statusCell = document.createElement('td');
         if (entry.entryType === 'parent-folder') {
-            statusCell.textContent = 'Zurück';
+            statusCell.textContent = uiText('file.status.back');
         } else if (entry.entryType === 'folder') {
-            statusCell.textContent = 'Ordner';
+            statusCell.textContent = uiText('file.status.folder');
         } else {
-            statusCell.textContent = fileDialogState.source === 'server' ? 'Server' : getScoreStatusLabel(entry);
+            statusCell.textContent = fileDialogState.source === 'server'
+                ? uiText('file.status.server')
+                : getScoreStatusLabel(entry);
         }
         const dateCell = document.createElement('td');
         dateCell.textContent = fileDialogState.source === 'server'
@@ -1391,7 +1421,7 @@ async function refreshFileDialogEntries() {
                 fileDialogState.selectedId = null;
                 fileDialogState.filter = 'all';
                 fileDialogState.folderName = 'Server (offline)';
-                setFileDialogServerNotice('Offline sind die lokal gespeicherten Notenblätter verfügbar.', '');
+                setFileDialogServerNotice(uiText('file.notice.offlineLocalAvailable'), '');
                 renderFileDialogList();
                 return;
             }
@@ -1452,7 +1482,7 @@ async function refreshFileDialogEntries() {
         fileDialogState.entries = [];
         fileDialogState.selectedId = null;
         renderFileDialogList();
-        alert('Fehler beim Laden der Dateiliste: ' + error.message);
+        alert(uiText('file.error.listLoad', { message: error.message || '' }));
     }
 }
 
@@ -2533,8 +2563,8 @@ function setSheetQuickPlayButtonState(isPlaying) {
         buttonEl.setAttribute('aria-pressed', sheetQuickPlayState.isPlaying ? 'true' : 'false');
         buttonEl.classList.toggle('is-playing', sheetQuickPlayState.isPlaying);
         buttonEl.title = sheetQuickPlayState.isPlaying
-            ? 'Sofort-Spielen stoppen'
-            : 'Ausgewählte Pattern abspielen';
+            ? uiText('editor.quickPlay.stop')
+            : uiText('editor.quickPlay.playSelected');
     });
     updateSheetQuickPlayButtonAvailability();
 }
@@ -2551,12 +2581,12 @@ function updateSheetQuickPlayButtonAvailability() {
     mobileButtonEl.classList.toggle('is-loading', isLoading);
     if (isLoading) {
         mobileButtonEl.textContent = '…';
-        mobileButtonEl.title = 'Sounds werden geladen';
+        mobileButtonEl.title = uiText('editor.quickPlay.loadingSounds');
     } else {
         mobileButtonEl.textContent = sheetQuickPlayState.isPlaying ? '■' : '▶';
         mobileButtonEl.title = sheetQuickPlayState.isPlaying
-            ? 'Sofort-Spielen stoppen'
-            : 'Ausgewählte Pattern abspielen';
+            ? uiText('editor.quickPlay.stop')
+            : uiText('editor.quickPlay.playSelected');
     }
     positionMobileSheetQuickPlayFrame();
 }
@@ -3564,7 +3594,7 @@ function createSheetPatternMoveOverlayButton(range, direction, disabled) {
     const groupEl = s.g().attr({
         class: 'sheet-quick-play-overlay sheet-pattern-move-overlay' + (disabled ? ' is-disabled' : ''),
         cursor: disabled ? 'default' : 'pointer',
-        'aria-label': 'Pattern ' + (isUp ? 'nach vorn' : 'nach hinten') + ' verschieben',
+        'aria-label': uiText(isUp ? 'editor.movePatternForward' : 'editor.movePatternBackward'),
         'aria-disabled': disabled ? 'true' : 'false'
     });
     groupEl.add(s.rect(buttonX, buttonY, 13, 14).attr({
@@ -4105,7 +4135,7 @@ function startSheetQuickPlay() {
     const payload = buildSheetQuickPlayPayload();
     const frameEl = document.getElementById('sheetQuickPlayFrame');
     if (!payload || !frameEl) {
-        alert('Bitte zuerst ein Pattern im Notenblatt auswählen.');
+        alert(uiText('editor.quickPlay.selectPattern'));
         return;
     }
     setSheetQuickPlayButtonState(true);
@@ -4226,7 +4256,7 @@ function deleteSheetPage() {
     if (getSheetPageCount(zeilenAnzahl) <= 1) {
         return;
     }
-    const shouldDelete = confirm('Das letzte Blatt löschen? Inhalte auf diesem Blatt werden entfernt.');
+    const shouldDelete = confirm(uiText('editor.deleteLastPageConfirm'));
     if (!shouldDelete) {
         return;
     }
@@ -4933,7 +4963,7 @@ handleTextTouchEnd = function () {
     textTouchEndY = this.getBBox().y;
     if (textTouchEndX == textTouchStartX && textTouchEndY == textTouchStartY) {
         const text_a = this.attr('text');
-        const text_i = prompt('Gib hier bitte den gewünschten Text ein!', text_a);
+        const text_i = prompt(uiText('editor.editTextPrompt'), text_a);
         if (text_i == null) {
             return;
         }
@@ -4947,7 +4977,7 @@ handleTextTouchEnd = function () {
 insertTextField = function () {
     const elx = this.getBBox().cx + paletteOffsetX + 19;
     const ely = this.getBBox().y + paletteOffsetY + 12;
-    const text_i = prompt('Gib hier bitte den gewünschten Text ein!', '');
+    const text_i = prompt(uiText('editor.editTextPrompt'), '');
     if (text_i == null) {
         return;
     }
@@ -5045,11 +5075,11 @@ function buildExportSvgContent() {
 }
 
 function sanitizeDownloadFileName(value, fallback) {
-    return String(value || fallback || 'Notenblatt')
+    return String(value || fallback || uiText('editor.defaultExportName'))
         .trim()
         .replace(/[\\/:*?"<>|]+/g, '-')
         .replace(/\s+/g, ' ')
-        || fallback || 'Notenblatt';
+        || fallback || uiText('editor.defaultExportName');
 }
 
 function downloadTextFile(content, fileName, mimeType) {
@@ -5068,7 +5098,7 @@ function downloadTextFile(content, fileName, mimeType) {
 
 function callPHPScript2(nameOverride) {
     const svgContent = buildExportSvgContent();
-    const baseName = sanitizeDownloadFileName(nameOverride || titel.attr('text'), 'Notenblatt');
+    const baseName = sanitizeDownloadFileName(nameOverride || titel.attr('text'), uiText('editor.defaultExportName'));
     downloadTextFile(svgContent, baseName + '.svg', 'image/svg+xml;charset=utf-8');
 }
 
@@ -5199,7 +5229,7 @@ function loadImageFromObjectUrl(url) {
             resolve(image);
         };
         image.onerror = function () {
-            reject(new Error('Das Notenblatt konnte nicht für den PDF-Export gerendert werden.'));
+            reject(new Error(uiText('error.pdfRenderFailed')));
         };
         image.src = url;
     });
@@ -5207,7 +5237,7 @@ function loadImageFromObjectUrl(url) {
 
 async function exportCurrentSheetAsPdf() {
     const svgContent = buildExportSvgContent();
-    const documentTitle = titel.attr('text') || 'Notenblatt';
+    const documentTitle = titel.attr('text') || uiText('editor.defaultExportName');
     const svgBlob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8' });
     const svgUrl = URL.createObjectURL(svgBlob);
 
@@ -5235,7 +5265,7 @@ async function exportCurrentSheetAsPdf() {
         const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.94);
         const jpegBytes = base64ToUint8Array(jpegDataUrl.split(',')[1]);
         const pdfBlob = createSingleImagePdf(jpegBytes, canvas.width, canvas.height);
-        const baseName = sanitizeDownloadFileName(documentTitle, 'Notenblatt');
+        const baseName = sanitizeDownloadFileName(documentTitle, uiText('editor.defaultExportName'));
         const pdfUrl = URL.createObjectURL(pdfBlob);
         const link = document.createElement('a');
         link.href = pdfUrl;
@@ -5248,7 +5278,7 @@ async function exportCurrentSheetAsPdf() {
         }, 1000);
     } catch (error) {
         console.error('PDF-Export fehlgeschlagen', error);
-        alert('Fehler beim PDF-Export: ' + error.message);
+        alert(uiText('error.pdfExportFailed', { message: error.message || '' }));
     } finally {
         URL.revokeObjectURL(svgUrl);
     }
@@ -6569,11 +6599,11 @@ const mobileSheetEditorTools = [
     { id: 'shortbar', label: 'ShortBar' },
     { id: 'wiederholung', label: 'Wiederholung' },
     { id: 'tuplet', label: 'Triole oder Quartole' },
-    { id: 'edit_text', label: 'Textfeld einsetzen' },
+    { id: 'edit_text', labelKey: 'editor.insertTextField' },
     { id: 'chooser', label: 'Instrument und Funktion einsetzen' },
-    { id: 'select', label: 'Noten auswählen' },
-    { id: 'duplicate', label: 'Auswahl duplizieren' },
-    { id: 'delete', label: 'Element löschen' }
+    { id: 'select', labelKey: 'editor.selectNotes' },
+    { id: 'duplicate', labelKey: 'editor.duplicateSelection' },
+    { id: 'delete', labelKey: 'editor.deleteElement' }
 ];
 
 function createMobileSheetEditorToolIcon(toolId) {
@@ -6794,7 +6824,7 @@ function createMobileSheetEditorPalette() {
     const paletteEl = document.createElement('div');
     paletteEl.className = 'mobile-sheet-editor-palette';
     paletteEl.setAttribute('role', 'toolbar');
-    paletteEl.setAttribute('aria-label', 'Notenpalette');
+    paletteEl.setAttribute('aria-label', uiText('editor.notePalette'));
 
     mobileSheetEditorTools.forEach(function (tool) {
         const buttonEl = document.createElement('button');
@@ -6802,8 +6832,9 @@ function createMobileSheetEditorPalette() {
         buttonEl.className = 'mobile-sheet-editor-tool';
         buttonEl.dataset.toolId = tool.id;
         buttonEl.appendChild(createMobileSheetEditorToolIcon(tool.id));
-        buttonEl.title = tool.label;
-        buttonEl.setAttribute('aria-label', tool.label);
+        const toolLabel = tool.labelKey ? uiText(tool.labelKey) : tool.label;
+        buttonEl.title = toolLabel;
+        buttonEl.setAttribute('aria-label', toolLabel);
         buttonEl.setAttribute('aria-pressed', mobileSheetEditorState.activeTool === tool.id ? 'true' : 'false');
         buttonEl.classList.toggle('is-active', mobileSheetEditorState.activeTool === tool.id);
         if (tool.id === 'duplicate') {
@@ -7242,7 +7273,7 @@ function insertMobileSheetEditorElement(toolId, sourceBarIndex, sourceStepIndex,
     }
 
     if (toolId === 'edit_text') {
-        const textValue = prompt('Text für das Notenblatt:', '');
+        const textValue = prompt(uiText('editor.scoreTextPrompt'), '');
         if (textValue != null && String(textValue).trim()) {
             recordHistorySnapshot();
             createEditableTextElement(targetPosition.x, targetPosition.y, String(textValue).trim());
@@ -7350,7 +7381,9 @@ function createMobileSheetChooserSelect(sourceBarIndex, chooserType, currentValu
         : getFunctionChooserOptions();
     const selectEl = document.createElement('select');
     selectEl.className = 'mobile-sheet-chooser-select mobile-sheet-chooser-' + chooserType;
-    selectEl.setAttribute('aria-label', chooserType === 'instrument' ? 'Instrument auswählen' : 'Pattern auswählen');
+    selectEl.setAttribute('aria-label', uiText(
+        chooserType === 'instrument' ? 'editor.selectInstrument' : 'editor.selectPattern'
+    ));
 
     const selectedValue = chooserType === 'instrument'
         ? String(normalizeDoundounInstrumentName(currentValue) || '').trim()
@@ -7706,7 +7739,9 @@ function createMobileSheetBarElement(bar, barIndex, previousBar, nextBar) {
             selectButtonEl.type = 'button';
             selectButtonEl.className = 'mobile-sheet-pattern-toggle';
             selectButtonEl.dataset.patternId = quickPlayPatternId;
-            selectButtonEl.setAttribute('aria-label', (titleEl.textContent || 'Pattern') + ' auswählen');
+            selectButtonEl.setAttribute('aria-label', uiText('editor.selectNamedPattern', {
+                name: titleEl.textContent || 'Pattern'
+            }));
             selectButtonEl.setAttribute('aria-pressed', 'false');
             selectButtonEl.addEventListener('click', function () {
                 selectSheetQuickPlayPattern(quickPlayPatternId);
@@ -7741,11 +7776,11 @@ function createMobileSheetBarElement(bar, barIndex, previousBar, nextBar) {
                     movePatternButtonEl.className = 'mobile-sheet-chooser-action mobile-sheet-pattern-move-action';
                     movePatternButtonEl.textContent = isUp ? '↑' : '↓';
                     movePatternButtonEl.disabled = isDisabled;
-                    movePatternButtonEl.title = 'Ganzes Pattern ' + (isUp ? 'nach oben' : 'nach unten') + ' verschieben';
-                    movePatternButtonEl.setAttribute(
-                        'aria-label',
-                        'Ganzes Pattern ' + (isUp ? 'nach oben' : 'nach unten') + ' verschieben'
+                    const movePatternLabel = uiText(
+                        isUp ? 'editor.moveWholePatternUp' : 'editor.moveWholePatternDown'
                     );
+                    movePatternButtonEl.title = movePatternLabel;
+                    movePatternButtonEl.setAttribute('aria-label', movePatternLabel);
                     movePatternButtonEl.addEventListener('click', function (event) {
                         event.stopPropagation();
                         moveSheetPatternByDirection(patternMoveRange.id, direction);
@@ -7781,7 +7816,9 @@ function createMobileSheetBarElement(bar, barIndex, previousBar, nextBar) {
             chooserTargetEl.type = 'button';
             chooserTargetEl.className = 'mobile-sheet-chooser-target';
             chooserTargetEl.textContent = 'Instrument und Funktion hier einsetzen';
-            chooserTargetEl.setAttribute('aria-label', 'Instrument und Funktion in Takt ' + sourceBarIndex + ' einsetzen');
+            chooserTargetEl.setAttribute('aria-label', uiText('editor.insertChooserInBar', {
+                bar: sourceBarIndex
+            }));
             chooserTargetEl.addEventListener('click', function (event) {
                 event.stopPropagation();
                 if (mobileSheetEditorState.activeTool === 'chooser') {
@@ -8151,8 +8188,8 @@ function renderMobileSheetView(readResult) {
         titleInputEl.type = 'text';
         titleInputEl.className = 'mobile-sheet-title-input';
         titleInputEl.value = isDefaultTitleText(currentRhythmTitle) ? '' : currentRhythmTitle;
-        titleInputEl.placeholder = defaultRhythmTitle;
-        titleInputEl.setAttribute('aria-label', 'Rhythmusname');
+        titleInputEl.placeholder = uiText('editor.rhythmName');
+        titleInputEl.setAttribute('aria-label', uiText('editor.rhythmName'));
         titleInputEl.autocomplete = 'off';
         titleInputEl.spellcheck = false;
         let titleHistoryRecorded = false;
@@ -8173,13 +8210,13 @@ function renderMobileSheetView(readResult) {
         headerEl.appendChild(titleInputEl);
     } else {
         const headingEl = document.createElement('h2');
-        headingEl.textContent = currentRhythmTitle || 'Notenblatt';
+        headingEl.textContent = currentRhythmTitle || uiText('editor.defaultScoreTitle');
         headerEl.appendChild(headingEl);
     }
 
     const controlsEl = document.createElement('div');
     controlsEl.className = 'mobile-sheet-quick-play-controls';
-    controlsEl.setAttribute('aria-label', 'Sofort-Spielen');
+    controlsEl.setAttribute('aria-label', uiText('editor.quickPlay.aria'));
     const tempoLabelEl = document.createElement('label');
     tempoLabelEl.setAttribute('for', 'mobileSheetQuickPlayTempo');
     tempoLabelEl.textContent = 'BPM';
@@ -8500,7 +8537,7 @@ function runReadRhythm() {
         callPHPScript_lesen(zeilenAnzahl);
     } catch (error) {
         console.error('callPHPScript_lesen failed', error);
-        alert('Fehler beim Auslesen: ' + error.message);
+        alert(uiText('error.scoreReadFailed', { message: error.message || '' }));
     }
 }
 
@@ -8836,11 +8873,11 @@ async function saveCurrentScoreFromMenu() {
             return;
         }
         const savedScore = await saveCurrentScoreLocal();
-        showAutoDismissMessage('"' + savedScore.title + '" wurde lokal gespeichert.');
+        showAutoDismissMessage(uiText('file.message.savedLocal', { title: savedScore.title }));
         closeAppMenus();
     } catch (error) {
         console.error('Lokales Speichern fehlgeschlagen', error);
-        alert('Fehler beim lokalen Speichern: ' + error.message);
+        alert(uiText('file.error.localSave', { message: error.message || '' }));
     }
 }
 
@@ -8852,24 +8889,24 @@ async function renameLocalScore() {
     try {
         const scoreId = getSelectedLocalScoreId();
         if (!scoreId) {
-            alert('Bitte zuerst eine lokale Datei auswählen oder speichern.');
+            alert(uiText('file.error.selectLocalToRename'));
             return;
         }
 
         const score = await localLibrary.getScore(scoreId);
         if (!score) {
-            alert('Die lokale Datei wurde nicht gefunden.');
+            alert(uiText('file.error.localNotFound'));
             return;
         }
 
-        const nextTitle = prompt('Neuer Name:', score.title || '');
+        const nextTitle = prompt(uiText('file.prompt.newName'), score.title || '');
         if (nextTitle == null) {
             return;
         }
 
         const trimmedTitle = nextTitle.trim();
         if (!trimmedTitle) {
-            alert('Der Name darf nicht leer sein.');
+            alert(uiText('file.error.nameEmpty'));
             return;
         }
 
@@ -8881,10 +8918,10 @@ async function renameLocalScore() {
         setRhythmTitle(renamedScore.title);
         setSelectedFileSource('local');
         await refreshFileList();
-        alert('"' + renamedScore.title + '" wurde lokal umbenannt.');
+        alert(uiText('file.message.renamedLocal', { title: renamedScore.title }));
     } catch (error) {
         console.error('Lokales Umbenennen fehlgeschlagen', error);
-        alert('Fehler beim lokalen Umbenennen: ' + error.message);
+        alert(uiText('file.error.localRename', { message: error.message || '' }));
     }
 }
 
@@ -8892,17 +8929,17 @@ async function deleteLocalScore() {
     try {
         const scoreId = getSelectedLocalScoreId();
         if (!scoreId) {
-            alert('Bitte zuerst eine lokale Datei auswählen.');
+            alert(uiText('file.error.selectLocal'));
             return;
         }
 
         const score = await localLibrary.getScore(scoreId);
         if (!score) {
-            alert('Die lokale Datei wurde nicht gefunden.');
+            alert(uiText('file.error.localNotFound'));
             return;
         }
 
-        const shouldDelete = confirm('"' + score.title + '" lokal löschen?\nDer Server bleibt unverändert.');
+        const shouldDelete = confirm(uiText('file.confirm.deleteLocal', { title: score.title }));
         if (!shouldDelete) {
             return;
         }
@@ -8915,10 +8952,10 @@ async function deleteLocalScore() {
         }
         viererNoten();
         await refreshFileList();
-        alert('"' + score.title + '" wurde lokal gelöscht.');
+        alert(uiText('file.message.deletedLocal', { title: score.title }));
     } catch (error) {
         console.error('Lokales Löschen fehlgeschlagen', error);
-        alert('Fehler beim lokalen Löschen: ' + error.message);
+        alert(uiText('file.error.localDelete', { message: error.message || '' }));
     }
 }
 
@@ -8966,10 +9003,10 @@ async function publishCurrentScoreToServer(nameOverride) {
 async function publishCurrentScore() {
     try {
         const publishedScore = await publishCurrentScoreToServer();
-        alert('"' + publishedScore.title + '" wurde veröffentlicht.');
+        alert(uiText('file.message.published', { title: publishedScore.title }));
     } catch (error) {
         console.error('Veröffentlichen fehlgeschlagen', error);
-        alert('Fehler beim Veröffentlichen: ' + error.message);
+        alert(uiText('file.error.publish', { message: error.message || '' }));
     }
 }
 
@@ -8984,7 +9021,7 @@ function applyDialogNameToTitle() {
 async function openLocalScore(scoreId) {
     const score = await localLibrary.getScore(scoreId);
     if (!score) {
-        throw new Error('Die lokale Datei wurde nicht gefunden.');
+        throw new Error(uiText('file.error.localNotFound'));
     }
     loadRhythmContent(score.title, score.content || score.data, score.id);
     return score;
@@ -9015,12 +9052,11 @@ async function importServerScore(serverPath, serverInfo) {
                 });
             }
             if (existingScore.syncState === 'modified-local') {
-                const shouldReplace = confirm(
-                    '"' + existingScore.title + '" wurde lokal geändert.\n' +
-                    'Trotzdem die Serverversion laden und die lokale Kopie ersetzen?'
-                );
+                const shouldReplace = confirm(uiText('file.confirm.replaceLocalChanges', {
+                    title: existingScore.title
+                }));
                 if (!shouldReplace) {
-                    const cancelError = new Error('Serverversion wurde nicht geladen.');
+                    const cancelError = new Error(uiText('file.error.serverVersionCancelled'));
                     cancelError.isUserCancel = true;
                     throw cancelError;
                 }
@@ -9072,13 +9108,13 @@ async function loadFileDialogServerNoticeVersion() {
         const serverInfo = await findServerScoreInfo(serverPath);
         const savedScore = await importServerScore(serverPath, serverInfo);
         closeFileDialog();
-        showAutoDismissMessage('"' + savedScore.title + '" wurde vom Server geladen.');
+        showAutoDismissMessage(uiText('file.message.loadedFromServer', { title: savedScore.title }));
     } catch (error) {
         if (error && error.isUserCancel) {
             return;
         }
         console.error('Serverversion konnte nicht geladen werden', error);
-        alert('Fehler beim Laden der Serverversion: ' + error.message);
+        alert(uiText('file.error.serverVersionLoad', { message: error.message || '' }));
     }
 }
 
@@ -9125,7 +9161,7 @@ async function confirmFileDialog() {
         if (fileDialogState.source === 'server') {
             const publishedScore = await publishCurrentScoreToServer(chosenName);
             closeFileDialog();
-            alert('"' + publishedScore.title + '" wurde veröffentlicht.');
+            alert(uiText('file.message.published', { title: publishedScore.title }));
             return;
         }
 
@@ -9133,13 +9169,13 @@ async function confirmFileDialog() {
             asCopy: fileDialogState.mode === 'saveAs'
         });
         closeFileDialog();
-        showAutoDismissMessage('"' + savedScore.title + '" wurde lokal gespeichert.');
+        showAutoDismissMessage(uiText('file.message.savedLocal', { title: savedScore.title }));
     } catch (error) {
         if (error && error.isUserCancel) {
             return;
         }
         console.error('Dateidialog-Aktion fehlgeschlagen', error);
-        alert('Fehler: ' + error.message);
+        alert(uiText('file.error.generic', { message: error.message || '' }));
     }
 }
 
@@ -9148,14 +9184,14 @@ async function createFileDialogFolder() {
         return;
     }
 
-    const folderName = prompt('Name des neuen Ordners:', 'Neuer Ordner');
+    const folderName = prompt(uiText('file.prompt.newFolderName'), uiText('file.dialog.newFolder'));
     if (folderName == null) {
         return;
     }
 
     const trimmedName = folderName.trim();
     if (!trimmedName) {
-        alert('Der Ordnername darf nicht leer sein.');
+        alert(uiText('file.error.folderNameEmpty'));
         return;
     }
 
@@ -9164,7 +9200,7 @@ async function createFileDialogFolder() {
         await navigateFileDialogFolder(folder.id);
     } catch (error) {
         console.error('Ordner konnte nicht erstellt werden', error);
-        alert('Fehler beim Erstellen des Ordners: ' + error.message);
+        alert(uiText('file.error.folderCreate', { message: error.message || '' }));
     }
 }
 
@@ -9175,14 +9211,14 @@ async function renameSelectedFileDialogScore() {
     }
 
     if (entry.entryType === 'folder') {
-        const nextName = prompt('Neuer Ordnername:', entry.name || entry.title || '');
+        const nextName = prompt(uiText('file.prompt.renameFolder'), entry.name || entry.title || '');
         if (nextName == null) {
             return;
         }
 
         const trimmedName = nextName.trim();
         if (!trimmedName) {
-            alert('Der Ordnername darf nicht leer sein.');
+            alert(uiText('file.error.folderNameEmpty'));
             return;
         }
 
@@ -9192,7 +9228,7 @@ async function renameSelectedFileDialogScore() {
             await refreshFileDialogEntries();
         } catch (error) {
             console.error('Lokaler Ordner konnte nicht umbenannt werden', error);
-            alert('Fehler beim Umbenennen des Ordners: ' + error.message);
+            alert(uiText('file.error.folderRename', { message: error.message || '' }));
         }
         return;
     }
@@ -9212,11 +9248,13 @@ async function deleteSelectedFileDialogScore() {
 
     if (entry.entryType === 'folder') {
         if (!entry.isEmpty) {
-            alert('Der Ordner enthält noch Dateien oder Unterordner und kann nicht gelöscht werden.');
+            alert(uiText('file.error.folderNotEmpty'));
             return;
         }
 
-        const shouldDeleteFolder = confirm('Den leeren Ordner "' + (entry.name || entry.title) + '" lokal löschen?');
+        const shouldDeleteFolder = confirm(uiText('file.confirm.deleteEmptyFolder', {
+            name: entry.name || entry.title
+        }));
         if (!shouldDeleteFolder) {
             return;
         }
@@ -9227,7 +9265,7 @@ async function deleteSelectedFileDialogScore() {
             await refreshFileDialogEntries();
         } catch (error) {
             console.error('Lokaler Ordner konnte nicht gelöscht werden', error);
-            alert('Fehler beim Löschen des Ordners: ' + error.message);
+            alert(uiText('file.error.folderDelete', { message: error.message || '' }));
         }
         return;
     }
@@ -9247,14 +9285,13 @@ async function deletePublishedFileDialogScore() {
     }
 
     if (!entry.serverPath || !entry.publishToken) {
-        alert('Diese lokale Datei hat kein Publish-Token für eine Serververöffentlichung.');
+        alert(uiText('file.error.publishTokenMissing'));
         return;
     }
 
-    const shouldDelete = confirm(
-        '"' + (entry.title || entry.serverPath) + '" vom Server löschen?\n' +
-        'Die lokale Datei bleibt erhalten.'
-    );
+    const shouldDelete = confirm(uiText('file.confirm.deleteFromServer', {
+        title: entry.title || entry.serverPath
+    }));
     if (!shouldDelete) {
         return;
     }
@@ -9266,10 +9303,10 @@ async function deletePublishedFileDialogScore() {
         setSelectedFileSource('local');
         await refreshFileList();
         await refreshFileDialogEntries();
-        alert('Die Veröffentlichung wurde gelöscht. Die lokale Datei bleibt erhalten.');
+        alert(uiText('file.message.publicationDeleted'));
     } catch (error) {
         console.error('Veröffentlichung konnte nicht gelöscht werden', error);
-        alert('Fehler beim Löschen der Veröffentlichung: ' + error.message);
+        alert(uiText('file.error.publicationDelete', { message: error.message || '' }));
     }
 }
 
@@ -9382,7 +9419,7 @@ async function logoutBarabeat() {
     const logoutButtonEl = document.getElementById('accessLogoutButton');
     if (logoutButtonEl) {
         logoutButtonEl.disabled = true;
-        logoutButtonEl.textContent = 'Wird abgemeldet ...';
+        logoutButtonEl.textContent = uiText('auth.loggingOut');
     }
 
     try {
@@ -9430,11 +9467,13 @@ function updateTemporaryAccessButton() {
     buttonEl.classList.toggle('is-open', remainingSeconds > 0);
     buttonEl.disabled = temporaryAccessControlState.busy;
     if (temporaryAccessControlState.busy) {
-        buttonEl.textContent = 'Zugang wird geändert ...';
+        buttonEl.textContent = uiText('auth.temporaryChanging');
     } else if (remainingSeconds > 0) {
-        buttonEl.textContent = 'Zugang schließen (' + formatTemporaryAccessRemaining(remainingSeconds) + ')';
+        buttonEl.textContent = uiText('auth.temporaryClose', {
+            time: formatTemporaryAccessRemaining(remainingSeconds)
+        });
     } else {
-        buttonEl.textContent = 'Zugang 5 Min öffnen';
+        buttonEl.textContent = uiText('auth.temporaryOpen');
     }
 }
 
@@ -9444,7 +9483,7 @@ async function toggleTemporaryAccessWindow() {
     }
 
     const isOpen = getTemporaryAccessRemainingSeconds() > 0;
-    if (!isOpen && !window.confirm('Der Passwortschutz wird für alle Besucher und automatisierten Webzugriffe fünf Minuten deaktiviert. Fortfahren?')) {
+    if (!isOpen && !window.confirm(uiText('auth.temporaryConfirm'))) {
         return;
     }
 
@@ -9465,13 +9504,13 @@ async function toggleTemporaryAccessWindow() {
         });
         const result = await response.json();
         if (!response.ok || !result.success) {
-            throw new Error(result.message || 'Der Zugang konnte nicht geändert werden.');
+            throw new Error(result.message || uiText('auth.changeFailed'));
         }
 
         temporaryAccessControlState.deadlineMs = Date.now() + (Math.max(0, Number(result.remainingSeconds) || 0) * 1000);
-        showAutoDismissMessage(result.message || 'Der Zugang wurde geändert.', 3500);
+        showAutoDismissMessage(result.message || uiText('auth.changed'), 3500);
     } catch (error) {
-        window.alert(error && error.message ? error.message : 'Der Zugang konnte nicht geändert werden.');
+        window.alert(error && error.message ? error.message : uiText('auth.changeFailed'));
     } finally {
         temporaryAccessControlState.busy = false;
         updateTemporaryAccessButton();
@@ -10770,7 +10809,7 @@ function get_value(e) {
     if (getSelectedFileSource() === 'server' || selectedFromUrl) {
         importServerScore(selectedFileName).catch(function (error) {
             console.error('Serverdatei konnte nicht importiert werden', error);
-            alert('Fehler beim Laden vom Server: ' + error.message);
+            alert(uiText('file.error.serverLoad', { message: error.message || '' }));
         });
         return;
     }
@@ -10782,7 +10821,7 @@ function get_value(e) {
         loadRhythmContent(score.title, score.content || score.data, score.id);
     }).catch(function (error) {
         console.error('Lokale Datei konnte nicht geladen werden', error);
-        alert('Fehler beim lokalen Laden: ' + error.message);
+        alert(uiText('file.error.localLoad', { message: error.message || '' }));
     });
 }
 
