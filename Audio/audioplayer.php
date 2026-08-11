@@ -2969,8 +2969,9 @@ if (soloTrackControl) {
   }, false);
 }
 
-const lookahead = 25;          // ms
-const scheduleAheadTime = 0.25; // sec
+const lookahead = 25;                 // ms
+const foregroundScheduleAheadTime = 0.25; // sec
+const backgroundScheduleAheadTime = 4.0;  // sec
 const playerStartDelay = 0.18; // sec
 const practiceLeadInDelay = isPracticeMode && !isSheetQuickPlayMode ? 3.0 : 0; // sec
 const practiceCountInBeats = 4;
@@ -4164,6 +4165,9 @@ function shouldStopTimelineAtOneShotEnd() {
 
 function scheduler() {
   const dTime = instr._audioCtx.currentTime;
+  const scheduleAheadTime = document.hidden
+    ? backgroundScheduleAheadTime
+    : foregroundScheduleAheadTime;
 
   while (nextNoteTime < dTime + scheduleAheadTime) {
     applyPendingPracticeSectionsIfReady();
@@ -4213,6 +4217,20 @@ function scheduler() {
     timerID = window.setTimeout(scheduler, lookahead);
   }
 }
+
+function refillSchedulerAfterVisibilityChange() {
+  if (!isPlaying) {
+    return;
+  }
+
+  if (timerID !== null && timerID !== undefined) {
+    window.clearTimeout(timerID);
+    timerID = null;
+  }
+  scheduler();
+}
+
+document.addEventListener('visibilitychange', refillSchedulerAfterVisibilityChange);
 
 function scheduleCurrentStep(time) {
   notifyEmbeddedPlaybackStep(globalPlaybackStep, time);
