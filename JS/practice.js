@@ -1357,6 +1357,7 @@ function createPracticeEntry(pattern, parallelGroupId, blockId, repeatCount, isL
         blockId: blockId,
         parallelGroupId: parallelGroupId,
         repeatCount: normalizePracticeCount(repeatCount, 1, 1, 32),
+        patternRepeatCount: normalizePracticeCount(entryOptions.patternRepeatCount, 1, 1, 32),
         isLeadIn: Boolean(isLeadIn),
         suppressPlayback: Boolean(entryOptions.suppressPlayback),
         sectionTempo: entryOptions.sectionTempo === null || entryOptions.sectionTempo === undefined
@@ -1387,6 +1388,37 @@ function addPracticeParallelGroup(entries, patterns, blockIndex, repeatCount, is
         createdEntries.push(entry);
     });
     return createdEntries;
+}
+
+function groupConsecutivePracticeAccompaniments(patterns) {
+    return (Array.isArray(patterns) ? patterns : []).reduce(function (groups, pattern) {
+        const previousGroup = groups[groups.length - 1];
+        const isAccompaniment = pattern && pattern.labelType === 'Begleitung';
+        const canJoinPreviousGroup = isAccompaniment && previousGroup && previousGroup.every(function (candidate) {
+            return candidate && candidate.labelType === 'Begleitung';
+        });
+        if (canJoinPreviousGroup) {
+            previousGroup.push(pattern);
+        } else {
+            groups.push([pattern]);
+        }
+        return groups;
+    }, []);
+}
+
+function mergeUniquePracticePatterns(patternGroups) {
+    const mergedPatterns = [];
+    const seenPatternIds = {};
+    (Array.isArray(patternGroups) ? patternGroups : []).forEach(function (patterns) {
+        (Array.isArray(patterns) ? patterns : []).forEach(function (pattern) {
+            if (!pattern || seenPatternIds[pattern.id]) {
+                return;
+            }
+            seenPatternIds[pattern.id] = true;
+            mergedPatterns.push(pattern);
+        });
+    });
+    return mergedPatterns;
 }
 
 function getPracticePatternDefaultRepeatCount(pattern) {
@@ -1494,6 +1526,7 @@ function buildPracticeEntries(options) {
         return [];
     }
     const cycleSoloPatterns = getPracticeCyclePatterns(soloPatterns, accompanimentPatterns.length > 0);
+    const cycleSoloPatternGroups = groupConsecutivePracticeAccompaniments(cycleSoloPatterns);
     const hasSelectedPracticePatterns = soloPatterns.length > 0;
     const accompanimentOnlyLoops = !hasSelectedPracticePatterns && accompanimentPatterns.length > 0
         ? Math.max(1, practiceState.loopsWithoutSolo)
@@ -1535,12 +1568,7 @@ function buildPracticeEntries(options) {
             continue;
         }
 
-        if (accompanimentOnlyLoops > 0) {
-            addPracticeParallelGroup(entries, accompanimentPatterns, blockIndex, accompanimentOnlyLoops, isLeadInCycle, cycleOptions);
-            blockIndex += 1;
-        }
-
-        if (cycleSoloPatterns.length === 0) {
+        if (cycleSoloPatternGroups.length === 0) {
             continue;
         }
 
@@ -1548,20 +1576,55 @@ function buildPracticeEntries(options) {
             callPlayed: false,
             introPlayed: false
         };
-        cycleSoloPatterns.forEach(function (soloPattern, soloPatternIndex) {
+        function addAccompanimentOnlyGroup() {
+            const createdEntries = addPracticeParallelGroup(
+                entries,
+                accompanimentPatterns,
+                blockIndex,
+                accompanimentOnlyLoops,
+                isLeadInCycle,
+                cycleOptions
+            );
+            if (createdEntries.length === 0) {
+                return false;
+            }
+            blockIndex += 1;
+            return true;
+        }
+
+        cycleSoloPatternGroups.forEach(function (soloPatternGroup, soloPatternIndex) {
+            const soloPattern = soloPatternGroup[0];
             const accompanimentIsActive = shouldPracticeAccompanimentPlayForPattern(soloPattern, startState);
-            const isPausePattern = soloPattern && soloPattern.labelType === 'Pause';
+            const isPausePattern = soloPatternGroup.some(function (pattern) {
+                return pattern && pattern.labelType === 'Pause';
+            });
+            const containsOnlyPracticeAccompaniments = soloPatternGroup.every(function (pattern) {
+                return pattern && pattern.labelType === 'Begleitung';
+            });
+            const usesParallelAccompanimentTiming = containsOnlyPracticeAccompaniments &&
+                (soloPatternGroup.length > 1 || (accompanimentIsActive && accompanimentPatterns.length > 0));
             const groupPatterns = shouldPausePracticeAccompanimentForPattern(soloPattern) || !accompanimentIsActive
-                ? [soloPattern]
-                : accompanimentPatterns.concat([soloPattern]);
+                ? soloPatternGroup
+                : mergeUniquePracticePatterns([accompanimentPatterns, soloPatternGroup]);
             const createdEntries = addPracticeParallelGroup(
                 entries,
                 groupPatterns,
                 blockIndex,
-                getPracticePatternDefaultRepeatCount(soloPattern),
+                usesParallelAccompanimentTiming ? 1 : getPracticePatternDefaultRepeatCount(soloPattern),
                 isLeadInCycle,
                 cycleOptions
             );
+            if (usesParallelAccompanimentTiming) {
+                createdEntries.forEach(function (entry) {
+                    if (soloPatternGroup.some(function (pattern) {
+                        return pattern && pattern.id === entry.patternId;
+                    })) {
+                        entry.patternRepeatCount = getPracticePatternDefaultRepeatCount(
+                            findPatternById(entry.patternId)
+                        );
+                    }
+                });
+            }
             if (isPausePattern && accompanimentIsActive) {
                 createdEntries.forEach(function (entry) {
                     const pattern = findPatternById(entry && entry.patternId);
@@ -1571,19 +1634,42 @@ function buildPracticeEntries(options) {
                 });
             }
             blockIndex += 1;
-            if (soloPattern && soloPattern.labelType === 'Call') {
+            if (soloPatternGroup.some(function (pattern) {
+                return pattern && pattern.labelType === 'Call';
+            })) {
                 startState.callPlayed = true;
             }
-            if (soloPattern && soloPattern.labelType === 'Intro') {
+            if (soloPatternGroup.some(function (pattern) {
+                return pattern && pattern.labelType === 'Intro';
+            })) {
                 startState.introPlayed = true;
             }
-            if (practiceState.accompanimentBetweenPatterns && soloPatternIndex < cycleSoloPatterns.length - 1) {
-                if (practiceState.loopsWithoutSolo > 0) {
-                    addPracticeParallelGroup(entries, accompanimentPatterns, blockIndex, practiceState.loopsWithoutSolo, isLeadInCycle, cycleOptions);
-                    blockIndex += 1;
+            if (practiceState.accompanimentBetweenPatterns && soloPatternIndex < cycleSoloPatternGroups.length - 1) {
+                const nextSoloPattern = cycleSoloPatternGroups[soloPatternIndex + 1][0];
+                const accompanimentWillBeActive = shouldPracticeAccompanimentPlayForPattern(
+                    nextSoloPattern,
+                    startState
+                );
+                if (practiceState.loopsWithoutSolo > 0 && accompanimentWillBeActive) {
+                    const createdEntries = addPracticeParallelGroup(
+                        entries,
+                        accompanimentPatterns,
+                        blockIndex,
+                        practiceState.loopsWithoutSolo,
+                        isLeadInCycle,
+                        cycleOptions
+                    );
+                    if (createdEntries.length > 0) {
+                        blockIndex += 1;
+                    }
                 }
             }
         });
+        if (accompanimentPatterns.length > 0 &&
+                accompanimentOnlyLoops > 0 &&
+                shouldPracticeAccompanimentPlayForPattern(null, startState)) {
+            addAccompanimentOnlyGroup();
+        }
     }
 
     return entries;
@@ -1616,6 +1702,7 @@ function buildPracticeBlocksFromEntries(entries) {
             isPracticeTarget: Boolean(entry.isPracticeTarget),
             suppressPlayback: Boolean(entry.suppressPlayback),
             repeatCount: normalizePracticeCount(entry.repeatCount, 1, 1, 32),
+            patternRepeatCount: normalizePracticeCount(entry.patternRepeatCount, 1, 1, 32),
             isLeadIn: Boolean(entry.isLeadIn),
             sectionTempo: entry.sectionTempo === null || entry.sectionTempo === undefined
                 ? null
@@ -2713,7 +2800,10 @@ function buildPracticeSectionsFromEntries(entries) {
             const patternNotes = ignoreShortBarForRunningAccompaniment
                 ? flattenPracticePatternNotesIgnoringShortBars(pattern)
                 : flattenPracticePatternNotes(pattern);
-            return Math.max(maxLength, patternNotes.length);
+            return Math.max(
+                maxLength,
+                patternNotes.length * normalizePracticeCount(entry.patternRepeatCount, 1, 1, 32)
+            );
         }, 0);
         const hasTargetAccompaniment = block.entries.some(function (entry) {
             const pattern = findPatternById(entry && entry.patternId);
@@ -2728,7 +2818,10 @@ function buildPracticeSectionsFromEntries(entries) {
                 const patternNotes = ignoreShortBarForRunningAccompaniment
                     ? flattenPracticePatternNotesIgnoringShortBars(pattern)
                     : flattenPracticePatternNotes(pattern);
-                return Math.max(maxLength, patternNotes.length);
+                const patternRepeatCount = entry.isPracticeTarget
+                    ? normalizePracticeCount(entry.patternRepeatCount, 1, 1, 32)
+                    : 1;
+                return Math.max(maxLength, patternNotes.length * patternRepeatCount);
             }, 0)
             : 0;
         const blockPracticeLength = Math.max(targetPatternLength, accompanimentCycleLength);
@@ -2761,15 +2854,17 @@ function buildPracticeSectionsFromEntries(entries) {
             const shouldUseAccompanimentSegment = isAccompanimentEntry &&
                 blockPracticeLength > 0 &&
                 rawPatternNotes.length > blockPracticeLength;
-            const shouldLoopTargetAccompaniment = entry.isPracticeTarget &&
-                pattern.labelType === 'Begleitung' &&
+            const shouldLoopAccompaniment = pattern.labelType === 'Begleitung' &&
                 rawPatternNotes.length > 0 &&
                 rawPatternNotes.length < blockPracticeLength;
-            const patternSegmentOffset = shouldUseAccompanimentSegment ? accompanimentOffset : 0;
+            const patternSegmentOffset = shouldUseAccompanimentSegment ||
+                    (shouldLoopAccompaniment && isAccompanimentEntry)
+                ? accompanimentOffset
+                : 0;
             let patternNotes = shouldUseAccompanimentSegment
                 ? getPracticeLoopedSegment(rawPatternNotes, accompanimentOffset, blockPracticeLength, 'f')
-                : shouldLoopTargetAccompaniment
-                    ? getPracticeLoopedSegment(rawPatternNotes, 0, blockPracticeLength, 'f')
+                : shouldLoopAccompaniment
+                    ? getPracticeLoopedSegment(rawPatternNotes, patternSegmentOffset, blockPracticeLength, 'f')
                     : rawPatternNotes.slice();
             if (!shouldUseAccompanimentSegment && rawPatternPickupEndStep > 0) {
                 patternNotes = pickupWrapsToPatternStart
@@ -2781,7 +2876,7 @@ function buildPracticeSectionsFromEntries(entries) {
             }
             const patternOutStep = getPracticePatternOutStep(pattern);
             const rawPatternBarStartSteps = getPracticePatternBarStartSteps(pattern);
-            const patternBarStartSteps = shouldUseAccompanimentSegment || shouldLoopTargetAccompaniment
+            const patternBarStartSteps = shouldUseAccompanimentSegment || shouldLoopAccompaniment
                 ? getPracticeLoopedBarStartSegment(
                     rawPatternBarStartSteps,
                     rawPatternNotes.length,
@@ -2798,7 +2893,7 @@ function buildPracticeSectionsFromEntries(entries) {
                     ? null
                     : Math.max(0, Math.round(Number(patternOutStep) || 0) - rawPatternMainStartStep)
                 : patternOutStep;
-            if (shouldLoopTargetAccompaniment &&
+            if (shouldLoopAccompaniment &&
                     effectivePatternOutStep !== null &&
                     effectivePatternOutStep !== undefined) {
                 const lastLoopStart = Math.floor((blockPracticeLength - 1) / rawPatternNotes.length) *

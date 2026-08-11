@@ -1004,10 +1004,9 @@ function findPatternById(patternId) {
 }
 
 function updateTimelineMetadataNode() {
-    const existingMetadataNode = s.select(timelineMetadataSelector);
-    if (existingMetadataNode) {
-        existingMetadataNode.remove();
-    }
+    s.selectAll(timelineMetadataSelector).forEach(function (metadataNode) {
+        metadataNode.remove();
+    });
 
     const metadataEntries = pruneTimelineOrphanOverlayEntries(timelineState.entries);
     if (metadataEntries.length !== timelineState.entries.length) {
