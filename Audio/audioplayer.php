@@ -12,6 +12,8 @@ $i18nJs = @filemtime(__DIR__ . '/../JS/i18n.js') ?: 1;
 $editionJs = @filemtime(__DIR__ . '/../JS/edition.js') ?: 1;
 $playerJs = @filemtime(__DIR__ . '/js/instrument_2.js') ?: 1;
 $playerCss = @filemtime(__DIR__ . '/css/audio_style.css') ?: 1;
+$pwaIcon192 = @filemtime(__DIR__ . '/../Assets/pwa-icon-192.png') ?: 1;
+$pwaIcon512 = @filemtime(__DIR__ . '/../Assets/pwa-icon-512.png') ?: 1;
 ?>
 <script>
   window.BaraBeatI18nConfig = <?php echo barabeat_i18n_config_json(); ?>;
@@ -84,6 +86,13 @@ $playerCss = @filemtime(__DIR__ . '/css/audio_style.css') ?: 1;
   }
 </script>
 <script src="../JS/i18n.js?v=<?php echo $i18nJs; ?>"></script>
+<script>
+  function playerText(key, values) {
+      return window.BaraBeatI18n && typeof window.BaraBeatI18n.t === 'function'
+          ? window.BaraBeatI18n.t(key, values)
+          : key;
+  }
+</script>
 <script src="../JS/edition.js?v=<?php echo $editionJs; ?>"></script>
 <!DOCTYPE html>
 <html lang="<?php echo htmlspecialchars(barabeat_language(), ENT_QUOTES, 'UTF-8'); ?>">
@@ -91,10 +100,10 @@ $playerCss = @filemtime(__DIR__ . '/css/audio_style.css') ?: 1;
   <meta charset="utf-8">
   <meta http-equiv="x-ua-compatible" content="ie=edge">
   <script>
-    document.title = obj[0] && obj[0].Name ? obj[0].Name : 'BaraBeat Player';
+    document.title = obj[0] && obj[0].Name ? obj[0].Name : playerText('player.title');
   </script>
 
-  <meta name="description" content="Making an instrument with the Web Audio API">
+  <meta name="description" content="<?php echo htmlspecialchars(barabeat_t('player.description'), ENT_QUOTES, 'UTF-8'); ?>">
   <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
   <script src="js/instrument_2.js?v=<?php echo $playerJs; ?>"></script>
 
@@ -116,33 +125,36 @@ a:link {
 </script>
 
 <div class="loading">
-  <p>Loading...</p>
+  <p data-i18n="player.loading.initial"><?php echo htmlspecialchars(barabeat_t('player.loading.initial'), ENT_QUOTES, 'UTF-8'); ?></p>
 </div>
 
 <div id="sequencer">
   <section class="controls-main">
     <div class="player-title standalone-player-only">
+      <a href="javascript:close_window();" aria-label="<?php echo htmlspecialchars(barabeat_t('common.close'), ENT_QUOTES, 'UTF-8'); ?>" title="<?php echo htmlspecialchars(barabeat_t('common.close'), ENT_QUOTES, 'UTF-8'); ?>" data-i18n-aria-label="common.close" data-i18n-title="common.close">X</a><span id="playerTitleText"></span>
       <script>
-        document.write('<a href="javascript:close_window();">X</a>' + (obj[0] && obj[0].Name ? obj[0].Name : 'BaraBeat Player'));
+        document.querySelector('#playerTitleText').textContent = obj[0] && obj[0].Name
+          ? obj[0].Name
+          : playerText('player.title');
       </script>
     </div>
     <div class="player-controls">
       <label for="bpm">BPM</label>
       <input name="bpm" id="bpm" type="range" min="30" max="180" value="100" step="1" />
       <span id="bpmval">100</span>
-      <label for="soloTrack" class="standalone-player-only">Stimme</label>
+      <label for="soloTrack" class="standalone-player-only" data-i18n="player.controls.voice"><?php echo htmlspecialchars(barabeat_t('player.controls.voice'), ENT_QUOTES, 'UTF-8'); ?></label>
       <select id="soloTrack" class="standalone-player-only">
-        <option value="">Alle</option>
-        <option value="Kenkeni">Kenkeni</option>
-        <option value="Sangban">Sangban</option>
-        <option value="Doundoun">Doundoun</option>
-        <option value="Dreierbass">Dreierbass</option>
-        <option value="Djembe_1">Djembe 1</option>
-        <option value="Djembe_2">Djembe 2</option>
-        <option value="Djembe_3">Djembe 3</option>
+        <option value="" data-i18n="player.controls.allVoices"><?php echo htmlspecialchars(barabeat_t('player.controls.allVoices'), ENT_QUOTES, 'UTF-8'); ?></option>
+        <option value="Kenkeni" data-i18n="player.instrument.kenkeni"><?php echo htmlspecialchars(barabeat_t('player.instrument.kenkeni'), ENT_QUOTES, 'UTF-8'); ?></option>
+        <option value="Sangban" data-i18n="player.instrument.sangban"><?php echo htmlspecialchars(barabeat_t('player.instrument.sangban'), ENT_QUOTES, 'UTF-8'); ?></option>
+        <option value="Doundoun" data-i18n="player.instrument.doundoun"><?php echo htmlspecialchars(barabeat_t('player.instrument.doundoun'), ENT_QUOTES, 'UTF-8'); ?></option>
+        <option value="Dreierbass" data-i18n="player.instrument.threeBass"><?php echo htmlspecialchars(barabeat_t('player.instrument.threeBass'), ENT_QUOTES, 'UTF-8'); ?></option>
+        <option value="Djembe_1" data-i18n="player.instrument.djembe1"><?php echo htmlspecialchars(barabeat_t('player.instrument.djembe1'), ENT_QUOTES, 'UTF-8'); ?></option>
+        <option value="Djembe_2" data-i18n="player.instrument.djembe2"><?php echo htmlspecialchars(barabeat_t('player.instrument.djembe2'), ENT_QUOTES, 'UTF-8'); ?></option>
+        <option value="Djembe_3" data-i18n="player.instrument.djembe3"><?php echo htmlspecialchars(barabeat_t('player.instrument.djembe3'), ENT_QUOTES, 'UTF-8'); ?></option>
       </select>
-      <button type="button" id="exportWavButton" class="secondary-button">Export WAV</button>
-      <button data-playing="false">&nbsp;</button>
+      <button type="button" id="exportWavButton" class="secondary-button" data-i18n="player.export.button"><?php echo htmlspecialchars(barabeat_t('player.export.button'), ENT_QUOTES, 'UTF-8'); ?></button>
+      <button data-playing="false" aria-label="<?php echo htmlspecialchars(barabeat_t('player.controls.playStop'), ENT_QUOTES, 'UTF-8'); ?>" title="<?php echo htmlspecialchars(barabeat_t('player.controls.playStop'), ENT_QUOTES, 'UTF-8'); ?>">&nbsp;</button>
     </div>
   </section>
 </div>
@@ -218,31 +230,75 @@ function notifyEmbeddedPlaybackEndedAt(scheduledTime) {
 function updateLoadingStatus(message) {
   console.log(message);
   if (loadingEl) {
-    loadingEl.innerHTML = '<p>' + message + '</p>';
+    const statusParagraph = document.createElement('p');
+    statusParagraph.textContent = message;
+    loadingEl.textContent = '';
+    loadingEl.appendChild(statusParagraph);
   }
 }
 
 window.addEventListener('error', function (event) {
   console.error('Player-Fehler:', event.error || event.message);
-  updateLoadingStatus('Player-Fehler: ' + (event.message || 'Unbekannter Fehler'));
+  updateLoadingStatus(playerText('player.error.player', {
+    message: event.message || playerText('player.error.unknown')
+  }));
 });
 
 window.addEventListener('unhandledrejection', function (event) {
   const rejectionMessage = event.reason && event.reason.message ? event.reason.message : String(event.reason);
   console.error('Player Promise-Fehler:', event.reason);
-  updateLoadingStatus('Ladefehler: ' + rejectionMessage);
+  updateLoadingStatus(playerText('player.error.loading', { message: rejectionMessage }));
 });
 
-updateLoadingStatus('Player startet...');
+updateLoadingStatus(playerText('player.status.starting'));
 
 const playerConfig = Array.isArray(obj) && obj.length > 0 ? obj[0] : {};
 const isPracticeMode = Boolean(playerConfig.PracticeMode);
 const isSheetQuickPlayMode = Boolean(playerConfig.SheetQuickPlayMode);
 const usesSheetQuickPlayExternalScheduler = isSheetQuickPlayMode &&
   Boolean(playerConfig.SheetQuickPlayExternalScheduler);
+
+function configureBarabeatMediaMetadata() {
+  if (typeof navigator === 'undefined' || !navigator.mediaSession ||
+      typeof window.MediaMetadata !== 'function') {
+    return;
+  }
+
+  const rhythmName = String(playerConfig.Name || '').trim();
+  const modeName = isPracticeMode
+    ? playerText('practice.title')
+    : (Boolean(playerConfig.TimelineMode)
+        ? playerText('arrangement.title')
+        : playerText('player.title'));
+
+  try {
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: rhythmName || playerText('player.title'),
+      artist: 'BaraBeat Studio · ' + modeName,
+      album: 'BaraBeat Studio',
+      artwork: [
+        {
+          src: new URL('../Assets/pwa-icon-192.png?v=<?php echo $pwaIcon192; ?>', window.location.href).href,
+          sizes: '192x192',
+          type: 'image/png'
+        },
+        {
+          src: new URL('../Assets/pwa-icon-512.png?v=<?php echo $pwaIcon512; ?>', window.location.href).href,
+          sizes: '512x512',
+          type: 'image/png'
+        }
+      ]
+    });
+  } catch (error) {
+    console.warn('Media-Session-Metadaten konnten nicht gesetzt werden:', error);
+  }
+}
+
+configureBarabeatMediaMetadata();
 document.body.classList.toggle('sheet-quick-play-player', isSheetQuickPlayMode);
 if (isSheetQuickPlayMode) {
-  playButton.setAttribute('aria-label', 'Ausgewählte Pattern abspielen oder stoppen');
+  playButton.setAttribute('aria-label', playerText('player.controls.quickPlayStop'));
+  playButton.setAttribute('title', playerText('player.controls.quickPlayStop'));
 }
 const allPracticeTrackNames = ['Kenkeni', 'Sangban', 'Doundoun', 'Dreierbass', 'Djembe_1', 'Djembe_2', 'Djembe_3', 'Shekere'];
 const practiceInstrumentToneVolumeKeys = {
@@ -445,7 +501,7 @@ const practiceCountInReadyPromise = loadPracticeCountInSound();
 
 console.log("Name : " + obj[0].Name);
 console.log("Rhythmus : " + obj[0].Rhythmus);
-updateLoadingStatus('Audiodateien werden geladen...');
+updateLoadingStatus(playerText('player.loading.audioFiles'));
 
 Promise.all(allInstrumentReadyPromises.concat([practiceCountInReadyPromise]))
   .then(function () {
@@ -467,7 +523,7 @@ Promise.all(allInstrumentReadyPromises.concat([practiceCountInReadyPromise]))
   })
   .catch(function (error) {
     console.error('Audio-Initialisierung fehlgeschlagen:', error);
-    updateLoadingStatus('Ladefehler: ' + error.message);
+    updateLoadingStatus(playerText('player.error.loading', { message: error.message || String(error) }));
   });
 
 let steuerung = {};
@@ -2724,7 +2780,7 @@ function expandBarsWithRepeats(flatBars, repeatRangesToApply, startBarIndex, end
     currentBarIndex = matchingRange.endBar + 1;
 
     if (expandedBars.length > MAX_EXPANDED_BARS) {
-      throw new Error('Zu viele expandierte Takte durch Wiederholungen');
+      throw new Error(playerText('player.error.tooManyExpandedBars'));
     }
   }
 
@@ -2903,7 +2959,9 @@ function queuePracticeSectionsUpdate(configuredSections, nextLoopCount, nextDura
     })
     .catch(function (error) {
       console.error('Practice-Samples konnten nicht nachgeladen werden:', error);
-      updateLoadingStatus('Ladefehler: ' + (error && error.message ? error.message : String(error)));
+      updateLoadingStatus(playerText('player.error.loading', {
+        message: error && error.message ? error.message : String(error)
+      }));
     });
 }
 
@@ -4708,7 +4766,7 @@ function downloadBlob(blob, filename) {
 
 async function exportCurrentArrangementAsWav() {
   if (!audioIsReady) {
-    updateLoadingStatus('Audiodateien werden noch geladen...');
+    updateLoadingStatus(playerText('player.loading.audioFilesPending'));
     return;
   }
 
@@ -4720,7 +4778,7 @@ async function exportCurrentArrangementAsWav() {
 
   exportWavButton.disabled = true;
   const previousButtonText = exportWavButton.textContent;
-  exportWavButton.textContent = 'WAV...';
+  exportWavButton.textContent = playerText('player.export.rendering');
 
   try {
     let renderTime = 0;
@@ -4862,13 +4920,15 @@ function createSheetQuickPlayGestureAudioContext() {
 
 async function startAudioPlayback() {
   if (!audioIsReady) {
-    updateLoadingStatus('Audiodateien werden noch geladen...');
+    updateLoadingStatus(playerText('player.loading.audioFilesPending'));
     return false;
   }
 
   if (isPlaying) {
     return true;
   }
+
+  configureBarabeatMediaMetadata();
 
   // Mobile Safari may report a preloaded context as running while its clock
   // remains at zero. Create the playback context inside the real tap instead.
@@ -4890,7 +4950,7 @@ async function startAudioPlayback() {
   } catch (err) {
     isPlaying = false;
     console.error('AudioContext resume fehlgeschlagen:', err);
-    updateLoadingStatus('Audio konnte nicht gestartet werden.');
+    updateLoadingStatus(playerText('player.error.audioStart'));
     return false;
   }
 
@@ -4967,7 +5027,9 @@ window.pumpEmbeddedPlaybackSchedulerFromParent = function () {
 exportWavButton.addEventListener('click', function () {
   exportCurrentArrangementAsWav().catch(function (error) {
     console.error('WAV-Export fehlgeschlagen:', error);
-    updateLoadingStatus('Exportfehler: ' + (error && error.message ? error.message : String(error)));
+    updateLoadingStatus(playerText('player.error.export', {
+      message: error && error.message ? error.message : String(error)
+    }));
   });
 });
 </script>

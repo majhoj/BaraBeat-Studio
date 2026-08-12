@@ -1,16 +1,186 @@
+function chooserUiText(key, values) {
+  if (window.BaraBeatI18n && typeof window.BaraBeatI18n.t === "function") {
+    return window.BaraBeatI18n.t(key, values);
+  }
+  return key;
+}
+
+function getChooserType(chooserElement) {
+  if (!chooserElement) {
+    return "";
+  }
+  if (typeof chooserElement.hasClass === "function") {
+    if (chooserElement.hasClass("instrument-chooser")) {
+      return "instrument";
+    }
+    if (chooserElement.hasClass("function-chooser")) {
+      return "function";
+    }
+  }
+  let node = chooserElement.node || null;
+  if (node && node.classList) {
+    if (node.classList.contains("instrument-chooser") || node.classList.contains("instrument-label")) {
+      return "instrument";
+    }
+    if (node.classList.contains("function-chooser") || node.classList.contains("function-label")) {
+      return "function";
+    }
+  }
+  return "";
+}
+
+function getChooserDisplayText(value, chooserType) {
+  let internalValue = String(value || "").trim();
+  const instrumentKeys = {
+    Instrument: "arrangement.instrument.generic",
+    Djembe: "practice.instrument.djembe",
+    "Djembe 1": "practice.instrument.djembe1",
+    "Djembe 2": "practice.instrument.djembe2",
+    "Djembe 3": "practice.instrument.djembe3",
+    "Bässe": "practice.instrument.basses",
+    Kenkeni: "practice.instrument.kenkeni",
+    Sangban: "practice.instrument.sangban",
+    Doundoun: "practice.instrument.doundoun",
+    Dreierbass: "practice.instrument.threeBass",
+    Leer: "practice.type.empty",
+  };
+  const functionKeys = {
+    Funktion: "chooser.placeholder.function",
+    Call: "practice.type.call",
+    Intro: "practice.type.intro",
+    Echauffement: "practice.type.warmup",
+    Begleitpattern: "chooser.function.accompanimentPattern",
+    Begleitung: "practice.type.accompaniment",
+    Solo: "practice.type.solo",
+    Outro: "practice.type.outro",
+    Leer: "practice.type.empty",
+  };
+  const keyMap = chooserType === "instrument" ? instrumentKeys : functionKeys;
+  if (keyMap[internalValue]) {
+    return chooserUiText(keyMap[internalValue]);
+  }
+  if (chooserType === "function" && internalValue.indexOf("Begleitpattern") === 0) {
+    return chooserUiText("chooser.function.accompanimentPattern") + internalValue.slice("Begleitpattern".length);
+  }
+  if (chooserType === "function" && internalValue.indexOf("Begleitung") === 0) {
+    return chooserUiText("practice.type.accompaniment") + internalValue.slice("Begleitung".length);
+  }
+  return internalValue;
+}
+
+function normalizeChooserInternalText(value, chooserType) {
+  let displayValue = String(value || "").trim();
+  const candidates = chooserType === "instrument"
+    ? ["Instrument", "Djembe", "Djembe 1", "Djembe 2", "Djembe 3", "Bässe", "Kenkeni", "Sangban", "Doundoun", "Dreierbass", "Leer"]
+    : ["Funktion", "Call", "Intro", "Echauffement", "Begleitpattern", "Begleitung", "Solo", "Outro", "Leer"];
+  for (let index = 0; index < candidates.length; index += 1) {
+    if (displayValue === getChooserDisplayText(candidates[index], chooserType)) {
+      return candidates[index];
+    }
+  }
+  if (chooserType === "function") {
+    const accompanimentPatternLabel = getChooserDisplayText("Begleitpattern", "function");
+    if (accompanimentPatternLabel && displayValue.indexOf(accompanimentPatternLabel) === 0) {
+      return "Begleitpattern" + displayValue.slice(accompanimentPatternLabel.length);
+    }
+    const accompanimentLabel = getChooserDisplayText("Begleitung", "function");
+    if (accompanimentLabel && displayValue.indexOf(accompanimentLabel) === 0) {
+      return "Begleitung" + displayValue.slice(accompanimentLabel.length);
+    }
+  }
+  return displayValue;
+}
+
+function setChooserNodeValue(textNode, value, chooserType, fillValue) {
+  if (!textNode) {
+    return;
+  }
+  const internalValue = normalizeChooserInternalText(value, chooserType);
+  if (typeof textNode.data === "function") {
+    textNode.data("chooserValue", internalValue);
+  }
+  const attributes = { text: getChooserDisplayText(internalValue, chooserType) };
+  if (fillValue !== undefined) {
+    attributes.fill = fillValue;
+  }
+  textNode.attr(attributes);
+}
+
+function getChooserInternalValue(chooserElement, chooserType) {
+  if (!chooserElement) {
+    return "";
+  }
+  let resolvedType = chooserType || getChooserType(chooserElement);
+  let textNode = chooserElement;
+  if (chooserElement.type !== "text" && typeof chooserElement.select === "function") {
+    textNode = chooserElement.select("text");
+  }
+  if (!textNode) {
+    return "";
+  }
+  if (!resolvedType) {
+    resolvedType = getChooserType(textNode);
+  }
+  const storedValue = typeof textNode.data === "function" ? textNode.data("chooserValue") : "";
+  const visibleValue = typeof textNode.attr === "function" ? textNode.attr("text") : "";
+  return normalizeChooserInternalText(storedValue || visibleValue, resolvedType);
+}
+
+function serializeEditorElementForStorage(element) {
+  const chooserType = getChooserType(element);
+  const elementId = typeof element.attr === "function" ? element.attr("id") : "";
+  if ((elementId === "triplet" || elementId === "quartuplet") && typeof element.selectAll === "function") {
+    const tupletTextNodes = element.selectAll("text");
+    const visibleTupletValues = [];
+    tupletTextNodes.forEach(function (textNode) {
+      visibleTupletValues.push(textNode.attr("text"));
+    });
+    const internalTupletLabel = elementId === "quartuplet" ? "Quartole" : "Triole";
+    tupletTextNodes.forEach(function (textNode) {
+      textNode.attr({ text: internalTupletLabel });
+    });
+    try {
+      return element.toString();
+    } finally {
+      tupletTextNodes.forEach(function (textNode, index) {
+        textNode.attr({ text: visibleTupletValues[index] });
+      });
+    }
+  }
+  if (!chooserType || typeof element.selectAll !== "function") {
+    return element.toString();
+  }
+  const textNodes = element.selectAll("text");
+  const visibleValues = [];
+  textNodes.forEach(function (textNode) {
+    visibleValues.push(textNode.attr("text"));
+  });
+  textNodes.forEach(function (textNode) {
+    textNode.attr({ text: getChooserInternalValue(textNode, chooserType) });
+  });
+  try {
+    return element.toString();
+  } finally {
+    textNodes.forEach(function (textNode, index) {
+      textNode.attr({ text: visibleValues[index] });
+    });
+  }
+}
+
 function createMenuChooser(s, x, y, config) {
   let chooserGruppe = s.g();
   chooserGruppe.addClass("chooser-node");
   chooserGruppe.addClass(config.chooserClass);
   let menuGruppe = s.g().attr({ display: "none" });
 
-  let chooserText = s.text(0, 0, config.startText).attr({
+  let chooserText = s.text(0, 0, "").attr({
     class: config.labelClass,
     fill: config.startFill,
     "font-size": 16,
     "font-family": "sans-serif",
     cursor: "pointer",
   });
+  setChooserNodeValue(chooserText, config.startText, config.chooserType, config.startFill);
 
   let zeilenHoehe = 22;
   let menuBreite = config.menuWidth;
@@ -26,12 +196,13 @@ function createMenuChooser(s, x, y, config) {
   menuGruppe.add(menuBg);
 
   config.options.forEach(function (name, index) {
-    let eintrag = s.text(5, 22 + index * zeilenHoehe, name).attr({
+    let eintrag = s.text(5, 22 + index * zeilenHoehe, "").attr({
       fill: "#333",
       "font-size": 14,
       "font-family": "sans-serif",
       cursor: "pointer",
     });
+    setChooserNodeValue(eintrag, name, config.chooserType);
     menuGruppe.add(eintrag);
   });
 
@@ -65,11 +236,11 @@ function requestChooserLabel(defaultName, promptText) {
 
     let cancelButton = document.createElement("button");
     cancelButton.type = "button";
-    cancelButton.textContent = "Abbrechen";
+    cancelButton.textContent = chooserUiText("common.cancel");
 
     let okButton = document.createElement("button");
     okButton.type = "button";
-    okButton.textContent = "OK";
+    okButton.textContent = chooserUiText("chooser.dialog.confirm");
 
     function closeDialog(result) {
       overlay.remove();
@@ -116,9 +287,7 @@ function requestChooserLabel(defaultName, promptText) {
 }
 
 function getChooserLabelSeed(name, chooserText) {
-  let currentText = chooserText && typeof chooserText.attr === "function"
-    ? String(chooserText.attr("text") || "").trim()
-    : "";
+  let currentText = getChooserInternalValue(chooserText, "function");
 
   if (!currentText || currentText === "Funktion") {
     return name;
@@ -166,10 +335,7 @@ function setChooserText(chooserGruppe, textValue, fillValue = "#333") {
   if (!textNode) {
     return;
   }
-  textNode.attr({
-    text: textValue,
-    fill: fillValue,
-  });
+  setChooserNodeValue(textNode, textValue, getChooserType(chooserGruppe), fillValue);
 }
 
 function bringChooserToFront(chooserGruppe, menuGruppe) {
@@ -252,6 +418,7 @@ function getFunctionChooserOptions() {
 
 function createInstrumentChooser(s, x, y, startText = "Instrument", startFill = "gray") {
   return createMenuChooser(s, x, y, {
+    chooserType: "instrument",
     chooserClass: "instrument-chooser",
     labelClass: "instrument-label",
     startText: normalizeDoundounInstrumentName(startText),
@@ -272,6 +439,7 @@ function createInstrumentChooser(s, x, y, startText = "Instrument", startFill = 
 
 function createFunctionChooser(s, x, y, startText = "Funktion", startFill = "gray") {
   return createMenuChooser(s, x, y, {
+    chooserType: "function",
     chooserClass: "function-chooser",
     labelClass: "function-label",
     startText: startText,
@@ -282,11 +450,15 @@ function createFunctionChooser(s, x, y, startText = "Funktion", startFill = "gra
       if (name !== "Solo" && name !== "Begleitpattern") {
         return name;
       }
-      let promptText =
-        'Bezeichnung für "' +
-        name +
-        '" anpassen.\nZum Beispiel: "Solo 1", "1. Solo", "Begleitpattern 2".';
-      return requestChooserLabel(getChooserLabelSeed(name, chooserText), promptText);
+      let promptText = chooserUiText("chooser.dialog.customizeLabel", {
+        name: getChooserDisplayText(name, "function"),
+      });
+      return requestChooserLabel(
+        getChooserDisplayText(getChooserLabelSeed(name, chooserText), "function"),
+        promptText
+      ).then(function (configuredName) {
+        return configuredName === null ? null : normalizeChooserInternalText(configuredName, "function");
+      });
     },
   });
 }
@@ -543,7 +715,8 @@ function bindChooserInteraction(chooserGruppe, chooserText, menuGruppe, onSelect
     let beforeSelectionSnapshot = typeof getCurrentHistorySnapshot === "function"
       ? getCurrentHistorySnapshot()
       : null;
-    let name = eintrag.attr("text");
+    let chooserType = getChooserType(chooserGruppe);
+    let name = getChooserInternalValue(eintrag, chooserType);
     let selectedName = onSelect ? onSelect(name, chooserGruppe, chooserText) : name;
     Promise.resolve(selectedName).then(function (resolvedName) {
       if (resolvedName === null) {
@@ -551,7 +724,7 @@ function bindChooserInteraction(chooserGruppe, chooserText, menuGruppe, onSelect
         rebindChooserDragAfterMenuAction();
         return;
       }
-      chooserText.attr({ text: resolvedName, fill: "#333" });
+      setChooserNodeValue(chooserText, resolvedName, chooserType, "#333");
       setChooserMenuVisible(menuGruppe, false);
       rebindChooserDragAfterMenuAction();
       if (beforeSelectionSnapshot &&
@@ -767,9 +940,9 @@ function rewireInstrumentChooser(chooserGruppe) {
     return;
   }
 
-  instrumentText.attr({ text: normalizeDoundounInstrumentName(instrumentText.attr("text")) });
+  setChooserNodeValue(instrumentText, normalizeDoundounInstrumentName(instrumentText.attr("text")), "instrument");
   menuGruppe.selectAll("text").forEach(function (menuText) {
-    menuText.attr({ text: normalizeDoundounInstrumentName(menuText.attr("text")) });
+    setChooserNodeValue(menuText, normalizeDoundounInstrumentName(menuText.attr("text")), "instrument");
   });
 
   chooserGruppe.undrag();
@@ -792,6 +965,11 @@ function rewireFunctionChooser(chooserGruppe) {
     return;
   }
 
+  setChooserNodeValue(functionText, functionText.attr("text"), "function");
+  menuGruppe.selectAll("text").forEach(function (menuText) {
+    setChooserNodeValue(menuText, menuText.attr("text"), "function");
+  });
+
   chooserGruppe.undrag();
   functionText.unclick();
   menuGruppe.selectAll("text").forEach(function (t) {
@@ -802,10 +980,14 @@ function rewireFunctionChooser(chooserGruppe) {
     if (name !== "Solo" && name !== "Begleitpattern") {
       return name;
     }
-    let promptText =
-      'Bezeichnung für "' +
-      name +
-      '" anpassen.\nZum Beispiel: "Solo 1", "1. Solo", "Begleitpattern 2".';
-    return requestChooserLabel(getChooserLabelSeed(name, functionText), promptText);
+    let promptText = chooserUiText("chooser.dialog.customizeLabel", {
+      name: getChooserDisplayText(name, "function"),
+    });
+    return requestChooserLabel(
+      getChooserDisplayText(getChooserLabelSeed(name, functionText), "function"),
+      promptText
+    ).then(function (configuredName) {
+      return configuredName === null ? null : normalizeChooserInternalText(configuredName, "function");
+    });
   });
 }

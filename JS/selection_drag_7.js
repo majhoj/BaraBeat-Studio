@@ -153,7 +153,9 @@ function createChooserClone(sourceElement) {
   var startX = Number.isFinite(chooserPosition.x) ? chooserPosition.x : chooserBounds.x;
   var startY = Number.isFinite(chooserPosition.y) ? chooserPosition.y : chooserBounds.y + 13;
   var textElement = sourceElement.select("text");
-  var chooserText = textElement.attr("text");
+  var chooserText = typeof getChooserInternalValue === "function"
+    ? getChooserInternalValue(sourceElement)
+    : textElement.attr("text");
   var chooserColor = textElement.attr("fill");
 
   if (isFunctionChooserNode(sourceElement)) {
@@ -201,6 +203,9 @@ function bindClonedElement(clonedElement) {
   }
   if (clonedElement.attr("id") == "edit_text") {
     clonedElement.dblclick(edit_text);
+  }
+  if (typeof localizeTupletElement === "function") {
+    localizeTupletElement(clonedElement);
   }
   clonedElement.drag(move, sel_start, stop_m);
   return clonedElement;
@@ -935,7 +940,9 @@ function getSelectedElementMarkup() {
   }
   var markup = "";
   getSelectedElements(selections).forEach(function (ele) {
-    markup += ele.toString();
+    markup += typeof serializeEditorElementForStorage === "function"
+      ? serializeEditorElementForStorage(ele)
+      : ele.toString();
   });
   return markup;
 }

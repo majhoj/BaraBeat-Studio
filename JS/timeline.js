@@ -39,6 +39,74 @@ const timelineState = {
 };
 let timelineActiveDragPayload = null;
 
+const timelineTypeLabelKeys = Object.freeze({
+    Begleitung: 'arrangement.type.accompaniment',
+    Call: 'arrangement.type.call',
+    Intro: 'arrangement.type.intro',
+    Outro: 'arrangement.type.outro',
+    Echauffement: 'arrangement.type.warmup',
+    Solo: 'arrangement.type.solo',
+    Pause: 'arrangement.type.pause',
+    Leer: 'arrangement.type.empty'
+});
+
+const timelineInstrumentLabelKeys = Object.freeze({
+    Instrument: 'arrangement.instrument.generic',
+    Kenkeni: 'arrangement.instrument.kenkeni',
+    Sangban: 'arrangement.instrument.sangban',
+    Doundoun: 'arrangement.instrument.doundoun',
+    Dununba: 'arrangement.instrument.doundoun',
+    Dundunba: 'arrangement.instrument.doundoun',
+    Dreierbass: 'arrangement.instrument.threeBass',
+    Djembe: 'arrangement.instrument.djembe',
+    Djembe_1: 'arrangement.instrument.djembe1',
+    Djembe_2: 'arrangement.instrument.djembe2',
+    Djembe_3: 'arrangement.instrument.djembe3',
+    Bässe: 'arrangement.instrument.basses'
+});
+
+function timelineText(key, values) {
+    if (window.BaraBeatI18n && typeof window.BaraBeatI18n.t === 'function') {
+        return window.BaraBeatI18n.t(key, values);
+    }
+    return String(key);
+}
+
+function getTimelineTypeLabel(type) {
+    const internalType = String(type || '').trim();
+    const labelKey = timelineTypeLabelKeys[internalType];
+    return labelKey ? timelineText(labelKey) : internalType;
+}
+
+function getTimelineInstrumentLabel(instrumentName) {
+    const internalName = String(instrumentName || '').trim();
+    const labelKey = timelineInstrumentLabelKeys[internalName];
+    return labelKey ? timelineText(labelKey) : internalName;
+}
+
+function getTimelinePatternLabel(pattern, fallbackLabel) {
+    const internalType = String(pattern && pattern.labelType || '').trim();
+    const rawLabel = String(
+        pattern && (pattern.labelName || pattern.labelType) || fallbackLabel || ''
+    ).trim();
+
+    if (internalType && (!pattern.labelName || rawLabel === internalType)) {
+        return getTimelineTypeLabel(internalType);
+    }
+    if (!internalType && rawLabel === 'Passage') {
+        return timelineText('arrangement.passage');
+    }
+    return rawLabel || timelineText('arrangement.pattern');
+}
+
+function getTimelineBarCountLabel(count) {
+    const normalizedCount = Math.max(0, Math.round(Number(count) || 0));
+    const key = normalizedCount === 1
+        ? 'arrangement.barCount.one'
+        : 'arrangement.barCount.other';
+    return timelineText(key, { count: normalizedCount });
+}
+
 function normalizeTimelineTempo(rawValue) {
     const numericValue = Number(rawValue);
     if (!Number.isFinite(numericValue)) {
@@ -1248,7 +1316,9 @@ function buildTimelinePatternBarSummary(pattern) {
         const continues = repeatEndMarkers.some(isTimelineContinuationMarker);
 
         if (continues) {
-            summaryParts.push('Takt ' + (barIndex + 1) + ' weiterlaufend');
+            summaryParts.push(timelineText('arrangement.barContinues', {
+                number: barIndex + 1
+            }));
             continue;
         }
 
@@ -1259,7 +1329,12 @@ function buildTimelinePatternBarSummary(pattern) {
             repeatCount = markerCount + 1;
         }
 
-        summaryParts.push('Takt ' + (barIndex + 1) + (repeatCount > 1 ? ' ' + repeatCount + 'x' : ''));
+        summaryParts.push(repeatCount > 1
+            ? timelineText('arrangement.barRepeated', {
+                number: barIndex + 1,
+                count: repeatCount
+            })
+            : timelineText('arrangement.bar', { number: barIndex + 1 }));
     }
 
     return summaryParts.join(', ');
@@ -1283,7 +1358,9 @@ function buildTimelineGroupSummary(group, patternLibrary) {
             sequenceIndexByPatternId[entry.patternId] = nextSequenceIndex++;
         }
 
-        const sequenceLabel = 'Takt ' + sequenceIndexByPatternId[entry.patternId];
+        const sequenceLabel = timelineText('arrangement.bar', {
+            number: sequenceIndexByPatternId[entry.patternId]
+        });
         if (currentRun && currentRun.patternId === entry.patternId) {
             currentRun.count += 1;
             return;
@@ -1313,7 +1390,12 @@ function buildTimelineGroupSummary(group, patternLibrary) {
         text: summaryParts.length <= 1
             ? ''
             : summaryParts.map(function (part) {
-                return part.label + (part.count > 1 ? ' | Wiederholung x' + part.count : '');
+                return part.count > 1
+                    ? timelineText('arrangement.summaryRepeat', {
+                        label: part.label,
+                        count: part.count
+                    })
+                    : part.label;
             }).join(', ')
     };
 }
@@ -1748,7 +1830,12 @@ function buildPatternLibraryGroupSummary(patternGroup) {
         if (barCount <= 0) {
             return;
         }
-        summaryParts.push('Takt ' + (patternIndex + 1) + (barCount > 1 ? ' (' + barCount + ' Takte)' : ''));
+        summaryParts.push(barCount > 1
+            ? timelineText('arrangement.barWithCount', {
+                number: patternIndex + 1,
+                bars: getTimelineBarCountLabel(barCount)
+            })
+            : timelineText('arrangement.bar', { number: patternIndex + 1 }));
     });
 
     return summaryParts.join(', ');
@@ -2307,8 +2394,8 @@ function createTimelineDropzone(targetIndex) {
     const dropzone = document.createElement('div');
     dropzone.className = 'timeline-dropzone';
     dropzone.textContent = targetIndex === timelineState.entries.length
-        ? 'Pattern hier ablegen'
-        : 'Hier einfügen';
+        ? timelineText('arrangement.drop.append')
+        : timelineText('arrangement.drop.insert');
     dropzone.addEventListener('dragover', function (event) {
         event.preventDefault();
         markTimelineDropTarget(dropzone);
@@ -2328,7 +2415,7 @@ function createTimelineDropzone(targetIndex) {
 function createTimelineParallelDropzone(rowGroups) {
     const dropzone = document.createElement('div');
     dropzone.className = 'timeline-dropzone timeline-dropzone-inline';
-    dropzone.textContent = 'Parallel hier';
+    dropzone.textContent = timelineText('arrangement.drop.parallel');
     bindParallelDropTarget(dropzone, rowGroups);
     return dropzone;
 }
@@ -2409,6 +2496,7 @@ function renderTimelinePatternLibrary() {
         const addButton = document.createElement('button');
         addButton.type = 'button';
         addButton.textContent = '+';
+        addButton.setAttribute('aria-label', timelineText('arrangement.addPatternAtEnd'));
         addButton.addEventListener('click', function () {
             const newBlockId = nextTimelineBlockId();
             const newEntries = (patternGroup.entries || []).map(function (entry) {
@@ -2446,14 +2534,14 @@ function createTimelineSectionHeader(rowGroups, rowIndex, visualRows, rowTempoIn
     sectionActionWrap.className = 'timeline-entry-actions timeline-section-actions';
     const sectionRepeatEl = document.createElement('label');
     sectionRepeatEl.className = 'timeline-entry-repeat-count';
-    sectionRepeatEl.appendChild(document.createTextNode('Wdh.'));
+    sectionRepeatEl.appendChild(document.createTextNode(timelineText('arrangement.repeatShort')));
     const sectionRepeatInputEl = document.createElement('input');
     sectionRepeatInputEl.type = 'number';
     sectionRepeatInputEl.min = '1';
     sectionRepeatInputEl.max = '100';
     sectionRepeatInputEl.step = '1';
     sectionRepeatInputEl.placeholder = rowRepeatInfo.mixed
-        ? 'gemischt'
+        ? timelineText('arrangement.mixed')
         : String(normalizeTimelineGroupRepeatCount(rowRepeatInfo.repeatCount || 1));
     sectionRepeatInputEl.value = rowRepeatInfo.mixed
         ? ''
@@ -2472,14 +2560,14 @@ function createTimelineSectionHeader(rowGroups, rowIndex, visualRows, rowTempoIn
 
     const sectionTempoEl = document.createElement('label');
     sectionTempoEl.className = 'timeline-entry-repeat-count timeline-section-tempo-control';
-    sectionTempoEl.appendChild(document.createTextNode('Tempo'));
+    sectionTempoEl.appendChild(document.createTextNode(timelineText('arrangement.tempo')));
     const sectionTempoInputEl = document.createElement('input');
     sectionTempoInputEl.type = 'number';
     sectionTempoInputEl.min = '30';
     sectionTempoInputEl.max = '180';
     sectionTempoInputEl.step = '1';
     sectionTempoInputEl.placeholder = tempoInfo.mixed
-        ? 'gemischt'
+        ? timelineText('arrangement.mixed')
         : String(normalizeTimelineTempo(tempoInfo.effectiveTempo));
     sectionTempoInputEl.value = tempoInfo.mixed
         ? ''
@@ -2500,7 +2588,7 @@ function createTimelineSectionHeader(rowGroups, rowIndex, visualRows, rowTempoIn
     moveUpButtonEl.type = 'button';
     moveUpButtonEl.className = 'timeline-section-move-button';
     moveUpButtonEl.textContent = '↑';
-    moveUpButtonEl.setAttribute('aria-label', 'Abschnitt nach oben verschieben');
+    moveUpButtonEl.setAttribute('aria-label', timelineText('arrangement.moveSectionUp'));
     moveUpButtonEl.disabled = rowIndex <= 0;
     moveUpButtonEl.addEventListener('click', function (event) {
         event.stopPropagation();
@@ -2511,7 +2599,7 @@ function createTimelineSectionHeader(rowGroups, rowIndex, visualRows, rowTempoIn
     moveDownButtonEl.type = 'button';
     moveDownButtonEl.className = 'timeline-section-move-button';
     moveDownButtonEl.textContent = '↓';
-    moveDownButtonEl.setAttribute('aria-label', 'Abschnitt nach unten verschieben');
+    moveDownButtonEl.setAttribute('aria-label', timelineText('arrangement.moveSectionDown'));
     moveDownButtonEl.disabled = !Array.isArray(visualRows) || rowIndex >= visualRows.length - 1;
     moveDownButtonEl.addEventListener('click', function (event) {
         event.stopPropagation();
@@ -2525,15 +2613,15 @@ function createTimelineSectionHeader(rowGroups, rowIndex, visualRows, rowTempoIn
 }
 
 function getTimelineDisplayParts(pattern, patternDisplayInfo) {
-    const fallbackName = pattern ? pattern.name || '' : 'Pattern';
+    const fallbackName = pattern ? pattern.name || '' : timelineText('arrangement.pattern');
     const displayName = pattern
         ? (patternDisplayInfo.displayNameByPatternId[pattern.id] || fallbackName)
         : fallbackName;
     const splitMatch = String(displayName).match(/^(P\d+)\s*-\s*([^/]+?)\s*\/\s*(.+)$/);
     if (splitMatch) {
         return {
-            main: splitMatch[2].trim(),
-            sub: splitMatch[3].trim()
+            main: getTimelineInstrumentLabel(splitMatch[2].trim()),
+            sub: getTimelinePatternLabel(pattern, splitMatch[3].trim())
         };
     }
 
@@ -2554,6 +2642,20 @@ function appendTimelineChipLabel(parentEl, pattern, patternDisplayInfo) {
         subEl.className = 'timeline-chip-subtitle';
         parentEl.appendChild(subEl);
     }
+}
+
+function getTimelineFullDisplayLabel(pattern, patternDisplayInfo) {
+    const fallbackName = pattern ? pattern.name || '' : timelineText('arrangement.pattern');
+    const displayName = pattern
+        ? (patternDisplayInfo.displayNameByPatternId[pattern.id] || fallbackName)
+        : fallbackName;
+    const splitMatch = String(displayName).match(/^(P\d+)\s*-\s*([^/]+?)\s*\/\s*(.+)$/);
+    if (!splitMatch) {
+        return displayName;
+    }
+
+    return splitMatch[1] + ' - ' + getTimelineInstrumentLabel(splitMatch[2].trim()) +
+        ' / ' + getTimelinePatternLabel(pattern, splitMatch[3].trim());
 }
 
 function createTimelineEntryChip(group, rowGroups, patternDisplayInfo) {
@@ -2600,12 +2702,12 @@ function createTimelineEntryChip(group, rowGroups, patternDisplayInfo) {
     removeButton.type = 'button';
     removeButton.className = 'timeline-chip-remove';
     removeButton.textContent = 'x';
-    removeButton.setAttribute('aria-label', 'Pattern entfernen');
+    removeButton.setAttribute('aria-label', timelineText('arrangement.removePattern'));
     removeButton.addEventListener('click', function (event) {
         event.stopPropagation();
         if (detailsEl.open) {
             detailsEl.open = false;
-            removeButton.setAttribute('aria-label', 'Pattern entfernen');
+            removeButton.setAttribute('aria-label', timelineText('arrangement.removePattern'));
             return;
         }
         if (typeof recordArrangementHistorySnapshot === 'function') {
@@ -2620,14 +2722,19 @@ function createTimelineEntryChip(group, rowGroups, patternDisplayInfo) {
     const groupSummary = buildTimelineGroupSummary(group, timelineState.sourcePatterns);
     const metaEl = document.createElement('small');
     const displayedBarCount = groupSummary.totalBars || (Array.isArray(pattern.bars) ? pattern.bars.length : 0);
-    metaEl.textContent = groupSummary.barText || ('Takte: ' + displayedBarCount);
+    metaEl.textContent = groupSummary.barText || getTimelineBarCountLabel(displayedBarCount);
     entryCard.appendChild(chipHeadEl);
 
     detailsEl.addEventListener('toggle', function () {
-        removeButton.setAttribute('aria-label', detailsEl.open ? 'Ansicht zuklappen' : 'Pattern entfernen');
+        removeButton.setAttribute(
+            'aria-label',
+            detailsEl.open
+                ? timelineText('arrangement.collapsePattern')
+                : timelineText('arrangement.removePattern')
+        );
     });
     const detailsSummaryEl = document.createElement('summary');
-    detailsSummaryEl.textContent = 'Einstellungen';
+    detailsSummaryEl.textContent = timelineText('arrangement.settings');
     detailsEl.appendChild(detailsSummaryEl);
 
     const detailBodyEl = document.createElement('div');
@@ -2646,10 +2753,10 @@ function createTimelineEntryChip(group, rowGroups, patternDisplayInfo) {
         const handWrap = document.createElement('div');
         handWrap.className = 'timeline-entry-targets';
         const handLabelEl = document.createElement('label');
-        handLabelEl.appendChild(document.createTextNode('Handsatz'));
+        handLabelEl.appendChild(document.createTextNode(timelineText('arrangement.handMode')));
         const handSelectEl = document.createElement('select');
         [
-            { value: 'auto', label: 'Auto' },
+            { value: 'auto', label: timelineText('arrangement.handModeAutomatic') },
             { value: 'h2h', label: 'H2H' },
             { value: 'hoh', label: 'HOH' }
         ].forEach(function (optionData) {
@@ -2708,14 +2815,16 @@ function createTimelineEntryChip(group, rowGroups, patternDisplayInfo) {
                 updateTimelineMetadataNode();
             });
             labelEl.appendChild(checkboxEl);
-            labelEl.appendChild(document.createTextNode(targetName.replace('_', ' ')));
+            labelEl.appendChild(document.createTextNode(getTimelineInstrumentLabel(targetName)));
             targetWrap.appendChild(labelEl);
         });
         detailBodyEl.appendChild(targetWrap);
     } else {
         const fixedTargetEl = document.createElement('div');
         fixedTargetEl.className = 'timeline-entry-targets';
-        fixedTargetEl.textContent = 'Instrument: ' + pattern.instrument;
+        fixedTargetEl.textContent = timelineText('arrangement.instrumentLabel', {
+            instrument: getTimelineInstrumentLabel(pattern.instrument)
+        });
         detailBodyEl.appendChild(fixedTargetEl);
     }
 
@@ -2760,7 +2869,9 @@ function createTimelineOverlayGrid(rowGroups, patternDisplayInfo) {
     for (let repeatIndex = 0; repeatIndex < repeatCount; repeatIndex++) {
         const cellEl = document.createElement('div');
         cellEl.className = 'timeline-overlay-cell';
-        cellEl.title = 'Solo fuer Wiederholung ' + String(repeatIndex + 1);
+        cellEl.title = timelineText('arrangement.soloForRepeat', {
+            count: repeatIndex + 1
+        });
         cellEl.addEventListener('dragover', function (event) {
             event.preventDefault();
         });
@@ -2796,12 +2907,12 @@ function createTimelineOverlayGrid(rowGroups, patternDisplayInfo) {
             if (pattern) {
                 appendTimelineChipLabel(titleEl, pattern, patternDisplayInfo);
             } else {
-                titleEl.textContent = 'Pattern';
+                titleEl.textContent = timelineText('arrangement.pattern');
             }
             const removeButton = document.createElement('button');
             removeButton.type = 'button';
             removeButton.textContent = 'x';
-            removeButton.setAttribute('aria-label', 'Solo aus Zelle entfernen');
+            removeButton.setAttribute('aria-label', timelineText('arrangement.removeSolo'));
             removeButton.addEventListener('click', function (event) {
                 event.stopPropagation();
                 if (typeof recordArrangementHistorySnapshot === 'function') {
@@ -2878,16 +2989,16 @@ function renderTimelineSequence() {
         laneEl.style.gridRow = String(block.startRowIndex + 1) + ' / span ' + String(block.span);
 
         const titleEl = document.createElement('strong');
-        titleEl.textContent = patternDisplayInfo.displayNameByPatternId[block.pattern.id] || block.pattern.name;
+        titleEl.textContent = getTimelineFullDisplayLabel(block.pattern, patternDisplayInfo);
         const targetEl = document.createElement('small');
-        targetEl.textContent = block.targets.join(', ');
+        targetEl.textContent = block.targets.map(getTimelineInstrumentLabel).join(', ');
         const statusEl = document.createElement('small');
-        statusEl.textContent = 'läuft weiter';
+        statusEl.textContent = timelineText('arrangement.continues');
         const actionWrap = document.createElement('div');
         actionWrap.className = 'timeline-entry-actions';
         const removeButton = document.createElement('button');
         removeButton.type = 'button';
-        removeButton.textContent = 'Entfernen';
+        removeButton.textContent = timelineText('common.remove');
         removeButton.addEventListener('click', function () {
             if (typeof recordArrangementHistorySnapshot === 'function') {
                 recordArrangementHistorySnapshot();
@@ -3014,13 +3125,17 @@ function renderTimelinePanel() {
         return;
     }
 
-    titleEl.innerHTML = '<span class="practice-title-label">Arrangement:</span> ' +
-        '<span class="practice-title-rhythm"></span>';
-    const rhythmTitleEl = titleEl.querySelector('.practice-title-rhythm');
+    titleEl.textContent = '';
+    const titleLabelEl = document.createElement('span');
+    titleLabelEl.className = 'practice-title-label';
+    titleLabelEl.textContent = timelineText('arrangement.title') + ':';
+    const rhythmTitleEl = document.createElement('span');
+    rhythmTitleEl.className = 'practice-title-rhythm';
+    titleEl.append(titleLabelEl, document.createTextNode(' '), rhythmTitleEl);
     if (rhythmTitleEl) {
         rhythmTitleEl.textContent = typeof getCurrentRhythmTitle === 'function'
-            ? (getCurrentRhythmTitle() || 'Unbenannter Rhythmus')
-            : 'Unbenannter Rhythmus';
+            ? (getCurrentRhythmTitle() || timelineText('arrangement.untitledRhythm'))
+            : timelineText('arrangement.untitledRhythm');
     }
 
     if (tempoInputEl) {
@@ -3081,9 +3196,10 @@ function renderTimelinePanel() {
     });
     const profileTitleEl = swingProfileWrapEl ? swingProfileWrapEl.querySelector('span') : null;
     if (profileTitleEl) {
-        profileTitleEl.textContent = currentProfileKey === 'binaer'
-            ? 'Profil 16/8'
-            : (currentProfileKey === 'tenaer' ? 'Profil 12/8' : 'Profil 9/8');
+        const meter = currentProfileKey === 'binaer'
+            ? '16/8'
+            : (currentProfileKey === 'tenaer' ? '12/8' : '9/8');
+        profileTitleEl.textContent = timelineText('arrangement.swingProfileMeter', { meter: meter });
     }
     const practiceProfileTitleEl = practiceSwingProfileWrapEl
         ? practiceSwingProfileWrapEl.querySelector('span')

@@ -23,7 +23,6 @@ const APP_SHELL = [
   './Assets/favicon.svg',
   './Assets/favicon-32.png',
   './apple-touch-icon.png',
-  './Assets/apple-touch-icon.png',
   './Assets/pwa-icon-192.png',
   './Assets/pwa-icon-512.png',
   './Bedienungsanleitung.php',

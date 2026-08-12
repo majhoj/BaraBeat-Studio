@@ -1,4 +1,10 @@
 // JavaScript Document
+function audioPlayerText(key, values) {
+  return window.BaraBeatI18n && typeof window.BaraBeatI18n.t === 'function'
+    ? window.BaraBeatI18n.t(key, values)
+    : key;
+}
+
 function configureBarabeatAudioSession() {
   if (typeof navigator === 'undefined' || !navigator.audioSession) {
     return;
@@ -68,11 +74,11 @@ class Instrumente {
     const contentType = response.headers.get('content-type') || '';
 
     if (!response.ok) {
-      throw new Error(
-        'Audiodatei konnte nicht geladen werden: ' + filepath +
-        ' -> ' + response.url +
-        ' (HTTP ' + response.status + ')'
-      );
+      throw new Error(audioPlayerText('player.error.audioFileLoad', {
+        path: filepath,
+        url: response.url,
+        status: response.status
+      }));
     }
 
     const arrayBuffer = await response.arrayBuffer();
@@ -80,21 +86,22 @@ class Instrumente {
     const firstText = String.fromCharCode.apply(null, firstBytes).trim();
 
     if (/^(text\/html|application\/json|application\/xml|text\/xml)\b/i.test(contentType) || firstText.charAt(0) === '<') {
-      throw new Error(
-        'Audiodatei liefert keine Audiodaten: ' + filepath +
-        ' -> ' + response.url +
-        ' (' + (contentType || 'kein Content-Type') + ')'
-      );
+      throw new Error(audioPlayerText('player.error.audioFileInvalid', {
+        path: filepath,
+        url: response.url,
+        contentType: contentType || audioPlayerText('player.error.noContentType')
+      }));
     }
 
     try {
       return await this._audioCtx.decodeAudioData(arrayBuffer);
     } catch (error) {
-      throw new Error(
-        'Audiodatei konnte nicht dekodiert werden: ' + filepath +
-        ' -> ' + response.url +
-        ' (' + (contentType || 'kein Content-Type') + ') - ' + error.message
-      );
+      throw new Error(audioPlayerText('player.error.audioFileDecode', {
+        path: filepath,
+        url: response.url,
+        contentType: contentType || audioPlayerText('player.error.noContentType'),
+        message: error.message || String(error)
+      }));
     }
   }
 
@@ -116,7 +123,7 @@ class Instrumente {
       console.error('Fehler beim Laden der Audiodateien:', error);
       if (loadingIndicator) {
         const errorMessage = window.BaraBeatI18n && typeof window.BaraBeatI18n.t === 'function'
-          ? window.BaraBeatI18n.t('error.audioLoad', { message: error.message || '' })
+          ? window.BaraBeatI18n.t('player.error.loading', { message: error.message || '' })
           : String(error.message || '');
         const errorParagraph = document.createElement('p');
         errorParagraph.textContent = errorMessage;

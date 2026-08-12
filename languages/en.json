@@ -196,7 +196,9 @@
       "playSelected": "Play selected patterns",
       "stop": "Stop instant playback",
       "loadingSounds": "Loading sounds",
-      "selectPattern": "Select a pattern in the score first."
+      "selectPattern": "Select a pattern in the score first.",
+      "preview": "Preview",
+      "pickupLabel": "{name} pickup"
     },
     "defaultScoreTitle": "Score",
     "editTextPrompt": "Enter the text you want.",
@@ -216,7 +218,70 @@
     "movePatternBackward": "Move pattern backward",
     "moveWholePatternUp": "Move entire pattern up",
     "moveWholePatternDown": "Move entire pattern down",
-    "defaultExportName": "Score"
+    "defaultExportName": "Score",
+    "untitled": "Untitled",
+    "mobilePracticeOnly": "Only practice and playback are available on smartphones.",
+    "moveChooser": "Move chooser",
+    "moveChooserFromBar": "Move chooser from bar {bar}",
+    "deleteChooser": "Delete chooser",
+    "deleteChooserFromBar": "Delete chooser from bar {bar}",
+    "moveChooserHere": "Move chooser here",
+    "barComment": "Comment in bar {bar}",
+    "rhythmComment": "Comment on the rhythm"
+  },
+  "chooser": {
+    "placeholder": {
+      "function": "Function"
+    },
+    "function": {
+      "accompanimentPattern": "Accompaniment pattern"
+    },
+    "dialog": {
+      "confirm": "OK",
+      "customizeLabel": "Customize the label for \"{name}\".\nFor example: \"Solo 1\", \"1st solo\", \"Accompaniment pattern 2\"."
+    }
+  },
+  "score": {
+    "pageNumber": "{current}/{total}",
+    "patternFallback": "Pattern",
+    "tuplet": {
+      "triplet": "Triplet",
+      "quartuplet": "Quadruplet",
+      "insertTitle": "Insert {name}",
+      "noteNumber": "Note {number}",
+      "tripletOrQuartuplet": "Triplet or quadruplet"
+    },
+    "note": {
+      "tone": "Tone",
+      "bass": "Bass",
+      "slapOrBell": "Slap or bell",
+      "slapSlashBell": "Slap / bell",
+      "muffledTone": "Muffled tone",
+      "muffledSlapOrClick": "Muffled slap or click",
+      "muffledSlapSlashClick": "Muffled slap / click",
+      "toneFlam": "Tone flam",
+      "slapFlam": "Slap flam",
+      "bassSlapFlam": "Bass and slap flam",
+      "bassSlapFlamPlural": "Bass and slap flam"
+    },
+    "legend": {
+      "repeat": "Repeat"
+    },
+    "readout": {
+      "binary": "binary",
+      "ternary": "ternary",
+      "nineEight": "ternary 9/8",
+      "untilStop": "until stopped",
+      "none": "none",
+      "bar": "Bar {bar}: {instrument}, {label}, repeat markers = start[{start}], end[{end}]",
+      "controls": "Controls [{index}] = [{controls}]",
+      "notes": "Strokes [{index}] = [{notes}]",
+      "repeatRangesNone": "Repeat ranges: none\n",
+      "repeatRangesTitle": "Repeat ranges:\n",
+      "repeatRange": "{index}. Bar {start}-{end}{count}\n",
+      "repeatCount": " x {count}",
+      "repeatUntilStop": " until stopped"
+    }
   },
   "practice": {
     "title": "Practice mode",
@@ -371,6 +436,125 @@
       "sequenceEmpty": "The practice settings did not produce a playback sequence.",
       "build": "Could not open practice mode: {message}",
       "refresh": "Could not refresh practice mode: {message}"
+    }
+  },
+  "arrangement": {
+    "title": "Arrangement",
+    "mobilePlay": "Play arrangement",
+    "mobileAudioFrameTitle": "Mobile arrangement audio player",
+    "audioFrameTitle": "Arrangement audio player",
+    "tempo": "Tempo",
+    "swingProfile": "Swing profile",
+    "swingProfileMeter": "Swing profile {meter}",
+    "feel": "Feel",
+    "volume": "Volume",
+    "shekereBeat": "Shekere beat",
+    "refreshFromScore": "Refresh from score",
+    "patternLibrary": "Pattern library",
+    "patternLibraryNote": "Each passage from the score appears here once. Drag it or use + to add it to the end of the timeline.",
+    "timelineTitle": "Timeline",
+    "timelineNote": "The timeline determines the playback order. Djembe assignments are made here.",
+    "pattern": "Pattern",
+    "passage": "Passage",
+    "settings": "Settings",
+    "repeatShort": "Rep.",
+    "mixed": "mixed",
+    "handMode": "Sticking",
+    "handModeAutomatic": "Auto",
+    "instrumentLabel": "Instrument: {instrument}",
+    "addPatternAtEnd": "Add pattern to the end of the timeline",
+    "removePattern": "Remove pattern",
+    "collapsePattern": "Collapse view",
+    "removeSolo": "Remove solo from cell",
+    "moveSectionUp": "Move section up",
+    "moveSectionDown": "Move section down",
+    "continues": "continues",
+    "soloForRepeat": "Solo for repeat {count}",
+    "bar": "Bar {number}",
+    "barContinues": "Bar {number} continuing",
+    "barRepeated": "Bar {number} {count}x",
+    "barWithCount": "Bar {number} ({bars})",
+    "summaryRepeat": "{label} | repeat x{count}",
+    "barCount": {
+      "one": "{count} bar",
+      "other": "{count} bars"
+    },
+    "drop": {
+      "append": "Drop pattern here",
+      "insert": "Insert here",
+      "parallel": "Add in parallel"
+    },
+    "type": {
+      "accompaniment": "Accompaniment",
+      "call": "Call",
+      "intro": "Intro",
+      "outro": "Outro",
+      "warmup": "Warm-up",
+      "solo": "Solo",
+      "pause": "Pause",
+      "empty": "Empty"
+    },
+    "instrument": {
+      "generic": "Instrument",
+      "kenkeni": "Kenkeni",
+      "sangban": "Sangban",
+      "doundoun": "Doundoun",
+      "threeBass": "Three bass drums",
+      "djembe": "Djembe",
+      "djembe1": "Djembe 1",
+      "djembe2": "Djembe 2",
+      "djembe3": "Djembe 3",
+      "basses": "Bass drums"
+    },
+    "untitledRhythm": "Untitled rhythm",
+    "error": {
+      "noPlayableArrangement": "This score does not yet contain a playable arrangement.",
+      "start": "Could not start the arrangement: {message}",
+      "build": "Could not open the timeline: {message}",
+      "refresh": "Could not refresh the timeline: {message}"
+    }
+  },
+  "player": {
+    "title": "BaraBeat Player",
+    "description": "BaraBeat audio player",
+    "controls": {
+      "voice": "Voice",
+      "allVoices": "All",
+      "playStop": "Start or stop playback",
+      "quickPlayStop": "Play or stop selected patterns"
+    },
+    "instrument": {
+      "kenkeni": "Kenkeni",
+      "sangban": "Sangban",
+      "doundoun": "Doundoun",
+      "threeBass": "Three bass drums",
+      "djembe1": "Djembe 1",
+      "djembe2": "Djembe 2",
+      "djembe3": "Djembe 3"
+    },
+    "loading": {
+      "initial": "Loading ...",
+      "audioFiles": "Loading audio files ...",
+      "audioFilesPending": "Audio files are still loading ..."
+    },
+    "status": {
+      "starting": "Starting player ..."
+    },
+    "export": {
+      "button": "Export WAV",
+      "rendering": "WAV ..."
+    },
+    "error": {
+      "player": "Player error: {message}",
+      "unknown": "Unknown error",
+      "loading": "Loading error: {message}",
+      "audioStart": "Audio could not be started.",
+      "export": "Export error: {message}",
+      "tooManyExpandedBars": "Too many bars expanded by repeats.",
+      "audioFileLoad": "Audio file could not be loaded: {path} -> {url} (HTTP {status})",
+      "audioFileInvalid": "Audio file did not return audio data: {path} -> {url} ({contentType})",
+      "audioFileDecode": "Audio file could not be decoded: {path} -> {url} ({contentType}) - {message}",
+      "noContentType": "no Content-Type"
     }
   },
   "offline": {

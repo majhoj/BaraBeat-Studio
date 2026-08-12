@@ -150,7 +150,7 @@ $activeLanguage = barabeat_language();
                 </details>
             </div>
         </details>
-        <button type="button" id="mobileArrangementPlayerButton" class="mobile-menu-action" hidden>Arrangement abspielen</button>
+        <button type="button" id="mobileArrangementPlayerButton" class="mobile-menu-action" hidden data-i18n="arrangement.mobilePlay"><?php echo htmlspecialchars(barabeat_t('arrangement.mobilePlay'), ENT_QUOTES, 'UTF-8'); ?></button>
         <button type="button" id="mobilePatternChooserButton" class="mobile-menu-action" hidden data-i18n="practice.patternSelectionOpen"><?php echo htmlspecialchars(barabeat_t('practice.patternSelectionOpen'), ENT_QUOTES, 'UTF-8'); ?></button>
         <button type="button" id="mobileBluetoothLatencyButton" class="mobile-menu-action" hidden aria-label="<?php echo htmlspecialchars(barabeat_t('practice.dialog.bluetoothLatency'), ENT_QUOTES, 'UTF-8'); ?>" data-i18n="practice.controls.mobileLatency" data-i18n-aria-label="practice.dialog.bluetoothLatency"><?php echo htmlspecialchars(barabeat_t('practice.controls.mobileLatency'), ENT_QUOTES, 'UTF-8'); ?></button>
         <form action="" name="uploadForm" class="hidden-upload-form">
@@ -170,10 +170,10 @@ $activeLanguage = barabeat_language();
     <div id="mobileArrangementOverlay" class="mobile-arrangement-overlay" hidden>
         <section class="mobile-arrangement-player" role="dialog" aria-modal="true" aria-labelledby="mobileArrangementTitle">
             <header class="mobile-arrangement-header">
-                <h2 id="mobileArrangementTitle">Arrangement</h2>
-                <button type="button" id="mobileArrangementCloseButton">Schließen</button>
+                <h2 id="mobileArrangementTitle" data-i18n="arrangement.title"><?php echo htmlspecialchars(barabeat_t('arrangement.title'), ENT_QUOTES, 'UTF-8'); ?></h2>
+                <button type="button" id="mobileArrangementCloseButton" data-i18n="common.close"><?php echo htmlspecialchars(barabeat_t('common.close'), ENT_QUOTES, 'UTF-8'); ?></button>
             </header>
-            <iframe id="mobileArrangementAudioFrame" name="mobileArrangementAudioFrame" title="Audioplayer Arrangement mobil" allow="autoplay"></iframe>
+            <iframe id="mobileArrangementAudioFrame" name="mobileArrangementAudioFrame" title="<?php echo htmlspecialchars(barabeat_t('arrangement.mobileAudioFrameTitle'), ENT_QUOTES, 'UTF-8'); ?>" data-i18n-title="arrangement.mobileAudioFrameTitle" allow="autoplay"></iframe>
         </section>
     </div>
 
@@ -271,34 +271,34 @@ $activeLanguage = barabeat_language();
         <div class="timeline-sticky-region">
             <div class="timeline-panel-header">
                 <div>
-                    <div id="timelineTitle" class="timeline-panel-title">Arrangement</div>
+                    <div id="timelineTitle" class="timeline-panel-title" data-i18n="arrangement.title"><?php echo htmlspecialchars(barabeat_t('arrangement.title'), ENT_QUOTES, 'UTF-8'); ?></div>
                 </div>
                 <div class="timeline-panel-actions">
                     <label class="timeline-tempo-control" for="timelineTempo">
-                        Tempo
+                        <span data-i18n="arrangement.tempo"><?php echo htmlspecialchars(barabeat_t('arrangement.tempo'), ENT_QUOTES, 'UTF-8'); ?></span>
                         <input type="number" id="timelineTempo" min="30" max="180" step="1" value="100" />
                     </label>
-                    <button type="button" id="timelineSwingProfileButton">Swing-Profil</button>
-                    <button type="button" id="timelineFeelProfileButton">Feel</button>
-                    <button type="button" id="timelineVolumeButton">Lautstärke</button>
-                    <button type="button" id="timelineShekereBeat" class="shekere-beat-toggle" aria-pressed="false">Shekere Beat</button>
-                    <button type="button" id="timelineRefreshButton">Aus Blatt aktualisieren</button>
-                    <button type="button" id="timelineCloseButton">Schließen</button>
+                    <button type="button" id="timelineSwingProfileButton" data-i18n="arrangement.swingProfile"><?php echo htmlspecialchars(barabeat_t('arrangement.swingProfile'), ENT_QUOTES, 'UTF-8'); ?></button>
+                    <button type="button" id="timelineFeelProfileButton" data-i18n="arrangement.feel"><?php echo htmlspecialchars(barabeat_t('arrangement.feel'), ENT_QUOTES, 'UTF-8'); ?></button>
+                    <button type="button" id="timelineVolumeButton" data-i18n="arrangement.volume"><?php echo htmlspecialchars(barabeat_t('arrangement.volume'), ENT_QUOTES, 'UTF-8'); ?></button>
+                    <button type="button" id="timelineShekereBeat" class="shekere-beat-toggle" aria-pressed="false" data-i18n="arrangement.shekereBeat"><?php echo htmlspecialchars(barabeat_t('arrangement.shekereBeat'), ENT_QUOTES, 'UTF-8'); ?></button>
+                    <button type="button" id="timelineRefreshButton" data-i18n="arrangement.refreshFromScore"><?php echo htmlspecialchars(barabeat_t('arrangement.refreshFromScore'), ENT_QUOTES, 'UTF-8'); ?></button>
+                    <button type="button" id="timelineCloseButton" data-i18n="common.close"><?php echo htmlspecialchars(barabeat_t('common.close'), ENT_QUOTES, 'UTF-8'); ?></button>
                 </div>
             </div>
             <section class="timeline-player-panel" hidden>
-                <iframe id="timelineAudioFrame" name="timelineAudioFrame" title="Audioplayer Arrangement" allow="autoplay"></iframe>
+                <iframe id="timelineAudioFrame" name="timelineAudioFrame" title="<?php echo htmlspecialchars(barabeat_t('arrangement.audioFrameTitle'), ENT_QUOTES, 'UTF-8'); ?>" data-i18n-title="arrangement.audioFrameTitle" allow="autoplay"></iframe>
             </section>
         </div>
         <div class="timeline-panel-body">
             <section class="timeline-column">
-                <h3>Pattern-Bibliothek</h3>
-                <p class="timeline-column-note">Jede Passage aus dem Notenblatt erscheint hier einmal. Ziehen oder ueber <code>+</code> ans Ende der Timeline anfuegen.</p>
+                <h3 data-i18n="arrangement.patternLibrary"><?php echo htmlspecialchars(barabeat_t('arrangement.patternLibrary'), ENT_QUOTES, 'UTF-8'); ?></h3>
+                <p class="timeline-column-note" data-i18n="arrangement.patternLibraryNote"><?php echo htmlspecialchars(barabeat_t('arrangement.patternLibraryNote'), ENT_QUOTES, 'UTF-8'); ?></p>
                 <div id="timelinePatternList" class="timeline-pattern-list"></div>
             </section>
             <section class="timeline-column">
-                <h3>Timeline</h3>
-                <p class="timeline-column-note">Die Timeline bestimmt die Wiedergabereihenfolge. Djembe-Zuordnung passiert hier.</p>
+                <h3 data-i18n="arrangement.timelineTitle"><?php echo htmlspecialchars(barabeat_t('arrangement.timelineTitle'), ENT_QUOTES, 'UTF-8'); ?></h3>
+                <p class="timeline-column-note" data-i18n="arrangement.timelineNote"><?php echo htmlspecialchars(barabeat_t('arrangement.timelineNote'), ENT_QUOTES, 'UTF-8'); ?></p>
                 <div id="timelineSequence" class="timeline-sequence-list"></div>
             </section>
         </div>
@@ -539,12 +539,12 @@ $activeLanguage = barabeat_language();
     <div id="tupletDialog" class="tuplet-dialog-backdrop" hidden>
         <section class="tuplet-dialog" role="dialog" aria-modal="true" aria-labelledby="tupletDialogTitle">
             <header class="tuplet-dialog-header">
-                <h2 id="tupletDialogTitle">Triole</h2>
+                <h2 id="tupletDialogTitle" data-i18n="score.tuplet.triplet"><?php echo htmlspecialchars(barabeat_t('score.tuplet.triplet'), ENT_QUOTES, 'UTF-8'); ?></h2>
             </header>
             <div id="tupletDialogControls" class="tuplet-dialog-controls"></div>
             <footer class="tuplet-dialog-footer">
-                <button type="button" id="tupletDialogCancelButton">Abbrechen</button>
-                <button type="button" id="tupletDialogInsertButton" class="primary">Einfügen</button>
+                <button type="button" id="tupletDialogCancelButton" data-i18n="common.cancel"><?php echo htmlspecialchars(barabeat_t('common.cancel'), ENT_QUOTES, 'UTF-8'); ?></button>
+                <button type="button" id="tupletDialogInsertButton" class="primary" data-i18n="common.insert"><?php echo htmlspecialchars(barabeat_t('common.insert'), ENT_QUOTES, 'UTF-8'); ?></button>
             </footer>
         </section>
     </div>
@@ -678,14 +678,14 @@ elem.addEventListener ("keydown", function (event) {
 */
 
 // Funktionen
-const defaultRhythmTitle = 'Rhythmusname';
-const legacyDefaultRhythmTitle = 'Enter the name of the Rhythm';
+const defaultRhythmTitle = uiText('editor.rhythmName');
+const legacyDefaultRhythmTitles = ['Rhythmusname', 'Rhythm name', 'Enter the name of the Rhythm'];
 
 function isDefaultTitleText(titleValue) {
     const normalizedTitle = String(titleValue || '').trim();
     return !normalizedTitle ||
         normalizedTitle === defaultRhythmTitle ||
-        normalizedTitle === legacyDefaultRhythmTitle;
+        legacyDefaultRhythmTitles.indexOf(normalizedTitle) !== -1;
 }
 
 function setRhythmTitle(titleValue) {
@@ -1556,7 +1556,7 @@ function loadRhythmContent(title, content, scoreId, options) {
         return;
     }
     const loadOptions = options || {};
-    loadedTitle = title || 'Unbenannt';
+    loadedTitle = title || uiText('editor.untitled');
     currentScoreId = scoreId || null;
     if (loadOptions.remember !== false) {
         rememberLastLoadedScore(currentScoreId);
@@ -1583,7 +1583,7 @@ function removeCanvasElements(selector) {
 function getCurrentHistorySnapshot() {
     const elementMarkup = [];
     s.selectAll(removableCanvasElementSelector).forEach(function (el) {
-        elementMarkup.push(el.toString());
+        elementMarkup.push(serializeEditorElementForStorage(el));
     });
     return {
         rhythm: rhythm || 'tenaer',
@@ -1654,6 +1654,17 @@ function drawHistoryBaseSheet(rhythmName) {
     }
 }
 
+function localizeTupletElement(element) {
+    const elementId = element && typeof element.attr === 'function' ? element.attr('id') : '';
+    if (elementId !== 'triplet' && elementId !== 'quartuplet') {
+        return;
+    }
+    const label = uiText(elementId === 'quartuplet' ? 'score.tuplet.quartuplet' : 'score.tuplet.triplet');
+    element.selectAll('text').forEach(function (textNode) {
+        textNode.attr({ text: label });
+    });
+}
+
 function bindLoadedScoreElements() {
     const loadedElements = s.selectAll(removableCanvasElementSelector);
     loadedElements.forEach(function (el) {
@@ -1669,6 +1680,7 @@ function bindLoadedScoreElements() {
         if (el.attr("id") == "shortbar") {
             updateShortBarMarkerVisual(el);
         }
+        localizeTupletElement(el);
         el.attr({ class: "shp" });
         el.drag(move, sel_start, stop_m);
     });
@@ -1732,7 +1744,7 @@ function restoreHistorySnapshot(snapshot) {
         s.append(Snap.parseStr(snapshot.elementsMarkup));
     }
     bindLoadedScoreElements();
-    setRhythmTitle(snapshot.title || 'Unbenannt');
+    setRhythmTitle(snapshot.title || uiText('editor.untitled'));
     syncStateAfterHistoryRestore(syncOptions);
 }
 
@@ -1908,11 +1920,11 @@ function bindPaletteInsert(sourceElement, templateElement, elementId, offsetX, o
 }
 
 const tupletNoteOptions = [
-    { value: "tone", label: "Tone" },
-    { value: "bass", label: "Bass" },
-    { value: "slap", label: "Slap / Glocke" },
-    { value: "tone_muffled", label: "gedämpfter Tone" },
-    { value: "slap_muffled", label: "gedämpfter Slap / Klick" }
+    { value: "tone", labelKey: "score.note.tone" },
+    { value: "bass", labelKey: "score.note.bass" },
+    { value: "slap", labelKey: "score.note.slapSlashBell" },
+    { value: "tone_muffled", labelKey: "score.note.muffledTone" },
+    { value: "slap_muffled", labelKey: "score.note.muffledSlapSlashClick" }
 ];
 
 function closeTupletDialog() {
@@ -1936,14 +1948,14 @@ function renderTupletDialogControls(display) {
 
     for (let index = 0; index < count; index += 1) {
         const labelEl = document.createElement("label");
-        labelEl.textContent = "Ton " + String(index + 1);
+        labelEl.textContent = uiText('score.tuplet.noteNumber', { number: index + 1 });
         const selectEl = document.createElement("select");
         selectEl.className = "tuplet-note-select";
         selectEl.setAttribute("data-note-index", String(index));
         tupletNoteOptions.forEach(function (option) {
             const optionEl = document.createElement("option");
             optionEl.value = option.value;
-            optionEl.textContent = option.label;
+            optionEl.textContent = uiText(option.labelKey);
             if (option.value === defaultValues[index]) {
                 optionEl.selected = true;
             }
@@ -1965,7 +1977,7 @@ function openTupletDialog(event) {
         return;
     }
     if (titleEl) {
-        titleEl.textContent = display.label + " einfügen";
+        titleEl.textContent = uiText('score.tuplet.insertTitle', { name: display.label });
     }
     dialogEl.setAttribute("data-tuplet-type", display.type);
     renderTupletDialogControls(display);
@@ -3290,7 +3302,7 @@ function createSheetQuickPlaySection(label, labelName, runtimeKey, options) {
     const sectionOptions = options || {};
     return {
         label: label || 'Begleitung',
-        labelName: labelName || label || 'Vorhören',
+        labelName: labelName || label || uiText('editor.quickPlay.preview'),
         runtimeKey: runtimeKey || ('sheet-quick-play-' + Date.now()),
         isLeadIn: Boolean(sectionOptions.isLeadIn),
         fixedLength: Math.max(0, Math.round(Number(sectionOptions.fixedLength) || 0)),
@@ -3531,9 +3543,11 @@ function buildSheetQuickPlayConfiguredSections(preparedPatterns) {
         });
 
         section.label = labels.indexOf('Begleitung') !== -1 ? 'Begleitung' : (labels[0] || 'Begleitung');
-        section.labelName = labelNames.join(' + ') || 'Vorhören';
+        section.labelName = labelNames.join(' + ') || uiText('editor.quickPlay.preview');
         pickupSection.label = section.label;
-        pickupSection.labelName = section.labelName ? section.labelName + ' Auftakt' : 'Auftakt';
+        pickupSection.labelName = uiText('editor.quickPlay.pickupLabel', {
+            name: section.labelName
+        });
 
         if (sheetQuickPlaySectionHasNotes(pickupSection)) {
             if (hostSection) {
@@ -3703,8 +3717,9 @@ function renderSheetQuickPlaySelectors(readResult) {
                 : sourceInstrumentName,
             sourceInstrument: sourceInstrumentName,
             labelType: labelInfo.type || 'Begleitung',
-            labelName: labelInfo.raw || ('Takt ' + Number(bar.index)),
-            name: sourceInstrumentName + ' / Takt ' + Number(bar.index),
+            labelName: labelInfo.raw || uiText('arrangement.bar', { number: Number(bar.index) }),
+            name: getChooserDisplayText(sourceInstrumentName, 'instrument') + ' / ' +
+                uiText('arrangement.bar', { number: Number(bar.index) }),
             defaultTargets: targetInstruments.slice(),
             isQuickPlayDraft: true,
             bars: [{
@@ -4220,7 +4235,7 @@ function redrawCurrentSheetFromSnapshot(snapshot, syncOptions) {
         s.append(Snap.parseStr(snapshot.elementsMarkup));
     }
     bindLoadedScoreElements();
-    setRhythmTitle(snapshot.title || 'Unbenannt');
+    setRhythmTitle(snapshot.title || uiText('editor.untitled'));
     syncStateAfterHistoryRestore(syncOptions || buildCurrentTimelineSyncOptions());
     renderSheetQuickPlaySelectors();
     if (isMobilePracticeViewport()) {
@@ -4282,7 +4297,10 @@ function drawSheetPageFrames() {
             strokeWidth: 0.7,
             pointerEvents: "none"
         }).insertAfter(canv);
-        s.text(sheetWidth - 34, pageOffsetY + sheetPageHeight - 34, (pageIndex + 1) + "/" + pageCount).attr({
+        s.text(sheetWidth - 34, pageOffsetY + sheetPageHeight - 34, uiText('score.pageNumber', {
+            current: pageIndex + 1,
+            total: pageCount
+        })).attr({
             id: "basis",
             class: "sheet-page-number",
             'font-size': 11,
@@ -4423,8 +4441,8 @@ paletteOriginY = paletteBaseY - 30;
 
 function getCurrentTupletDisplay() {
     return rhythm === "binaer"
-        ? { letter: "T", label: "Triole", type: "triplet" }
-        : { letter: "Q", label: "Quartole", type: "quartuplet" };
+        ? { letter: "T", label: uiText('score.tuplet.triplet'), type: "triplet" }
+        : { letter: "Q", label: uiText('score.tuplet.quartuplet'), type: "quartuplet" };
 }
 
 function updateTupletPaletteSymbol(symbol) {
@@ -4493,7 +4511,9 @@ function createTripletSymbol(paper, centerX, centerY, options) {
     const noteTypes = Array.isArray(settings.notes) && settings.notes.length
         ? settings.notes
         : ["tone", "tone", "slap"];
-    const labelText = settings.label === false ? "" : (settings.label || (tupletType === "quartuplet" ? "Quartole" : "Triole"));
+    const labelText = settings.label === false
+        ? ""
+        : (settings.label || uiText(tupletType === "quartuplet" ? 'score.tuplet.quartuplet' : 'score.tuplet.triplet'));
     const groupParts = [];
     const noteY = centerY;
     const positionOffsets = Array.isArray(settings.positionOffsets) && settings.positionOffsets.length
@@ -4562,8 +4582,8 @@ function getTupletPositionOffsets(tupletType, noteCount, spacing) {
 function createTupletElementFromPalette(noteTypes, tupletType) {
     const type = tupletType || getCurrentTupletDisplay().type;
     const display = type === "quartuplet"
-        ? { label: "Quartole", spacing: getTupletSymbolSpacing(type) }
-        : { label: "Triole", spacing: getTupletSymbolSpacing(type) };
+        ? { label: uiText('score.tuplet.quartuplet'), spacing: getTupletSymbolSpacing(type) }
+        : { label: uiText('score.tuplet.triplet'), spacing: getTupletSymbolSpacing(type) };
     const insertX = getPaletteInsertReferenceX();
     const insertY = paletteOriginY + 292 + paletteOffsetY;
     const element = createTripletSymbol(s, insertX, insertY, {
@@ -4757,18 +4777,18 @@ function renderLegend(initialChooserX) {
     removeCanvasElements(".legend-entry");
     updateTupletPaletteSymbol(Triplet);
 
-    ton_c = addLegendEntry(ton, "Tone", 92, 1166, 45, 178, legendOffsetX, legendOffsetY);
-    bass_c = addLegendEntry(bass, "Bass", 157, 1146, 46, 198, legendOffsetX, legendOffsetY);
-    slap_c = addLegendEntry(slap, "Slap/Glocke", 222, 1126, 45, 218, legendOffsetX, legendOffsetY);
-    flam_ton_c = addLegendEntry(flam_ton, "Flam mit Tones", 337, 1105, 49, 240, legendOffsetX, legendOffsetY);
-    flam_slap_c = addLegendEntry(flam_slap, "Flam mit Slaps", 475, 1087, 49, 259, legendOffsetX, legendOffsetY);
-    flam_bass_slap_c = addLegendEntry(flam_bass_slap, "Flam mit Bass und Slaps", 613, 1069, 49, 279, legendOffsetX, legendOffsetY);
-    ton_g_c = addLegendEntry(ton_g, "gedämpfter Tone", 92, 1078, 48, 299, legendOffsetX, legendOffsetY);
-    slap_g_c = addLegendEntry(slap_g, "gedämpfter Slap / Klick", 240, 1058, 48, 319, legendOffsetX, legendOffsetY);
-    In_c = addLegendEntry(In, "In", 428, 1034, 44, 343, legendOffsetX, legendOffsetY);
-    Out_c = addLegendEntry(Out, "Out", 470, 1011, 44, 366, legendOffsetX, legendOffsetY);
-    ShortBar_c = addLegendEntry(ShortBar, "ShortBar", 521, 938, 44, 439, legendOffsetX, legendOffsetY);
-    repeatMarkerLegendClone = addLegendEntry(repeatMarkerGroup, "Wiederholung", 605, 968, 44, 409, legendOffsetX, legendOffsetY);
+    ton_c = addLegendEntry(ton, uiText('score.note.tone'), 92, 1166, 45, 178, legendOffsetX, legendOffsetY);
+    bass_c = addLegendEntry(bass, uiText('score.note.bass'), 157, 1146, 46, 198, legendOffsetX, legendOffsetY);
+    slap_c = addLegendEntry(slap, uiText('score.note.slapSlashBell'), 222, 1126, 45, 218, legendOffsetX, legendOffsetY);
+    flam_ton_c = addLegendEntry(flam_ton, uiText('score.note.toneFlam'), 337, 1105, 49, 240, legendOffsetX, legendOffsetY);
+    flam_slap_c = addLegendEntry(flam_slap, uiText('score.note.slapFlam'), 475, 1087, 49, 259, legendOffsetX, legendOffsetY);
+    flam_bass_slap_c = addLegendEntry(flam_bass_slap, uiText('score.note.bassSlapFlamPlural'), 613, 1069, 49, 279, legendOffsetX, legendOffsetY);
+    ton_g_c = addLegendEntry(ton_g, uiText('score.note.muffledTone'), 92, 1078, 48, 299, legendOffsetX, legendOffsetY);
+    slap_g_c = addLegendEntry(slap_g, uiText('score.note.muffledSlapSlashClick'), 240, 1058, 48, 319, legendOffsetX, legendOffsetY);
+    In_c = addLegendEntry(In, 'In', 428, 1034, 44, 343, legendOffsetX, legendOffsetY);
+    Out_c = addLegendEntry(Out, 'Out', 470, 1011, 44, 366, legendOffsetX, legendOffsetY);
+    ShortBar_c = addLegendEntry(ShortBar, 'ShortBar', 521, 938, 44, 439, legendOffsetX, legendOffsetY);
+    repeatMarkerLegendClone = addLegendEntry(repeatMarkerGroup, uiText('score.legend.repeat'), 605, 968, 44, 409, legendOffsetX, legendOffsetY);
     Triplet_c = addLegendEntry(Triplet, tupletDisplay.label, 730, 900, 46, 477, legendOffsetX, legendOffsetY);
 }
 
@@ -5134,7 +5154,7 @@ function buildSerializedRhythm() {
 
     elementsToSave = s.selectAll(removableCanvasElementSelector);
     elementsToSave.forEach(function (el) {
-        serializedRhythm += el.toString();
+        serializedRhythm += serializeEditorElementForStorage(el);
     });
 
     return serializedRhythm;
@@ -5297,7 +5317,7 @@ let notenText = "eee";
 function getReadRhythmConfig() {
     if (rhythm == 'binaer') {
         return {
-            rhythmLabel: "binär",
+            rhythmLabel: uiText('score.readout.binary'),
             stepsPerBar: 32,
             totalStepsPerLine: 64,
             gapSlotCount: 2,
@@ -5308,7 +5328,7 @@ function getReadRhythmConfig() {
     }
     if (rhythm == 'tenaer') {
         return {
-            rhythmLabel: "tenär",
+            rhythmLabel: uiText('score.readout.ternary'),
             stepsPerBar: 24,
             totalStepsPerLine: 48,
             gapSlotCount: 2,
@@ -5318,7 +5338,7 @@ function getReadRhythmConfig() {
         };
     }
     return {
-        rhythmLabel: "tenär 9/8",
+        rhythmLabel: uiText('score.readout.nineEight'),
         stepsPerBar: 18,
         totalStepsPerLine: 36,
         gapSlotCount: 2,
@@ -5497,8 +5517,7 @@ function getStepIndexWithinBar(lineSlotIndex, stepsPerBar) {
 
 function getElementLabelText(element) {
     if (isInstrumentChooserNode(element) || isFunctionChooserNode(element)) {
-        const chooserLabel = element.select("text");
-        const chooserText = chooserLabel ? (chooserLabel.attr('text') || chooserLabel.node.textContent || '') : '';
+        const chooserText = getChooserInternalValue(element);
         if (chooserText == 'Instrument' || chooserText == 'Funktion') {
             return '';
         }
@@ -5808,13 +5827,13 @@ function buildBarSummary(rhythmBars) {
         const startMarkers = Array.isArray(bar.repeat.start) ? bar.repeat.start : [bar.repeat.start];
         const endMarkers = Array.isArray(bar.repeat.end) ? bar.repeat.end : [bar.repeat.end];
         const displayStartMarkers = startMarkers.map(function (marker) {
-            return marker === 'loop' ? 'bis Stop' : marker;
+            return marker === 'loop' ? uiText('score.readout.untilStop') : marker;
         });
         const displayEndMarkers = endMarkers.map(function (marker) {
-            return marker === 'loop' ? 'bis Stop' : marker;
+            return marker === 'loop' ? uiText('score.readout.untilStop') : marker;
         });
         const controlSummary = bar.controls.length === 0
-            ? 'keine'
+            ? uiText('score.readout.none')
             : bar.controls
                 .slice()
                 .sort(function (controlA, controlB) {
@@ -5827,27 +5846,40 @@ function buildBarSummary(rhythmBars) {
                     return controlLabel + '@' + (control.stepIndex + 1);
                 })
                 .join(', ');
-        summaryText +=
-            'Takt ' + bar.index + ': ' +
-            (bar.effectiveInstrument || '') + ', ' +
-            (bar.effectiveLabel || '') + ', Wiederholungsmarker = Start[' +
-            displayStartMarkers.join(', ') + '], Ende[' + displayEndMarkers.join(', ') + ']\n' +
-            'Steuerung [' + (bar.index - 1) + '] = [' + controlSummary + ']\n' +
-            'Schlaege [' + (bar.index - 1) + '] = [' + bar.notes.join(',') + ']\n';
+        summaryText += uiText('score.readout.bar', {
+            bar: bar.index,
+            instrument: getChooserDisplayText(bar.effectiveInstrument || '', 'instrument'),
+            label: getChooserDisplayText(bar.effectiveLabel || '', 'function'),
+            start: displayStartMarkers.join(', '),
+            end: displayEndMarkers.join(', ')
+        }) + '\n' +
+            uiText('score.readout.controls', {
+                index: bar.index - 1,
+                controls: controlSummary
+            }) + '\n' +
+            uiText('score.readout.notes', {
+                index: bar.index - 1,
+                notes: bar.notes.join(',')
+            }) + '\n';
     });
     return summaryText;
 }
 
 function buildRepeatRangeSummary(repeatRanges) {
     if (repeatRanges.length === 0) {
-        return 'Wiederholungsbereiche: keine\n';
+        return uiText('score.readout.repeatRangesNone');
     }
 
-    let rangeSummaryText = 'Wiederholungsbereiche:\n';
+    let rangeSummaryText = uiText('score.readout.repeatRangesTitle');
     repeatRanges.forEach(function (repeatRange, rangeIndex) {
-        rangeSummaryText +=
-            (rangeIndex + 1) + '. Takt ' + repeatRange.startBar + '-' + repeatRange.endBar +
-            (repeatRange.count === 'loop' ? ' bis Stop' : ' x ' + repeatRange.count) + '\n';
+        rangeSummaryText += uiText('score.readout.repeatRange', {
+            index: rangeIndex + 1,
+            start: repeatRange.startBar,
+            end: repeatRange.endBar,
+            count: repeatRange.count === 'loop'
+                ? uiText('score.readout.repeatUntilStop')
+                : uiText('score.readout.repeatCount', { count: repeatRange.count })
+        });
     });
     return rangeSummaryText;
 }
@@ -6124,7 +6156,7 @@ function updateMobilePracticeModeAvailability() {
             ? mobilePracticeViewport
             : mobileReadOnlyViewport;
         if (buttonEl.disabled) {
-            buttonEl.title = 'Auf Smartphones ist nur Üben/Abspielen aktiv.';
+            buttonEl.title = uiText('editor.mobilePracticeOnly');
         } else {
             buttonEl.removeAttribute('title');
         }
@@ -6196,7 +6228,7 @@ function openMobileArrangementPlayer() {
     try {
         const playerPayload = getCurrentTimelineArrangementPayload();
         if (!playerPayload) {
-            alert('Für dieses Notenblatt ist noch kein spielbares Arrangement vorhanden.');
+            alert(uiText('arrangement.error.noPlayableArrangement'));
             updateMobileArrangementButtonVisibility();
             return;
         }
@@ -6218,7 +6250,7 @@ function openMobileArrangementPlayer() {
         openAudioTestFrame(playerPayload, frameEl.name || 'mobileArrangementAudioFrame');
     } catch (error) {
         console.error('Mobiler Arrangement-Player konnte nicht gestartet werden', error);
-        alert('Fehler beim Starten des Arrangements: ' + error.message);
+        alert(uiText('arrangement.error.start', { message: error.message || '' }));
     }
 }
 
@@ -6587,21 +6619,21 @@ const mobileSheetEditorState = {
 };
 
 const mobileSheetEditorTools = [
-    { id: 'tone', label: 'Tone' },
-    { id: 'bass', label: 'Bass' },
-    { id: 'slap', label: 'Slap oder Glocke' },
-    { id: 'tone_muffled', label: 'Gedämpfter Tone' },
-    { id: 'slap_muffled', label: 'Gedämpfter Slap oder Klick' },
-    { id: 'tone_flam', label: 'Flam mit Tones' },
-    { id: 'slap_flam', label: 'Flam mit Slaps' },
-    { id: 'bass_slap_flam', label: 'Flam mit Bass und Slap' },
+    { id: 'tone', labelKey: 'score.note.tone' },
+    { id: 'bass', labelKey: 'score.note.bass' },
+    { id: 'slap', labelKey: 'score.note.slapOrBell' },
+    { id: 'tone_muffled', labelKey: 'score.note.muffledTone' },
+    { id: 'slap_muffled', labelKey: 'score.note.muffledSlapOrClick' },
+    { id: 'tone_flam', labelKey: 'score.note.toneFlam' },
+    { id: 'slap_flam', labelKey: 'score.note.slapFlam' },
+    { id: 'bass_slap_flam', labelKey: 'score.note.bassSlapFlam' },
     { id: 'in', label: 'In' },
     { id: 'out', label: 'Out' },
     { id: 'shortbar', label: 'ShortBar' },
-    { id: 'wiederholung', label: 'Wiederholung' },
-    { id: 'tuplet', label: 'Triole oder Quartole' },
+    { id: 'wiederholung', labelKey: 'score.legend.repeat' },
+    { id: 'tuplet', labelKey: 'score.tuplet.tripletOrQuartuplet' },
     { id: 'edit_text', labelKey: 'editor.insertTextField' },
-    { id: 'chooser', label: 'Instrument und Funktion einsetzen' },
+    { id: 'chooser', labelKey: 'editor.insertInstrumentAndFunction' },
     { id: 'select', labelKey: 'editor.selectNotes' },
     { id: 'duplicate', labelKey: 'editor.duplicateSelection' },
     { id: 'delete', labelKey: 'editor.deleteElement' }
@@ -6808,8 +6840,8 @@ function updateMobileSheetEditorPaletteState() {
     });
     document.querySelectorAll('.mobile-sheet-chooser-target').forEach(function (targetEl) {
         targetEl.textContent = isChooserMoveActive
-            ? 'Chooser hierher verschieben'
-            : 'Instrument und Funktion hier einsetzen';
+            ? uiText('editor.moveChooserHere')
+            : uiText('editor.insertInstrumentAndFunction');
     });
     document.querySelectorAll('.mobile-sheet-editor-tool').forEach(function (buttonEl) {
         const isActive = buttonEl.dataset.toolId === mobileSheetEditorState.activeTool;
@@ -7130,10 +7162,9 @@ function getMobileSheetStepFromPointer(svgEl, clientX) {
 }
 
 function getMobileSheetChooserText(chooserElement) {
-    const textNode = chooserElement && typeof chooserElement.select === 'function'
-        ? chooserElement.select('text')
-        : null;
-    return textNode ? String(textNode.attr('text') || '').trim() : '';
+    return chooserElement && typeof getChooserInternalValue === 'function'
+        ? String(getChooserInternalValue(chooserElement) || '').trim()
+        : '';
 }
 
 function isMobileSheetChooserPlaceholder(chooserElement, placeholderText) {
@@ -7337,16 +7368,17 @@ async function setMobileSheetBarChooserValue(sourceBarIndex, chooserType, rawVal
     if (chooserType === 'label' && (nextValue === 'Solo' || nextValue === 'Begleitpattern')) {
         const currentChooser = chooserByType.label;
         const currentTextNode = currentChooser ? currentChooser.select('text') : null;
-        const promptText = 'Bezeichnung für "' + nextValue + '" anpassen.\n' +
-            'Zum Beispiel: "Solo 1", "1. Solo", "Begleitpattern 2".';
+        const promptText = uiText('chooser.dialog.customizeLabel', {
+            name: getChooserDisplayText(nextValue, 'function')
+        });
         const configuredValue = await requestChooserLabel(
-            getChooserLabelSeed(nextValue, currentTextNode),
+            getChooserDisplayText(getChooserLabelSeed(nextValue, currentTextNode), 'function'),
             promptText
         );
         if (configuredValue == null) {
             return false;
         }
-        nextValue = configuredValue;
+        nextValue = normalizeChooserInternalText(configuredValue, 'function');
     }
 
     recordHistorySnapshot();
@@ -7392,13 +7424,13 @@ function createMobileSheetChooserSelect(sourceBarIndex, chooserType, currentValu
     if (selectedValue && options.indexOf(selectedValue) === -1) {
         const currentOptionEl = document.createElement('option');
         currentOptionEl.value = selectedValue;
-        currentOptionEl.textContent = selectedValue;
+        currentOptionEl.textContent = getChooserDisplayText(selectedValue, chooserType);
         selectEl.appendChild(currentOptionEl);
     }
     options.forEach(function (optionValue) {
         const optionEl = document.createElement('option');
         optionEl.value = optionValue;
-        optionEl.textContent = optionValue;
+        optionEl.textContent = getChooserDisplayText(optionValue, chooserType);
         selectEl.appendChild(optionEl);
     });
     selectEl.value = selectedValue || 'Leer';
@@ -7703,6 +7735,8 @@ function createMobileSheetBarElement(bar, barIndex, previousBar, nextBar) {
     titleEl.className = 'mobile-sheet-bar-title';
     const instrumentText = bar.effectiveInstrument || bar.instrument || 'Leer';
     const labelText = bar.effectiveLabel || bar.label || '';
+    const displayInstrumentText = getChooserDisplayText(instrumentText, 'instrument');
+    const displayLabelText = getChooserDisplayText(labelText, 'function');
     const isContinuationBar = previousBar &&
         !bar.instrument &&
         !bar.label &&
@@ -7727,7 +7761,7 @@ function createMobileSheetBarElement(bar, barIndex, previousBar, nextBar) {
     }
     titleEl.textContent = isContinuationBar
         ? ''
-        : (instrumentText + (labelText ? ' / ' + labelText : ''));
+        : (displayInstrumentText + (displayLabelText ? ' / ' + displayLabelText : ''));
     if (
         titleEl.textContent ||
         isLandscapeEditor ||
@@ -7741,7 +7775,7 @@ function createMobileSheetBarElement(bar, barIndex, previousBar, nextBar) {
             selectButtonEl.className = 'mobile-sheet-pattern-toggle';
             selectButtonEl.dataset.patternId = quickPlayPatternId;
             selectButtonEl.setAttribute('aria-label', uiText('editor.selectNamedPattern', {
-                name: titleEl.textContent || 'Pattern'
+                name: titleEl.textContent || uiText('score.patternFallback')
             }));
             selectButtonEl.setAttribute('aria-pressed', 'false');
             selectButtonEl.addEventListener('click', function () {
@@ -7793,8 +7827,10 @@ function createMobileSheetBarElement(bar, barIndex, previousBar, nextBar) {
             moveChooserButtonEl.type = 'button';
             moveChooserButtonEl.className = 'mobile-sheet-chooser-action';
             moveChooserButtonEl.textContent = '↕';
-            moveChooserButtonEl.title = 'Chooser verschieben';
-            moveChooserButtonEl.setAttribute('aria-label', 'Chooser aus Takt ' + sourceBarIndex + ' verschieben');
+            moveChooserButtonEl.title = uiText('editor.moveChooser');
+            moveChooserButtonEl.setAttribute('aria-label', uiText('editor.moveChooserFromBar', {
+                bar: sourceBarIndex
+            }));
             moveChooserButtonEl.addEventListener('click', function (event) {
                 event.stopPropagation();
                 setMobileSheetChooserMoveSource(sourceBarIndex);
@@ -7803,8 +7839,10 @@ function createMobileSheetBarElement(bar, barIndex, previousBar, nextBar) {
             deleteChooserButtonEl.type = 'button';
             deleteChooserButtonEl.className = 'mobile-sheet-chooser-action';
             deleteChooserButtonEl.textContent = '×';
-            deleteChooserButtonEl.title = 'Chooser löschen';
-            deleteChooserButtonEl.setAttribute('aria-label', 'Chooser aus Takt ' + sourceBarIndex + ' löschen');
+            deleteChooserButtonEl.title = uiText('editor.deleteChooser');
+            deleteChooserButtonEl.setAttribute('aria-label', uiText('editor.deleteChooserFromBar', {
+                bar: sourceBarIndex
+            }));
             deleteChooserButtonEl.addEventListener('click', function (event) {
                 event.stopPropagation();
                 deleteMobileSheetBarChoosers(sourceBarIndex);
@@ -7816,7 +7854,7 @@ function createMobileSheetBarElement(bar, barIndex, previousBar, nextBar) {
             const chooserTargetEl = document.createElement('button');
             chooserTargetEl.type = 'button';
             chooserTargetEl.className = 'mobile-sheet-chooser-target';
-            chooserTargetEl.textContent = 'Instrument und Funktion hier einsetzen';
+            chooserTargetEl.textContent = uiText('editor.insertInstrumentAndFunction');
             chooserTargetEl.setAttribute('aria-label', uiText('editor.insertChooserInBar', {
                 bar: sourceBarIndex
             }));
@@ -7843,7 +7881,7 @@ function createMobileSheetBarElement(bar, barIndex, previousBar, nextBar) {
                 commentInputEl.type = 'text';
                 commentInputEl.className = 'mobile-sheet-bar-comment-input';
                 commentInputEl.value = textEntry.text;
-                commentInputEl.setAttribute('aria-label', 'Kommentar in Takt ' + sourceBarIndex);
+                commentInputEl.setAttribute('aria-label', uiText('editor.barComment', { bar: sourceBarIndex }));
                 commentInputEl.autocomplete = 'off';
                 commentInputEl.spellcheck = false;
                 let commentHistoryRecorded = false;
@@ -8259,8 +8297,8 @@ function renderMobileSheetView(readResult) {
         subtitleInputEl.type = 'text';
         subtitleInputEl.className = 'mobile-sheet-comment-input';
         subtitleInputEl.value = subtitle;
-        subtitleInputEl.placeholder = 'Kommentar zum Rhythmus';
-        subtitleInputEl.setAttribute('aria-label', 'Kommentar zum Rhythmus');
+        subtitleInputEl.placeholder = uiText('editor.rhythmComment');
+        subtitleInputEl.setAttribute('aria-label', uiText('editor.rhythmComment'));
         subtitleInputEl.autocomplete = 'off';
         subtitleInputEl.spellcheck = false;
         let subtitleElement = subtitleEntry ? subtitleEntry.element : null;
@@ -8857,7 +8895,7 @@ function showAutoDismissMessage(message, durationMs) {
 async function saveCurrentScoreLocal(nameOverride, folderIdOverride, options) {
     const saveOptions = options || {};
     const serializedRhythm = buildSerializedRhythm();
-    const name = (nameOverride || titel.attr('text') || 'Unbenannt').trim();
+    const name = (nameOverride || titel.attr('text') || uiText('editor.untitled')).trim();
     const scoreId = saveOptions.asCopy ? null : currentScoreId;
     const existingScore = scoreId ? await localLibrary.getScore(scoreId) : null;
     const folderId = folderIdOverride ||
@@ -9049,7 +9087,7 @@ function applyDialogNameToTitle() {
     if (nameValue) {
         setRhythmTitle(nameValue);
     }
-    return nameValue || titel.attr('text') || 'Unbenannt';
+    return nameValue || titel.attr('text') || uiText('editor.untitled');
 }
 
 async function openLocalScore(scoreId) {
@@ -9723,7 +9761,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         } catch (error) {
             console.error('Timeline konnte nicht aktualisiert werden', error);
-            alert('Fehler beim Aufbau der Timeline: ' + error.message);
+            alert(uiText('arrangement.error.build', { message: error.message || '' }));
         }
     });
     document.querySelector('#sheetQuickPlayButton').addEventListener('click', function () {
@@ -10050,7 +10088,7 @@ document.addEventListener('DOMContentLoaded', function () {
             scheduleTimelineAudioRefresh(0);
         } catch (error) {
             console.error('Timeline-Refresh fehlgeschlagen', error);
-            alert('Fehler beim Aktualisieren der Timeline: ' + error.message);
+            alert(uiText('arrangement.error.refresh', { message: error.message || '' }));
         }
     });
     document.querySelector('#timelineCloseButton').addEventListener('click', function () {

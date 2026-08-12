@@ -196,7 +196,9 @@
       "playSelected": "Ausgewählte Pattern abspielen",
       "stop": "Sofort-Spielen stoppen",
       "loadingSounds": "Sounds werden geladen",
-      "selectPattern": "Bitte zuerst ein Pattern im Notenblatt auswählen."
+      "selectPattern": "Bitte zuerst ein Pattern im Notenblatt auswählen.",
+      "preview": "Vorhören",
+      "pickupLabel": "{name} Auftakt"
     },
     "defaultScoreTitle": "Notenblatt",
     "editTextPrompt": "Gib hier bitte den gewünschten Text ein!",
@@ -216,7 +218,70 @@
     "movePatternBackward": "Pattern nach hinten verschieben",
     "moveWholePatternUp": "Ganzes Pattern nach oben verschieben",
     "moveWholePatternDown": "Ganzes Pattern nach unten verschieben",
-    "defaultExportName": "Notenblatt"
+    "defaultExportName": "Notenblatt",
+    "untitled": "Unbenannt",
+    "mobilePracticeOnly": "Auf Smartphones ist nur Üben/Abspielen aktiv.",
+    "moveChooser": "Chooser verschieben",
+    "moveChooserFromBar": "Chooser aus Takt {bar} verschieben",
+    "deleteChooser": "Chooser löschen",
+    "deleteChooserFromBar": "Chooser aus Takt {bar} löschen",
+    "moveChooserHere": "Chooser hierher verschieben",
+    "barComment": "Kommentar in Takt {bar}",
+    "rhythmComment": "Kommentar zum Rhythmus"
+  },
+  "chooser": {
+    "placeholder": {
+      "function": "Funktion"
+    },
+    "function": {
+      "accompanimentPattern": "Begleitpattern"
+    },
+    "dialog": {
+      "confirm": "OK",
+      "customizeLabel": "Bezeichnung für \"{name}\" anpassen.\nZum Beispiel: \"Solo 1\", \"1. Solo\", \"Begleitpattern 2\"."
+    }
+  },
+  "score": {
+    "pageNumber": "{current}/{total}",
+    "patternFallback": "Pattern",
+    "tuplet": {
+      "triplet": "Triole",
+      "quartuplet": "Quartole",
+      "insertTitle": "{name} einfügen",
+      "noteNumber": "Ton {number}",
+      "tripletOrQuartuplet": "Triole oder Quartole"
+    },
+    "note": {
+      "tone": "Tone",
+      "bass": "Bass",
+      "slapOrBell": "Slap oder Glocke",
+      "slapSlashBell": "Slap / Glocke",
+      "muffledTone": "Gedämpfter Tone",
+      "muffledSlapOrClick": "Gedämpfter Slap oder Klick",
+      "muffledSlapSlashClick": "Gedämpfter Slap / Klick",
+      "toneFlam": "Flam mit Tones",
+      "slapFlam": "Flam mit Slaps",
+      "bassSlapFlam": "Flam mit Bass und Slap",
+      "bassSlapFlamPlural": "Flam mit Bass und Slaps"
+    },
+    "legend": {
+      "repeat": "Wiederholung"
+    },
+    "readout": {
+      "binary": "binär",
+      "ternary": "tenär",
+      "nineEight": "tenär 9/8",
+      "untilStop": "bis Stop",
+      "none": "keine",
+      "bar": "Takt {bar}: {instrument}, {label}, Wiederholungsmarker = Start[{start}], Ende[{end}]",
+      "controls": "Steuerung [{index}] = [{controls}]",
+      "notes": "Schläge [{index}] = [{notes}]",
+      "repeatRangesNone": "Wiederholungsbereiche: keine\n",
+      "repeatRangesTitle": "Wiederholungsbereiche:\n",
+      "repeatRange": "{index}. Takt {start}-{end}{count}\n",
+      "repeatCount": " x {count}",
+      "repeatUntilStop": " bis Stop"
+    }
   },
   "practice": {
     "title": "Übungsmodus",
@@ -371,6 +436,125 @@
       "sequenceEmpty": "Aus den Übungseinstellungen konnte keine Abspielfolge erzeugt werden.",
       "build": "Fehler beim Aufbau des Übungsmodus: {message}",
       "refresh": "Fehler beim Aktualisieren des Übungsmodus: {message}"
+    }
+  },
+  "arrangement": {
+    "title": "Arrangement",
+    "mobilePlay": "Arrangement abspielen",
+    "mobileAudioFrameTitle": "Audioplayer Arrangement mobil",
+    "audioFrameTitle": "Audioplayer Arrangement",
+    "tempo": "Tempo",
+    "swingProfile": "Swing-Profil",
+    "swingProfileMeter": "Swing-Profil {meter}",
+    "feel": "Feel",
+    "volume": "Lautstärke",
+    "shekereBeat": "Shekere Beat",
+    "refreshFromScore": "Aus Blatt aktualisieren",
+    "patternLibrary": "Pattern-Bibliothek",
+    "patternLibraryNote": "Jede Passage aus dem Notenblatt erscheint hier einmal. Ziehen oder über + ans Ende der Timeline anfügen.",
+    "timelineTitle": "Timeline",
+    "timelineNote": "Die Timeline bestimmt die Wiedergabereihenfolge. Djembe-Zuordnung passiert hier.",
+    "pattern": "Pattern",
+    "passage": "Passage",
+    "settings": "Einstellungen",
+    "repeatShort": "Wdh.",
+    "mixed": "gemischt",
+    "handMode": "Handsatz",
+    "handModeAutomatic": "Auto",
+    "instrumentLabel": "Instrument: {instrument}",
+    "addPatternAtEnd": "Pattern am Ende der Timeline hinzufügen",
+    "removePattern": "Pattern entfernen",
+    "collapsePattern": "Ansicht zuklappen",
+    "removeSolo": "Solo aus Zelle entfernen",
+    "moveSectionUp": "Abschnitt nach oben verschieben",
+    "moveSectionDown": "Abschnitt nach unten verschieben",
+    "continues": "läuft weiter",
+    "soloForRepeat": "Solo für Wiederholung {count}",
+    "bar": "Takt {number}",
+    "barContinues": "Takt {number} weiterlaufend",
+    "barRepeated": "Takt {number} {count}x",
+    "barWithCount": "Takt {number} ({bars})",
+    "summaryRepeat": "{label} | Wiederholung x{count}",
+    "barCount": {
+      "one": "{count} Takt",
+      "other": "{count} Takte"
+    },
+    "drop": {
+      "append": "Pattern hier ablegen",
+      "insert": "Hier einfügen",
+      "parallel": "Parallel hier"
+    },
+    "type": {
+      "accompaniment": "Begleitung",
+      "call": "Call",
+      "intro": "Intro",
+      "outro": "Outro",
+      "warmup": "Echauffement",
+      "solo": "Solo",
+      "pause": "Pause",
+      "empty": "Leer"
+    },
+    "instrument": {
+      "generic": "Instrument",
+      "kenkeni": "Kenkeni",
+      "sangban": "Sangban",
+      "doundoun": "Doundoun",
+      "threeBass": "Dreierbass",
+      "djembe": "Djembe",
+      "djembe1": "Djembe 1",
+      "djembe2": "Djembe 2",
+      "djembe3": "Djembe 3",
+      "basses": "Bässe"
+    },
+    "untitledRhythm": "Unbenannter Rhythmus",
+    "error": {
+      "noPlayableArrangement": "Für dieses Notenblatt ist noch kein spielbares Arrangement vorhanden.",
+      "start": "Fehler beim Starten des Arrangements: {message}",
+      "build": "Fehler beim Aufbau der Timeline: {message}",
+      "refresh": "Fehler beim Aktualisieren der Timeline: {message}"
+    }
+  },
+  "player": {
+    "title": "BaraBeat Player",
+    "description": "BaraBeat Audioplayer",
+    "controls": {
+      "voice": "Stimme",
+      "allVoices": "Alle",
+      "playStop": "Wiedergabe starten oder stoppen",
+      "quickPlayStop": "Ausgewählte Pattern abspielen oder stoppen"
+    },
+    "instrument": {
+      "kenkeni": "Kenkeni",
+      "sangban": "Sangban",
+      "doundoun": "Doundoun",
+      "threeBass": "Dreierbass",
+      "djembe1": "Djembe 1",
+      "djembe2": "Djembe 2",
+      "djembe3": "Djembe 3"
+    },
+    "loading": {
+      "initial": "Wird geladen ...",
+      "audioFiles": "Audiodateien werden geladen ...",
+      "audioFilesPending": "Audiodateien werden noch geladen ..."
+    },
+    "status": {
+      "starting": "Player startet ..."
+    },
+    "export": {
+      "button": "WAV exportieren",
+      "rendering": "WAV ..."
+    },
+    "error": {
+      "player": "Player-Fehler: {message}",
+      "unknown": "Unbekannter Fehler",
+      "loading": "Ladefehler: {message}",
+      "audioStart": "Audio konnte nicht gestartet werden.",
+      "export": "Exportfehler: {message}",
+      "tooManyExpandedBars": "Zu viele expandierte Takte durch Wiederholungen.",
+      "audioFileLoad": "Audiodatei konnte nicht geladen werden: {path} -> {url} (HTTP {status})",
+      "audioFileInvalid": "Audiodatei liefert keine Audiodaten: {path} -> {url} ({contentType})",
+      "audioFileDecode": "Audiodatei konnte nicht dekodiert werden: {path} -> {url} ({contentType}) - {message}",
+      "noContentType": "kein Content-Type"
     }
   },
   "offline": {
