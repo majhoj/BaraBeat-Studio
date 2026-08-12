@@ -173,6 +173,7 @@ function notifyEmbeddedTempoChange(nextTempo) {
   }
   window.parent.postMessage({
     type: 'barabeat-audio-tempo-change',
+    launchKey: playerLaunchKey,
     tempo: nextTempo
   }, window.location.origin);
 }
@@ -183,6 +184,7 @@ function notifyEmbeddedPlaybackState(nextState, extraData) {
   }
   window.parent.postMessage(Object.assign({
     type: 'barabeat-audio-state',
+    launchKey: playerLaunchKey,
     state: nextState
   }, extraData || {}), window.location.origin);
 }
@@ -194,6 +196,7 @@ function notifyEmbeddedPlaybackStep(playbackStep, scheduledTime) {
   const sectionContext = getPlaybackSectionContext(playbackStep);
   window.parent.postMessage({
     type: 'barabeat-audio-step',
+    launchKey: playerLaunchKey,
     playbackStep: playbackStep,
     runtimeKey: sectionContext && sectionContext.section
       ? String(sectionContext.section.runtimeKey || '')
@@ -454,6 +457,12 @@ Promise.all(allInstrumentReadyPromises.concat([practiceCountInReadyPromise]))
     }
     if (isSheetQuickPlayMode) {
       notifyEmbeddedPlaybackState('ready');
+    } else if (isPracticeMode) {
+      const startTiming = getPracticePlaybackStartTiming();
+      notifyEmbeddedPlaybackState('ready', {
+        leadInMs: Math.max(0, startTiming.playbackLeadInSeconds * 1000),
+        countInMs: Math.max(0, startTiming.countInDuration * 1000)
+      });
     }
   })
   .catch(function (error) {
@@ -822,6 +831,7 @@ function createOrderedSection(label) {
     continuingAccompaniments: {},
     practiceTargetInstruments: [],
     isLeadIn: false,
+    overlapsPracticeCountIn: false,
     repeatCount: 1,
     playbackLength: 0,
     length: 0,
@@ -2615,6 +2625,7 @@ function buildConfiguredPracticeSections(config) {
     const section = createOrderedSection(configuredSection && configuredSection.label ? configuredSection.label : 'Begleitung');
     section.repeatCount = normalizeSectionRepeatCount(configuredSection && configuredSection.repeatCount);
     section.isLeadIn = Boolean(configuredSection && configuredSection.isLeadIn);
+    section.overlapsPracticeCountIn = Boolean(configuredSection && configuredSection.overlapsPracticeCountIn);
     section.fixedLength = Math.max(0, Math.round(Number(configuredSection && configuredSection.fixedLength) || 0));
     section.labelName = configuredSection && configuredSection.labelName ? configuredSection.labelName : section.label;
     section.runtimeKey = configuredSection && configuredSection.runtimeKey
@@ -3283,6 +3294,39 @@ function getPracticeCountInDuration() {
   return isPracticeMode && !isSheetQuickPlayMode && practiceCountInBuffer
     ? getPracticeCountInBeatDuration() * practiceCountInBeats
     : 0;
+}
+
+function getPracticeCountInOverlapDuration() {
+  if (!isPracticeMode || !Array.isArray(orderedSections) || orderedSections.length === 0) {
+    return 0;
+  }
+
+  const firstSection = orderedSections[0];
+  if (!firstSection || !firstSection.overlapsPracticeCountIn) {
+    return 0;
+  }
+
+  const overlapSteps = Math.max(0, Number(firstSection.playbackLength || firstSection.length) || 0);
+  let overlapDuration = 0;
+  for (let stepIndex = 0; stepIndex < overlapSteps; stepIndex++) {
+    overlapDuration += getStepInterval(stepIndex, currentBaseTempo);
+  }
+  return Math.min(getPracticeCountInDuration(), overlapDuration);
+}
+
+function getPracticePlaybackStartTiming() {
+  const countInDuration = getPracticeCountInDuration();
+  const effectivePracticeLeadInDelay = isPracticeMode
+    ? Math.max(practiceLeadInDelay, countInDuration)
+    : practiceLeadInDelay;
+  const regularLeadInSeconds = playerStartDelay + effectivePracticeLeadInDelay;
+  const countInOverlapDuration = getPracticeCountInOverlapDuration();
+
+  return {
+    countInDuration: countInDuration,
+    regularLeadInSeconds: regularLeadInSeconds,
+    playbackLeadInSeconds: Math.max(0, regularLeadInSeconds - countInOverlapDuration)
+  };
 }
 
 function schedulePracticeCountIn(firstPlaybackTime) {
@@ -4854,11 +4898,10 @@ async function startAudioPlayback() {
   resetDjembeHandStates();
 
   const dTime = instr._audioCtx.currentTime;
-  const effectivePracticeLeadInDelay = isPracticeMode
-    ? Math.max(practiceLeadInDelay, getPracticeCountInDuration())
-    : practiceLeadInDelay;
-  nextNoteTime = dTime + playerStartDelay + effectivePracticeLeadInDelay;
-  schedulePracticeCountIn(nextNoteTime);
+  const startTiming = getPracticePlaybackStartTiming();
+  const regularPlaybackStartTime = dTime + startTiming.regularLeadInSeconds;
+  nextNoteTime = dTime + startTiming.playbackLeadInSeconds;
+  schedulePracticeCountIn(regularPlaybackStartTime);
   practiceStopAudioTime = practiceDurationSeconds > 0
     ? nextNoteTime + practiceDurationSeconds
     : 0;
@@ -4866,7 +4909,8 @@ async function startAudioPlayback() {
 
   playButton.dataset.playing = 'true';
   notifyEmbeddedPlaybackState('playing', {
-    leadInMs: Math.max(0, (playerStartDelay + effectivePracticeLeadInDelay) * 1000)
+    leadInMs: Math.max(0, startTiming.playbackLeadInSeconds * 1000),
+    countInMs: Math.max(0, startTiming.countInDuration * 1000)
   });
   if (!usesSheetQuickPlayExternalScheduler) {
     scheduler();

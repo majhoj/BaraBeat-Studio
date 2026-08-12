@@ -151,8 +151,8 @@ $activeLanguage = barabeat_language();
             </div>
         </details>
         <button type="button" id="mobileArrangementPlayerButton" class="mobile-menu-action" hidden>Arrangement abspielen</button>
-        <button type="button" id="mobilePatternChooserButton" class="mobile-menu-action" hidden>Patternauswahl öffnen</button>
-        <button type="button" id="mobileBluetoothLatencyButton" class="mobile-menu-action" hidden aria-label="Bluetooth-Latenz einstellen">Latenz</button>
+        <button type="button" id="mobilePatternChooserButton" class="mobile-menu-action" hidden data-i18n="practice.patternSelectionOpen"><?php echo htmlspecialchars(barabeat_t('practice.patternSelectionOpen'), ENT_QUOTES, 'UTF-8'); ?></button>
+        <button type="button" id="mobileBluetoothLatencyButton" class="mobile-menu-action" hidden aria-label="<?php echo htmlspecialchars(barabeat_t('practice.dialog.bluetoothLatency'), ENT_QUOTES, 'UTF-8'); ?>" data-i18n="practice.controls.mobileLatency" data-i18n-aria-label="practice.dialog.bluetoothLatency"><?php echo htmlspecialchars(barabeat_t('practice.controls.mobileLatency'), ENT_QUOTES, 'UTF-8'); ?></button>
         <form action="" name="uploadForm" class="hidden-upload-form">
             <input type="hidden" size="40" id="iofield" name="iofield" />
         </form>
@@ -307,143 +307,143 @@ $activeLanguage = barabeat_language();
     <div id="practicePanel" hidden>
         <div class="timeline-panel-header practice-panel-header">
             <div class="practice-header-main">
-                <div id="practiceTitle" class="timeline-panel-title practice-panel-title">Übungsmodus</div>
+                <div id="practiceTitle" class="timeline-panel-title practice-panel-title" data-i18n="practice.title"><?php echo htmlspecialchars(barabeat_t('practice.title'), ENT_QUOTES, 'UTF-8'); ?></div>
                 <label class="practice-header-scenario" for="practiceScenarioHeaderSelect">
-                    <span>Szenario</span>
+                    <span data-i18n="practice.scenario.label"><?php echo htmlspecialchars(barabeat_t('practice.scenario.label'), ENT_QUOTES, 'UTF-8'); ?></span>
                     <select id="practiceScenarioHeaderSelect">
-                        <option value="">Aktuelle Einstellungen</option>
+                        <option value="" data-i18n="practice.scenario.current"><?php echo htmlspecialchars(barabeat_t('practice.scenario.current'), ENT_QUOTES, 'UTF-8'); ?></option>
                     </select>
                 </label>
             </div>
             <div class="timeline-panel-actions">
                 <button type="button" id="practicePatternChooserToggle" aria-expanded="false" aria-controls="practicePatternChooser">
-                    Patternauswahl öffnen
+                    <?php echo htmlspecialchars(barabeat_t('practice.patternSelectionOpen'), ENT_QUOTES, 'UTF-8'); ?>
                 </button>
-                <button type="button" id="practiceCloseButton">Schließen</button>
+                <button type="button" id="practiceCloseButton" data-i18n="common.close"><?php echo htmlspecialchars(barabeat_t('common.close'), ENT_QUOTES, 'UTF-8'); ?></button>
             </div>
         </div>
         <div id="practicePatternChooser" class="timeline-panel-body practice-panel-body" hidden>
             <section class="practice-settings-column is-collapsed">
                 <h3 class="practice-column-heading practice-options-title">
                     <button type="button" class="practice-column-toggle" aria-expanded="false" aria-controls="practiceSettingsContent">
-                        Einstellungen
+                        <span data-i18n="practice.settings"><?php echo htmlspecialchars(barabeat_t('practice.settings'), ENT_QUOTES, 'UTF-8'); ?></span>
                     </button>
                 </h3>
                 <div id="practiceSettingsContent" class="practice-column-content">
                     <div class="practice-scenario-options">
                         <label class="timeline-tempo-control" for="practiceScenarioSelect">
-                            Übungsszenario
+                            <span data-i18n="practice.scenario.practiceLabel"><?php echo htmlspecialchars(barabeat_t('practice.scenario.practiceLabel'), ENT_QUOTES, 'UTF-8'); ?></span>
                             <select id="practiceScenarioSelect">
-                                <option value="">Aktuelle Einstellungen</option>
+                                <option value="" data-i18n="practice.scenario.current"><?php echo htmlspecialchars(barabeat_t('practice.scenario.current'), ENT_QUOTES, 'UTF-8'); ?></option>
                             </select>
                         </label>
-                        <button type="button" id="practiceScenarioSaveButton">Speichern</button>
-                        <button type="button" id="practiceScenarioNewButton">Neu</button>
-                        <button type="button" id="practiceScenarioDeleteButton">Löschen</button>
+                        <button type="button" id="practiceScenarioSaveButton" data-i18n="practice.scenario.save"><?php echo htmlspecialchars(barabeat_t('practice.scenario.save'), ENT_QUOTES, 'UTF-8'); ?></button>
+                        <button type="button" id="practiceScenarioNewButton" data-i18n="practice.scenario.new"><?php echo htmlspecialchars(barabeat_t('practice.scenario.new'), ENT_QUOTES, 'UTF-8'); ?></button>
+                        <button type="button" id="practiceScenarioDeleteButton" data-i18n="practice.scenario.delete"><?php echo htmlspecialchars(barabeat_t('practice.scenario.delete'), ENT_QUOTES, 'UTF-8'); ?></button>
                     </div>
                     <div class="practice-timing-options">
                         <label class="timeline-tempo-control" for="practiceTempo">
-                            Tempo
+                            <span data-i18n="practice.controls.tempo"><?php echo htmlspecialchars(barabeat_t('practice.controls.tempo'), ENT_QUOTES, 'UTF-8'); ?></span>
                             <input type="number" id="practiceTempo" min="30" max="180" step="1" value="100" />
                         </label>
-                        <button type="button" id="practiceSwingProfileButton">Swing-Profil</button>
-                        <button type="button" id="practiceFeelProfileButton">Feel</button>
-                        <button type="button" id="practiceTempoRampButton">Tempoaufbau</button>
-                        <button type="button" id="practiceVolumeButton">Lautstärke</button>
-                        <button type="button" id="practiceShekereBeat" class="shekere-beat-toggle" aria-pressed="false">Shekere Beat</button>
+                        <button type="button" id="practiceSwingProfileButton" data-i18n="practice.controls.swingProfile"><?php echo htmlspecialchars(barabeat_t('practice.controls.swingProfile'), ENT_QUOTES, 'UTF-8'); ?></button>
+                        <button type="button" id="practiceFeelProfileButton" data-i18n="practice.controls.feel"><?php echo htmlspecialchars(barabeat_t('practice.controls.feel'), ENT_QUOTES, 'UTF-8'); ?></button>
+                        <button type="button" id="practiceTempoRampButton" data-i18n="practice.controls.tempoRamp"><?php echo htmlspecialchars(barabeat_t('practice.controls.tempoRamp'), ENT_QUOTES, 'UTF-8'); ?></button>
+                        <button type="button" id="practiceVolumeButton" data-i18n="practice.controls.volume"><?php echo htmlspecialchars(barabeat_t('practice.controls.volume'), ENT_QUOTES, 'UTF-8'); ?></button>
+                        <button type="button" id="practiceShekereBeat" class="shekere-beat-toggle" aria-pressed="false" data-i18n="practice.controls.shekereBeat"><?php echo htmlspecialchars(barabeat_t('practice.controls.shekereBeat'), ENT_QUOTES, 'UTF-8'); ?></button>
                     </div>
                     <div class="practice-pattern-options">
                         <label class="timeline-tempo-control" for="practiceAccompanimentStart">
-                            Begleitung startet
+                            <span data-i18n="practice.controls.accompanimentStarts"><?php echo htmlspecialchars(barabeat_t('practice.controls.accompanimentStarts'), ENT_QUOTES, 'UTF-8'); ?></span>
                             <select id="practiceAccompanimentStart">
-                                <option value="immediate">Sofort</option>
-                                <option value="afterCall">Nach Call</option>
-                                <option value="afterIntro">Nach Intro</option>
-                                <option value="afterCallIntro">Nach Call + Intro</option>
+                                <option value="immediate" data-i18n="practice.controls.startImmediate"><?php echo htmlspecialchars(barabeat_t('practice.controls.startImmediate'), ENT_QUOTES, 'UTF-8'); ?></option>
+                                <option value="afterCall" data-i18n="practice.controls.startAfterCall"><?php echo htmlspecialchars(barabeat_t('practice.controls.startAfterCall'), ENT_QUOTES, 'UTF-8'); ?></option>
+                                <option value="afterIntro" data-i18n="practice.controls.startAfterIntro"><?php echo htmlspecialchars(barabeat_t('practice.controls.startAfterIntro'), ENT_QUOTES, 'UTF-8'); ?></option>
+                                <option value="afterCallIntro" data-i18n="practice.controls.startAfterCallIntro"><?php echo htmlspecialchars(barabeat_t('practice.controls.startAfterCallIntro'), ENT_QUOTES, 'UTF-8'); ?></option>
                             </select>
                         </label>
                         <label class="timeline-tempo-control" for="practiceWithoutSoloLoops">
-                            Ohne Übungsteil
+                            <span data-i18n="practice.controls.withoutPracticePart"><?php echo htmlspecialchars(barabeat_t('practice.controls.withoutPracticePart'), ENT_QUOTES, 'UTF-8'); ?></span>
                             <span class="practice-stepper">
-                                <button type="button" class="practice-stepper-button" data-practice-step-target="practiceWithoutSoloLoops" data-practice-step-delta="-1" aria-label="Ohne Übungsteil verringern">-</button>
+                                <button type="button" class="practice-stepper-button" data-practice-step-target="practiceWithoutSoloLoops" data-practice-step-delta="-1" aria-label="<?php echo htmlspecialchars(barabeat_t('practice.controls.decreaseWithoutPracticePart'), ENT_QUOTES, 'UTF-8'); ?>" data-i18n-aria-label="practice.controls.decreaseWithoutPracticePart">-</button>
                                 <input type="number" id="practiceWithoutSoloLoops" min="0" max="32" step="1" value="1" />
-                                <button type="button" class="practice-stepper-button" data-practice-step-target="practiceWithoutSoloLoops" data-practice-step-delta="1" aria-label="Ohne Übungsteil erhöhen">+</button>
+                                <button type="button" class="practice-stepper-button" data-practice-step-target="practiceWithoutSoloLoops" data-practice-step-delta="1" aria-label="<?php echo htmlspecialchars(barabeat_t('practice.controls.increaseWithoutPracticePart'), ENT_QUOTES, 'UTF-8'); ?>" data-i18n-aria-label="practice.controls.increaseWithoutPracticePart">+</button>
                             </span>
                         </label>
                         <label class="timeline-tempo-control" for="practiceWithSoloLoops">
-                            Mit Übungsteil
+                            <span data-i18n="practice.controls.withPracticePart"><?php echo htmlspecialchars(barabeat_t('practice.controls.withPracticePart'), ENT_QUOTES, 'UTF-8'); ?></span>
                             <span class="practice-stepper">
-                                <button type="button" class="practice-stepper-button" data-practice-step-target="practiceWithSoloLoops" data-practice-step-delta="-1" aria-label="Mit Übungsteil verringern">-</button>
+                                <button type="button" class="practice-stepper-button" data-practice-step-target="practiceWithSoloLoops" data-practice-step-delta="-1" aria-label="<?php echo htmlspecialchars(barabeat_t('practice.controls.decreaseWithPracticePart'), ENT_QUOTES, 'UTF-8'); ?>" data-i18n-aria-label="practice.controls.decreaseWithPracticePart">-</button>
                                 <input type="number" id="practiceWithSoloLoops" min="1" max="32" step="1" value="1" />
-                                <button type="button" class="practice-stepper-button" data-practice-step-target="practiceWithSoloLoops" data-practice-step-delta="1" aria-label="Mit Übungsteil erhöhen">+</button>
+                                <button type="button" class="practice-stepper-button" data-practice-step-target="practiceWithSoloLoops" data-practice-step-delta="1" aria-label="<?php echo htmlspecialchars(barabeat_t('practice.controls.increaseWithPracticePart'), ENT_QUOTES, 'UTF-8'); ?>" data-i18n-aria-label="practice.controls.increaseWithPracticePart">+</button>
                             </span>
                         </label>
                         <label class="timeline-tempo-control" for="practiceAccompanimentBetweenPatterns">
-                            Zwischen Übungsteilen
+                            <span data-i18n="practice.controls.betweenPracticeParts"><?php echo htmlspecialchars(barabeat_t('practice.controls.betweenPracticeParts'), ENT_QUOTES, 'UTF-8'); ?></span>
                             <input type="checkbox" id="practiceAccompanimentBetweenPatterns" />
                         </label>
                         <label class="timeline-tempo-control" for="practicePauseAccompanimentForLeadInPatterns">
-                            Begleitung stoppt bei Call/Intro
+                            <span data-i18n="practice.controls.stopAccompanimentAtCallIntro"><?php echo htmlspecialchars(barabeat_t('practice.controls.stopAccompanimentAtCallIntro'), ENT_QUOTES, 'UTF-8'); ?></span>
                             <input type="checkbox" id="practicePauseAccompanimentForLeadInPatterns" />
                         </label>
                         <label class="timeline-tempo-control" for="practiceRepeatCount" id="practiceRepeatCountControl">
-                            Wiederholen
+                            <span data-i18n="practice.controls.repeat"><?php echo htmlspecialchars(barabeat_t('practice.controls.repeat'), ENT_QUOTES, 'UTF-8'); ?></span>
                             <span class="practice-stepper">
-                                <button type="button" class="practice-stepper-button" data-practice-step-target="practiceRepeatCount" data-practice-step-delta="-1" aria-label="Wiederholungen verringern">-</button>
+                                <button type="button" class="practice-stepper-button" data-practice-step-target="practiceRepeatCount" data-practice-step-delta="-1" aria-label="<?php echo htmlspecialchars(barabeat_t('practice.controls.decreaseRepeats'), ENT_QUOTES, 'UTF-8'); ?>" data-i18n-aria-label="practice.controls.decreaseRepeats">-</button>
                                 <input type="number" id="practiceRepeatCount" min="1" max="999" step="1" value="4" />
-                                <button type="button" class="practice-stepper-button" data-practice-step-target="practiceRepeatCount" data-practice-step-delta="1" aria-label="Wiederholungen erhöhen">+</button>
+                                <button type="button" class="practice-stepper-button" data-practice-step-target="practiceRepeatCount" data-practice-step-delta="1" aria-label="<?php echo htmlspecialchars(barabeat_t('practice.controls.increaseRepeats'), ENT_QUOTES, 'UTF-8'); ?>" data-i18n-aria-label="practice.controls.increaseRepeats">+</button>
                             </span>
                         </label>
                         <label class="timeline-tempo-control" for="practiceTimerMinutes">
-                            Timer min
+                            <span data-i18n="practice.controls.timerMinutes"><?php echo htmlspecialchars(barabeat_t('practice.controls.timerMinutes'), ENT_QUOTES, 'UTF-8'); ?></span>
                             <span class="practice-stepper">
-                                <button type="button" class="practice-stepper-button" data-practice-step-target="practiceTimerMinutes" data-practice-step-delta="-1" aria-label="Timer verringern">-</button>
+                                <button type="button" class="practice-stepper-button" data-practice-step-target="practiceTimerMinutes" data-practice-step-delta="-1" aria-label="<?php echo htmlspecialchars(barabeat_t('practice.controls.decreaseTimer'), ENT_QUOTES, 'UTF-8'); ?>" data-i18n-aria-label="practice.controls.decreaseTimer">-</button>
                                 <input type="number" id="practiceTimerMinutes" min="0" max="240" step="1" value="0" />
-                                <button type="button" class="practice-stepper-button" data-practice-step-target="practiceTimerMinutes" data-practice-step-delta="1" aria-label="Timer erhöhen">+</button>
+                                <button type="button" class="practice-stepper-button" data-practice-step-target="practiceTimerMinutes" data-practice-step-delta="1" aria-label="<?php echo htmlspecialchars(barabeat_t('practice.controls.increaseTimer'), ENT_QUOTES, 'UTF-8'); ?>" data-i18n-aria-label="practice.controls.increaseTimer">+</button>
                             </span>
                         </label>
                         <label class="timeline-tempo-control" for="practiceAudioLatency">
-                            Latenz für Bluetooth ms
+                            <span data-i18n="practice.controls.bluetoothLatencyMs"><?php echo htmlspecialchars(barabeat_t('practice.controls.bluetoothLatencyMs'), ENT_QUOTES, 'UTF-8'); ?></span>
                             <input type="range" id="practiceAudioLatencyRange" min="0" max="1000" step="10" value="30" />
                             <input type="number" id="practiceAudioLatency" min="0" max="1000" step="10" value="30" />
                         </label>
                         <label class="timeline-tempo-control" for="practiceH2HRestMute">
-                            H2H Leer = Mute
+                            <span data-i18n="practice.controls.h2hRestMute"><?php echo htmlspecialchars(barabeat_t('practice.controls.h2hRestMute'), ENT_QUOTES, 'UTF-8'); ?></span>
                             <input type="checkbox" id="practiceH2HRestMute" />
                         </label>
-                        <button type="button" id="practiceRefreshButton">Aus Blatt aktualisieren</button>
+                        <button type="button" id="practiceRefreshButton" data-i18n="practice.controls.refreshFromScore"><?php echo htmlspecialchars(barabeat_t('practice.controls.refreshFromScore'), ENT_QUOTES, 'UTF-8'); ?></button>
                     </div>
                 </div>
             </section>
             <section class="timeline-column practice-column practice-accompaniment-column is-collapsed">
                 <h3 class="practice-column-heading">
                     <button type="button" class="practice-column-toggle" aria-expanded="false" aria-controls="practiceAccompanimentListWrap">
-                        Begleitung auswählen
+                        <span data-i18n="practice.selection.accompaniment"><?php echo htmlspecialchars(barabeat_t('practice.selection.accompaniment'), ENT_QUOTES, 'UTF-8'); ?></span>
                     </button>
                 </h3>
                 <div id="practiceAccompanimentListWrap" class="practice-column-content">
-                    <p class="timeline-column-note">Diese Pattern laufen parallel als Loop.</p>
+                    <p class="timeline-column-note" data-i18n="practice.selection.accompanimentNote"><?php echo htmlspecialchars(barabeat_t('practice.selection.accompanimentNote'), ENT_QUOTES, 'UTF-8'); ?></p>
                     <div id="practiceAccompanimentList" class="timeline-pattern-list"></div>
                 </div>
             </section>
             <section class="timeline-column practice-column practice-solo-column is-collapsed">
                 <h3 class="practice-column-heading">
                     <button type="button" class="practice-column-toggle" aria-expanded="false" aria-controls="practiceSoloListWrap">
-                        Übungsteile auswählen
+                        <span data-i18n="practice.selection.practiceParts"><?php echo htmlspecialchars(barabeat_t('practice.selection.practiceParts'), ENT_QUOTES, 'UTF-8'); ?></span>
                     </button>
                 </h3>
                 <div id="practiceSoloListWrap" class="practice-column-content">
-                    <p class="timeline-column-note">Diese Pattern werden in fester Reihenfolge zugeschaltet.</p>
+                    <p class="timeline-column-note" data-i18n="practice.selection.practicePartsNote"><?php echo htmlspecialchars(barabeat_t('practice.selection.practicePartsNote'), ENT_QUOTES, 'UTF-8'); ?></p>
                     <div id="practiceSoloList" class="timeline-pattern-list"></div>
                 </div>
             </section>
         </div>
         <section class="practice-player-panel">
-            <iframe id="practiceAudioFrame" name="practiceAudioFrame" title="Audioplayer Übungsmodus" allow="autoplay"></iframe>
+            <iframe id="practiceAudioFrame" name="practiceAudioFrame" title="<?php echo htmlspecialchars(barabeat_t('practice.audioFrameTitle'), ENT_QUOTES, 'UTF-8'); ?>" data-i18n-title="practice.audioFrameTitle" allow="autoplay"></iframe>
             <div id="practiceScroller" class="practice-scroller" hidden>
                 <div class="practice-scroller-head">
-                    <strong>Laufende Noten</strong>
-                    <span id="practiceScrollerStatus">Bereit</span>
+                    <strong data-i18n="practice.runningNotes"><?php echo htmlspecialchars(barabeat_t('practice.runningNotes'), ENT_QUOTES, 'UTF-8'); ?></strong>
+                    <span id="practiceScrollerStatus" data-i18n="practice.ready"><?php echo htmlspecialchars(barabeat_t('practice.ready'), ENT_QUOTES, 'UTF-8'); ?></span>
                 </div>
                 <div class="practice-scroller-stage">
                     <div class="practice-scroller-playhead" aria-hidden="true"></div>
@@ -456,8 +456,8 @@ $activeLanguage = barabeat_language();
     <div id="practiceSwingProfileDialog" class="swing-profile-dialog-backdrop" hidden>
         <section class="swing-profile-dialog" role="dialog" aria-modal="true" aria-labelledby="practiceSwingProfileTitle">
             <header class="swing-profile-dialog-header">
-                <h2 id="practiceSwingProfileTitle">Swing-Profil</h2>
-                <button type="button" id="practiceSwingProfileCloseButton" aria-label="Swing-Profil schließen">Schließen</button>
+                <h2 id="practiceSwingProfileTitle" data-i18n="practice.controls.swingProfile"><?php echo htmlspecialchars(barabeat_t('practice.controls.swingProfile'), ENT_QUOTES, 'UTF-8'); ?></h2>
+                <button type="button" id="practiceSwingProfileCloseButton" aria-label="<?php echo htmlspecialchars(barabeat_t('practice.dialog.closeSwingProfile'), ENT_QUOTES, 'UTF-8'); ?>" data-i18n="common.close" data-i18n-aria-label="practice.dialog.closeSwingProfile"><?php echo htmlspecialchars(barabeat_t('common.close'), ENT_QUOTES, 'UTF-8'); ?></button>
             </header>
             <div class="swing-profile-preview" id="practiceSwingProfilePreview" aria-hidden="true"></div>
             <div class="swing-profile-controls" id="practiceSwingProfileControls">
@@ -467,8 +467,8 @@ $activeLanguage = barabeat_language();
                 <label>S4 <input type="number" id="practiceSwingAnchor4" min="-50" max="50" step="1" value="0" /></label>
             </div>
             <footer class="swing-profile-dialog-footer">
-                <button type="button" id="practiceSwingProfileResetButton">Zurücksetzen</button>
-                <button type="button" id="practiceSwingProfileDoneButton" class="primary">Fertig</button>
+                <button type="button" id="practiceSwingProfileResetButton" data-i18n="common.reset"><?php echo htmlspecialchars(barabeat_t('common.reset'), ENT_QUOTES, 'UTF-8'); ?></button>
+                <button type="button" id="practiceSwingProfileDoneButton" class="primary" data-i18n="common.done"><?php echo htmlspecialchars(barabeat_t('common.done'), ENT_QUOTES, 'UTF-8'); ?></button>
             </footer>
         </section>
     </div>
@@ -476,21 +476,21 @@ $activeLanguage = barabeat_language();
     <div id="practiceFeelProfileDialog" class="swing-profile-dialog-backdrop" hidden>
         <section class="swing-profile-dialog" role="dialog" aria-modal="true" aria-labelledby="practiceFeelProfileTitle">
             <header class="swing-profile-dialog-header">
-                <h2 id="practiceFeelProfileTitle">Feel ms</h2>
-                <button type="button" id="practiceFeelProfileCloseButton" aria-label="Feel schließen">Schließen</button>
+                <h2 id="practiceFeelProfileTitle" data-i18n="practice.dialog.feelTitle"><?php echo htmlspecialchars(barabeat_t('practice.dialog.feelTitle'), ENT_QUOTES, 'UTF-8'); ?></h2>
+                <button type="button" id="practiceFeelProfileCloseButton" aria-label="<?php echo htmlspecialchars(barabeat_t('practice.dialog.closeFeel'), ENT_QUOTES, 'UTF-8'); ?>" data-i18n="common.close" data-i18n-aria-label="practice.dialog.closeFeel"><?php echo htmlspecialchars(barabeat_t('common.close'), ENT_QUOTES, 'UTF-8'); ?></button>
             </header>
             <div class="swing-profile-controls feel-profile-controls" id="practiceFeelProfileControls">
-                <label>Kenkeni <input type="number" id="practiceFeelKenkeni" step="1" value="0" /></label>
-                <label>Sangban <input type="number" id="practiceFeelSangban" step="1" value="0" /></label>
-                <label>Doundoun <input type="number" id="practiceFeelDoundoun" step="1" value="0" /></label>
-                <label>Dreierbass <input type="number" id="practiceFeelDreierbass" step="1" value="0" /></label>
-                <label>Djembe 1 <input type="number" id="practiceFeelDjembe1" step="1" value="0" /></label>
-                <label>Djembe 2 <input type="number" id="practiceFeelDjembe2" step="1" value="0" /></label>
-                <label>Djembe 3 <input type="number" id="practiceFeelDjembe3" step="1" value="0" /></label>
+                <label><span data-i18n="practice.instrument.kenkeni"><?php echo htmlspecialchars(barabeat_t('practice.instrument.kenkeni'), ENT_QUOTES, 'UTF-8'); ?></span> <input type="number" id="practiceFeelKenkeni" step="1" value="0" /></label>
+                <label><span data-i18n="practice.instrument.sangban"><?php echo htmlspecialchars(barabeat_t('practice.instrument.sangban'), ENT_QUOTES, 'UTF-8'); ?></span> <input type="number" id="practiceFeelSangban" step="1" value="0" /></label>
+                <label><span data-i18n="practice.instrument.doundoun"><?php echo htmlspecialchars(barabeat_t('practice.instrument.doundoun'), ENT_QUOTES, 'UTF-8'); ?></span> <input type="number" id="practiceFeelDoundoun" step="1" value="0" /></label>
+                <label><span data-i18n="practice.instrument.threeBass"><?php echo htmlspecialchars(barabeat_t('practice.instrument.threeBass'), ENT_QUOTES, 'UTF-8'); ?></span> <input type="number" id="practiceFeelDreierbass" step="1" value="0" /></label>
+                <label><span data-i18n="practice.instrument.djembe1"><?php echo htmlspecialchars(barabeat_t('practice.instrument.djembe1'), ENT_QUOTES, 'UTF-8'); ?></span> <input type="number" id="practiceFeelDjembe1" step="1" value="0" /></label>
+                <label><span data-i18n="practice.instrument.djembe2"><?php echo htmlspecialchars(barabeat_t('practice.instrument.djembe2'), ENT_QUOTES, 'UTF-8'); ?></span> <input type="number" id="practiceFeelDjembe2" step="1" value="0" /></label>
+                <label><span data-i18n="practice.instrument.djembe3"><?php echo htmlspecialchars(barabeat_t('practice.instrument.djembe3'), ENT_QUOTES, 'UTF-8'); ?></span> <input type="number" id="practiceFeelDjembe3" step="1" value="0" /></label>
             </div>
             <footer class="swing-profile-dialog-footer">
-                <button type="button" id="practiceFeelProfileResetButton">Zurücksetzen</button>
-                <button type="button" id="practiceFeelProfileDoneButton" class="primary">Fertig</button>
+                <button type="button" id="practiceFeelProfileResetButton" data-i18n="common.reset"><?php echo htmlspecialchars(barabeat_t('common.reset'), ENT_QUOTES, 'UTF-8'); ?></button>
+                <button type="button" id="practiceFeelProfileDoneButton" class="primary" data-i18n="common.done"><?php echo htmlspecialchars(barabeat_t('common.done'), ENT_QUOTES, 'UTF-8'); ?></button>
             </footer>
         </section>
     </div>
@@ -498,23 +498,23 @@ $activeLanguage = barabeat_language();
     <div id="practiceTempoRampDialog" class="swing-profile-dialog-backdrop" hidden>
         <section class="swing-profile-dialog" role="dialog" aria-modal="true" aria-labelledby="practiceTempoRampTitle">
             <header class="swing-profile-dialog-header">
-                <h2 id="practiceTempoRampTitle">Tempoaufbau</h2>
-                <button type="button" id="practiceTempoRampCloseButton" aria-label="Tempoaufbau schließen">Schließen</button>
+                <h2 id="practiceTempoRampTitle" data-i18n="practice.controls.tempoRamp"><?php echo htmlspecialchars(barabeat_t('practice.controls.tempoRamp'), ENT_QUOTES, 'UTF-8'); ?></h2>
+                <button type="button" id="practiceTempoRampCloseButton" aria-label="<?php echo htmlspecialchars(barabeat_t('practice.dialog.closeTempoRamp'), ENT_QUOTES, 'UTF-8'); ?>" data-i18n="common.close" data-i18n-aria-label="practice.dialog.closeTempoRamp"><?php echo htmlspecialchars(barabeat_t('common.close'), ENT_QUOTES, 'UTF-8'); ?></button>
             </header>
             <div class="swing-profile-controls practice-tempo-ramp-controls">
                 <label class="practice-tempo-ramp-enabled">
-                    Aktiv
+                    <span data-i18n="practice.tempoRamp.enabled"><?php echo htmlspecialchars(barabeat_t('practice.tempoRamp.enabled'), ENT_QUOTES, 'UTF-8'); ?></span>
                     <input type="checkbox" id="practiceTempoRampEnabled" />
                 </label>
-                <label>Starttempo <input type="number" id="practiceTempoRampStart" min="30" max="180" step="1" value="80" /></label>
-                <label>Endtempo <input type="number" id="practiceTempoRampEnd" min="30" max="180" step="1" value="100" /></label>
-                <label>Alle x Wiederholungen <input type="number" id="practiceTempoRampEvery" min="1" max="64" step="1" value="2" /></label>
-                <label>Steigerung BPM <input type="number" id="practiceTempoRampStep" min="1" max="30" step="1" value="5" /></label>
+                <label><span data-i18n="practice.tempoRamp.startTempo"><?php echo htmlspecialchars(barabeat_t('practice.tempoRamp.startTempo'), ENT_QUOTES, 'UTF-8'); ?></span> <input type="number" id="practiceTempoRampStart" min="30" max="180" step="1" value="80" /></label>
+                <label><span data-i18n="practice.tempoRamp.endTempo"><?php echo htmlspecialchars(barabeat_t('practice.tempoRamp.endTempo'), ENT_QUOTES, 'UTF-8'); ?></span> <input type="number" id="practiceTempoRampEnd" min="30" max="180" step="1" value="100" /></label>
+                <label><span data-i18n="practice.tempoRamp.everyRepeats"><?php echo htmlspecialchars(barabeat_t('practice.tempoRamp.everyRepeats'), ENT_QUOTES, 'UTF-8'); ?></span> <input type="number" id="practiceTempoRampEvery" min="1" max="64" step="1" value="2" /></label>
+                <label><span data-i18n="practice.tempoRamp.increaseBpm"><?php echo htmlspecialchars(barabeat_t('practice.tempoRamp.increaseBpm'), ENT_QUOTES, 'UTF-8'); ?></span> <input type="number" id="practiceTempoRampStep" min="1" max="30" step="1" value="5" /></label>
             </div>
-            <p class="practice-tempo-ramp-note">Nach dem Erreichen des Endtempos werden die normalen Wiederholungen im Zieltempo angehängt.</p>
+            <p class="practice-tempo-ramp-note" data-i18n="practice.tempoRamp.note"><?php echo htmlspecialchars(barabeat_t('practice.tempoRamp.note'), ENT_QUOTES, 'UTF-8'); ?></p>
             <footer class="swing-profile-dialog-footer">
-                <button type="button" id="practiceTempoRampResetButton">Zurücksetzen</button>
-                <button type="button" id="practiceTempoRampDoneButton" class="primary">Fertig</button>
+                <button type="button" id="practiceTempoRampResetButton" data-i18n="common.reset"><?php echo htmlspecialchars(barabeat_t('common.reset'), ENT_QUOTES, 'UTF-8'); ?></button>
+                <button type="button" id="practiceTempoRampDoneButton" class="primary" data-i18n="common.done"><?php echo htmlspecialchars(barabeat_t('common.done'), ENT_QUOTES, 'UTF-8'); ?></button>
             </footer>
         </section>
     </div>
@@ -522,16 +522,16 @@ $activeLanguage = barabeat_language();
     <div id="practiceBluetoothLatencyDialog" class="swing-profile-dialog-backdrop" hidden>
         <section class="swing-profile-dialog practice-bluetooth-latency-dialog" role="dialog" aria-modal="true" aria-labelledby="practiceBluetoothLatencyTitle">
             <header class="swing-profile-dialog-header">
-                <h2 id="practiceBluetoothLatencyTitle">Bluetooth-Latenz</h2>
-                <button type="button" id="practiceBluetoothLatencyCloseButton" aria-label="Bluetooth-Latenz schließen">Schließen</button>
+                <h2 id="practiceBluetoothLatencyTitle" data-i18n="practice.dialog.bluetoothLatency"><?php echo htmlspecialchars(barabeat_t('practice.dialog.bluetoothLatency'), ENT_QUOTES, 'UTF-8'); ?></h2>
+                <button type="button" id="practiceBluetoothLatencyCloseButton" aria-label="<?php echo htmlspecialchars(barabeat_t('practice.dialog.closeBluetoothLatency'), ENT_QUOTES, 'UTF-8'); ?>" data-i18n="common.close" data-i18n-aria-label="practice.dialog.closeBluetoothLatency"><?php echo htmlspecialchars(barabeat_t('common.close'), ENT_QUOTES, 'UTF-8'); ?></button>
             </header>
             <div class="practice-bluetooth-latency-controls">
-                <label for="mobilePracticeAudioLatencyRange">Verzögerung in ms</label>
+                <label for="mobilePracticeAudioLatencyRange" data-i18n="practice.dialog.latencyMilliseconds"><?php echo htmlspecialchars(barabeat_t('practice.dialog.latencyMilliseconds'), ENT_QUOTES, 'UTF-8'); ?></label>
                 <input type="range" id="mobilePracticeAudioLatencyRange" min="0" max="1000" step="10" value="30" />
                 <input type="number" id="mobilePracticeAudioLatency" min="0" max="1000" step="10" value="30" inputmode="numeric" />
             </div>
             <footer class="swing-profile-dialog-footer">
-                <button type="button" id="practiceBluetoothLatencyDoneButton" class="primary">Fertig</button>
+                <button type="button" id="practiceBluetoothLatencyDoneButton" class="primary" data-i18n="common.done"><?php echo htmlspecialchars(barabeat_t('common.done'), ENT_QUOTES, 'UTF-8'); ?></button>
             </footer>
         </section>
     </div>
@@ -6031,6 +6031,7 @@ function openAudioTestTarget(playerRows, targetName, embedded) {
         return candidateEl.name === targetName;
     });
     if (frameEl) {
+        frameEl.dataset.audioLaunchKey = launchKey;
         frameEl.src = launchUrl;
         return;
     }
@@ -8551,6 +8552,9 @@ function openPracticeAudioPlayer(playerPayload) {
 
     playerPanelEl.hidden = false;
     openAudioTestFrame(playerPayload, playerFrameEl.name || 'practiceAudioFrame');
+    if (typeof refreshPracticeScrollerLayout === 'function') {
+        window.requestAnimationFrame(refreshPracticeScrollerLayout);
+    }
 }
 
 function refreshPracticeAudioPlayer() {
@@ -8563,6 +8567,10 @@ function refreshPracticeAudioPlayer() {
     }
 
     try {
+        const playerPanelEl = document.querySelector('.practice-player-panel');
+        if (playerPanelEl) {
+            playerPanelEl.hidden = false;
+        }
         const audioTest = buildAudioTestPayload(true);
         openPracticeAudioPlayer(audioTest.playerPayload);
     } catch (error) {
@@ -8648,6 +8656,15 @@ function clearTimelineAudioPlayer() {
     }
 }
 
+function preparePracticeAudioPlayerReload() {
+    const playerPanelEl = document.querySelector('.practice-player-panel');
+    window.clearTimeout(practiceAudioRefreshTimer);
+    practiceAudioPlaybackState = 'stopped';
+    if (playerPanelEl) {
+        playerPanelEl.hidden = true;
+    }
+}
+
 function notifyPracticeSelectionChanged(options) {
     const changeOptions = options && typeof options === 'object' ? options : {};
     if (typeof updateTimelineMetadataNode === 'function') {
@@ -8660,7 +8677,7 @@ function notifyPracticeSelectionChanged(options) {
     }
 
     if (changeOptions.forcePlayerReload) {
-        practiceAudioPlaybackState = 'stopped';
+        preparePracticeAudioPlayerReload();
         schedulePracticeAudioRefresh(0);
         return;
     }
@@ -8682,7 +8699,10 @@ function notifyPracticeSelectionChanged(options) {
         }
     }
 
-    schedulePracticeAudioRefresh(250);
+    // Never leave a stopped player with the previous pattern selection
+    // clickable while its replacement is being prepared.
+    preparePracticeAudioPlayerReload();
+    schedulePracticeAudioRefresh(0);
 }
 
 function sendPracticeAudioMessage(message) {
@@ -8723,6 +8743,20 @@ function handleEmbeddedAudioPlayerMessage(event) {
     const isSheetQuickPlayFrame = sheetQuickPlayFrameEl && event.source === sheetQuickPlayFrameEl.contentWindow;
     const isArrangementFrame = isTimelineFrame || isMobileArrangementFrame;
     if (!isPracticeFrame && !isArrangementFrame && !isSheetQuickPlayFrame) {
+        return;
+    }
+
+    const sourceFrameEl = isPracticeFrame
+        ? practiceFrameEl
+        : isTimelineFrame
+            ? timelineFrameEl
+            : isMobileArrangementFrame
+                ? mobileArrangementFrameEl
+                : sheetQuickPlayFrameEl;
+    const expectedLaunchKey = sourceFrameEl && sourceFrameEl.dataset
+        ? String(sourceFrameEl.dataset.audioLaunchKey || '')
+        : '';
+    if (expectedLaunchKey && String(message.launchKey || '') !== expectedLaunchKey) {
         return;
     }
 
@@ -8776,7 +8810,7 @@ function handleEmbeddedAudioPlayerMessage(event) {
         }
         practiceAudioPlaybackState = message.state || 'stopped';
         if (isPracticeFrame && typeof updatePracticeScrollerState === 'function') {
-            updatePracticeScrollerState(message.state, message.leadInMs, message.delayMs);
+            updatePracticeScrollerState(message.state, message.leadInMs, message.delayMs, message.countInMs);
         }
     }
 }
@@ -9735,7 +9769,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         } catch (error) {
             console.error('Übungsmodus konnte nicht aktualisiert werden', error);
-            alert('Fehler beim Aufbau des Übungsmodus: ' + error.message);
+            alert(uiText('practice.error.build', { message: error.message || '' }));
         }
     });
     document.querySelector('#practiceRefreshButton').addEventListener('click', function () {
@@ -9744,7 +9778,7 @@ document.addEventListener('DOMContentLoaded', function () {
             schedulePracticeAudioRefresh(0);
         } catch (error) {
             console.error('Übungsmodus-Refresh fehlgeschlagen', error);
-            alert('Fehler beim Aktualisieren des Übungsmodus: ' + error.message);
+            alert(uiText('practice.error.refresh', { message: error.message || '' }));
         }
     });
     document.querySelector('#practiceCloseButton').addEventListener('click', function () {
@@ -10026,10 +10060,10 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     function getSwingProfileTitle() {
         const currentProfileKey = getCurrentTimelineSwingProfileKey();
-        if (currentProfileKey === 'binaer') {
-            return 'Profil 16/8';
-        }
-        return currentProfileKey === 'tenaer' ? 'Profil 12/8' : 'Profil 9/8';
+        const meter = currentProfileKey === 'binaer'
+            ? '16/8'
+            : (currentProfileKey === 'tenaer' ? '12/8' : '9/8');
+        return uiText('practice.dialog.swingProfileMeter', { meter: meter });
     }
     function getSwingProfileInputIds(profileIndex) {
         return [
@@ -10077,7 +10111,7 @@ document.addEventListener('DOMContentLoaded', function () {
         );
         const profileTitle = getSwingProfileTitle();
         if (titleEl) {
-            titleEl.textContent = 'Swing-' + profileTitle;
+            titleEl.textContent = profileTitle;
         }
         [
             'practiceSwingAnchor1',
@@ -10265,13 +10299,13 @@ document.addEventListener('DOMContentLoaded', function () {
             y: 28,
             'font-size': 13,
             fill: '#333'
-        }).textContent = profileTitle + ' Vorschau';
+        }).textContent = uiText('practice.dialog.profilePreview', { profile: profileTitle });
         addSvgElement('text', {
             x: left,
             y: 136,
             'font-size': 12,
             fill: '#666'
-        }).textContent = 'grau = Raster, schwarz = verschobene Note';
+        }).textContent = uiText('practice.dialog.profilePreviewLegend');
 
         previewEl.appendChild(svgEl);
     }
@@ -10330,8 +10364,11 @@ document.addEventListener('DOMContentLoaded', function () {
             const rampConfig = getPracticeTempoRampConfig();
             rampButtonEl.classList.toggle('is-active', rampConfig.enabled);
             rampButtonEl.textContent = rampConfig.enabled
-                ? 'Tempoaufbau ' + rampConfig.startTempo + '→' + rampConfig.endTempo
-                : 'Tempoaufbau';
+                ? uiText('practice.tempoRamp.activeButton', {
+                    start: rampConfig.startTempo,
+                    end: rampConfig.endTempo
+                })
+                : uiText('practice.controls.tempoRamp');
         }
     }
     function openPracticeTempoRampDialog() {

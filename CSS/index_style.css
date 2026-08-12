@@ -2563,7 +2563,7 @@ body[data-ui-theme="earth"] .app-menu-panel #temporaryAccessButton.is-open {
 }
 
 .practice-tempo-ramp-note {
-    margin: 8px 0 0;
+    margin: 8px 14px 0;
     color: var(--ui-text-muted);
     font-size: 13px;
 }

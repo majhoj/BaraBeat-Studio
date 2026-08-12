@@ -32,6 +32,13 @@ const practiceState = {
 const practiceRepeatCountMax = 999;
 const practiceTimerMinutesMax = 240;
 
+function practiceText(key, values) {
+    if (window.BaraBeatI18n && typeof window.BaraBeatI18n.t === 'function') {
+        return window.BaraBeatI18n.t(key, values);
+    }
+    return String(key);
+}
+
 const practiceTrackInstrumentNames = ['Kenkeni', 'Sangban', 'Doundoun', 'Dreierbass', 'Djembe_1', 'Djembe_2', 'Djembe_3', 'Shekere'];
 const practiceScrollerInstrumentLabels = {
     Kenkeni: 'Kenkeni',
@@ -42,6 +49,26 @@ const practiceScrollerInstrumentLabels = {
     Djembe_2: 'Djembe 2',
     Djembe_3: 'Djembe 3',
     Shekere: 'Shekere'
+};
+const practiceScrollerInstrumentLabelKeys = {
+    Kenkeni: 'practice.instrument.kenkeni',
+    Sangban: 'practice.instrument.sangban',
+    Doundoun: 'practice.instrument.doundoun',
+    Dreierbass: 'practice.instrument.threeBass',
+    Djembe_1: 'practice.instrument.djembe1',
+    Djembe_2: 'practice.instrument.djembe2',
+    Djembe_3: 'practice.instrument.djembe3',
+    Shekere: 'practice.instrument.shekere'
+};
+const practicePatternTypeLabelKeys = {
+    Begleitung: 'practice.type.accompaniment',
+    Call: 'practice.type.call',
+    Intro: 'practice.type.intro',
+    Outro: 'practice.type.outro',
+    Echauffement: 'practice.type.warmup',
+    Solo: 'practice.type.solo',
+    Pause: 'practice.type.pause',
+    Leer: 'practice.type.empty'
 };
 const practiceScrollerNoteLabels = {
     tone: 'To',
@@ -63,63 +90,81 @@ const practiceScrollerNoteLabels = {
 
 const practiceInstrumentToneVolumeLabels = {
     Kenkeni: [
-        { key: 'open', label: 'Open' },
-        { key: 'muffled', label: 'Gedämpft' },
-        { key: 'bell', label: 'Glocke' },
-        { key: 'klick', label: 'Klick' }
+        { key: 'open', labelKey: 'practice.tone.open' },
+        { key: 'muffled', labelKey: 'practice.tone.muffled' },
+        { key: 'bell', labelKey: 'practice.tone.bell' },
+        { key: 'klick', labelKey: 'practice.tone.click' }
     ],
     Sangban: [
-        { key: 'open', label: 'Open' },
-        { key: 'muffled', label: 'Gedämpft' },
-        { key: 'bell', label: 'Glocke' },
-        { key: 'klick', label: 'Klick' }
+        { key: 'open', labelKey: 'practice.tone.open' },
+        { key: 'muffled', labelKey: 'practice.tone.muffled' },
+        { key: 'bell', labelKey: 'practice.tone.bell' },
+        { key: 'klick', labelKey: 'practice.tone.click' }
     ],
     Doundoun: [
-        { key: 'open', label: 'Open' },
-        { key: 'muffled', label: 'Gedämpft' },
-        { key: 'bell', label: 'Glocke' },
-        { key: 'klick', label: 'Klick' }
+        { key: 'open', labelKey: 'practice.tone.open' },
+        { key: 'muffled', labelKey: 'practice.tone.muffled' },
+        { key: 'bell', labelKey: 'practice.tone.bell' },
+        { key: 'klick', labelKey: 'practice.tone.click' }
     ],
     Dreierbass: [
-        { key: 'kenkeni', label: 'Kenkeni' },
-        { key: 'kenkeni_muffled', label: 'Kenkeni gedämpft' },
-        { key: 'sangban', label: 'Sangban' },
-        { key: 'sangban_muffled', label: 'Sangban gedämpft' },
-        { key: 'doundoun', label: 'Doundoun' }
+        { key: 'kenkeni', labelKey: 'practice.instrument.kenkeni' },
+        { key: 'kenkeni_muffled', labelKey: 'practice.tone.kenkeniMuffled' },
+        { key: 'sangban', labelKey: 'practice.instrument.sangban' },
+        { key: 'sangban_muffled', labelKey: 'practice.tone.sangbanMuffled' },
+        { key: 'doundoun', labelKey: 'practice.instrument.doundoun' }
     ],
     Djembe_1: [
-        { key: 'tone', label: 'Tone' },
-        { key: 'bass', label: 'Bass' },
-        { key: 'slap', label: 'Slap' },
-        { key: 'tone_muffled', label: 'Gedämpfter Tone' },
-        { key: 'slap_muffled', label: 'Gedämpfter Slap' },
-        { key: 'tone_flam', label: 'Flam mit Tone' },
-        { key: 'slap_flam', label: 'Flam mit Slap' },
-        { key: 'bass_slap_flam', label: 'Flam Bass + Slap' },
-        { key: 'mute', label: 'H2H Leer/Mute' }
+        { key: 'tone', labelKey: 'practice.tone.tone' },
+        { key: 'bass', labelKey: 'practice.tone.bass' },
+        { key: 'slap', labelKey: 'practice.tone.slap' },
+        { key: 'tone_muffled', labelKey: 'practice.tone.muffledTone' },
+        { key: 'slap_muffled', labelKey: 'practice.tone.muffledSlap' },
+        { key: 'tone_flam', labelKey: 'practice.tone.toneFlam' },
+        { key: 'slap_flam', labelKey: 'practice.tone.slapFlam' },
+        { key: 'bass_slap_flam', labelKey: 'practice.tone.bassSlapFlam' },
+        { key: 'mute', labelKey: 'practice.tone.h2hRestMute' }
     ],
     Djembe_2: [
-        { key: 'tone', label: 'Tone' },
-        { key: 'bass', label: 'Bass' },
-        { key: 'slap', label: 'Slap' },
-        { key: 'tone_muffled', label: 'Gedämpfter Tone' },
-        { key: 'slap_muffled', label: 'Gedämpfter Slap' },
-        { key: 'tone_flam', label: 'Flam mit Tone' },
-        { key: 'slap_flam', label: 'Flam mit Slap' },
-        { key: 'bass_slap_flam', label: 'Flam Bass + Slap' },
-        { key: 'mute', label: 'H2H Leer/Mute' }
+        { key: 'tone', labelKey: 'practice.tone.tone' },
+        { key: 'bass', labelKey: 'practice.tone.bass' },
+        { key: 'slap', labelKey: 'practice.tone.slap' },
+        { key: 'tone_muffled', labelKey: 'practice.tone.muffledTone' },
+        { key: 'slap_muffled', labelKey: 'practice.tone.muffledSlap' },
+        { key: 'tone_flam', labelKey: 'practice.tone.toneFlam' },
+        { key: 'slap_flam', labelKey: 'practice.tone.slapFlam' },
+        { key: 'bass_slap_flam', labelKey: 'practice.tone.bassSlapFlam' },
+        { key: 'mute', labelKey: 'practice.tone.h2hRestMute' }
     ],
     Djembe_3: [
-        { key: 'tone', label: 'Tone' },
-        { key: 'bass', label: 'Bass' },
-        { key: 'slap', label: 'Slap' },
-        { key: 'slap_muffled', label: 'Gedämpfter Slap' },
-        { key: 'tone_flam', label: 'Flam mit Tone' },
-        { key: 'slap_flam', label: 'Flam mit Slap' },
-        { key: 'bass_slap_flam', label: 'Flam Bass + Slap' },
-        { key: 'mute', label: 'H2H Leer/Mute' }
+        { key: 'tone', labelKey: 'practice.tone.tone' },
+        { key: 'bass', labelKey: 'practice.tone.bass' },
+        { key: 'slap', labelKey: 'practice.tone.slap' },
+        { key: 'slap_muffled', labelKey: 'practice.tone.muffledSlap' },
+        { key: 'tone_flam', labelKey: 'practice.tone.toneFlam' },
+        { key: 'slap_flam', labelKey: 'practice.tone.slapFlam' },
+        { key: 'bass_slap_flam', labelKey: 'practice.tone.bassSlapFlam' },
+        { key: 'mute', labelKey: 'practice.tone.h2hRestMute' }
     ]
 };
+
+function getPracticeInstrumentDisplayLabel(instrumentName) {
+    const labelKey = practiceScrollerInstrumentLabelKeys[instrumentName];
+    return labelKey
+        ? practiceText(labelKey)
+        : (practiceScrollerInstrumentLabels[instrumentName] || String(instrumentName || '').replace('_', ' '));
+}
+
+function getPracticePatternTypeDisplayLabel(labelType) {
+    const labelKey = practicePatternTypeLabelKeys[labelType];
+    return labelKey ? practiceText(labelKey) : String(labelType || '');
+}
+
+function getPracticeToneDefinitionDisplayLabel(toneDefinition) {
+    return toneDefinition && toneDefinition.labelKey
+        ? practiceText(toneDefinition.labelKey)
+        : String(toneDefinition && toneDefinition.label || '');
+}
 const practiceScrollerState = {
     totalSteps: 0,
     currentStep: 0,
@@ -153,7 +198,11 @@ const practiceScrollerState = {
     repeatCount: 1,
     practiceDurationSeconds: 0,
     tempoRampLeadInCycles: 0,
-    visualSegmentRotations: Object.create(null)
+    visualSegmentRotations: Object.create(null),
+    dom: null,
+    layout: null,
+    lastStatusText: '',
+    lastStatusUpdateAt: 0
 };
 
 function isPracticeScrollerCompactViewport() {
@@ -169,11 +218,44 @@ function getPracticeScrollerVisualLoopCopies() {
     return practiceScrollerState.visualLoopCopies;
 }
 
-function getPracticeScrollerSectionVisualRepeatCopies(baseVisualLoopCopies) {
-    // Keep enough real copies to fill the complete viewport around the
-    // playhead. Higher repeat counts still use the bounded visual ring.
-    const minimumCopies = isPracticeScrollerCompactViewport() ? 7 : 10;
-    return Math.max(minimumCopies, Math.max(1, Number(baseVisualLoopCopies) || 1));
+function getPracticeScrollerViewportStepCount() {
+    const compactViewport = isPracticeScrollerCompactViewport();
+    const viewportWidth = typeof document !== 'undefined' && document.documentElement
+        ? document.documentElement.clientWidth
+        : (typeof window !== 'undefined' ? window.innerWidth : 0);
+    const stepWidth = compactViewport ? 22 : 18;
+    return Math.max(1, Math.ceil(Math.max(320, Number(viewportWidth) || 0) / stepWidth));
+}
+
+function getPracticeScrollerSectionVisualRepeatCopies(baseVisualLoopCopies, sectionLength) {
+    const safeSectionLength = Math.max(1, Number(sectionLength) || 1);
+    const copiesForViewport = Math.ceil(getPracticeScrollerViewportStepCount() / safeSectionLength);
+
+    // Four guard copies keep the active copy surrounded while the middle
+    // copies are recycled. Long sections therefore no longer allocate ten
+    // complete copies merely to fill the viewport.
+    return Math.max(
+        5,
+        Math.max(1, Number(baseVisualLoopCopies) || 1),
+        copiesForViewport + 4
+    );
+}
+
+function getPracticeScrollerOuterVisualLoopCopies(visualLoopLength, availableCopies) {
+    const safeAvailableCopies = Math.max(0, Number(availableCopies) || 0);
+    const safeLoopLength = Math.max(1, Number(visualLoopLength) || 1);
+    if (safeAvailableCopies <= 0) {
+        return 0;
+    }
+    if (isPracticeScrollerCompactViewport()) {
+        return Math.min(1, safeAvailableCopies);
+    }
+
+    const stepsAfterPlayhead = Math.ceil(
+        getPracticeScrollerViewportStepCount() * (1 - practiceScrollerState.playheadRatio)
+    );
+    const copiesForViewport = 1 + Math.ceil(stepsAfterPlayhead / safeLoopLength);
+    return Math.min(safeAvailableCopies, Math.max(1, copiesForViewport));
 }
 
 function getPracticeScrollerTailSteps(visualLoopLength) {
@@ -478,6 +560,13 @@ function getPracticePatternIdsFromMetadata(sourceKeys, patternIds, patternLibrar
         }
     });
 
+    // Source keys describe the musical pattern and remain stable when rows are
+    // inserted or the library is rebuilt. Positional pattern IDs are retained
+    // only for legacy files that do not contain source keys.
+    if (sourceKeyList.length > 0) {
+        return selectedIds;
+    }
+
     patternIdList.forEach(function (patternId) {
         const matchedPattern = patterns.find(function (pattern) {
             return pattern && pattern.id === patternId;
@@ -526,7 +615,7 @@ function buildPracticeSettingsMetadata() {
 
 function normalizePracticeScenarioName(rawName, index) {
     const name = String(rawName || '').trim();
-    return name || ('Szenario ' + (index + 1));
+    return name || practiceText('practice.scenario.defaultName', { number: index + 1 });
 }
 
 function createPracticeScenarioId() {
@@ -652,7 +741,12 @@ function applyPracticeMetadata(metadata, patternLibrary, sourceHash) {
     practiceState.activePracticeScenarioId = practiceState.practiceScenarios.some(function (scenario) {
         return scenario.id === metadata.activeScenarioId;
     }) ? metadata.activeScenarioId : '';
-    applyPracticeSettingsMetadata(metadata, patternLibrary, sourceHash);
+    const activeScenario = getActivePracticeScenario();
+    applyPracticeSettingsMetadata(
+        activeScenario ? activeScenario.settings : metadata,
+        patternLibrary,
+        sourceHash
+    );
 }
 
 function getActivePracticeScenario() {
@@ -685,8 +779,11 @@ function savePracticeScenario(name, scenarioId) {
 }
 
 function getPracticeScenariosSortedByName() {
+    const locale = window.BaraBeatI18n && typeof window.BaraBeatI18n.getLocale === 'function'
+        ? window.BaraBeatI18n.getLocale()
+        : 'de-DE';
     return normalizePracticeScenarios(practiceState.practiceScenarios).slice().sort(function (scenarioA, scenarioB) {
-        return String(scenarioA.name || '').localeCompare(String(scenarioB.name || ''), 'de', {
+        return String(scenarioA.name || '').localeCompare(String(scenarioB.name || ''), locale, {
             sensitivity: 'base',
             numeric: true
         });
@@ -714,7 +811,7 @@ function renderPracticeScenarioControls() {
         selectEl.innerHTML = '';
         const currentOptionEl = document.createElement('option');
         currentOptionEl.value = '';
-        currentOptionEl.textContent = 'Aktuelle Einstellungen';
+        currentOptionEl.textContent = practiceText('practice.scenario.current');
         selectEl.appendChild(currentOptionEl);
         sortedScenarios.forEach(function (scenario) {
             const optionEl = document.createElement('option');
@@ -740,8 +837,10 @@ async function persistPracticeScenarioMetadataToScore() {
 }
 
 async function createPracticeScenarioFromCurrent() {
-    const defaultName = 'Szenario ' + (practiceState.practiceScenarios.length + 1);
-    const name = window.prompt('Name für das Übungsszenario:', defaultName);
+    const defaultName = practiceText('practice.scenario.defaultName', {
+        number: practiceState.practiceScenarios.length + 1
+    });
+    const name = window.prompt(practiceText('practice.scenario.promptName'), defaultName);
     if (name === null) {
         return;
     }
@@ -768,7 +867,7 @@ async function deleteActivePracticeScenario() {
     if (!activeScenario) {
         return;
     }
-    if (!window.confirm('Übungsszenario "' + activeScenario.name + '" löschen?')) {
+    if (!window.confirm(practiceText('practice.scenario.confirmDelete', { name: activeScenario.name }))) {
         return;
     }
     recordArrangementHistorySnapshot();
@@ -781,8 +880,9 @@ async function deleteActivePracticeScenario() {
 }
 
 function applyPracticeScenario(scenarioId) {
+    const requestedScenarioId = String(scenarioId || '');
     const scenario = practiceState.practiceScenarios.find(function (candidate) {
-        return candidate.id === scenarioId;
+        return candidate.id === requestedScenarioId;
     });
     if (!scenario) {
         practiceState.activePracticeScenarioId = '';
@@ -913,18 +1013,18 @@ function getPracticeTargetOptionsForPattern(pattern) {
 
     if (isGenericDjembe) {
         return [
-            { value: 'Djembe_1', label: 'Djembe 1' },
-            { value: 'Djembe_2', label: 'Djembe 2' },
-            { value: 'Djembe_3', label: 'Djembe 3' }
+            { value: 'Djembe_1', labelKey: 'practice.instrument.djembe1' },
+            { value: 'Djembe_2', labelKey: 'practice.instrument.djembe2' },
+            { value: 'Djembe_3', labelKey: 'practice.instrument.djembe3' }
         ];
     }
 
     if (isGenericBass) {
         return [
-            { value: 'Kenkeni', label: 'Kenkeni' },
-            { value: 'Sangban', label: 'Sangban' },
-            { value: 'Doundoun', label: 'Doundoun' },
-            { value: 'Dreierbass', label: 'Dreierbass' }
+            { value: 'Kenkeni', labelKey: 'practice.instrument.kenkeni' },
+            { value: 'Sangban', labelKey: 'practice.instrument.sangban' },
+            { value: 'Doundoun', labelKey: 'practice.instrument.doundoun' },
+            { value: 'Dreierbass', labelKey: 'practice.instrument.threeBass' }
         ];
     }
 
@@ -955,10 +1055,17 @@ function getPracticePatternPlaybackTargets(pattern) {
 
 function getPracticePatternDisplayInstrument(pattern) {
     const selectedTarget = getPracticeTargetForPattern(pattern);
-    if (selectedTarget && practiceScrollerInstrumentLabels[selectedTarget]) {
-        return practiceScrollerInstrumentLabels[selectedTarget];
+    if (selectedTarget) {
+        return getPracticeInstrumentDisplayLabel(selectedTarget);
     }
-    return pattern.sourceInstrument || pattern.instrument || '';
+    const sourceInstrument = pattern.sourceInstrument || pattern.instrument || '';
+    if (sourceInstrument === 'Djembe') {
+        return practiceText('practice.instrument.djembe');
+    }
+    if (sourceInstrument === 'Bässe' || sourceInstrument === 'Baesse') {
+        return practiceText('practice.instrument.basses');
+    }
+    return getPracticeInstrumentDisplayLabel(sourceInstrument);
 }
 
 function getPracticePatternDisplayTitle(pattern) {
@@ -966,7 +1073,10 @@ function getPracticePatternDisplayTitle(pattern) {
     const prefixMatch = rawName.match(/^(P\d+)\s*-/i);
     const prefix = prefixMatch ? prefixMatch[1] : rawName;
     const instrumentText = getPracticePatternDisplayInstrument(pattern);
-    const labelText = pattern.labelName || pattern.labelType || '';
+    const rawLabelText = pattern.labelName || pattern.labelType || '';
+    const labelText = !pattern.labelName || pattern.labelName === pattern.labelType
+        ? getPracticePatternTypeDisplayLabel(rawLabelText)
+        : rawLabelText;
     return [prefix, instrumentText].filter(Boolean).join(' - ') +
         (labelText ? ' / ' + labelText : '');
 }
@@ -1017,14 +1127,14 @@ function createPracticePatternRow(pattern, listName) {
         upButtonEl.type = 'button';
         upButtonEl.className = 'practice-pattern-order-button';
         upButtonEl.textContent = '↑';
-        upButtonEl.setAttribute('aria-label', 'Übungsteil nach oben verschieben');
+        upButtonEl.setAttribute('aria-label', practiceText('practice.patternRow.moveUp'));
         upButtonEl.disabled = practiceState[listName].indexOf(pattern.id) === 0;
 
         const downButtonEl = document.createElement('button');
         downButtonEl.type = 'button';
         downButtonEl.className = 'practice-pattern-order-button';
         downButtonEl.textContent = '↓';
-        downButtonEl.setAttribute('aria-label', 'Übungsteil nach unten verschieben');
+        downButtonEl.setAttribute('aria-label', practiceText('practice.patternRow.moveDown'));
         downButtonEl.disabled = practiceState[listName].indexOf(pattern.id) === practiceState[listName].length - 1;
 
         [upButtonEl, downButtonEl].forEach(function (buttonEl) {
@@ -1070,17 +1180,19 @@ function createPracticePatternRow(pattern, listName) {
     if (pattern.instrument === 'Djembe') {
         const handModeWrapEl = document.createElement('label');
         handModeWrapEl.className = 'practice-pattern-hand-mode-wrap';
-        handModeWrapEl.appendChild(document.createTextNode('Handsatz'));
+        handModeWrapEl.appendChild(document.createTextNode(practiceText('practice.patternRow.handMode')));
         const handModeEl = document.createElement('select');
         handModeEl.className = 'practice-pattern-hand-mode';
         [
-            { value: 'auto', label: 'Auto' },
+            { value: 'auto', labelKey: 'practice.patternRow.automatic' },
             { value: 'h2h', label: 'H2H' },
             { value: 'hoh', label: 'HOH' }
         ].forEach(function (optionData) {
             const optionEl = document.createElement('option');
             optionEl.value = optionData.value;
-            optionEl.textContent = optionData.label;
+            optionEl.textContent = optionData.labelKey
+                ? practiceText(optionData.labelKey)
+                : optionData.label;
             handModeEl.appendChild(optionEl);
         });
         handModeEl.value = normalizePracticeHandMode(practiceState.patternHandModes[pattern.id]);
@@ -1107,7 +1219,7 @@ function createPracticePatternRow(pattern, listName) {
         if (listName === 'soloPatternIds') {
             const repeatCountEl = document.createElement('label');
             repeatCountEl.className = 'practice-pattern-repeat-count';
-            repeatCountEl.appendChild(document.createTextNode('Wdh.'));
+            repeatCountEl.appendChild(document.createTextNode(practiceText('practice.patternRow.repeatShort')));
             const repeatInputEl = document.createElement('input');
             repeatInputEl.type = 'number';
             repeatInputEl.min = '1';
@@ -1145,7 +1257,7 @@ function createPracticePatternRow(pattern, listName) {
             targetOptions.forEach(function (optionData) {
                 const optionEl = document.createElement('option');
                 optionEl.value = optionData.value;
-                optionEl.textContent = optionData.label;
+                optionEl.textContent = practiceText(optionData.labelKey);
                 targetEl.appendChild(optionEl);
             });
             targetEl.value = getPracticeTargetForPattern(pattern);
@@ -1276,16 +1388,18 @@ function getPracticeRhythmDisplayName() {
     const rawTitle = typeof titel !== 'undefined' && titel && typeof titel.attr === 'function'
         ? String(titel.attr('text') || '').trim()
         : '';
-    if (rawTitle && rawTitle !== 'Enter the name of the Rhythm' && rawTitle !== 'Rhythmusname') {
+    if (rawTitle && rawTitle !== 'Enter the name of the Rhythm' && rawTitle !== 'Rhythmusname' && rawTitle !== 'Rhythm name') {
         return rawTitle;
     }
 
     const rhythmNames = {
-        binaer: 'Binärer Rhythmus',
-        tenaer: 'Tenärer Rhythmus',
-        neunaer: '9/8 Rhythmus'
+        binaer: 'practice.rhythm.binary',
+        tenaer: 'practice.rhythm.ternary',
+        neunaer: 'practice.rhythm.nineEight'
     };
-    return rhythmNames[rhythm] || 'Unbenannter Rhythmus';
+    return rhythmNames[rhythm]
+        ? practiceText(rhythmNames[rhythm])
+        : practiceText('practice.rhythm.unnamed');
 }
 
 function renderPracticePanel() {
@@ -1302,12 +1416,13 @@ function renderPracticePanel() {
     syncPracticeSelectionsWithPatternLibrary();
     panelEl.hidden = !practiceState.visible;
     document.body.classList.toggle('is-practice-mode-visible', practiceState.visible);
-    titleEl.innerHTML = '<span class="practice-title-label">Übungsmodus:</span> ' +
-        '<span class="practice-title-rhythm"></span>';
-    const rhythmTitleEl = titleEl.querySelector('.practice-title-rhythm');
-    if (rhythmTitleEl) {
-        rhythmTitleEl.textContent = getPracticeRhythmDisplayName();
-    }
+    const titleLabelEl = document.createElement('span');
+    titleLabelEl.className = 'practice-title-label';
+    titleLabelEl.textContent = practiceText('practice.title') + ':';
+    const rhythmTitleEl = document.createElement('span');
+    rhythmTitleEl.className = 'practice-title-rhythm';
+    rhythmTitleEl.textContent = getPracticeRhythmDisplayName();
+    titleEl.replaceChildren(titleLabelEl, document.createTextNode(' '), rhythmTitleEl);
 
     updatePracticeInputs();
     if (typeof window.syncTimingControlValues === 'function') {
@@ -1318,17 +1433,19 @@ function renderPracticePanel() {
     }
     if (chooserToggleEl) {
         chooserToggleEl.textContent = practiceState.patternChooserExpanded
-            ? 'Patternauswahl schließen'
-            : 'Patternauswahl öffnen';
+            ? practiceText('practice.patternSelectionClose')
+            : practiceText('practice.patternSelectionOpen');
         chooserToggleEl.setAttribute('aria-expanded', practiceState.patternChooserExpanded ? 'true' : 'false');
         chooserToggleEl.classList.toggle('is-active', practiceState.patternChooserExpanded);
     }
     if (mobileChooserToggleEl) {
         mobileChooserToggleEl.hidden = !practiceState.visible;
-        mobileChooserToggleEl.textContent = 'Pattern';
+        mobileChooserToggleEl.textContent = practiceText('practice.pattern');
         mobileChooserToggleEl.setAttribute(
             'aria-label',
-            practiceState.patternChooserExpanded ? 'Patternauswahl schließen' : 'Patternauswahl öffnen'
+            practiceState.patternChooserExpanded
+                ? practiceText('practice.patternSelectionClose')
+                : practiceText('practice.patternSelectionOpen')
         );
         mobileChooserToggleEl.setAttribute('aria-expanded', practiceState.patternChooserExpanded ? 'true' : 'false');
         mobileChooserToggleEl.classList.toggle('is-active', practiceState.patternChooserExpanded);
@@ -2269,6 +2386,7 @@ function createPracticeSection(block, blockIndex, sectionSuffix) {
             finalRepeatOutStepTypes: createEmptyPracticeTrackTextMap(),
             forceFinalOutAtSectionEnd: false,
             usePracticeTargetAccompanimentOut: false,
+            overlapsPracticeCountIn: false,
             barStartSteps: [],
             minLength: 0,
             practiceTargetInstruments: []
@@ -2293,6 +2411,7 @@ function clonePracticeSection(section, sectionSuffix) {
         finalRepeatOutStepTypes: createEmptyPracticeTrackTextMap(),
         forceFinalOutAtSectionEnd: Boolean(section.forceFinalOutAtSectionEnd),
         usePracticeTargetAccompanimentOut: Boolean(section.usePracticeTargetAccompanimentOut),
+        overlapsPracticeCountIn: Boolean(section.overlapsPracticeCountIn),
         barStartSteps: Array.isArray(section.barStartSteps) ? section.barStartSteps.slice() : [],
         minLength: Math.max(0, Math.round(Number(section.minLength) || 0)),
         practiceTargetInstruments: Array.isArray(section.practiceTargetInstruments)
@@ -2402,6 +2521,70 @@ function mergePracticePickupIntoHostSection(hostSection, pickupSection) {
             );
         }
     });
+}
+
+function trimStandalonePracticePickup(section) {
+    const sectionLength = getPracticeSectionLength(section);
+    if (sectionLength <= 0) {
+        return;
+    }
+
+    let firstTargetStep = sectionLength;
+    let firstPlayableStep = sectionLength;
+    practiceTrackInstrumentNames.forEach(function (instrumentName) {
+        const notes = Array.isArray(section.trackNotes[instrumentName])
+            ? section.trackNotes[instrumentName]
+            : [];
+        const targetFlags = section.trackTargetFlags &&
+            Array.isArray(section.trackTargetFlags[instrumentName])
+            ? section.trackTargetFlags[instrumentName]
+            : [];
+        const targetStep = notes.findIndex(function (noteValue, stepIndex) {
+            return Boolean(targetFlags[stepIndex]) && isPlayablePracticeNote(noteValue);
+        });
+        if (targetStep !== -1) {
+            firstTargetStep = Math.min(firstTargetStep, targetStep);
+        }
+        const playableStep = notes.findIndex(function (noteValue) {
+            return isPlayablePracticeNote(noteValue);
+        });
+        if (playableStep !== -1) {
+            firstPlayableStep = Math.min(firstPlayableStep, playableStep);
+        }
+    });
+
+    if (firstTargetStep < sectionLength) {
+        firstPlayableStep = firstTargetStep;
+    }
+
+    if (firstPlayableStep <= 0 || firstPlayableStep >= sectionLength) {
+        return;
+    }
+
+    practiceTrackInstrumentNames.forEach(function (instrumentName) {
+        if (Array.isArray(section.trackNotes[instrumentName])) {
+            section.trackNotes[instrumentName] = section.trackNotes[instrumentName].slice(firstPlayableStep);
+        }
+        if (section.trackTargetFlags && Array.isArray(section.trackTargetFlags[instrumentName])) {
+            section.trackTargetFlags[instrumentName] =
+                section.trackTargetFlags[instrumentName].slice(firstPlayableStep);
+        }
+        if (section.finalRepeatOutSteps) {
+            const outStep = section.finalRepeatOutSteps[instrumentName];
+            if (outStep !== null && outStep !== undefined && outStep !== '') {
+                section.finalRepeatOutSteps[instrumentName] = Math.max(
+                    0,
+                    Math.round(Number(outStep) || 0) - firstPlayableStep
+                );
+            }
+        }
+    });
+    section.barStartSteps = shiftPracticeBarStartStepsAfterOffset(
+        section.barStartSteps,
+        firstPlayableStep,
+        sectionLength - firstPlayableStep
+    );
+    section.minLength = Math.max(0, (Number(section.minLength) || 0) - firstPlayableStep);
 }
 
 function clearPracticeSectionOutSteps(section) {
@@ -2576,7 +2759,7 @@ function appendPracticeSectionWithFinalOut(sections, section) {
     sections.push(section);
 }
 
-function appendPracticeSectionWithPickup(sections, section, pickupSection, hasPickup) {
+function appendPracticeSectionWithPickup(sections, section, pickupSection, hasPickup, overlapsCountIn) {
     if (!hasPickup || !sectionHasPracticeNotes(pickupSection)) {
         appendPracticeSectionWithFinalOut(sections, section);
         return null;
@@ -2594,6 +2777,8 @@ function appendPracticeSectionWithPickup(sections, section, pickupSection, hasPi
     }
 
     if (hostIndex === -1) {
+        trimStandalonePracticePickup(pickupSection);
+        pickupSection.overlapsPracticeCountIn = Boolean(overlapsCountIn);
         sections.push(pickupSection);
         appendPracticeSectionWithFinalOut(sections, section);
         return pickupSection;
@@ -2788,6 +2973,7 @@ function buildPracticeSectionsFromEntries(entries) {
         pickupSection.isLeadIn = true;
         const labels = [];
         const labelNames = [];
+        let blockHasSoloCountInPickup = false;
         const ignoreShortBarForRunningAccompaniment = practiceBlockShouldIgnoreShortBarForRunningAccompaniment(block);
         const blockHasPickup = !previousBlockEndedWithShortBar && block.entries.some(function (entry) {
             return practiceEntryAllowsPickup(entry, block);
@@ -2916,6 +3102,9 @@ function buildPracticeSectionsFromEntries(entries) {
 
             if (blockHasPickup && patternInStep !== null && practiceEntryAllowsPickup(entry, block)) {
                 const pickupSingleNoteOnly = label === 'Call' || label === 'Intro';
+                if (entry.isPracticeTarget && /^Solo(?:\s|$)/i.test(String(label || ''))) {
+                    blockHasSoloCountInPickup = true;
+                }
                 const pickupNotes = buildPracticePickupNotes(rawPatternNotes, patternInStep, {
                     singleNoteOnly: pickupSingleNoteOnly,
                     limitToPickupBar: true
@@ -2978,7 +3167,13 @@ function buildPracticeSectionsFromEntries(entries) {
         section.labelName = labelNames.join(' + ') || section.label;
         pickupSection.label = section.label;
         pickupSection.labelName = section.labelName ? section.labelName + ' Auftakt' : 'Auftakt';
-        const loopPickupSection = appendPracticeSectionWithPickup(sections, section, pickupSection, blockHasPickup);
+        const loopPickupSection = appendPracticeSectionWithPickup(
+            sections,
+            section,
+            pickupSection,
+            blockHasPickup,
+            blockHasSoloCountInPickup
+        );
         if (!loopStartPickupSection && loopPickupSection && !section.isLeadIn) {
             loopStartPickupSection = loopPickupSection;
         }
@@ -3064,10 +3259,10 @@ function notifyPracticeInstrumentVolumesChanged() {
 
 function buildPracticePlayerPayload() {
     if (!Array.isArray(timelineState.sourcePatterns) || timelineState.sourcePatterns.length === 0) {
-        throw new Error('Es wurden noch keine Pattern aus dem Notenblatt gelesen.');
+        throw new Error(practiceText('practice.error.patternsNotRead'));
     }
     if (practiceState.accompanimentPatternIds.length === 0 && practiceState.soloPatternIds.length === 0) {
-        throw new Error('Bitte mindestens ein Begleit- oder Übungsteil-Pattern für den Übungsmodus auswählen.');
+        throw new Error(practiceText('practice.error.selectPattern'));
     }
 
     const tempoRampPlan = buildPracticeTempoRampPlan();
@@ -3082,7 +3277,7 @@ function buildPracticePlayerPayload() {
         })
         : buildPracticeEntries({ singleCycle: true });
     if (entries.length === 0) {
-        throw new Error('Aus den Übungseinstellungen konnte keine Abspielfolge erzeugt werden.');
+        throw new Error(practiceText('practice.error.sequenceEmpty'));
     }
 
     const payload = buildTimelinePlayerPayload(timelineState.sourcePatterns, entries);
@@ -3131,21 +3326,57 @@ function getPracticeScrollerStepsPerBeat() {
     return 8;
 }
 
-function getPracticeScrollerBaseStepMs() {
+function getPracticeScrollerBaseStepMs(tempoValue) {
     const tempo = typeof normalizeTimelineTempo === 'function'
-        ? normalizeTimelineTempo(timelineState.tempo)
+        ? normalizeTimelineTempo(
+            tempoValue === null || tempoValue === undefined
+                ? timelineState.tempo
+                : tempoValue
+        )
         : 100;
     const safeTempo = Math.max(1, Number(tempo) || 100);
     const stepSeconds = 60 / safeTempo / getPracticeScrollerStepsPerBeat();
     return Math.max(1, stepSeconds * 1000);
 }
 
-function getPracticeScrollerLeadInSteps(leadInMs) {
+function getPracticeScrollerLeadInSteps(leadInMs, countInMs) {
     const safeLeadInMs = Math.max(0, Number(leadInMs) || 0);
     if (safeLeadInMs <= 0) {
         return practiceScrollerState.leadInSteps;
     }
+
+    const safeCountInMs = Math.max(0, Number(countInMs) || 0);
+    if (safeCountInMs > 0) {
+        const countInBeatMs = safeCountInMs / 4;
+        const countInStepMs = countInBeatMs / getPracticeScrollerStepsPerBeat();
+        return Math.max(1, safeLeadInMs / Math.max(1, countInStepMs));
+    }
+
     return Math.max(1, safeLeadInMs / getPracticeScrollerBaseStepMs());
+}
+
+function getPracticeScrollerInitialLeadInTiming(config, sections) {
+    const tempo = config && config.Tempo !== undefined
+        ? config.Tempo
+        : timelineState.tempo;
+    const beatDurationMs = 60000 / Math.max(1, Number(tempo) || 100);
+    const countInMs = beatDurationMs * 4;
+    const regularLeadInMs = 180 + Math.max(3000, countInMs);
+    const firstSection = Array.isArray(sections) && sections.length > 0
+        ? sections[0]
+        : null;
+    const overlapSteps = firstSection && firstSection.overlapsPracticeCountIn
+        ? getPracticeSectionLength(firstSection)
+        : 0;
+    const overlapMs = Math.min(
+        countInMs,
+        Math.max(0, overlapSteps) * getPracticeScrollerBaseStepMs(tempo)
+    );
+
+    return {
+        countInMs: countInMs,
+        leadInMs: Math.max(0, regularLeadInMs - overlapMs)
+    };
 }
 
 function parsePracticeScrollerTuplet(noteValue) {
@@ -3337,12 +3568,9 @@ function flattenPracticeScrollerSections(sections, options) {
     const flattenOptions = options || {};
     const safeSections = Array.isArray(sections) ? sections : [];
     const visualLoopCopies = getPracticeScrollerVisualLoopCopies();
-    const sectionVisualRepeatCopies = getPracticeScrollerSectionVisualRepeatCopies(visualLoopCopies);
     const hasTimerLoop = practiceState.timerMinutes > 0;
     const configuredPracticeRepeats = normalizePracticeCount(practiceState.repeatCount, 1, 1, practiceRepeatCountMax);
     const actualOuterLoopCopies = hasTimerLoop ? visualLoopCopies : Math.max(0, configuredPracticeRepeats - 1);
-    const hasOuterPracticeLoop = hasTimerLoop || actualOuterLoopCopies > 0;
-    const extraVisualLoopCopies = Math.min(visualLoopCopies, actualOuterLoopCopies);
     const trackNotes = createEmptyPracticeTrackNotes();
     const targetSteps = createEmptyPracticeTrackFlags();
     const trackPatternNames = createEmptyPracticeTrackLabelMap();
@@ -3368,7 +3596,10 @@ function flattenPracticeScrollerSections(sections, options) {
             return;
         }
         const repeatCount = normalizePracticeCount(section.repeatCount, 1, 1, 32);
-        const renderRepeatCount = Math.min(repeatCount, sectionVisualRepeatCopies);
+        const renderRepeatCount = Math.min(
+            repeatCount,
+            getPracticeScrollerSectionVisualRepeatCopies(visualLoopCopies, sectionLength)
+        );
         const isLeadIn = Boolean(section.isLeadIn);
         const finalRepeatOutSteps = section && section.finalRepeatOutSteps ? section.finalRepeatOutSteps : {};
         if (!isLeadIn && loopStartStep === null) {
@@ -3473,6 +3704,10 @@ function flattenPracticeScrollerSections(sections, options) {
     const safePlaybackLoopStart = playbackLoopStart === null ? 0 : playbackLoopStart;
     const visualLoopLength = Math.max(0, visualCycleSteps - safeLoopStartStep);
     const playbackLoopLength = Math.max(0, playbackOffset - safePlaybackLoopStart);
+    const extraVisualLoopCopies = getPracticeScrollerOuterVisualLoopCopies(
+        visualLoopLength,
+        Math.min(visualLoopCopies, actualOuterLoopCopies)
+    );
     const baseTrackNotes = {};
     const baseTargetSteps = {};
     const baseBarStartSteps = barStartSteps
@@ -3563,6 +3798,7 @@ function createPracticeScrollerCell(noteValue, stepIndex, stepsPerBar, isPractic
     const safeBarStartInfo = barStartInfo || {};
     const tuplet = parsePracticeScrollerTuplet(noteValue);
     cellEl.className = 'practice-scroller-cell ' + getPracticeScrollerNoteClass(noteValue);
+    cellEl.dataset.practiceStepOrder = String(stepIndex);
     if (tuplet) {
         const displayStepWidth = isPracticeScrollerCompactViewport() ? 22 : 18;
         cellEl.classList.add('has-tuplet');
@@ -3714,14 +3950,14 @@ function openPracticeInstrumentToneVolumePopover(instrumentName, anchorEl, retur
     const anchorRect = anchorEl.getBoundingClientRect();
     closePracticeInstrumentVolumePopover();
 
-    const labelText = practiceScrollerInstrumentLabels[instrumentName] || instrumentName.replace('_', ' ');
+    const labelText = getPracticeInstrumentDisplayLabel(instrumentName);
     const popoverEl = document.createElement('div');
     popoverEl.id = 'practiceInstrumentVolumePopover';
     popoverEl.className = 'practice-volume-popover practice-volume-popover-wide';
 
     const titleEl = document.createElement('div');
     titleEl.className = 'practice-volume-title';
-    titleEl.textContent = 'Tonlautstärken: ' + labelText;
+    titleEl.textContent = practiceText('practice.mixer.toneVolumes', { instrument: labelText });
     popoverEl.appendChild(titleEl);
 
     toneDefinitions.forEach(function (toneDefinition) {
@@ -3730,7 +3966,8 @@ function openPracticeInstrumentToneVolumePopover(instrumentName, anchorEl, retur
 
         const nameEl = document.createElement('span');
         nameEl.className = 'practice-volume-row-name';
-        nameEl.textContent = toneDefinition.label;
+        const toneLabel = getPracticeToneDefinitionDisplayLabel(toneDefinition);
+        nameEl.textContent = toneLabel;
 
         const rangeEl = document.createElement('input');
         rangeEl.type = 'range';
@@ -3738,7 +3975,7 @@ function openPracticeInstrumentToneVolumePopover(instrumentName, anchorEl, retur
         rangeEl.max = '200';
         rangeEl.step = '5';
         rangeEl.value = Math.round(getPracticeInstrumentToneVolume(instrumentName, toneDefinition.key) * 100);
-        rangeEl.setAttribute('aria-label', toneDefinition.label + ' Lautstärke');
+        rangeEl.setAttribute('aria-label', practiceText('practice.mixer.toneVolumeAria', { tone: toneLabel }));
 
         const valueEl = document.createElement('output');
         valueEl.className = 'practice-volume-row-value';
@@ -3766,7 +4003,7 @@ function openPracticeInstrumentToneVolumePopover(instrumentName, anchorEl, retur
 
     const resetButtonEl = document.createElement('button');
     resetButtonEl.type = 'button';
-    resetButtonEl.textContent = 'Alle 100%';
+    resetButtonEl.textContent = practiceText('practice.mixer.allOneHundred');
     resetButtonEl.addEventListener('click', function () {
         if (practiceState.instrumentToneVolumes[instrumentName] &&
                 Object.keys(practiceState.instrumentToneVolumes[instrumentName]).length > 0 &&
@@ -3790,7 +4027,7 @@ function openPracticeInstrumentToneVolumePopover(instrumentName, anchorEl, retur
 
     const backButtonEl = document.createElement('button');
     backButtonEl.type = 'button';
-    backButtonEl.textContent = 'Zurück';
+    backButtonEl.textContent = practiceText('common.back');
     backButtonEl.addEventListener('click', function () {
         if (typeof returnHandler === 'function') {
             returnHandler();
@@ -3816,7 +4053,7 @@ function openPracticeInstrumentVolumePopover(instrumentNames, anchorEl, labelTex
 
     closePracticeInstrumentVolumePopover();
 
-    const label = labelText || practiceScrollerInstrumentLabels[targetInstruments[0]] || targetInstruments[0];
+    const label = labelText || getPracticeInstrumentDisplayLabel(targetInstruments[0]);
     const volume = targetInstruments.reduce(function (sum, instrumentName) {
         return sum + getPracticeInstrumentVolume(instrumentName);
     }, 0) / targetInstruments.length;
@@ -3840,14 +4077,14 @@ function openPracticeInstrumentVolumePopover(instrumentNames, anchorEl, labelTex
     rangeEl.max = '200';
     rangeEl.step = '5';
     rangeEl.value = Math.round(volume * 100);
-    rangeEl.setAttribute('aria-label', label + ' Lautstärke');
+    rangeEl.setAttribute('aria-label', practiceText('practice.mixer.instrumentVolumeAria', { instrument: label }));
 
     const actionsEl = document.createElement('div');
     actionsEl.className = 'practice-volume-actions';
 
     const muteButtonEl = document.createElement('button');
     muteButtonEl.type = 'button';
-    muteButtonEl.textContent = 'Stumm';
+    muteButtonEl.textContent = practiceText('practice.mixer.mute');
 
     const resetButtonEl = document.createElement('button');
     resetButtonEl.type = 'button';
@@ -3855,7 +4092,7 @@ function openPracticeInstrumentVolumePopover(instrumentNames, anchorEl, labelTex
 
     const toneButtonEl = document.createElement('button');
     toneButtonEl.type = 'button';
-    toneButtonEl.textContent = 'Töne';
+    toneButtonEl.textContent = practiceText('practice.mixer.tones');
     toneButtonEl.disabled = targetInstruments.length !== 1;
 
     function applyVolume(percentValue) {
@@ -3919,11 +4156,11 @@ function openTimelineInstrumentVolumesPopover(anchorEl) {
 
     const titleEl = document.createElement('div');
     titleEl.className = 'practice-volume-title';
-    titleEl.textContent = 'Instrumentlautstärken';
+    titleEl.textContent = practiceText('practice.mixer.instrumentVolumes');
     popoverEl.appendChild(titleEl);
 
     practiceTrackInstrumentNames.forEach(function (instrumentName) {
-        const labelText = practiceScrollerInstrumentLabels[instrumentName] || instrumentName.replace('_', ' ');
+        const labelText = getPracticeInstrumentDisplayLabel(instrumentName);
         const toneDefinitions = practiceInstrumentToneVolumeLabels[instrumentName] || [];
         const rowEl = document.createElement('div');
         rowEl.className = 'practice-volume-row';
@@ -3934,7 +4171,7 @@ function openTimelineInstrumentVolumesPopover(anchorEl) {
         if (toneDefinitions.length > 0) {
             nameEl.setAttribute('role', 'button');
             nameEl.setAttribute('tabindex', '0');
-            nameEl.title = 'Tonlautstärken öffnen';
+            nameEl.title = practiceText('practice.mixer.openToneVolumes');
             function openToneVolumes(event) {
                 if (event && typeof event.stopPropagation === 'function') {
                     event.stopPropagation();
@@ -3958,7 +4195,9 @@ function openTimelineInstrumentVolumesPopover(anchorEl) {
         rangeEl.max = '200';
         rangeEl.step = '5';
         rangeEl.value = Math.round(getPracticeInstrumentVolume(instrumentName) * 100);
-        rangeEl.setAttribute('aria-label', labelText + ' Lautstärke');
+        rangeEl.setAttribute('aria-label', practiceText('practice.mixer.instrumentVolumeAria', {
+            instrument: labelText
+        }));
 
         const valueEl = document.createElement('output');
         valueEl.className = 'practice-volume-row-value';
@@ -3990,7 +4229,7 @@ function openTimelineInstrumentVolumesPopover(anchorEl) {
 
     const resetButtonEl = document.createElement('button');
     resetButtonEl.type = 'button';
-    resetButtonEl.textContent = 'Alle 100%';
+    resetButtonEl.textContent = practiceText('practice.mixer.allOneHundred');
     resetButtonEl.addEventListener('click', function () {
         if (Object.keys(normalizePracticeInstrumentVolumes(practiceState.instrumentVolumes)).length > 0 &&
                 typeof recordArrangementHistorySnapshot === 'function') {
@@ -4022,6 +4261,110 @@ document.addEventListener('click', function (event) {
     closePracticeInstrumentVolumePopover();
 });
 
+function cachePracticeScrollerDom(scrollerEl) {
+    if (!scrollerEl) {
+        practiceScrollerState.dom = null;
+        practiceScrollerState.layout = null;
+        return null;
+    }
+
+    practiceScrollerState.dom = {
+        scrollerEl: scrollerEl,
+        stageEl: scrollerEl.querySelector('.practice-scroller-stage'),
+        firstLaneWrapEl: scrollerEl.querySelector('.practice-scroller-lane-wrap'),
+        firstCellEl: scrollerEl.querySelector('.practice-scroller-cell'),
+        statusEl: document.getElementById('practiceScrollerStatus'),
+        laneEls: Array.prototype.slice.call(scrollerEl.querySelectorAll('.practice-scroller-lane'))
+    };
+    practiceScrollerState.layout = null;
+    return practiceScrollerState.dom;
+}
+
+function getPracticeScrollerDom(scrollerEl) {
+    const cachedDom = practiceScrollerState.dom;
+    if (cachedDom && cachedDom.scrollerEl === scrollerEl && cachedDom.scrollerEl.isConnected) {
+        return cachedDom;
+    }
+    return cachePracticeScrollerDom(scrollerEl);
+}
+
+function restorePracticeScrollerCellOrder(scrollerEl) {
+    const scrollerDom = getPracticeScrollerDom(scrollerEl);
+    if (!scrollerDom) {
+        return;
+    }
+
+    practiceScrollerState.activeCells.forEach(function (cellEl) {
+        cellEl.classList.remove('is-current');
+    });
+    practiceScrollerState.activeCells = [];
+    practiceScrollerState.activeStep = -1;
+
+    scrollerDom.laneEls.forEach(function (laneEl) {
+        const cells = Array.prototype.slice.call(laneEl.children);
+        const orderedCells = cells.slice().sort(function (cellA, cellB) {
+            return (Number(cellA.dataset.practiceStepOrder) || 0) -
+                (Number(cellB.dataset.practiceStepOrder) || 0);
+        });
+        const orderChanged = orderedCells.some(function (cellEl, cellIndex) {
+            return cellEl !== cells[cellIndex];
+        });
+        if (!orderChanged) {
+            return;
+        }
+
+        const orderedFragment = document.createDocumentFragment();
+        orderedCells.forEach(function (cellEl) {
+            orderedFragment.appendChild(cellEl);
+        });
+        laneEl.appendChild(orderedFragment);
+    });
+
+    practiceScrollerState.visualSegmentRotations = Object.create(null);
+}
+
+function getPracticeScrollerLayout(scrollerDom) {
+    if (practiceScrollerState.layout) {
+        return practiceScrollerState.layout;
+    }
+
+    const cellRect = scrollerDom && scrollerDom.firstCellEl
+        ? scrollerDom.firstCellEl.getBoundingClientRect()
+        : null;
+    const stepWidth = cellRect && cellRect.width > 0
+        ? cellRect.width
+        : practiceScrollerState.stepWidth;
+    const compactViewport = isPracticeScrollerCompactViewport();
+    const playheadRatio = compactViewport ? 0.24 : practiceScrollerState.playheadRatio;
+    practiceScrollerState.layout = {
+        stepWidth: stepWidth,
+        playheadX: scrollerDom && scrollerDom.stageEl
+            ? scrollerDom.stageEl.clientWidth * playheadRatio
+            : 0,
+        laneStartX: scrollerDom && scrollerDom.firstLaneWrapEl
+            ? scrollerDom.firstLaneWrapEl.offsetLeft
+            : 0
+    };
+    practiceScrollerState.stepWidth = stepWidth;
+    return practiceScrollerState.layout;
+}
+
+function refreshPracticeScrollerLayout() {
+    const scrollerEl = document.getElementById('practiceScroller');
+    if (!scrollerEl || scrollerEl.hidden || practiceScrollerState.totalSteps <= 0) {
+        return;
+    }
+
+    practiceScrollerState.layout = null;
+    updatePracticeScrollerPosition(practiceScrollerState.currentStep);
+}
+
+if (typeof window !== 'undefined') {
+    window.addEventListener('resize', function () {
+        practiceScrollerState.layout = null;
+    }, { passive: true });
+}
+
 function renderPracticeScrollerFromPayload(playerPayload) {
     const scrollerEl = document.getElementById('practiceScroller');
     const rowsEl = document.getElementById('practiceScrollerRows');
@@ -4042,6 +4385,10 @@ function renderPracticeScrollerFromPayload(playerPayload) {
     practiceScrollerState.playbackAnchor = null;
     practiceScrollerState.activeCells = [];
     practiceScrollerState.visualSegmentRotations = Object.create(null);
+    practiceScrollerState.dom = null;
+    practiceScrollerState.layout = null;
+    practiceScrollerState.lastStatusText = '';
+    practiceScrollerState.lastStatusUpdateAt = 0;
     closePracticeInstrumentVolumePopover();
 
     const flattened = flattenPracticeScrollerSections(sections, {
@@ -4073,12 +4420,17 @@ function renderPracticeScrollerFromPayload(playerPayload) {
     practiceScrollerState.stepsPerBar = stepsPerBar;
     practiceScrollerState.currentStep = 0;
     practiceScrollerState.activeStep = -1;
+    const initialLeadInTiming = getPracticeScrollerInitialLeadInTiming(config, sections);
+    practiceScrollerState.visualLeadInSteps = getPracticeScrollerLeadInSteps(
+        initialLeadInTiming.leadInMs + practiceState.audioLatencyMs,
+        initialLeadInTiming.countInMs
+    );
 
     rowsEl.innerHTML = '';
     scrollerEl.hidden = flattened.totalSteps === 0;
 
     if (flattened.totalSteps === 0) {
-        statusEl.textContent = 'Keine Noten';
+        statusEl.textContent = practiceText('practice.status.noNotes');
         return;
     }
 
@@ -4131,10 +4483,13 @@ function renderPracticeScrollerFromPayload(playerPayload) {
         labelEl.tabIndex = 0;
         labelEl.setAttribute('role', 'button');
         labelEl.dataset.instrumentName = instrumentName;
-        const displayLabel = collapsedDjembeRows.labels[instrumentName] ||
-            practiceScrollerInstrumentLabels[instrumentName] ||
-            instrumentName;
-        labelEl.setAttribute('aria-label', 'Lautstärke für ' + displayLabel + ' einstellen');
+        const collapsedLabel = collapsedDjembeRows.labels[instrumentName];
+        const displayLabel = collapsedLabel === 'Djembe'
+            ? practiceText('practice.instrument.djembe')
+            : (collapsedLabel || getPracticeInstrumentDisplayLabel(instrumentName));
+        labelEl.setAttribute('aria-label', practiceText('practice.mixer.adjustInstrumentVolume', {
+            instrument: displayLabel
+        }));
         const volumeInstruments = collapsedDjembeRows.labels[instrumentName] === 'Djembe'
             ? ['Djembe_1', 'Djembe_2', 'Djembe_3']
             : [instrumentName];
@@ -4191,6 +4546,7 @@ function renderPracticeScrollerFromPayload(playerPayload) {
         rowsEl.appendChild(rowEl);
     });
 
+    cachePracticeScrollerDom(scrollerEl);
     updatePracticeScrollerPosition(-practiceScrollerState.visualLeadInSteps);
 }
 
@@ -4208,7 +4564,7 @@ function getPracticeScrollerRemainingStatus(rawStep) {
     if (rampLeadInCycles > 0 && loopStart > 0 && safeStep < loopStart) {
         const rampCycleLength = Math.max(1, loopStart / rampLeadInCycles);
         const remainingRampCycles = Math.max(0, Math.ceil((loopStart - safeStep) / rampCycleLength));
-        return 'Tempoaufbau: noch ' + remainingRampCycles + ' Wdh.';
+        return practiceText('practice.status.rampRemaining', { count: remainingRampCycles });
     }
 
     if (practiceScrollerState.practiceDurationSeconds > 0) {
@@ -4221,20 +4577,22 @@ function getPracticeScrollerRemainingStatus(rawStep) {
         const remainingMilliseconds = practiceScrollerState.timerEndsAt !== null
             ? practiceScrollerState.timerEndsAt - window.performance.now()
             : practiceScrollerState.practiceDurationSeconds * 1000;
-        return 'Noch ' + formatPracticeRemainingTime(remainingMilliseconds);
+        return practiceText('practice.status.timeRemaining', {
+            time: formatPracticeRemainingTime(remainingMilliseconds)
+        });
     }
 
     const repeatCount = normalizePracticeCount(practiceScrollerState.repeatCount, 1, 1, practiceRepeatCountMax);
     const loopLength = Math.max(0, Number(practiceScrollerState.playbackLoopLength) || 0);
     if (loopLength <= 0) {
-        return 'Noch ' + repeatCount + ' Wdh.';
+        return practiceText('practice.status.repeatsRemaining', { count: repeatCount });
     }
 
     const completedLoops = safeStep < loopStart
         ? 0
         : Math.floor((safeStep - loopStart) / loopLength);
     const remainingLoops = Math.max(0, repeatCount - completedLoops);
-    return 'Noch ' + remainingLoops + ' Wdh.';
+    return practiceText('practice.status.repeatsRemaining', { count: remainingLoops });
 }
 
 function normalizePracticeScrollerPlaybackStep(playbackStep) {
@@ -4368,7 +4726,7 @@ function getPracticeScrollerSegmentVisualStep(segment, localPlaybackStep) {
     );
 }
 
-function rotatePracticeScrollerSegmentCopies(scrollerEl, segmentStartStep, carouselInfo) {
+function rotatePracticeScrollerSegmentCopies(scrollerEl, segmentStartStep, carouselInfo, laneEls) {
     if (!scrollerEl || !carouselInfo || carouselInfo.normalCopyCount <= 1) {
         return;
     }
@@ -4386,7 +4744,10 @@ function rotatePracticeScrollerSegmentCopies(scrollerEl, segmentStartStep, carou
 
     const firstChildIndex = getPracticeScrollerPreRollLineSteps() + safeSegmentStart;
     const movedCellCount = rotationDelta * sectionLength;
-    scrollerEl.querySelectorAll('.practice-scroller-lane').forEach(function (laneEl) {
+    const lanes = Array.isArray(laneEls)
+        ? laneEls
+        : Array.prototype.slice.call(scrollerEl.querySelectorAll('.practice-scroller-lane'));
+    lanes.forEach(function (laneEl) {
         const finalCopyStartIndex = firstChildIndex + normalCopyCount * sectionLength;
         const insertionReference = laneEl.children[finalCopyStartIndex];
         if (!insertionReference || laneEl.children.length < finalCopyStartIndex + sectionLength) {
@@ -4429,11 +4790,8 @@ function updatePracticeScrollerPosition(playbackStep) {
         return;
     }
 
-    const stageEl = scrollerEl.querySelector('.practice-scroller-stage');
-    const firstLaneWrapEl = scrollerEl.querySelector('.practice-scroller-lane-wrap');
-    const firstLaneEl = scrollerEl.querySelector('.practice-scroller-lane');
-    const firstCellEl = scrollerEl.querySelector('.practice-scroller-cell');
-    const statusEl = document.getElementById('practiceScrollerStatus');
+    const scrollerDom = getPracticeScrollerDom(scrollerEl);
+    const scrollerLayout = getPracticeScrollerLayout(scrollerDom);
     const minVisualStep = -practiceScrollerState.visualLeadInSteps;
     const maxVisualStep = Math.max(0, practiceScrollerState.visualTotalSteps - 1);
     const rawStep = Math.max(minVisualStep, Number(playbackStep) || 0);
@@ -4455,30 +4813,33 @@ function updatePracticeScrollerPosition(playbackStep) {
             rotatePracticeScrollerSegmentCopies(
                 scrollerEl,
                 getRenderedPracticeScrollerStep(playbackContext.visualSegmentStart),
-                carouselInfo
+                carouselInfo,
+                scrollerDom ? scrollerDom.laneEls : null
             );
         }
     }
     const safeStep = Math.max(minVisualStep, Math.min(maxVisualStep, renderedStep));
     const activeStep = Math.max(0, Math.min(maxVisualStep, Math.floor(safeStep)));
-    const cellRect = firstCellEl ? firstCellEl.getBoundingClientRect() : null;
-    const stepWidth = cellRect && cellRect.width > 0 ? cellRect.width : practiceScrollerState.stepWidth;
-    const activePlayheadRatio = window.matchMedia('(max-width: 760px)').matches
-        ? 0.24
-        : practiceScrollerState.playheadRatio;
-    const playheadX = stageEl ? stageEl.clientWidth * activePlayheadRatio : 0;
-    const laneStartX = firstLaneWrapEl ? firstLaneWrapEl.offsetLeft : 0;
+    const stepWidth = scrollerLayout.stepWidth;
     const visualStep = safeStep + getPracticeScrollerPreRollLineSteps();
-    const laneOffset = playheadX - laneStartX - (visualStep * stepWidth) - (stepWidth / 2);
+    const laneOffset = scrollerLayout.playheadX - scrollerLayout.laneStartX -
+        (visualStep * stepWidth) - (stepWidth / 2);
 
+    const now = window.performance.now();
     practiceScrollerState.currentStep = rawStep;
-    practiceScrollerState.stepWidth = stepWidth;
     scrollerEl.style.setProperty('--practice-scroller-offset', laneOffset + 'px');
-    if (statusEl) {
-        statusEl.textContent = getPracticeScrollerRemainingStatus(rawStep);
+    const activeStepChanged = practiceScrollerState.activeStep !== activeStep;
+    if (scrollerDom && scrollerDom.statusEl &&
+            (activeStepChanged || now - practiceScrollerState.lastStatusUpdateAt >= 250)) {
+        const nextStatusText = getPracticeScrollerRemainingStatus(rawStep);
+        if (nextStatusText !== practiceScrollerState.lastStatusText) {
+            scrollerDom.statusEl.textContent = nextStatusText;
+            practiceScrollerState.lastStatusText = nextStatusText;
+        }
+        practiceScrollerState.lastStatusUpdateAt = now;
     }
 
-    if (practiceScrollerState.activeStep !== activeStep) {
+    if (activeStepChanged) {
         if (isPracticeScrollerCompactViewport()) {
             practiceScrollerState.activeCells.forEach(function (cellEl) {
                 cellEl.classList.remove('is-current');
@@ -4489,7 +4850,7 @@ function updatePracticeScrollerPosition(playbackStep) {
                 cellEl.classList.remove('is-current');
             });
             practiceScrollerState.activeCells = [];
-            scrollerEl.querySelectorAll('.practice-scroller-lane').forEach(function (laneEl) {
+            (scrollerDom ? scrollerDom.laneEls : []).forEach(function (laneEl) {
                 const activeChildIndex = activeStep + getPracticeScrollerPreRollLineSteps();
                 if (laneEl.children[activeChildIndex]) {
                     const activeCellEl = laneEl.children[activeChildIndex];
@@ -4512,10 +4873,14 @@ function stopPracticeScrollerAnimation() {
 function runPracticeScrollerAnimation() {
     const now = window.performance.now();
     const events = practiceScrollerState.playbackEvents;
+    let dueEventCount = 0;
 
-    while (events.length > 0 && events[0].time <= now) {
-        practiceScrollerState.playbackAnchor = events.shift();
-        updatePracticeScrollerPosition(practiceScrollerState.playbackAnchor.step);
+    while (dueEventCount < events.length && events[dueEventCount].time <= now) {
+        dueEventCount += 1;
+    }
+    if (dueEventCount > 0) {
+        practiceScrollerState.playbackAnchor = events[dueEventCount - 1];
+        events.splice(0, dueEventCount);
     }
 
     const anchor = practiceScrollerState.playbackAnchor;
@@ -4566,7 +4931,18 @@ function recyclePracticeScrollerVisualLoop(nextStep) {
 
 function updatePracticeScrollerPlayback(playbackStep, delayMs) {
     const stepNumber = Math.max(0, Number(playbackStep) || 0);
-    const eventTime = window.performance.now() + Math.max(0, Number(delayMs) || 0) + practiceState.audioLatencyMs;
+    const now = window.performance.now();
+    const eventTime = now + Math.max(0, Number(delayMs) || 0) + practiceState.audioLatencyMs;
+
+    // The player schedules notes ahead of time. During count-in, an early
+    // scheduler message must not replace the authoritative start announced by
+    // the preceding "playing" state, otherwise the score reaches the playhead
+    // one or more count-in beats too soon.
+    if (practiceScrollerState.playbackStartedAt !== null &&
+            eventTime < practiceScrollerState.playbackStartedAt - 40) {
+        return;
+    }
+
     const matchingEvent = practiceScrollerState.playbackEvents.find(function (playbackEvent) {
         return playbackEvent.step === stepNumber && Math.abs(playbackEvent.time - eventTime) < 40;
     });
@@ -4583,24 +4959,38 @@ function updatePracticeScrollerPlayback(playbackStep, delayMs) {
         };
     }
 
-    practiceScrollerState.playbackEvents.push({
+    const playbackEvent = {
         step: stepNumber,
         time: eventTime
-    });
-    practiceScrollerState.playbackEvents.sort(function (a, b) {
-        return a.time - b.time;
-    });
+    };
+    const lastPlaybackEvent = practiceScrollerState.playbackEvents[
+        practiceScrollerState.playbackEvents.length - 1
+    ];
+    if (!lastPlaybackEvent || lastPlaybackEvent.time <= eventTime) {
+        practiceScrollerState.playbackEvents.push(playbackEvent);
+    } else {
+        let insertIndex = practiceScrollerState.playbackEvents.length;
+        while (insertIndex > 0 && practiceScrollerState.playbackEvents[insertIndex - 1].time > eventTime) {
+            insertIndex -= 1;
+        }
+        practiceScrollerState.playbackEvents.splice(insertIndex, 0, playbackEvent);
+    }
 
     if (practiceScrollerState.animationFrameId === null) {
         practiceScrollerState.animationFrameId = window.requestAnimationFrame(runPracticeScrollerAnimation);
     }
 }
 
-function startPracticeScrollerLeadIn(leadInMs) {
+function startPracticeScrollerLeadIn(leadInMs, countInMs) {
     const safeLeadInMs = Math.max(0, Number(leadInMs) || 0) + practiceState.audioLatencyMs;
+    const safeCountInMs = Math.max(0, Number(countInMs) || 0);
     stopPracticeScrollerAnimation();
+    const scrollerEl = document.getElementById('practiceScroller');
+    if (scrollerEl) {
+        restorePracticeScrollerCellOrder(scrollerEl);
+    }
     practiceScrollerState.playbackEvents = [];
-    practiceScrollerState.visualLeadInSteps = getPracticeScrollerLeadInSteps(safeLeadInMs);
+    practiceScrollerState.visualLeadInSteps = getPracticeScrollerLeadInSteps(safeLeadInMs, safeCountInMs);
     practiceScrollerState.playbackAnchor = {
         step: -practiceScrollerState.visualLeadInSteps,
         time: window.performance.now()
@@ -4623,14 +5013,33 @@ function startPracticeScrollerLeadIn(leadInMs) {
     practiceScrollerState.animationFrameId = window.requestAnimationFrame(runPracticeScrollerAnimation);
 }
 
-function updatePracticeScrollerState(nextState, leadInMs, endDelayMs) {
+function preparePracticeScrollerLeadIn(leadInMs, countInMs) {
+    const safeLeadInMs = Math.max(0, Number(leadInMs) || 0) + practiceState.audioLatencyMs;
+    const safeCountInMs = Math.max(0, Number(countInMs) || 0);
+    if (safeLeadInMs <= 0) {
+        return;
+    }
+
+    stopPracticeScrollerAnimation();
+    practiceScrollerState.playbackEvents = [];
+    practiceScrollerState.playbackAnchor = null;
+    practiceScrollerState.playbackStartedAt = null;
+    practiceScrollerState.visualLeadInSteps = getPracticeScrollerLeadInSteps(safeLeadInMs, safeCountInMs);
+    updatePracticeScrollerPosition(-practiceScrollerState.visualLeadInSteps);
+}
+
+function updatePracticeScrollerState(nextState, leadInMs, endDelayMs, countInMs) {
     const scrollerEl = document.getElementById('practiceScroller');
     if (!scrollerEl) {
         return;
     }
     scrollerEl.dataset.playbackState = nextState || '';
+    if (nextState === 'ready') {
+        preparePracticeScrollerLeadIn(leadInMs, countInMs);
+        return;
+    }
     if (nextState === 'playing') {
-        startPracticeScrollerLeadIn(leadInMs);
+        startPracticeScrollerLeadIn(leadInMs, countInMs);
         return;
     }
 
