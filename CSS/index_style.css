@@ -3107,6 +3107,22 @@ body.is-timeline-dragging .timeline-dropzone-inline {
 }
 
 @media (max-width: 760px), (hover: none) and (pointer: coarse) and (max-height: 760px) {
+    input:not([type]),
+    input[type="text"],
+    input[type="search"],
+    input[type="password"],
+    input[type="email"],
+    input[type="url"],
+    input[type="tel"],
+    input[type="number"],
+    input[type="date"],
+    input[type="time"],
+    input[type="datetime-local"],
+    select,
+    textarea {
+        font-size: 16px !important;
+    }
+
     .app-body {
         margin: 0;
         padding: 0;

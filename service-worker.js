@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'barabeat-studio-offline-v6-i18n-phase2';
+const CACHE_NAME = 'barabeat-studio-offline-v7-mobile-inputs';
 const APP_SHELL = [
   './',
   './index.php',

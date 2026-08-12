@@ -348,7 +348,11 @@ function barabeat_access_render_login($errorMessage = '', $configurationMissing 
         button:hover { background: #19583f; }
         .message { margin: 0 0 16px; padding: 10px 12px; border-left: 4px solid #9b3e2f; background: #f8e4df; color: #7d2f23; }
         .config { border-left-color: #a86b17; background: #fff0cf; color: #6c4613; }
-        @media (max-width: 520px) { body { padding: 14px; } main { padding: 22px; } }
+        @media (max-width: 520px), (hover: none) and (pointer: coarse) {
+            body { padding: 14px; }
+            main { padding: 22px; }
+            input, select, textarea { font-size: 16px; }
+        }
     </style>
 </head>
 <body>

@@ -291,6 +291,19 @@ body.embedded-player [data-playing] {
 }
 
 @media (max-width: 560px) {
+  input:not([type]),
+  input[type="text"],
+  input[type="search"],
+  input[type="password"],
+  input[type="email"],
+  input[type="url"],
+  input[type="tel"],
+  input[type="number"],
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
   body.embedded-player {
     padding: 6px;
     font-size: 84%;
