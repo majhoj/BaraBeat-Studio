@@ -192,7 +192,7 @@
     "quickPlay": {
       "aria": "Reproducir directamente desde la partitura",
       "frameTitle": "Reproductor de vista previa de la partitura",
-      "tempo": "Tempo",
+      "tempo": "BPM",
       "playSelected": "Reproducir la selección de Pattern",
       "stop": "Detener la reproducción inmediata",
       "loadingSounds": "Cargando sonidos",
@@ -304,7 +304,7 @@
       "confirmDelete": "¿Eliminar el escenario de práctica \"{name}\"?"
     },
     "controls": {
-      "tempo": "Tempo",
+      "tempo": "BPM",
       "swingProfile": "Perfil de Swing",
       "feel": "Feel",
       "tempoRamp": "Progresión de tempo",
@@ -443,7 +443,7 @@
     "mobilePlay": "Reproducir arreglo",
     "mobileAudioFrameTitle": "Reproductor de audio móvil del arreglo",
     "audioFrameTitle": "Reproductor de audio del arreglo",
-    "tempo": "Tempo",
+    "tempo": "BPM",
     "swingProfile": "Perfil de Swing",
     "swingProfileMeter": "Perfil de Swing {meter}",
     "feel": "Feel",

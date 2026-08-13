@@ -192,7 +192,7 @@
     "quickPlay": {
       "aria": "Direktes Abspielen vom Notenblatt",
       "frameTitle": "Notenblatt-Vorhörspieler",
-      "tempo": "Tempo",
+      "tempo": "BPM",
       "playSelected": "Ausgewählte Pattern abspielen",
       "stop": "Sofort-Spielen stoppen",
       "loadingSounds": "Sounds werden geladen",
@@ -304,7 +304,7 @@
       "confirmDelete": "Übungsszenario \"{name}\" löschen?"
     },
     "controls": {
-      "tempo": "Tempo",
+      "tempo": "BPM",
       "swingProfile": "Swing-Profil",
       "feel": "Feel",
       "tempoRamp": "Tempoaufbau",
@@ -443,7 +443,7 @@
     "mobilePlay": "Arrangement abspielen",
     "mobileAudioFrameTitle": "Audioplayer Arrangement mobil",
     "audioFrameTitle": "Audioplayer Arrangement",
-    "tempo": "Tempo",
+    "tempo": "BPM",
     "swingProfile": "Swing-Profil",
     "swingProfileMeter": "Swing-Profil {meter}",
     "feel": "Feel",

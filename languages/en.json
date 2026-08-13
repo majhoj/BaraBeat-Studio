@@ -192,7 +192,7 @@
     "quickPlay": {
       "aria": "Play directly from the score",
       "frameTitle": "Score preview player",
-      "tempo": "Tempo",
+      "tempo": "BPM",
       "playSelected": "Play selected patterns",
       "stop": "Stop instant playback",
       "loadingSounds": "Loading sounds",
@@ -304,7 +304,7 @@
       "confirmDelete": "Delete practice scenario \"{name}\"?"
     },
     "controls": {
-      "tempo": "Tempo",
+      "tempo": "BPM",
       "swingProfile": "Swing profile",
       "feel": "Feel",
       "tempoRamp": "Tempo ramp",
@@ -443,7 +443,7 @@
     "mobilePlay": "Play arrangement",
     "mobileAudioFrameTitle": "Mobile arrangement audio player",
     "audioFrameTitle": "Arrangement audio player",
-    "tempo": "Tempo",
+    "tempo": "BPM",
     "swingProfile": "Swing profile",
     "swingProfileMeter": "Swing profile {meter}",
     "feel": "Feel",

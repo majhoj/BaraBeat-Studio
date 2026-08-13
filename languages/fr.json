@@ -192,7 +192,7 @@
     "quickPlay": {
       "aria": "Lecture directe depuis la partition",
       "frameTitle": "Lecteur d'aperçu de la partition",
-      "tempo": "Tempo",
+      "tempo": "BPM",
       "playSelected": "Lire les Patterns sélectionnés",
       "stop": "Arrêter la lecture immédiate",
       "loadingSounds": "Chargement des sons",
@@ -304,7 +304,7 @@
       "confirmDelete": "Supprimer le scénario d'entraînement \"{name}\" ?"
     },
     "controls": {
-      "tempo": "Tempo",
+      "tempo": "BPM",
       "swingProfile": "Profil Swing",
       "feel": "Feel",
       "tempoRamp": "Progression du tempo",
@@ -443,7 +443,7 @@
     "mobilePlay": "Lire l'arrangement",
     "mobileAudioFrameTitle": "Lecteur audio mobile de l'arrangement",
     "audioFrameTitle": "Lecteur audio de l'arrangement",
-    "tempo": "Tempo",
+    "tempo": "BPM",
     "swingProfile": "Profil Swing",
     "swingProfileMeter": "Profil Swing {meter}",
     "feel": "Feel",
