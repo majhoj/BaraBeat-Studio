@@ -4,5 +4,10 @@ barabeat_require_access('page');
 
 header('Content-Type: text/html; charset=UTF-8');
 header('Cache-Control: private, no-cache, must-revalidate');
-readfile(__DIR__ . '/Bedienungsanleitung.html');
 
+define('BARABEAT_MANUAL_RENDER', true);
+$manualLanguage = 'de';
+$manualAssetBaseUrl = 'manual/assets';
+$manualBackUrl = 'index.php';
+
+require __DIR__ . '/manual/index.php';

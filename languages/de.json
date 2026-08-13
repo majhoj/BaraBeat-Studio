@@ -388,8 +388,8 @@
     "instrument": {
       "kenkeni": "Kenkeni",
       "sangban": "Sangban",
-      "doundoun": "Doundoun",
-      "threeBass": "Dreierbass",
+      "doundoun": "Dununba",
+      "threeBass": "Ballet Dununs",
       "djembe": "Djembe",
       "djembe1": "Djembe 1",
       "djembe2": "Djembe 2",
@@ -402,7 +402,7 @@
       "call": "Call",
       "intro": "Intro",
       "outro": "Outro",
-      "warmup": "Echauffement",
+      "warmup": "Échauffement",
       "solo": "Solo",
       "pause": "Pause",
       "empty": "Leer"
@@ -489,7 +489,7 @@
       "call": "Call",
       "intro": "Intro",
       "outro": "Outro",
-      "warmup": "Echauffement",
+      "warmup": "Échauffement",
       "solo": "Solo",
       "pause": "Pause",
       "empty": "Leer"
@@ -498,8 +498,8 @@
       "generic": "Instrument",
       "kenkeni": "Kenkeni",
       "sangban": "Sangban",
-      "doundoun": "Doundoun",
-      "threeBass": "Dreierbass",
+      "doundoun": "Dununba",
+      "threeBass": "Ballet Dununs",
       "djembe": "Djembe",
       "djembe1": "Djembe 1",
       "djembe2": "Djembe 2",
@@ -526,8 +526,8 @@
     "instrument": {
       "kenkeni": "Kenkeni",
       "sangban": "Sangban",
-      "doundoun": "Doundoun",
-      "threeBass": "Dreierbass",
+      "doundoun": "Dununba",
+      "threeBass": "Ballet Dununs",
       "djembe1": "Djembe 1",
       "djembe2": "Djembe 2",
       "djembe3": "Djembe 3"

@@ -3205,9 +3205,12 @@ function renderTimelinePanel() {
         ? practiceSwingProfileWrapEl.querySelector('span')
         : document.getElementById('practiceSwingProfileTitle');
     if (practiceProfileTitleEl) {
-        practiceProfileTitleEl.textContent = currentProfileKey === 'binaer'
-            ? 'Profil 16/8'
-            : (currentProfileKey === 'tenaer' ? 'Profil 12/8' : 'Profil 9/8');
+        const practiceMeter = currentProfileKey === 'binaer'
+            ? '16/8'
+            : (currentProfileKey === 'tenaer' ? '12/8' : '9/8');
+        practiceProfileTitleEl.textContent = timelineText('practice.dialog.swingProfileMeter', {
+            meter: practiceMeter
+        });
     }
 
     panelEl.hidden = !timelineState.visible;

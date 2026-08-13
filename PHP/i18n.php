@@ -95,7 +95,7 @@ function barabeat_locale($language = null)
         'en' => 'en-GB',
         'fr' => 'fr-FR',
         'es' => 'es-ES',
-        'pt' => 'pt-PT',
+        'pt' => 'pt-BR',
     ];
     $resolved = $language === null ? barabeat_language() : barabeat_normalize_language($language);
     return $locales[$resolved] ?? $locales['en'];
@@ -176,7 +176,7 @@ function barabeat_i18n_config()
             'en' => 'en-GB',
             'fr' => 'fr-FR',
             'es' => 'es-ES',
-            'pt' => 'pt-PT',
+            'pt' => 'pt-BR',
         ],
         'catalogs' => $catalogs,
     ];
@@ -195,4 +195,3 @@ function barabeat_i18n_config_json()
     );
     return is_string($json) ? $json : '{}';
 }
-

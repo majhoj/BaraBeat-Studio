@@ -20,6 +20,6 @@ labels and stored values have been separated explicitly, translate them through
 a display mapping only. Never replace the underlying value in `.bbs` content,
 IndexedDB records, timeline metadata or player data.
 
-German is the reference catalog. English is the fallback catalog. Every new
-key must be added to both catalogs before it is used. French, Spanish and
-Portuguese catalogs can be added later without changing the API.
+English is the primary semantic reference catalog and the fallback catalog.
+German is the secondary reference. Every new key must be added to all five
+catalogs (`de`, `en`, `fr`, `es`, `pt`) before it is used.

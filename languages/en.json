@@ -234,11 +234,11 @@
       "function": "Function"
     },
     "function": {
-      "accompanimentPattern": "Accompaniment pattern"
+      "accompanimentPattern": "Accompaniment Pattern"
     },
     "dialog": {
       "confirm": "OK",
-      "customizeLabel": "Customize the label for \"{name}\".\nFor example: \"Solo 1\", \"1st solo\", \"Accompaniment pattern 2\"."
+      "customizeLabel": "Customize the label for \"{name}\".\nFor example: \"Solo 1\", \"1st solo\", \"Accompaniment Pattern 2\"."
     }
   },
   "score": {
@@ -256,13 +256,13 @@
       "bass": "Bass",
       "slapOrBell": "Slap or bell",
       "slapSlashBell": "Slap / bell",
-      "muffledTone": "Muffled tone",
-      "muffledSlapOrClick": "Muffled slap or click",
-      "muffledSlapSlashClick": "Muffled slap / click",
-      "toneFlam": "Tone flam",
-      "slapFlam": "Slap flam",
-      "bassSlapFlam": "Bass and slap flam",
-      "bassSlapFlamPlural": "Bass and slap flam"
+      "muffledTone": "Muffled Tone",
+      "muffledSlapOrClick": "Muffled Slap or click",
+      "muffledSlapSlashClick": "Muffled Slap / click",
+      "toneFlam": "Tone Flam",
+      "slapFlam": "Slap Flam",
+      "bassSlapFlam": "Bass and Slap Flam",
+      "bassSlapFlamPlural": "Bass and Slap Flam"
     },
     "legend": {
       "repeat": "Repeat"
@@ -348,7 +348,7 @@
       "automatic": "Auto"
     },
     "dialog": {
-      "closeSwingProfile": "Close swing profile",
+      "closeSwingProfile": "Close Swing profile",
       "swingProfileMeter": "Swing profile {meter}",
       "profilePreview": "{profile} preview",
       "profilePreviewLegend": "grey = grid, black = shifted note",
@@ -388,8 +388,8 @@
     "instrument": {
       "kenkeni": "Kenkeni",
       "sangban": "Sangban",
-      "doundoun": "Doundoun",
-      "threeBass": "Three bass drums",
+      "doundoun": "Dununba",
+      "threeBass": "Ballet Dununs",
       "djembe": "Djembe",
       "djembe1": "Djembe 1",
       "djembe2": "Djembe 2",
@@ -402,7 +402,7 @@
       "call": "Call",
       "intro": "Intro",
       "outro": "Outro",
-      "warmup": "Warm-up",
+      "warmup": "Échauffement",
       "solo": "Solo",
       "pause": "Pause",
       "empty": "Empty"
@@ -417,11 +417,11 @@
       "tone": "Tone",
       "bass": "Bass",
       "slap": "Slap",
-      "muffledTone": "Muffled tone",
-      "muffledSlap": "Muffled slap",
-      "toneFlam": "Tone flam",
-      "slapFlam": "Slap flam",
-      "bassSlapFlam": "Bass + slap flam",
+      "muffledTone": "Muffled Tone",
+      "muffledSlap": "Muffled Slap",
+      "toneFlam": "Tone Flam",
+      "slapFlam": "Slap Flam",
+      "bassSlapFlam": "Bass + Slap Flam",
       "h2hRestMute": "H2H rest/mute"
     },
     "rhythm": {
@@ -489,7 +489,7 @@
       "call": "Call",
       "intro": "Intro",
       "outro": "Outro",
-      "warmup": "Warm-up",
+      "warmup": "Échauffement",
       "solo": "Solo",
       "pause": "Pause",
       "empty": "Empty"
@@ -498,8 +498,8 @@
       "generic": "Instrument",
       "kenkeni": "Kenkeni",
       "sangban": "Sangban",
-      "doundoun": "Doundoun",
-      "threeBass": "Three bass drums",
+      "doundoun": "Dununba",
+      "threeBass": "Ballet Dununs",
       "djembe": "Djembe",
       "djembe1": "Djembe 1",
       "djembe2": "Djembe 2",
@@ -526,8 +526,8 @@
     "instrument": {
       "kenkeni": "Kenkeni",
       "sangban": "Sangban",
-      "doundoun": "Doundoun",
-      "threeBass": "Three bass drums",
+      "doundoun": "Dununba",
+      "threeBass": "Ballet Dununs",
       "djembe1": "Djembe 1",
       "djembe2": "Djembe 2",
       "djembe3": "Djembe 3"

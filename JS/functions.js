@@ -203,8 +203,14 @@ function createMenuChooser(s, x, y, config) {
       cursor: "pointer",
     });
     setChooserNodeValue(eintrag, name, config.chooserType);
+    let eintragBreite = eintrag.getBBox().width;
+    if (Number.isFinite(eintragBreite)) {
+      menuBreite = Math.max(menuBreite, Math.ceil(eintragBreite) + 20);
+    }
     menuGruppe.add(eintrag);
   });
+
+  menuBg.attr({ width: menuBreite });
 
   chooserGruppe.add(chooserText, menuGruppe);
   chooserGruppe.transform("translate(" + x + "," + y + ")");
@@ -212,6 +218,20 @@ function createMenuChooser(s, x, y, config) {
   bindChooserInteraction(chooserGruppe, chooserText, menuGruppe, config.onSelect);
 
   return chooserGruppe;
+}
+
+function setChooserMenuMinimumWidth(menuGruppe, minimumWidth) {
+  if (!menuGruppe || typeof menuGruppe.select !== "function") {
+    return;
+  }
+  let menuBackground = menuGruppe.select("rect");
+  if (!menuBackground) {
+    return;
+  }
+  let currentWidth = Number(menuBackground.attr("width"));
+  menuBackground.attr({
+    width: Number.isFinite(currentWidth) ? Math.max(currentWidth, minimumWidth) : minimumWidth,
+  });
 }
 
 function requestChooserLabel(defaultName, promptText) {
@@ -423,7 +443,7 @@ function createInstrumentChooser(s, x, y, startText = "Instrument", startFill = 
     labelClass: "instrument-label",
     startText: normalizeDoundounInstrumentName(startText),
     startFill: startFill,
-    menuWidth: 120,
+    menuWidth: 155,
     options: getInstrumentChooserOptions(),
     onSelect: function (name, chooserGruppe) {
       if (name === "Leer") {
@@ -444,7 +464,7 @@ function createFunctionChooser(s, x, y, startText = "Funktion", startFill = "gra
     labelClass: "function-label",
     startText: startText,
     startFill: startFill,
-    menuWidth: 140,
+    menuWidth: 260,
     options: getFunctionChooserOptions(),
     onSelect: function (name, chooserGruppe, chooserText) {
       if (name !== "Solo" && name !== "Begleitpattern") {
@@ -940,6 +960,8 @@ function rewireInstrumentChooser(chooserGruppe) {
     return;
   }
 
+  setChooserMenuMinimumWidth(menuGruppe, 155);
+
   setChooserNodeValue(instrumentText, normalizeDoundounInstrumentName(instrumentText.attr("text")), "instrument");
   menuGruppe.selectAll("text").forEach(function (menuText) {
     setChooserNodeValue(menuText, normalizeDoundounInstrumentName(menuText.attr("text")), "instrument");
@@ -964,6 +986,8 @@ function rewireFunctionChooser(chooserGruppe) {
   if (!menuGruppe || menuGruppe.type !== "g") {
     return;
   }
+
+  setChooserMenuMinimumWidth(menuGruppe, 260);
 
   setChooserNodeValue(functionText, functionText.attr("text"), "function");
   menuGruppe.selectAll("text").forEach(function (menuText) {

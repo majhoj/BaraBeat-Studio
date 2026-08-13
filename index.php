@@ -107,6 +107,9 @@ $activeLanguage = barabeat_language();
                     <select id="languageSelect" data-barabeat-language-select aria-label="<?php echo htmlspecialchars(barabeat_t('language.label'), ENT_QUOTES, 'UTF-8'); ?>" data-i18n-aria-label="language.label">
                         <option value="de" data-i18n="language.option.de"<?php echo $activeLanguage === 'de' ? ' selected' : ''; ?>><?php echo htmlspecialchars(barabeat_t('language.option.de'), ENT_QUOTES, 'UTF-8'); ?></option>
                         <option value="en" data-i18n="language.option.en"<?php echo $activeLanguage === 'en' ? ' selected' : ''; ?>><?php echo htmlspecialchars(barabeat_t('language.option.en'), ENT_QUOTES, 'UTF-8'); ?></option>
+                        <option value="fr"<?php echo $activeLanguage === 'fr' ? ' selected' : ''; ?>>Français</option>
+                        <option value="es"<?php echo $activeLanguage === 'es' ? ' selected' : ''; ?>>Español</option>
+                        <option value="pt"<?php echo $activeLanguage === 'pt' ? ' selected' : ''; ?>>Português</option>
                     </select>
                 </label>
                 <?php if ($canManageTemporaryAccess): ?>
@@ -1720,7 +1723,16 @@ function bindLoadedScoreElements() {
 
 function syncStateAfterHistoryRestore(syncOptions) {
     try {
-        const readResult = callPHPScript_lesen(zeilenAnzahl, { showAlert: false });
+        let readResult = callPHPScript_lesen(zeilenAnzahl, {
+            showAlert: false,
+            updateQuickPlaySelectors: false
+        });
+        if (normalizeLegacyMobileSheetNotePositions(readResult)) {
+            readResult = callPHPScript_lesen(zeilenAnzahl, {
+                showAlert: false,
+                updateQuickPlaySelectors: false
+            });
+        }
         syncTimelineStateFromReadResult(readResult, syncOptions || buildCurrentTimelineSyncOptions());
         renderPracticePanel();
         if (practiceState.visible) {
@@ -3101,6 +3113,19 @@ function repeatSheetQuickPlayHighlightRefsToLength(sourceRefs, targetLength) {
     return repeatedRefs;
 }
 
+function repeatSheetQuickPlayValues(sourceValues, repeatCount) {
+    const values = Array.isArray(sourceValues) ? sourceValues : [];
+    const safeRepeatCount = Math.max(1, Math.round(Number(repeatCount) || 1));
+    if (values.length === 0 || safeRepeatCount === 1) {
+        return values.slice();
+    }
+    const repeatedValues = [];
+    for (let repeatIndex = 0; repeatIndex < safeRepeatCount; repeatIndex++) {
+        repeatedValues.push.apply(repeatedValues, values);
+    }
+    return repeatedValues;
+}
+
 function getSheetQuickPlayPatternNotes(pattern) {
     return (Array.isArray(pattern && pattern.bars) ? pattern.bars : []).reduce(function (allNotes, bar) {
         const barNotes = Array.isArray(bar && bar.notes) ? bar.notes : [];
@@ -3416,6 +3441,7 @@ function buildSheetQuickPlayConfiguredSections(preparedPatterns) {
         const labels = [];
         const labelNames = [];
         const parallelAccompanimentLoops = [];
+        const hasParallelPatterns = group.length > 1;
         const section = createSheetQuickPlaySection(
             'Begleitung',
             '',
@@ -3432,14 +3458,28 @@ function buildSheetQuickPlayConfiguredSections(preparedPatterns) {
         group.forEach(function (groupEntry) {
             const pattern = groupEntry.pattern;
             const targetInstruments = groupEntry.targetInstruments;
-            section.repeatCount = Math.max(
-                section.repeatCount,
-                Math.max(1, Math.round(Number(pattern.quickPlaySectionRepeatCount) || 1))
+            const patternRepeatCount = Math.max(
+                1,
+                Math.round(Number(pattern.quickPlaySectionRepeatCount) || 1)
             );
-            const patternNotes = getSheetQuickPlayPatternNotes(pattern);
-            const patternHighlightRefs = getSheetQuickPlayPatternHighlightRefs(pattern);
+            if (!hasParallelPatterns) {
+                section.repeatCount = Math.max(section.repeatCount, patternRepeatCount);
+            }
+            let patternNotes = getSheetQuickPlayPatternNotes(pattern);
+            let patternHighlightRefs = getSheetQuickPlayPatternHighlightRefs(pattern);
+            const patternUnitLength = patternNotes.length;
+            if (hasParallelPatterns && patternRepeatCount > 1) {
+                patternNotes = repeatSheetQuickPlayValues(patternNotes, patternRepeatCount);
+                patternHighlightRefs = repeatSheetQuickPlayValues(patternHighlightRefs, patternRepeatCount);
+            }
             const inStep = getSheetQuickPlayPatternInStep(pattern);
-            const outStep = getSheetQuickPlayPatternOutStep(pattern);
+            const sourceOutStep = getSheetQuickPlayPatternOutStep(pattern);
+            const outStep = sourceOutStep !== null &&
+                    sourceOutStep !== undefined &&
+                    hasParallelPatterns &&
+                    patternRepeatCount > 1
+                ? sourceOutStep + (patternUnitLength * (patternRepeatCount - 1))
+                : sourceOutStep;
             const pickupEndStep = getSheetQuickPlayPickupEndStep(patternNotes, inStep, stepsPerBar);
             let pickupNotes = buildSheetQuickPlayPickupNotes(patternNotes, inStep, stepsPerBar);
             let mainNotes = pickupEndStep > 0 ? patternNotes.slice(pickupEndStep) : patternNotes.slice();
@@ -5327,13 +5367,16 @@ function getReadRhythmConfig() {
         };
     }
     if (rhythm == 'tenaer') {
+        const gridLineStepX = 850 / 26;
+        const noteStepX = gridLineStepX / 2;
+        const firstNoteX = 100 + gridLineStepX + 1;
         return {
             rhythmLabel: uiText('score.readout.ternary'),
             stepsPerBar: 24,
             totalStepsPerLine: 48,
             gapSlotCount: 2,
             getLineSlotIndex: function (centerX) {
-                return Math.round(((centerX - 34) / 16.5) - 5);
+                return Math.round((centerX - firstNoteX) / noteStepX) + 1;
             }
         };
     }
@@ -6316,6 +6359,7 @@ function getMobileSheetLayoutConfig() {
             syllables: ['Ja', 'Pi', 'Du']
         };
     }
+    const ternaryGridLineStepRel = 850 / 26;
     return {
         subdivisionCount: 26,
         centerDividerIndex: 13,
@@ -6323,8 +6367,8 @@ function getMobileSheetLayoutConfig() {
         beatNumberOffset: 3,
         beatDivisor: 3,
         beatWrapAt: 4,
-        noteStartRel: 33,
-        noteStepRel: 16.5,
+        noteStartRel: ternaryGridLineStepRel,
+        noteStepRel: ternaryGridLineStepRel / 2,
         syllables: ['Ja', 'Pi', 'Du']
     };
 }
@@ -6889,6 +6933,43 @@ function createMobileSheetEditorPalette() {
     return paletteEl;
 }
 
+function getMobileSheetLegacyNoteOffsetY(elementId, instrumentName) {
+    const normalizedInstrument = String(instrumentName || '');
+    if (normalizedInstrument === 'Dreierbass') {
+        return elementId === 'slap' || elementId === 'slap_muffled'
+            ? 37
+            : (elementId === 'tone' || elementId === 'tone_muffled' ? 53 : 69);
+    }
+    if (['Kenkeni', 'Sangban', 'Doundoun', 'Dununba', 'Dundunba', 'Bässe'].indexOf(normalizedInstrument) !== -1) {
+        return elementId === 'slap' || elementId === 'slap_muffled' ? 47 : 69;
+    }
+    return 65;
+}
+
+function getMobileSheetCanonicalNoteOffsetY(elementId, instrumentName) {
+    const normalizedInstrument = String(instrumentName || '');
+    if (tupletElementIds.includes(elementId)) {
+        return 32;
+    }
+    if (normalizedInstrument === 'Dreierbass') {
+        if (elementId === 'slap' || elementId === 'slap_muffled' || elementId === 'slap_flam') {
+            return 17;
+        }
+        if (elementId === 'bass' || elementId === 'bass_slap_flam') {
+            return 47;
+        }
+        return 32;
+    }
+    if (['Kenkeni', 'Sangban', 'Doundoun', 'Dununba', 'Dundunba', 'Bässe'].indexOf(normalizedInstrument) !== -1) {
+        return elementId === 'slap' || elementId === 'slap_flam' ? 17 : 47;
+    }
+    return 32;
+}
+
+function isMobileSheetPositionedNote(elementId) {
+    return noteElementIds.includes(elementId) || tupletElementIds.includes(elementId);
+}
+
 function getMobileSheetSourcePosition(sourceBarIndex, sourceStepIndex, elementId, instrumentName) {
     const zeroBasedBarIndex = Math.max(0, Math.round(Number(sourceBarIndex) || 1) - 1);
     const lineIndex = Math.floor(zeroBasedBarIndex / 2);
@@ -6897,30 +6978,108 @@ function getMobileSheetSourcePosition(sourceBarIndex, sourceStepIndex, elementId
     let firstStepX;
     let stepX;
     if (rhythm === 'binaer') {
-        firstStepX = isRightBar ? 550 : 125;
+        firstStepX = isRightBar ? 551 : 126;
         stepX = 12.5;
     } else if (rhythm === 'neunaer') {
-        firstStepX = isRightBar ? 567.5 : 142.5;
+        firstStepX = isRightBar ? 568.5 : 143.5;
         stepX = 21.25;
     } else {
-        firstStepX = isRightBar ? 562 : 133;
-        stepX = 16.5;
+        const ternaryGridLineStepX = 850 / 26;
+        firstStepX = (isRightBar ? 525 : 100) + ternaryGridLineStepX + 1;
+        stepX = ternaryGridLineStepX / 2;
     }
 
-    let yOffset = 0;
-    const normalizedInstrument = String(instrumentName || '');
-    if (normalizedInstrument === 'Dreierbass') {
-        yOffset = elementId === 'slap' || elementId === 'slap_muffled'
-            ? -28
-            : (elementId === 'tone' || elementId === 'tone_muffled' ? -12 : 4);
-    } else if (['Kenkeni', 'Sangban', 'Doundoun', 'Dununba', 'Dundunba', 'Bässe'].indexOf(normalizedInstrument) !== -1) {
-        yOffset = elementId === 'slap' || elementId === 'slap_muffled' ? -18 : 4;
-    }
+    const sourceOffsetY = isMobileSheetPositionedNote(elementId)
+        ? getMobileSheetCanonicalNoteOffsetY(elementId, instrumentName)
+        : 65;
 
     return {
         x: firstStepX + stepIndex * stepX,
-        y: getSheetLineBaseY(lineIndex) + 65 + yOffset
+        y: getSheetLineBaseY(lineIndex) + sourceOffsetY
     };
+}
+
+function normalizeLegacyMobileSheetNotePositions(readResult) {
+    const rhythmBars = readResult && Array.isArray(readResult.rhythmBars)
+        ? readResult.rhythmBars
+        : [];
+    if (!rhythmBars.length || !s) {
+        return false;
+    }
+
+    const readConfig = getReadRhythmConfig();
+    const candidates = [];
+    s.selectAll('.shp').forEach(function (element) {
+        const elementId = element.attr('id');
+        if (!isMobileSheetPositionedNote(elementId)) {
+            return;
+        }
+        const position = getElementReadPosition(element);
+        const positionInfo = getBarIndexFromPosition(position.x, position.y, readConfig, zeilenAnzahl);
+        const rhythmBar = rhythmBars[positionInfo.barIndex];
+        if (!rhythmBar) {
+            return;
+        }
+        const instrumentName = rhythmBar.effectiveInstrument || rhythmBar.instrument || '';
+        const lineBaseY = getSheetLineBaseY(positionInfo.lineIndex);
+        const currentOffsetY = position.y - lineBaseY;
+        const legacyOffsetY = getMobileSheetLegacyNoteOffsetY(elementId, instrumentName);
+        const canonicalOffsetY = getMobileSheetCanonicalNoteOffsetY(elementId, instrumentName);
+        const stepIndex = getStepIndexWithinBar(positionInfo.lineSlotIndex, readConfig.stepsPerBar);
+        if (stepIndex === null) {
+            return;
+        }
+        const targetPosition = getMobileSheetSourcePosition(
+            positionInfo.barIndex + 1,
+            stepIndex,
+            elementId,
+            instrumentName
+        );
+        const canonicalXDistance = Math.abs(position.x - targetPosition.x);
+        const horizontalSnapTolerance = Math.max(1, (Number(gridSize) || 2) / 2 - 0.01);
+        const matchesLegacyY = Math.abs(currentOffsetY - legacyOffsetY) <= 1.5;
+        const isNearCanonicalGridX = canonicalXDistance <= horizontalSnapTolerance;
+        if (matchesLegacyY || isNearCanonicalGridX) {
+            candidates.push({
+                element: element,
+                position: position,
+                targetX: isNearCanonicalGridX ? targetPosition.x : position.x,
+                targetY: targetPosition.y,
+                legacyOffsetY: legacyOffsetY,
+                canonicalOffsetY: canonicalOffsetY,
+                matchesLegacyY: matchesLegacyY,
+                hasHorizontalMisalignment: isNearCanonicalGridX && canonicalXDistance > 0.05
+            });
+        }
+    });
+
+    const canonicalOffsets = [17, 32, 47, 62];
+    const hasDistinctLegacyVerticalPosition = candidates.some(function (candidate) {
+        if (!candidate.matchesLegacyY) {
+            return false;
+        }
+        return !canonicalOffsets.some(function (canonicalOffsetY) {
+            return Math.abs(candidate.legacyOffsetY - canonicalOffsetY) <= 1.5;
+        });
+    });
+    const hasHorizontalMisalignment = candidates.some(function (candidate) {
+        return candidate.hasHorizontalMisalignment;
+    });
+    if (!hasDistinctLegacyVerticalPosition && !hasHorizontalMisalignment) {
+        return false;
+    }
+
+    candidates.forEach(function (candidate) {
+        moveSheetElementAnchorTo(
+            candidate.element,
+            candidate.targetX,
+            hasDistinctLegacyVerticalPosition && candidate.matchesLegacyY
+                ? candidate.targetY
+                : candidate.position.y,
+            false
+        );
+    });
+    return candidates.length > 0;
 }
 
 function moveSheetElementAnchorTo(element, targetX, targetY, preserveY) {
@@ -10820,7 +10979,16 @@ function onSVGLoaded(data) {
     setRhythmTitle(loadedTitle);
 
     try {
-        const readResult = callPHPScript_lesen(zeilenAnzahl, { showAlert: false });
+        let readResult = callPHPScript_lesen(zeilenAnzahl, {
+            showAlert: false,
+            updateQuickPlaySelectors: false
+        });
+        if (normalizeLegacyMobileSheetNotePositions(readResult)) {
+            readResult = callPHPScript_lesen(zeilenAnzahl, {
+                showAlert: false,
+                updateQuickPlaySelectors: false
+            });
+        }
         const persistedEntries = persistedTimelineMetadata && Array.isArray(persistedTimelineMetadata.entries)
             ? persistedTimelineMetadata.entries
             : [];

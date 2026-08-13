@@ -4115,7 +4115,7 @@ body.is-timeline-dragging .timeline-dropzone-inline {
 
 .mobile-sheet-chooser-target {
     box-sizing: border-box;
-    width: 322px;
+    width: 442px;
     height: 32px;
     padding: 3px 8px;
     border: 1px dashed transparent;
@@ -4182,11 +4182,11 @@ body.is-timeline-dragging .timeline-dropzone-inline {
 }
 
 .mobile-sheet-chooser-instrument {
-    width: 136px;
+    width: 172px;
 }
 
 .mobile-sheet-chooser-label {
-    width: 180px;
+    width: 264px;
 }
 
 .mobile-sheet-bar-comments {

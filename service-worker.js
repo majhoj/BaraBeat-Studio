@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'barabeat-studio-offline-v7-mobile-inputs';
+const CACHE_NAME = 'barabeat-studio-offline-v8-languages';
 const APP_SHELL = [
   './',
   './index.php',
@@ -27,7 +27,10 @@ const APP_SHELL = [
   './Assets/pwa-icon-512.png',
   './Bedienungsanleitung.php',
   './languages/de.json',
-  './languages/en.json'
+  './languages/en.json',
+  './languages/fr.json',
+  './languages/es.json',
+  './languages/pt.json'
 ];
 
 function scopedUrl(relativePath) {
