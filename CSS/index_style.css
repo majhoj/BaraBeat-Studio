@@ -285,6 +285,36 @@ html {
     background: var(--ui-bg);
 }
 
+.app-legal-footer {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 5px 10px;
+    padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
+    color: var(--ui-text-soft);
+    font-family: var(--ui-font);
+    font-size: 12px;
+    text-align: center;
+}
+
+.app-legal-footer a {
+    color: inherit;
+    text-underline-offset: 2px;
+}
+
+.app-legal-footer a:focus-visible {
+    outline: 2px solid var(--ui-border-strong);
+    outline-offset: 3px;
+    border-radius: 2px;
+}
+
+.view-legal-footer {
+    flex: 0 0 auto;
+    margin-top: 12px;
+    padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--ui-border);
+}
+
 .hidden-upload-form {
     display: none;
 }
@@ -1383,7 +1413,12 @@ body[data-ui-theme="earth"] .app-menu-panel #temporaryAccessButton.is-open {
     top: 58px;
     left: 12px;
     right: 12px;
+    display: flex;
+    flex-direction: column;
     z-index: 20;
+    box-sizing: border-box;
+    height: calc(100vh - 64px);
+    height: calc(100dvh - 64px);
     background: var(--ui-bg);
     border: 1px solid var(--ui-border);
     border-radius: 14px;
@@ -1395,6 +1430,16 @@ body[data-ui-theme="earth"] .app-menu-panel #temporaryAccessButton.is-open {
     backdrop-filter: blur(8px);
     background: #f6fbf8;
     border-color: #9fcfb2;
+}
+
+#practicePanel > .practice-panel-header,
+#practicePanel > .practice-panel-body,
+#practicePanel > .practice-player-panel {
+    flex: 0 0 auto;
+}
+
+#practicePanel > .view-legal-footer {
+    margin-top: auto;
 }
 
 .mobile-arrangement-overlay {
@@ -1419,7 +1464,7 @@ body[data-ui-theme="earth"] .app-menu-panel #temporaryAccessButton.is-open {
     width: min(720px, 100%);
     height: 100%;
     display: grid;
-    grid-template-rows: auto 1fr;
+    grid-template-rows: auto minmax(0, 1fr) auto;
     overflow: hidden;
     border: 1px solid var(--ui-border);
     border-radius: 14px;
@@ -3631,6 +3676,7 @@ body.is-timeline-dragging .timeline-dropzone-inline {
     #practicePanel {
         position: fixed;
         inset: calc(45px + env(safe-area-inset-top)) 0 0 0;
+        height: auto;
         z-index: 70;
         max-height: none;
         overflow: auto;
@@ -3856,6 +3902,10 @@ body.is-timeline-dragging .timeline-dropzone-inline {
 
     #practiceAudioFrame {
         height: 82px;
+    }
+
+    #practicePanel > .view-legal-footer {
+        margin-top: auto;
     }
 
     .practice-scroller-head {
@@ -4263,4 +4313,7 @@ body.is-timeline-dragging .timeline-dropzone-inline {
     stroke-width: 1.5;
     stroke-dasharray: 4 3;
     pointer-events: none;
+}
+body[data-offline-boot="true"] [data-online-only] {
+    display: none !important;
 }

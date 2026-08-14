@@ -1,9 +1,18 @@
 <?php
 require_once __DIR__ . '/PHP/i18n.php';
-require_once __DIR__ . '/PHP/access_control.php';
 require_once __DIR__ . '/PHP/edition_config.php';
-barabeat_require_access('page');
 
+$barabeatOfflineShellBuild = defined('BARABEAT_OFFLINE_SHELL_BUILD') && BARABEAT_OFFLINE_SHELL_BUILD === true;
+if ($barabeatOfflineShellBuild) {
+    $_GET = [];
+    $_POST = [];
+    $_COOKIE[BARABEAT_LANGUAGE_COOKIE] = 'de';
+} else {
+    require_once __DIR__ . '/PHP/access_control.php';
+    barabeat_require_access('page');
+}
+
+$jsAppBootstrap = @filemtime(__DIR__ . '/JS/app-bootstrap.js') ?: 1;
 $jsI18n = @filemtime(__DIR__ . '/JS/i18n.js') ?: 1;
 $jsEdition = @filemtime(__DIR__ . '/JS/edition.js') ?: 1;
 $jsSnap = @filemtime(__DIR__ . '/JS/snapNEU.svg.js') ?: 1;
@@ -15,16 +24,40 @@ $jsFn = @filemtime(__DIR__ . '/JS/functions.js') ?: 1;
 $jsTimeline = @filemtime(__DIR__ . '/JS/timeline.js') ?: 1;
 $jsPractice = @filemtime(__DIR__ . '/JS/practice.js') ?: 1;
 $jsOffline = @filemtime(__DIR__ . '/JS/offline.js') ?: 1;
+$jsLegalNavigation = @filemtime(__DIR__ . '/legal/navigation.js') ?: 1;
 $cssIndex = @filemtime(__DIR__ . '/CSS/index_style.css') ?: 1;
 $faviconSvg = @filemtime(__DIR__ . '/Assets/favicon.svg') ?: 1;
 $faviconPng = @filemtime(__DIR__ . '/Assets/favicon-32.png') ?: 1;
 $appleTouchIcon = @filemtime(__DIR__ . '/apple-touch-icon.png') ?: 1;
-$accessConfig = barabeat_access_config();
-$canManageTemporaryAccess = !empty($accessConfig['enabled']) && barabeat_access_is_authenticated();
-$temporaryAccessUntil = barabeat_access_window_until();
-$temporaryAccessRemaining = max(0, $temporaryAccessUntil - time());
-$accessCsrfToken = $canManageTemporaryAccess ? barabeat_access_csrf_token() : '';
-$activeLanguage = barabeat_language();
+if ($barabeatOfflineShellBuild) {
+    $canManageTemporaryAccess = false;
+    $temporaryAccessRemaining = 0;
+    $accessCsrfToken = '';
+    $activeLanguage = barabeat_language('de');
+} else {
+    $accessConfig = barabeat_access_config();
+    $canManageTemporaryAccess = !empty($accessConfig['enabled']) && barabeat_access_is_authenticated();
+    $temporaryAccessUntil = barabeat_access_window_until();
+    $temporaryAccessRemaining = max(0, $temporaryAccessUntil - time());
+    $accessCsrfToken = $canManageTemporaryAccess ? barabeat_access_csrf_token() : '';
+    $activeLanguage = barabeat_language();
+}
+$offlineFallbackEditionConfig = [
+    'edition' => 'demo',
+    'features' => barabeat_edition_features('demo'),
+    'content' => [
+        'demoStartScore' => null,
+        'demoArrangement' => null,
+    ],
+    'messages' => [
+        'featureUnavailable' => barabeat_t('edition.featureUnavailable'),
+    ],
+    'debug' => false,
+];
+$offlineFallbackEditionConfigJson = json_encode(
+    $offlineFallbackEditionConfig,
+    JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
+);
 ?>
 <!doctype html>
 <html lang="<?php echo htmlspecialchars($activeLanguage, ENT_QUOTES, 'UTF-8'); ?>">
@@ -41,9 +74,24 @@ $activeLanguage = barabeat_language();
     <link rel="apple-touch-icon-precomposed" sizes="180x180" href="apple-touch-icon.png?v=<?php echo $appleTouchIcon; ?>">
     <link rel="icon" href="Assets/favicon.svg?v=<?php echo $faviconSvg; ?>" type="image/svg+xml">
     <link rel="icon" href="Assets/favicon-32.png?v=<?php echo $faviconPng; ?>" type="image/png" sizes="32x32">
+    <script>
+        window.BARABEAT_OFFLINE_BOOT = <?php echo $barabeatOfflineShellBuild ? 'true' : 'false'; ?>;
+        window.BaraBeatOfflineFallbackEditionConfig = <?php echo $offlineFallbackEditionConfigJson ?: '{}'; ?>;
+    </script>
+    <script src="JS/app-bootstrap.js?v=<?php echo $jsAppBootstrap; ?>"></script>
     <script>window.BaraBeatI18nConfig = <?php echo barabeat_i18n_config_json(); ?>;</script>
+    <script>window.BaraBeatAccessConfig = <?php echo json_encode([
+        'csrfToken' => $accessCsrfToken,
+    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;</script>
     <script src="JS/i18n.js?v=<?php echo $jsI18n; ?>"></script>
-    <script>window.BaraBeatEditionConfig = <?php echo barabeat_edition_config_json(); ?>;</script>
+<?php if ($barabeatOfflineShellBuild): ?>
+    <script>window.BaraBeatEditionConfig = window.BaraBeatAppBootstrap.getOfflineEditionConfig(window.BaraBeatOfflineFallbackEditionConfig);</script>
+<?php else: ?>
+    <script>
+        window.BaraBeatEditionConfig = <?php echo barabeat_edition_config_json(); ?>;
+        window.BaraBeatAppBootstrap.rememberEditionConfig(window.BaraBeatEditionConfig);
+    </script>
+<?php endif; ?>
     <script src="JS/edition.js?v=<?php echo $jsEdition; ?>"></script>
     <script src="JS/snapNEU.svg.js?v=<?php echo $jsSnap; ?>"></script>
     <script src="JS/jquery.min.js?v=<?php echo $jsJq; ?>"></script>
@@ -54,12 +102,13 @@ $activeLanguage = barabeat_language();
     <script src="JS/timeline.js?v=<?php echo $jsTimeline; ?>"></script>
     <script src="JS/practice.js?v=<?php echo $jsPractice; ?>"></script>
     <script src="JS/offline.js?v=<?php echo $jsOffline; ?>" defer></script>
+    <script src="legal/navigation.js?v=<?php echo $jsLegalNavigation; ?>" defer></script>
     <link rel="stylesheet" href="CSS/index_style.css?v=<?php echo $cssIndex; ?>">
 </head>
 
-<body class="app-body">
+<body class="app-body" data-offline-boot="<?php echo $barabeatOfflineShellBuild ? 'true' : 'false'; ?>">
     <?php
-    $file_name = $_GET["file"] ?? "";
+    $file_name = $barabeatOfflineShellBuild ? '' : ($_GET["file"] ?? "");
     echo "<script>datei_name = " . json_encode($file_name) . ";</script>";
     ?>
 
@@ -101,7 +150,7 @@ $activeLanguage = barabeat_language();
                 <button type="button" id="saveFileDialogButton" data-i18n="file.save"><?php echo htmlspecialchars(barabeat_t('file.save'), ENT_QUOTES, 'UTF-8'); ?></button>
                 <button type="button" id="saveAsFileDialogButton" data-i18n="file.saveAs"><?php echo htmlspecialchars(barabeat_t('file.saveAs'), ENT_QUOTES, 'UTF-8'); ?></button>
                 <button type="button" id="exportFileDialogButton" data-i18n="file.export"><?php echo htmlspecialchars(barabeat_t('file.export'), ENT_QUOTES, 'UTF-8'); ?></button>
-                <a class="app-menu-link mobile-manual-link" href="Bedienungsanleitung.php" data-i18n="navigation.manual"><?php echo htmlspecialchars(barabeat_t('navigation.manual'), ENT_QUOTES, 'UTF-8'); ?></a>
+                <a class="app-menu-link mobile-manual-link" href="manual/offline/<?php echo htmlspecialchars($activeLanguage, ENT_QUOTES, 'UTF-8'); ?>.html" target="barabeatManual" rel="opener" data-barabeat-open-window data-barabeat-manual-link data-i18n="navigation.manual"><?php echo htmlspecialchars(barabeat_t('navigation.manual'), ENT_QUOTES, 'UTF-8'); ?></a>
                 <label class="app-menu-language-control" for="languageSelect">
                     <span data-i18n="language.label"><?php echo htmlspecialchars(barabeat_t('language.label'), ENT_QUOTES, 'UTF-8'); ?></span>
                     <select id="languageSelect" data-barabeat-language-select aria-label="<?php echo htmlspecialchars(barabeat_t('language.label'), ENT_QUOTES, 'UTF-8'); ?>" data-i18n-aria-label="language.label">
@@ -113,9 +162,9 @@ $activeLanguage = barabeat_language();
                     </select>
                 </label>
                 <?php if ($canManageTemporaryAccess): ?>
-                    <button type="button" id="temporaryAccessButton" data-i18n="auth.temporaryOpen"><?php echo htmlspecialchars(barabeat_t('auth.temporaryOpen'), ENT_QUOTES, 'UTF-8'); ?></button>
+                    <button type="button" id="temporaryAccessButton" data-online-only data-i18n="auth.temporaryOpen"><?php echo htmlspecialchars(barabeat_t('auth.temporaryOpen'), ENT_QUOTES, 'UTF-8'); ?></button>
                 <?php endif; ?>
-                <button type="button" id="accessLogoutButton" data-i18n="auth.logout"><?php echo htmlspecialchars(barabeat_t('auth.logout'), ENT_QUOTES, 'UTF-8'); ?></button>
+                <button type="button" id="accessLogoutButton" data-online-only data-i18n="auth.logout"><?php echo htmlspecialchars(barabeat_t('auth.logout'), ENT_QUOTES, 'UTF-8'); ?></button>
             </div>
         </details>
         <details class="app-menu" id="scoreSheetMenu">
@@ -142,7 +191,7 @@ $activeLanguage = barabeat_language();
             <div class="app-menu-panel">
                 <button type="button" id="practiceButton" data-i18n="navigation.practice"><?php echo htmlspecialchars(barabeat_t('navigation.practice'), ENT_QUOTES, 'UTF-8'); ?></button>
                 <button type="button" id="button11" data-i18n="navigation.arrange"><?php echo htmlspecialchars(barabeat_t('navigation.arrange'), ENT_QUOTES, 'UTF-8'); ?></button>
-                <a class="app-menu-link" href="Bedienungsanleitung.php" target="_blank" rel="noopener" data-i18n="navigation.manual"><?php echo htmlspecialchars(barabeat_t('navigation.manual'), ENT_QUOTES, 'UTF-8'); ?></a>
+                <a class="app-menu-link" href="manual/offline/<?php echo htmlspecialchars($activeLanguage, ENT_QUOTES, 'UTF-8'); ?>.html" target="barabeatManual" rel="opener" data-barabeat-open-window data-barabeat-manual-link data-i18n="navigation.manual"><?php echo htmlspecialchars(barabeat_t('navigation.manual'), ENT_QUOTES, 'UTF-8'); ?></a>
                 <details class="app-submenu">
                     <summary data-i18n="navigation.template"><?php echo htmlspecialchars(barabeat_t('navigation.template'), ENT_QUOTES, 'UTF-8'); ?></summary>
                     <div class="app-submenu-panel">
@@ -177,6 +226,11 @@ $activeLanguage = barabeat_language();
                 <button type="button" id="mobileArrangementCloseButton" data-i18n="common.close"><?php echo htmlspecialchars(barabeat_t('common.close'), ENT_QUOTES, 'UTF-8'); ?></button>
             </header>
             <iframe id="mobileArrangementAudioFrame" name="mobileArrangementAudioFrame" title="<?php echo htmlspecialchars(barabeat_t('arrangement.mobileAudioFrameTitle'), ENT_QUOTES, 'UTF-8'); ?>" data-i18n-title="arrangement.mobileAudioFrameTitle" allow="autoplay"></iframe>
+            <footer class="app-legal-footer view-legal-footer" aria-label="Rechtliche Informationen">
+                <a href="legal/offline/impressum.html" target="_blank" rel="opener" data-online-href="impressum.php">Impressum</a>
+                <span aria-hidden="true">·</span>
+                <a href="legal/offline/datenschutz.html" target="_blank" rel="opener" data-online-href="datenschutz.php">Datenschutz</a>
+            </footer>
         </section>
     </div>
 
@@ -201,7 +255,7 @@ $activeLanguage = barabeat_language();
                 <aside class="file-dialog-sidebar" aria-label="<?php echo htmlspecialchars(barabeat_t('file.dialog.sources'), ENT_QUOTES, 'UTF-8'); ?>" data-i18n-aria-label="file.dialog.sources">
                     <div class="file-dialog-sidebar-section" data-i18n="file.dialog.sources"><?php echo htmlspecialchars(barabeat_t('file.dialog.sources'), ENT_QUOTES, 'UTF-8'); ?></div>
                     <button type="button" class="file-dialog-source is-active" data-source="local" data-i18n="common.local"><?php echo htmlspecialchars(barabeat_t('common.local'), ENT_QUOTES, 'UTF-8'); ?></button>
-                    <button type="button" class="file-dialog-source" data-source="server" data-i18n="common.server"><?php echo htmlspecialchars(barabeat_t('common.server'), ENT_QUOTES, 'UTF-8'); ?></button>
+                    <button type="button" class="file-dialog-source" data-source="server" data-online-only data-i18n="common.server"><?php echo htmlspecialchars(barabeat_t('common.server'), ENT_QUOTES, 'UTF-8'); ?></button>
                     <div class="file-dialog-sidebar-section" data-i18n="file.dialog.collections"><?php echo htmlspecialchars(barabeat_t('file.dialog.collections'), ENT_QUOTES, 'UTF-8'); ?></div>
                     <button type="button" class="file-dialog-filter is-active" data-filter="all" data-i18n="file.dialog.filterAll"><?php echo htmlspecialchars(barabeat_t('file.dialog.filterAll'), ENT_QUOTES, 'UTF-8'); ?></button>
                     <button type="button" class="file-dialog-filter" data-filter="published" data-i18n="file.dialog.filterPublished"><?php echo htmlspecialchars(barabeat_t('file.dialog.filterPublished'), ENT_QUOTES, 'UTF-8'); ?></button>
@@ -223,7 +277,7 @@ $activeLanguage = barabeat_language();
                     <div id="fileDialogServerNoticeSlot" class="file-dialog-server-notice-slot">
                         <div id="fileDialogServerNotice" class="file-dialog-server-notice" hidden>
                             <span></span>
-                            <button type="button" data-i18n="file.dialog.serverVersionLoad"><?php echo htmlspecialchars(barabeat_t('file.dialog.serverVersionLoad'), ENT_QUOTES, 'UTF-8'); ?></button>
+                            <button type="button" data-online-only data-i18n="file.dialog.serverVersionLoad"><?php echo htmlspecialchars(barabeat_t('file.dialog.serverVersionLoad'), ENT_QUOTES, 'UTF-8'); ?></button>
                         </div>
                     </div>
                     <div class="file-dialog-table-wrap">
@@ -246,7 +300,7 @@ $activeLanguage = barabeat_language();
                     <button type="button" id="fileDialogNewFolderButton" data-i18n="file.dialog.newFolder"><?php echo htmlspecialchars(barabeat_t('file.dialog.newFolder'), ENT_QUOTES, 'UTF-8'); ?></button>
                     <button type="button" id="fileDialogRenameButton" data-i18n="common.rename"><?php echo htmlspecialchars(barabeat_t('common.rename'), ENT_QUOTES, 'UTF-8'); ?></button>
                     <button type="button" id="fileDialogDeleteButton" data-i18n="common.delete"><?php echo htmlspecialchars(barabeat_t('common.delete'), ENT_QUOTES, 'UTF-8'); ?></button>
-                    <button type="button" id="fileDialogUnpublishButton" data-i18n="file.dialog.deletePublication"><?php echo htmlspecialchars(barabeat_t('file.dialog.deletePublication'), ENT_QUOTES, 'UTF-8'); ?></button>
+                    <button type="button" id="fileDialogUnpublishButton" data-online-only data-i18n="file.dialog.deletePublication"><?php echo htmlspecialchars(barabeat_t('file.dialog.deletePublication'), ENT_QUOTES, 'UTF-8'); ?></button>
                 </div>
                 <label class="file-dialog-format" for="fileDialogFormat">
                     <span data-i18n="common.format"><?php echo htmlspecialchars(barabeat_t('common.format'), ENT_QUOTES, 'UTF-8'); ?></span>:
@@ -305,6 +359,11 @@ $activeLanguage = barabeat_language();
                 <div id="timelineSequence" class="timeline-sequence-list"></div>
             </section>
         </div>
+        <footer class="app-legal-footer view-legal-footer" aria-label="Rechtliche Informationen">
+            <a href="legal/offline/impressum.html" target="_blank" rel="opener" data-online-href="impressum.php">Impressum</a>
+            <span aria-hidden="true">·</span>
+            <a href="legal/offline/datenschutz.html" target="_blank" rel="opener" data-online-href="datenschutz.php">Datenschutz</a>
+        </footer>
     </div>
 
     <div id="practicePanel" hidden>
@@ -454,6 +513,11 @@ $activeLanguage = barabeat_language();
                 </div>
             </div>
         </section>
+        <footer class="app-legal-footer view-legal-footer" aria-label="Rechtliche Informationen">
+            <a href="legal/offline/impressum.html" target="_blank" rel="opener" data-online-href="impressum.php">Impressum</a>
+            <span aria-hidden="true">·</span>
+            <a href="legal/offline/datenschutz.html" target="_blank" rel="opener" data-online-href="datenschutz.php">Datenschutz</a>
+        </footer>
     </div>
 
     <div id="practiceSwingProfileDialog" class="swing-profile-dialog-backdrop" hidden>
@@ -651,8 +715,8 @@ const readableElementSelector = "#wiederholung, " + chooserSelector;
 const phpEndpointBase = "PHP/";
 const fileListEndpoint = "auswahlliste.php";
 const loadFileEndpoint = "dateiladen.php";
-const saveTextEndpoint = "dateispeichern.php";
 const checkTextFileEndpoint = "dateivorhanden.php";
+const isOfflineColdStart = window.BARABEAT_OFFLINE_BOOT === true;
 const historyLimit = 80;
 let currentScoreId = null;
 let currentFileSource = "local";
@@ -808,6 +872,11 @@ function getIoFieldValue() {
 }
 
 function postPhp(endpoint, payload, onSuccess) {
+    if (isOfflineColdStart) {
+        console.warn('PHP-Aufruf im Offline-Kaltstart unterbunden:', endpoint);
+        alert(uiText('offline.onlineOnly'));
+        return null;
+    }
     const url = phpEndpointBase + endpoint;
     if (typeof payload === 'function') {
         $.post(url, payload);
@@ -829,14 +898,15 @@ function getSelectedFileSource() {
 }
 
 function setSelectedFileSource(source) {
+    const normalizedSource = isOfflineColdStart && source === 'server' ? 'local' : source;
     const sourceEl = document.querySelector('#fileSource');
     if (sourceEl) {
-        sourceEl.value = source;
+        sourceEl.value = normalizedSource;
     }
-    currentFileSource = source;
-    fileDialogState.source = source;
+    currentFileSource = normalizedSource;
+    fileDialogState.source = normalizedSource;
     document.querySelectorAll('.file-dialog-source').forEach(function (buttonEl) {
-        buttonEl.classList.toggle('is-active', buttonEl.dataset.source === source);
+        buttonEl.classList.toggle('is-active', buttonEl.dataset.source === normalizedSource);
     });
 }
 
@@ -1066,6 +1136,10 @@ async function updateFileDialogServerNotice() {
     fileDialogState.serverNoticeRequest = requestId;
     setFileDialogServerNotice('', '');
 
+    if (isOfflineColdStart) {
+        return;
+    }
+
     try {
         if (fileDialogState.mode !== 'open') {
             return;
@@ -1291,7 +1365,7 @@ function updateFileDialogControls() {
         deleteButton.disabled = !isFileDialogManagementAvailable();
     }
     if (unpublishButton) {
-        unpublishButton.disabled = !canDeletePublishedFileDialogScore();
+        unpublishButton.disabled = isOfflineColdStart || !canDeletePublishedFileDialogScore();
     }
     if (nameEl) {
         nameEl.disabled = fileDialogState.mode === 'open';
@@ -1300,7 +1374,7 @@ function updateFileDialogControls() {
         fieldsEl.hidden = fileDialogState.mode === 'open';
     }
     if (serverNoticeSlotEl) {
-        serverNoticeSlotEl.hidden = fileDialogState.mode !== 'open';
+        serverNoticeSlotEl.hidden = isOfflineColdStart || fileDialogState.mode !== 'open';
     }
     if (folderNameEl) {
         folderNameEl.textContent = fileDialogState.source === 'server'
@@ -1310,7 +1384,7 @@ function updateFileDialogControls() {
                 : fileDialogState.folderName);
     }
     sourceButtons.forEach(function (buttonEl) {
-        buttonEl.disabled = isExportMode;
+        buttonEl.disabled = isExportMode || (isOfflineColdStart && buttonEl.dataset.source === 'server');
         buttonEl.classList.toggle('is-active', buttonEl.dataset.source === fileDialogState.source);
     });
 
@@ -1419,7 +1493,7 @@ function renderFileDialogList() {
 async function refreshFileDialogEntries() {
     try {
         if (fileDialogState.source === 'server') {
-            if (navigator.onLine === false) {
+            if (isOfflineColdStart || navigator.onLine === false) {
                 fileDialogState.entries = [];
                 fileDialogState.selectedId = null;
                 fileDialogState.filter = 'all';
@@ -1440,7 +1514,7 @@ async function refreshFileDialogEntries() {
             }
             fileDialogState.folderName = currentFolder && currentFolder.name ? currentFolder.name : 'Lokal';
             let serverScoreMap = {};
-            if (fileDialogState.mode === 'open') {
+            if (fileDialogState.mode === 'open' && !isOfflineColdStart) {
                 try {
                     serverScoreMap = createServerScoreInfoMap(await serverLibrary.listScores());
                 } catch (serverError) {
@@ -6101,7 +6175,7 @@ function openAudioTestTarget(playerRows, targetName, embedded) {
     // launch key in the fragment, but also vary the query so every payload gets
     // a fresh player document (the service worker ignores this query offline).
     const encodedLaunchKey = encodeURIComponent(launchKey);
-    const launchUrl = 'Audio/audioplayer.php?launchReload=' + encodedLaunchKey + '#launch=' + encodedLaunchKey;
+    const launchUrl = 'Audio/player.html?launchReload=' + encodedLaunchKey + '#launch=' + encodedLaunchKey;
     const frameEl = Array.from(document.querySelectorAll('iframe[name]')).find(function (candidateEl) {
         return candidateEl.name === targetName;
     });
@@ -6116,23 +6190,15 @@ function openAudioTestTarget(playerRows, targetName, embedded) {
         return;
     }
 
-    delete window.barabeatAudioLaunchPayloads[launchKey];
-    try {
-        localStorage.removeItem(launchKey);
-    } catch (error) {
-        // Storage may be unavailable in private browsing.
-    }
-
-    // Keep the previous online fallback for browsers that block window.open().
+    // A form submission can still open the static player when window.open() is
+    // blocked. The payload remains in localStorage for player.html to consume.
     const form = document.createElement('form');
-    form.action = 'Audio/audioplayer.php';
-    form.method = 'POST';
+    form.action = 'Audio/player.html#launch=' + encodedLaunchKey;
+    form.method = 'GET';
     form.target = targetName || '_blank';
-    form.innerHTML = '<input type="hidden" name="myObj" /><input type="hidden" name="embedded" /><input type="hidden" name="uiTheme" />';
+    form.innerHTML = '<input type="hidden" name="launchReload" />';
     document.body.appendChild(form);
-    form.querySelector('input[name="myObj"]').value = JSON.stringify(playerRows);
-    form.querySelector('input[name="embedded"]').value = embedded ? '1' : '';
-    form.querySelector('input[name="uiTheme"]').value = document.body.dataset.uiTheme || '';
+    form.querySelector('input[name="launchReload"]').value = launchKey;
     form.submit();
     form.remove();
 }
@@ -8549,7 +8615,6 @@ function buildAudioTestPayload(forcePracticeMode) {
     }
 
     window.lastPlayerRows = playerPayload;
-    console.log('playerRows', playerPayload);
     return {
         playerPayload: playerPayload,
         practiceIsActive: practiceIsActive
@@ -8702,11 +8767,6 @@ function callPHPScript_lesen(anzahl, options) {
     window.lastReadRepeatBoundaries = repeatBoundaries;
     window.lastReadRepeatRanges = repeatRanges;
     notenText = buildBarSummary(rhythmBars) + '\n' + buildRepeatRangeSummary(repeatRanges);
-    if (readOptions.logResults !== false) {
-        console.log('readRhythmBars', rhythmBars);
-        console.log('readRepeatBoundaries', repeatBoundaries);
-        console.log('readRepeatRanges', repeatRanges);
-    }
     if (shouldShowAlert) {
         alert(notenText);
     }
@@ -9191,6 +9251,9 @@ async function deleteLocalScore() {
 }
 
 async function publishCurrentScoreToServer(nameOverride) {
+    if (isOfflineColdStart) {
+        throw new Error(uiText('offline.onlineOnly'));
+    }
     const savedScore = await saveCurrentScoreLocal(nameOverride);
     const serverBaseName = String(savedScore.serverPath || '').replace(/\.(bbs|txt)$/i, '');
     const localBaseName = String(savedScore.title || '').trim();
@@ -9510,6 +9573,10 @@ async function deleteSelectedFileDialogScore() {
 }
 
 async function deletePublishedFileDialogScore() {
+    if (isOfflineColdStart) {
+        alert(uiText('offline.onlineOnly'));
+        return;
+    }
     const entry = getSelectedFileDialogEntry();
     if (!entry || fileDialogState.source !== 'local') {
         return;
@@ -9647,6 +9714,10 @@ function closeAppMenus() {
 }
 
 async function logoutBarabeat() {
+    if (isOfflineColdStart) {
+        alert(uiText('offline.onlineOnly'));
+        return;
+    }
     const logoutButtonEl = document.getElementById('accessLogoutButton');
     if (logoutButtonEl) {
         logoutButtonEl.disabled = true;
@@ -9672,7 +9743,7 @@ async function logoutBarabeat() {
 }
 
 const temporaryAccessControlState = {
-    csrfToken: <?php echo json_encode($accessCsrfToken); ?>,
+    csrfToken: String(window.BaraBeatAccessConfig && window.BaraBeatAccessConfig.csrfToken || ''),
     deadlineMs: Date.now() + (<?php echo (int) $temporaryAccessRemaining; ?> * 1000),
     busy: false
 };
@@ -9709,6 +9780,10 @@ function updateTemporaryAccessButton() {
 }
 
 async function toggleTemporaryAccessWindow() {
+    if (isOfflineColdStart) {
+        alert(uiText('offline.onlineOnly'));
+        return;
+    }
     if (temporaryAccessControlState.busy) {
         return;
     }
@@ -10937,6 +11012,41 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 
+window.addEventListener('barabeat-language-change', function (event) {
+    const language = event.detail && event.detail.language ? event.detail.language : '';
+    ['practiceAudioFrame', 'timelineAudioFrame', 'mobileArrangementAudioFrame', 'sheetQuickPlayFrame'].forEach(function (frameId) {
+        const frameEl = document.getElementById(frameId);
+        if (frameEl && frameEl.contentWindow) {
+            frameEl.contentWindow.postMessage({
+                type: 'barabeat-language-change',
+                language: language
+            }, window.location.origin);
+        }
+    });
+
+    if (typeof renderTimelinePanel === 'function') {
+        renderTimelinePanel();
+    }
+    if (typeof renderPracticePanel === 'function') {
+        renderPracticePanel();
+    }
+    if (typeof updateMobilePracticeModeAvailability === 'function') {
+        updateMobilePracticeModeAvailability();
+    }
+    if (typeof updateMobileArrangementButtonVisibility === 'function') {
+        updateMobileArrangementButtonVisibility();
+    }
+    if (typeof renderLegend === 'function') {
+        renderLegend(125);
+    }
+    if (typeof localizeTupletElement === 'function' && typeof s !== 'undefined' && s) {
+        s.selectAll('#triplet, #quartuplet').forEach(localizeTupletElement);
+    }
+    if (typeof renderMobileSheetView === 'function') {
+        renderMobileSheetView();
+    }
+});
+
 // Laden
 
 callPHPScript1();
@@ -11081,6 +11191,12 @@ function get_value(e) {
 })();
 
     </script>
-    <br>
+    <footer class="app-legal-footer" aria-label="Rechtliche Informationen">
+        <span class="app-copyright">© 2020–<?php echo date('Y'); ?> Art &amp; Werbeteam GmbH · BaraBeat</span>
+        <span aria-hidden="true">·</span>
+        <a href="legal/offline/impressum.html" target="_blank" rel="opener" data-online-href="impressum.php">Impressum</a>
+        <span aria-hidden="true">·</span>
+        <a href="legal/offline/datenschutz.html" target="_blank" rel="opener" data-online-href="datenschutz.php">Datenschutz</a>
+    </footer>
 </body>
 </html>

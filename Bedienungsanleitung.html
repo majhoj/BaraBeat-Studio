@@ -348,7 +348,7 @@
   </style>
 </head>
 <body>
-  <a id="manualBackLink" class="manual-back-link" href="index.php" aria-label="Zurück zum Notenblatt">← Zurück zum Notenblatt</a>
+  <a id="manualBackLink" class="manual-back-link" href="index.php" data-barabeat-return aria-label="Zurück zum Notenblatt">← Zurück zum Notenblatt</a>
   <header>
     <div class="wrap">
       <h1>BaraBeat Studio</h1>
@@ -1005,24 +1005,6 @@
       </section>
     </article>
   </main>
-  <script>
-    (function () {
-      var backLink = document.getElementById('manualBackLink');
-      if (!backLink) {
-        return;
-      }
-      backLink.addEventListener('click', function (event) {
-        try {
-          var referrer = document.referrer ? new URL(document.referrer) : null;
-          if (referrer && referrer.origin === window.location.origin && window.history.length > 1) {
-            event.preventDefault();
-            window.history.back();
-          }
-        } catch (error) {
-          // Der normale Link zu index.php bleibt als Fallback erhalten.
-        }
-      });
-    }());
-  </script>
+  <script src="legal/navigation.js"></script>
 </body>
 </html>

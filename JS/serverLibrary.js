@@ -24,19 +24,37 @@
     return formData;
   }
 
+  function getAccessCsrfToken() {
+    const accessConfig = global.BaraBeatAccessConfig && typeof global.BaraBeatAccessConfig === "object"
+      ? global.BaraBeatAccessConfig
+      : {};
+    return typeof accessConfig.csrfToken === "string" ? accessConfig.csrfToken : "";
+  }
+
   function getFreshEndpointUrl(endpoint) {
     const separator = String(endpoint || "").indexOf("?") === -1 ? "?" : "&";
     return ENDPOINT_BASE + endpoint + separator + "_=" + Date.now();
   }
 
+  function isOfflineBoot() {
+    return global.BARABEAT_OFFLINE_BOOT === true;
+  }
+
+  function assertOnlineAvailable() {
+    if (isOfflineBoot()) {
+      throw new Error(t("offline.onlineOnly"));
+    }
+  }
+
   function handleExpiredAccess(response) {
-    if (response && response.status === 401 && typeof window !== "undefined") {
+    if (!isOfflineBoot() && response && response.status === 401 && typeof window !== "undefined") {
       window.location.assign("index.php");
       throw new Error(t("error.loginExpired"));
     }
   }
 
   async function postEndpoint(endpoint, payload) {
+    assertOnlineAvailable();
     const response = await fetch(getFreshEndpointUrl(endpoint), {
       method: "POST",
       body: encodeForm(payload),
@@ -56,9 +74,15 @@
   }
 
   async function postJsonEndpoint(endpoint, payload) {
+    assertOnlineAvailable();
+    const securedPayload = Object.assign({}, payload || {});
+    const csrfToken = getAccessCsrfToken();
+    if (csrfToken) {
+      securedPayload.csrfToken = csrfToken;
+    }
     const response = await fetch(getFreshEndpointUrl(endpoint), {
       method: "POST",
-      body: encodeForm(payload),
+      body: encodeForm(securedPayload),
       cache: "no-store",
       headers: {
         "Cache-Control": "no-cache"

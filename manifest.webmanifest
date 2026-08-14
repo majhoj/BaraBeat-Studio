@@ -1,7 +1,30 @@
 {
-  "name": "BaraBeat-Studio",
+  "lang": "de",
+  "dir": "ltr",
+  "name": "BaraBeat",
   "short_name": "BaraBeat",
   "description": "Notenblätter für westafrikanische Rhythmen erstellen, arrangieren und üben.",
+  "name_localized": {
+    "de": "BaraBeat",
+    "en": "BaraBeat",
+    "fr": "BaraBeat",
+    "es": "BaraBeat",
+    "pt": "BaraBeat"
+  },
+  "short_name_localized": {
+    "de": "BaraBeat",
+    "en": "BaraBeat",
+    "fr": "BaraBeat",
+    "es": "BaraBeat",
+    "pt": "BaraBeat"
+  },
+  "description_localized": {
+    "de": "Notenblätter für westafrikanische Rhythmen erstellen, arrangieren und üben.",
+    "en": "Create, arrange and practise scores for West African rhythms.",
+    "fr": "Créer, arranger et travailler des partitions de rythmes ouest-africains.",
+    "es": "Crear, arreglar y practicar partituras de ritmos de África Occidental.",
+    "pt": "Criar, arranjar e praticar partituras de ritmos da África Ocidental."
+  },
   "start_url": "./index.php",
   "scope": "./",
   "display": "standalone",

@@ -1,0 +1,12 @@
+<?php
+if (!defined('BARABEAT_MANUAL_RENDER')) { http_response_code(404); exit; }
+?>      <section id="workflows">
+        <h2>12. Fluxos de trabalho típicos</h2>
+        <h3>Escrever um novo Pattern</h3><ol><li>Crie uma partitura binária, ternária ou 9/8 e nomeie o ritmo.</li><li>Coloque o seletor de instrumento, por exemplo <em>Djembe 1</em>.</li><li>Coloque a função, como <em>Pattern de acompanhamento</em>, <em>Call</em> ou <em>Solo 1</em>.</li><li>Arraste notas da paleta.</li><li>Adicione <strong>In</strong>, <strong>Out</strong>, <strong>Repetição</strong>, <strong>ShortBar</strong> ou tercina/quartina se necessário.</li><li>Salve.</li></ol>
+        <h3>Salvar e reabrir</h3><ol><li><strong>Arquivo → Salvar</strong> atualiza o arquivo local; <strong>Salvar como</strong> cria outro.</li><li>Em <strong>Arquivo → Abrir</strong>, escolha <strong>Local</strong>.</li><li>Abra a pasta, selecione e carregue.</li><li>Para o servidor, escolha <strong>Servidor</strong>; ao carregar é criada uma cópia local.</li></ol>
+        <h3>Exportar SVG ou PDF</h3><ol><li>Abra <strong>Arquivo → Exportar</strong>.</li><li>Escolha nome e <strong>SVG</strong> ou <strong>PDF</strong>.</li><li>Exporte; abra o PDF para imprimir.</li></ol>
+        <h3>Editar no iPhone</h3><ol><li>Abra e gire o iPhone.</li><li>Em um compasso novo, toque na ferramenta de seletores e <strong>Inserir instrumento e função aqui</strong>.</li><li>Escolha instrumento e tipo de Pattern.</li><li>Escolha uma nota e toque na posição.</li><li>Mova elementos ou selecione vários.</li><li>Use <strong>Salvar</strong> ou <strong>Salvar como</strong>.</li></ol>
+        <h3>Verificar um Pattern</h3><ol><li>Marque sua caixa.</li><li>Adicione outros se quiser.</li><li>Ajuste BPM.</li><li>Toque Play; a seleção repete e as notas são destacadas.</li><li>Toque novamente para parar.</li></ol>
+        <h3>Praticar um Pattern</h3><ol><li>Abra modo de prática.</li><li>Abra seleção.</li><li>Escolha Acompanhamento.</li><li>Escolha e ordene partes.</li><li>Ajuste repetições ou temporizador.</li><li>Opcionalmente salve um cenário.</li><li>Toque Play.</li></ol>
+        <h3>Criar um Arranjo</h3><ol><li>Abra Arranjo.</li><li>Arraste Pattern da Biblioteca para a linha do tempo.</li><li>Coloque-os na mesma seção para tocar em paralelo.</li><li>Ajuste repetições.</li><li>Coloque Solos nas células.</li><li>Confira BPM, Swing, Feel e volumes.</li><li>Reproduza ou exporte WAV.</li></ol>
+      </section>

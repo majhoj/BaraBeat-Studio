@@ -9,6 +9,20 @@ if (!defined("BARABEAT_MANUAL_RENDER")) {
         <h2>1. Kurzstart</h2>
         <p>BaraBeat Studio ist ein Editor und Player für Djembe- und Dunun-Notation. Du kannst Pattern wie Call, Intro, Begleitpattern, Solo oder Échauffement notieren und direkt anhören.</p>
 
+        <h3>BaraBeat in knapp 3 Minuten</h3>
+        <p>Das Video zeigt die wichtigsten Schritte vom ersten Eintrag im Notenblatt bis zum Abspielen und Speichern eines Rhythmus. Anschließend kannst du die einzelnen Schritte im Kurzstart in Ruhe nachvollziehen.</p>
+        <video
+          class="manual-quickstart-video"
+          controls
+          playsinline
+          preload="metadata"
+          poster="<?php echo barabeat_manual_escape($manualAssetBaseUrl . '/poster.png'); ?>">
+          <source
+            src="<?php echo barabeat_manual_escape($manualAssetBaseUrl . '/barabeat-quickstart.mp4'); ?>"
+            type="video/mp4">
+          Dein Browser unterstützt die Wiedergabe dieses Videos nicht.
+        </video>
+
         <div class="workflow">
           <h3>Schneller Arbeitsablauf</h3>
           <ol>

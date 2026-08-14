@@ -2,6 +2,7 @@
 require_once __DIR__ . '/access_control.php';
 require_once __DIR__ . '/edition_config.php';
 barabeat_require_access('json');
+barabeat_require_write_csrf('json');
 
 header('Content-Type: application/json; charset=UTF-8');
 
@@ -12,7 +13,11 @@ function respond_json($statusCode, $payload) {
 }
 
 function normalize_server_path($rawPath) {
-    $fileName = basename(trim($rawPath));
+    $rawPath = trim((string) $rawPath);
+    if ($rawPath === '' || preg_match('/[\\\\\/\x00-\x1F\x7F]/', $rawPath)) {
+        return '';
+    }
+    $fileName = basename($rawPath);
     if ($fileName === '' || $fileName === '.' || $fileName === '..') {
         return '';
     }

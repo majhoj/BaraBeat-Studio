@@ -3,6 +3,7 @@
 
   const statusElId = 'offlineStatus';
   let statusHideTimer = null;
+  let preparedWorker = null;
 
   function t(key) {
     return window.BaraBeatI18n && typeof window.BaraBeatI18n.t === 'function'
@@ -40,21 +41,27 @@
     }
   }
 
-  function requestOfflinePreparation(registration) {
+  function requestOfflinePreparation(registration, force) {
     if (navigator.onLine === false) {
       return;
     }
-    const worker = registration.active || registration.waiting || registration.installing;
+    const worker = navigator.serviceWorker.controller || registration.active;
     if (!worker) {
       return;
     }
+    if (!force && preparedWorker === worker) {
+      return;
+    }
+    preparedWorker = worker;
     setOfflineStatus(t('offline.preparing'), 'preparing');
     worker.postMessage({ type: 'barabeat-prepare-offline' });
   }
 
   window.addEventListener('online', function () {
     updateNetworkState();
-    navigator.serviceWorker.ready.then(requestOfflinePreparation).catch(function () {});
+    navigator.serviceWorker.ready.then(function (registration) {
+      requestOfflinePreparation(registration, true);
+    }).catch(function () {});
   });
   window.addEventListener('offline', updateNetworkState);
 
@@ -84,12 +91,19 @@
       }
     });
 
+    navigator.serviceWorker.addEventListener('controllerchange', function () {
+      preparedWorker = null;
+      navigator.serviceWorker.ready.then(function (registration) {
+        requestOfflinePreparation(registration, true);
+      }).catch(function () {});
+    });
+
     navigator.serviceWorker.register('service-worker.js', {
       scope: './',
       updateViaCache: 'none'
     }).then(function (registration) {
-      return navigator.serviceWorker.ready.then(function () {
-        requestOfflinePreparation(registration);
+      return navigator.serviceWorker.ready.then(function (readyRegistration) {
+        requestOfflinePreparation(readyRegistration || registration);
       });
     }).catch(function (error) {
       console.warn('Offline-Modus konnte nicht registriert werden', error);

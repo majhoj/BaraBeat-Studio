@@ -1,11 +1,11 @@
 'use strict';
 
-const CACHE_NAME = 'barabeat-studio-offline-v8-languages';
+const CACHE_NAME = 'barabeat-studio-offline-v19-cold-start';
 const APP_SHELL = [
-  './',
-  './index.php',
+  './app-shell.html',
   './manifest.webmanifest',
   './CSS/index_style.css',
+  './JS/app-bootstrap.js',
   './JS/i18n.js',
   './JS/edition.js',
   './JS/snapNEU.svg.js',
@@ -17,21 +17,35 @@ const APP_SHELL = [
   './JS/timeline.js',
   './JS/practice.js',
   './JS/offline.js',
-  './Audio/audioplayer.php',
   './Audio/css/audio_style.css',
   './Audio/js/instrument_2.js',
+  './Audio/player.html',
   './Assets/favicon.svg',
   './Assets/favicon-32.png',
   './apple-touch-icon.png',
   './Assets/pwa-icon-192.png',
   './Assets/pwa-icon-512.png',
-  './Bedienungsanleitung.php',
   './languages/de.json',
   './languages/en.json',
   './languages/fr.json',
   './languages/es.json',
-  './languages/pt.json'
+  './languages/pt.json',
+  './manual/assets/manual.css',
+  './manual/assets/manual.js',
+  './manual/assets/poster.png',
+  './manual/offline/de.html',
+  './manual/offline/en.html',
+  './manual/offline/fr.html',
+  './manual/offline/es.html',
+  './manual/offline/pt.html',
+  './legal/legal.css',
+  './legal/navigation.js',
+  './legal/offline/impressum.html',
+  './legal/offline/datenschutz.html'
 ];
+const APP_SHELL_PATHS = new Set(APP_SHELL.map(function (relativePath) {
+  return relativePath.replace(/^\.\//, '');
+}));
 
 function scopedUrl(relativePath) {
   return new URL(relativePath, self.registration.scope).toString();
@@ -39,17 +53,27 @@ function scopedUrl(relativePath) {
 
 async function cacheResponse(cache, request, options) {
   const response = await fetch(request, options);
-  if (response && response.ok) {
-    await cache.put(request, response.clone());
+  if (!response || !response.ok) {
+    const status = response ? response.status : 0;
+    throw new Error(request.url + ': HTTP ' + status);
   }
+  await cache.put(request, response.clone());
   return response;
 }
 
 async function cacheAppShell() {
-  const cache = await caches.open(CACHE_NAME);
-  await Promise.all(APP_SHELL.map(function (relativePath) {
+  const resources = await Promise.all(APP_SHELL.map(async function (relativePath) {
     const request = new Request(scopedUrl(relativePath), { cache: 'reload' });
-    return cacheResponse(cache, request, { cache: 'reload' });
+    const response = await fetch(request, { cache: 'reload' });
+    if (!response || !response.ok) {
+      const status = response ? response.status : 0;
+      throw new Error(relativePath + ': HTTP ' + status);
+    }
+    return { request: request, response: response };
+  }));
+  const cache = await caches.open(CACHE_NAME);
+  await Promise.all(resources.map(function (resource) {
+    return cache.put(resource.request, resource.response);
   }));
 }
 
@@ -99,6 +123,10 @@ async function notifyClient(clientId, message) {
 self.addEventListener('install', function (event) {
   event.waitUntil(cacheAppShell().then(function () {
     return self.skipWaiting();
+  }).catch(function (error) {
+    return caches.delete(CACHE_NAME).then(function () {
+      throw error;
+    });
   }));
 });
 
@@ -148,6 +176,25 @@ function isServerOnlyRequest(relativePath) {
     relativePath === 'offline-assets.php';
 }
 
+function isSessionBoundDocumentRequest(relativePath) {
+  return relativePath === '' ||
+    /\.php$/i.test(relativePath);
+}
+
+function isAppEntryNavigation(request, relativePath) {
+  return request.mode === 'navigate' &&
+    (relativePath === '' || relativePath === 'index.php');
+}
+
+function isAppShellRequest(relativePath) {
+  return APP_SHELL_PATHS.has(relativePath);
+}
+
+function isOfflineAudioRequest(relativePath) {
+  return relativePath.indexOf('Audio/snd/') === 0 ||
+    relativePath.indexOf('Audio/snd alt/') === 0;
+}
+
 async function networkFirst(request, fallbackPath) {
   const cache = await caches.open(CACHE_NAME);
   try {
@@ -162,6 +209,21 @@ async function networkFirst(request, fallbackPath) {
       if (fallbackResponse) {
         return fallbackResponse;
       }
+    }
+    throw error;
+  }
+}
+
+async function networkAppEntryOrShell(request) {
+  try {
+    return await fetch(request, { cache: 'no-store' });
+  } catch (error) {
+    const cache = await caches.open(CACHE_NAME);
+    const shellResponse = await cache.match(scopedUrl('./app-shell.html'), {
+      ignoreSearch: true
+    });
+    if (shellResponse) {
+      return shellResponse;
     }
     throw error;
   }
@@ -192,19 +254,27 @@ self.addEventListener('fetch', function (event) {
 
   const url = new URL(request.url);
   const relativePath = getRelativePath(url);
-  if (relativePath === null || isServerOnlyRequest(relativePath)) {
+  if (relativePath === null) {
     return;
   }
 
-  if (request.mode === 'navigate') {
-    event.respondWith(networkFirst(request, './index.php'));
+  if (isAppEntryNavigation(request, relativePath)) {
+    event.respondWith(networkAppEntryOrShell(request));
     return;
   }
 
-  if (relativePath.indexOf('Audio/snd/') === 0 || relativePath.indexOf('Audio/snd alt/') === 0) {
+  if (
+      isServerOnlyRequest(relativePath) ||
+      isSessionBoundDocumentRequest(relativePath)) {
+    return;
+  }
+
+  if (isOfflineAudioRequest(relativePath)) {
     event.respondWith(cacheFirstWithRefresh(event));
     return;
   }
 
-  event.respondWith(networkFirst(request));
+  if (isAppShellRequest(relativePath)) {
+    event.respondWith(networkFirst(request));
+  }
 });

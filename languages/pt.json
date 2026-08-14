@@ -563,6 +563,7 @@
     "unsupported": "Este navegador não oferece suporte ao modo offline.",
     "httpsRequired": "A instalação offline requer HTTPS.",
     "ready": "Pronto para uso offline.",
+    "onlineOnly": "Esta função requer uma conexão com a Internet.",
     "prepareFailed": "Não foi possível preparar todos os dados offline.",
     "setupFailed": "Não foi possível configurar o modo offline."
   },

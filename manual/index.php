@@ -6,9 +6,9 @@ if (!defined('BARABEAT_MANUAL_RENDER')) {
 }
 
 $manualLanguage = isset($manualLanguage) ? (string) $manualLanguage : 'de';
-$manualAvailableLanguages = ['de'];
+$manualAvailableLanguages = ['de', 'en', 'fr', 'es', 'pt'];
 if (!in_array($manualLanguage, $manualAvailableLanguages, true)) {
-    $manualLanguage = 'de';
+    $manualLanguage = 'en';
 }
 
 $manualRoot = __DIR__;

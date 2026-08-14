@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mode d’emploi de BaraBeat Studio</title>
+  <link rel="stylesheet" href="../assets/manual.css">
+</head>
+<body data-manual-static="true">
+  <a id="manualBackLink" class="manual-back-link" href="../../index.php" data-barabeat-return aria-label="Retour à la partition">← Retour à la partition</a>
+  <header>
+    <div class="wrap">
+      <h1>BaraBeat Studio</h1>
+      <p>Mode d’emploi de l’éditeur de partition, de la lecture immédiate, du mode entraînement, du lecteur audio et de l’Arrangement.</p>
+    </div>
+  </header>
+
+  <main>
+    <nav aria-label="Sommaire">
+      <h2>Sommaire</h2>
+      <a href="#quickstart">Prise en main</a>
+      <a href="#interface">Interface</a>
+      <a href="#files">Fichiers</a>
+      <a href="#editor">Modifier la partition</a>
+      <a href="#symbols">Symboles et signes spéciaux</a>
+      <a href="#selection">Sélection, copie et annulation</a>
+      <a href="#player">Lecteur audio</a>
+      <a href="#practice">Mode entraînement</a>
+      <a href="#arrangement">Arrangement</a>
+      <a href="#sound">Son, Swing et Feel</a>
+      <a href="#mobile">Utilisation sur smartphone</a>
+      <a href="#workflows">Procédures courantes</a>
+      <a href="#troubleshooting">Dépannage</a>
+      <a href="#glossary">Glossaire</a>
+      <p class="toc-note">Ce mode d’emploi décrit l’état du logiciel en août 2026.</p>
+    </nav>
+
+    <article>
+      <section id="quickstart">
+        <h2>1. Prise en main</h2>
+        <p>BaraBeat Studio est un éditeur et un lecteur de notation pour Djembe et Dunun. Vous pouvez noter des Patterns tels que Call, Intro, Pattern d’accompagnement, Solo ou Échauffement et les écouter immédiatement.</p>
+        <h3>BaraBeat en moins de 3 minutes</h3>
+        <p>La vidéo présente les étapes essentielles, de la première saisie dans la partition jusqu’à la lecture et l’enregistrement d’un rythme. Vous pourrez ensuite reprendre tranquillement chaque étape de la prise en main.</p>
+        <video class="manual-quickstart-video" controls playsinline preload="metadata" poster="../assets/poster.png">
+          <source src="../assets/barabeat-quickstart.mp4" type="video/mp4">
+          Votre navigateur ne permet pas de lire cette vidéo.
+        </video>
+        <div class="workflow">
+          <h3>Procédure rapide</h3>
+          <ol>
+            <li>Utilisez <strong>Fichier</strong> pour ouvrir une partition existante ou <strong>Partition</strong> pour en créer une.</li>
+            <li>Saisissez le <strong>nom du rythme</strong> en haut de la partition.</li>
+            <li>Nommez la partie avec les sélecteurs d’instrument et de fonction, par exemple <em>Djembe 1</em> et <em>Pattern d’accompagnement</em>.</li>
+            <li>Placez les notes et, si nécessaire, les signes de commande de la palette sur la grille.</li>
+            <li>Activez la case devant le Pattern à écouter.</li>
+            <li>Réglez les BPM et lancez la <strong>lecture immédiate</strong> avec le bouton Play.</li>
+            <li>Enregistrez avec <strong>Fichier → Enregistrer</strong> ; utilisez <strong>Enregistrer sous</strong> pour un autre nom ou une copie.</li>
+          </ol>
+        </div>
+        <p>Pour un travail systématique, passez au <strong>mode entraînement</strong> ; construisez des séquences plus longues dans l’<strong>Arrangement</strong>. Sur smartphone, le mode portrait sert surtout à lire et à écouter, le mode paysage à modifier.</p>
+      </section>
+      <section id="interface">
+        <h2>2. Interface</h2>
+        <p>L’application comprend la partition, une palette déplaçable, le menu principal et des vues de travail facultatives pour le mode entraînement et l’Arrangement.</p>
+        <h3>Menu principal</h3>
+        <table><thead><tr><th>Menu</th><th>Utilisation</th></tr></thead><tbody>
+          <tr><td><strong>Fichier</strong></td><td>Ouvrir et enregistrer les partitions, les gérer localement ou sur le serveur, les exporter et choisir la langue. Sur smartphone, le mode d’emploi est également accessible ici.</td></tr>
+          <tr><td><strong>Partition</strong></td><td>Créer une partition binaire, ternaire ou 9/8, ajouter ou supprimer des pages.</td></tr>
+          <tr><td><strong>Insérer</strong></td><td>Insérer des éléments ou des modèles supplémentaires.</td></tr>
+          <tr><td><strong>Outils</strong></td><td>Sur ordinateur, ouvrir le mode entraînement, l’Arrangement, le mode d’emploi et le choix des modèles.</td></tr>
+        </tbody></table>
+        <h3>Langue</h3>
+        <p>Avec <strong>Fichier → Langue</strong>, choisissez <strong>Deutsch</strong>, <strong>English</strong>, <strong>Français</strong>, <strong>Español</strong> ou <strong>Português</strong>. BaraBeat Studio mémorise ce choix. Seuls les commandes et messages visibles changent ; les données musicales, textes libres et partitions enregistrées ne sont ni traduits ni modifiés.</p>
+        <h3>Connexion</h3>
+        <p>Si la protection d’accès est active, un mot de passe est demandé avant BaraBeat Studio. La connexion reste valable dans le navigateur ou l’app de l’écran d’accueil jusqu’à <strong>Fichier → Déconnexion</strong> ou jusqu’à la suppression des données du navigateur. Déconnectez-vous sur un appareil partagé.</p>
+        <h3>Administration : accès temporaire</h3>
+        <p>Après une connexion normale, <strong>Fichier → Ouvrir l’accès pendant 5 min</strong> suspend temporairement la protection pour tous les visiteurs, y compris les navigateurs automatisés, requêtes API et outils de test sans connexion ni cookie. Une confirmation évite une ouverture accidentelle. Le bouton indique le temps restant et peut fermer l’accès plus tôt ; la protection revient automatiquement après cinq minutes.</p>
+        <p>Pendant cette période, BaraBeat Studio marque les réponses avec <code>noindex</code> et <code>no-store</code>. Les outils automatisés peuvent accéder à l’application, mais les moteurs de recherche ne doivent ni l’indexer ni la mettre en cache.</p>
+        <h3>Modèles</h3>
+        <p><strong>Outils → Modèle</strong> permet de choisir des styles visuels, notamment <strong>Clair</strong>, <strong>Ludique</strong> et <strong>Terre</strong>. Ils modifient l’ambiance visuelle, jamais les données musicales.</p>
+      </section>
+      <section id="files">
+        <h2>3. Ouvrir et enregistrer des fichiers</h2>
+        <p>Les partitions sont enregistrées au format <code>.bbs</code>. Les anciennes partitions <code>.txt</code> restent lisibles.</p>
+        <h3>Ouvrir</h3>
+        <ul>
+          <li><strong>Local</strong> affiche les partitions enregistrées dans ce navigateur ou cette app de l’écran d’accueil. Elles peuvent être classées en dossiers et sous-dossiers.</li>
+          <li><strong>Serveur</strong> affiche les partitions du dossier <code>Noten/</code>. La liste est relue à chaque ouverture du dialogue.</li>
+          <li>Lors d’un chargement depuis le serveur, BaraBeat Studio mémorise la date et la version. Si le fichier change ensuite sur le serveur, <strong>Serveur modifié depuis</strong> apparaît. Une modification locale est indiquée séparément par <strong>Modifié localement</strong> avec sa date.</li>
+          <li>Au besoin, le message au-dessus de la liste propose <strong>Charger la version du serveur</strong>.</li>
+          <li>Sur smartphone, la vue est simplifiée afin de garder l’ouverture et la suppression des fichiers locaux accessibles.</li>
+        </ul>
+        <h3>Enregistrer</h3>
+        <ul>
+          <li><strong>Enregistrer</strong> remplace la partition ouverte.</li>
+          <li><strong>Enregistrer sous</strong> crée un nouveau nom ou une copie.</li>
+          <li><strong>Enregistrer sous</strong> est également disponible sur iPhone pour conserver localement ou sur le serveur les partitions créées ou modifiées dans l’éditeur mobile.</li>
+          <li>La bibliothèque locale permet de créer et renommer des dossiers. Un dossier ne peut être supprimé que s’il ne contient plus aucune partition ni sous-dossier.</li>
+          <li>Un enregistrement réussi affiche brièvement un état ; les erreurs restent visibles.</li>
+        </ul>
+        <h3>Publier sur le serveur</h3>
+        <p>L’enregistrement sur le serveur publie la partition et la conserve aussi localement. BaraBeat Studio place un jeton de publication dans cette copie locale. Il prouve ensuite que vous pouvez actualiser ou retirer cette publication.</p>
+        <ul><li>Enregistrer à nouveau le même fichier publié actualise la publication.</li><li>Un nouveau nom crée une nouvelle publication.</li><li><strong>Supprimer la publication</strong> retire la version serveur, sans supprimer la copie locale.</li><li>Sans jeton, le fichier serveur reste lisible mais ne peut pas être géré comme votre publication. Utilisez le navigateur ou l’app qui l’a publié.</li></ul>
+        <p>La colonne d’état distingue fichiers locaux, publications et versions modifiées localement. Pour les fichiers serveur, BaraBeat Studio signale aussi une modification depuis le dernier chargement.</p>
+        <h3>SVG, PDF et impression</h3>
+        <p>Dans <strong>Fichier → Exporter</strong>, saisissez un nom et choisissez :</p>
+        <ul><li><strong>SVG</strong>, fichier vectoriel redimensionnable adapté à la retouche ou à un affichage de qualité.</li><li><strong>PDF</strong>, adapté au partage et à l’impression avec une mise en page stable.</li></ul>
+        <p>Pour imprimer, ouvrez le PDF exporté et utilisez la commande du navigateur ou du système. BaraBeat Studio ne possède pas de dialogue d’impression propre.</p>
+        <div class="hint"><strong>Remarque :</strong> La partition enregistre aussi les réglages d’entraînement, scénarios, sélections de Patterns, la timeline de l’Arrangement, les volumes, Swing, Feel et d’autres métadonnées.</div>
+      </section>
+      <section id="editor">
+        <h2>4. Modifier la partition</h2>
+        <p>La partition est la base de toutes les autres fonctions. Les Patterns sont formés de passages nommés par un sélecteur d’instrument et un sélecteur de fonction.</p>
+        <h3>Types de partition</h3>
+        <table><thead><tr><th>Type</th><th>Grille</th><th>Usage courant</th></tr></thead><tbody>
+          <tr><td>Binaire</td><td>Quatre subdivisions par pulsation</td><td>De nombreux rythmes réguliers de Djembe et Dunun</td></tr>
+          <tr><td>Ternaire</td><td>Trois subdivisions par pulsation</td><td>Rythmes en triolets</td></tr>
+          <tr><td>9/8</td><td>Trois groupes de trois</td><td>Rythmes 9/8 particuliers comme Koreduga</td></tr>
+        </tbody></table>
+        <h3>Partitions de plusieurs pages</h3>
+        <p>Une partition peut compter plusieurs pages de dix lignes. Utilisez <strong>Ajouter une page</strong> si nécessaire. La légende est placée sur la dernière page et des numéros tels que <code>1/2</code> et <code>2/2</code> apparaissent en bas à droite.</p>
+        <h3>Palette</h3>
+        <p>La palette contient les notes, sélecteurs et signes de commande. Sur ordinateur, elle reste visible pendant le défilement et peut être déplacée. Dans l’éditeur mobile en paysage, elle forme une barre d’outils horizontale défilante en bas de l’écran.</p>
+        <h3>Définir l’instrument et la fonction</h3>
+        <p>Le sélecteur d’instrument choisit la partie instrumentale : Djembe, Kenkeni, Sangban, Dununba ou Ballet Dununs. Le sélecteur de fonction indique le rôle du Pattern : Call, Intro, Pattern d’accompagnement, Solo, Échauffement ou Outro. Pour <strong>Pattern d’accompagnement</strong> et <strong>Solo</strong>, saisissez librement un nom comme <em>Pattern d’accompagnement 2</em> ou <em>Solo 1</em>. Ce nom réapparaît lors d’une modification ultérieure.</p>
+        <p>Dans BaraBeat Studio, <strong>Ballet Dununs</strong> désigne la partie commune ou l’ensemble joué conjointement par Kenkeni, Sangban et Dununba.</p>
+        <h3>Nom du rythme</h3>
+        <p>Le nom du rythme se trouve en haut de la partition et se modifie directement. Au démarrage, le dernier titre chargé est restauré si le navigateur possède encore cette information.</p>
+        <h3>Lecture immédiate depuis la partition</h3>
+        <p>Les BPM et un bouton Play se trouvent à côté du nom. Les petites cases devant les Patterns indiquent ce qui doit être lu. Elles deviennent actives dès qu’une mesure est reconnue comme jouable grâce à un instrument, un nom de Pattern ou des notes, sans enregistrement préalable. Sur iPhone, l’en-tête avec le nom et Play reste visible pendant le défilement.</p>
+        <ul><li>Un Pattern sélectionné tourne en boucle jusqu’à Stop.</li><li>Les Patterns de différents instruments sont joués en parallèle.</li><li>Les Patterns du même instrument jouent à la suite.</li><li>Un Accompagnement sélectionné continue pendant qu’un Solo supplémentaire joue en parallèle. Son Out est ignoré pour une boucle continue.</li><li>Les notes qui sonnent sont brièvement colorées dans la partition.</li></ul>
+        <h3>Déplacer un Pattern complet</h3>
+        <p>Un Pattern complet, avec notes, sélecteurs et marques supplémentaires, peut être déplacé vers le haut ou le bas grâce aux flèches placées à son début. Cette fonction existe sur ordinateur et dans l’éditeur mobile en paysage.</p>
+      </section>
+      <section id="symbols">
+        <h2>5. Symboles et signes spéciaux</h2>
+        <p>Les principaux signes correspondent à la légende de la partition.</p>
+        <table><thead><tr><th>Signe</th><th>Signification</th></tr></thead><tbody>
+          <tr><td>Tone</td><td>Tone ouvert du Djembe.</td></tr><tr><td>Bass</td><td>Frappe Bass du Djembe ou frappe de Dununba, selon la partie.</td></tr><tr><td>Slap / cloche</td><td>Slap au Djembe, cloche au Kenkeni, Sangban, Dununba ou Ballet Dununs.</td></tr><tr><td>Flam</td><td>Deux frappes très rapprochées, superposées dans les notes défilantes.</td></tr><tr><td>Tone étouffé / Slap étouffé</td><td>Frappes étouffées, soulignées dans la partition.</td></tr><tr><td>In</td><td>Anacrouse ou point d’entrée. La note sous In peut précéder le Pattern proprement dit.</td></tr><tr><td>Out</td><td>Point de sortie. La note au-dessus de Out est encore jouée, puis la partie s’arrête.</td></tr><tr><td>Reprise</td><td>Répétition interne ; le nombre indique combien de fois.</td></tr><tr><td>ShortBar</td><td>Raccourcit une mesure sans réduire sa largeur visuelle ; les unités omises sont en pointillés.</td></tr><tr><td>Triolet / quartolet</td><td>Signes de subdivisions régulières. Une partition binaire affiche <strong>T</strong>, une partition ternaire ou 9/8 affiche <strong>Q</strong>.</td></tr>
+        </tbody></table>
+        <div class="warning"><strong>ShortBar :</strong> Il supprime les quatre dernières unités d’un rythme binaire et les trois dernières d’un rythme ternaire ou 9/8. La structure visuelle reste stable, tandis que l’audio et les notes défilantes respectent la durée raccourcie.</div>
+        <div class="hint"><strong>Out dans un Pattern d’accompagnement :</strong> Dans l’Arrangement, Out peut marquer une sortie volontaire. En mode entraînement, il est généralement ignoré pour maintenir les boucles. Il peut toutefois s’appliquer si l’Accompagnement doit s’arrêter avant Call/Intro ou si un Pattern d’accompagnement joué comme partie d’entraînement doit sortir au dernier passage avant le Call/Intro suivant.</div>
+        <p>Le symbole triolet/quartolet s’adapte au rythme dans la palette et la légende. Il comprend trois points et une lettre : <strong>T</strong> ou <strong>Q</strong>. Après un clic, choisissez la frappe de chaque note. Le symbole composé apparaît près de la palette et peut être glissé sur la partition.</p>
+      </section>
+      <section id="selection">
+        <h2>6. Sélection, copie et annulation</h2>
+        <p>Les éléments se déplacent séparément ou ensemble après sélection par un cadre. La sélection reste active après le déplacement jusqu’à un clic à l’extérieur.</p>
+        <h3>Clavier</h3>
+        <table><thead><tr><th>Touche</th><th>Fonction</th></tr></thead><tbody><tr><td><kbd>Alt</kbd> pendant le glissement</td><td>Cloner l’élément.</td></tr><tr><td><kbd>Cmd</kbd> + <kbd>Z</kbd></td><td>Annuler.</td></tr><tr><td><kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd></td><td>Rétablir.</td></tr><tr><td><kbd>Cmd</kbd> + <kbd>C</kbd></td><td>Copier la sélection.</td></tr><tr><td><kbd>Cmd</kbd> + <kbd>X</kbd></td><td>Couper la sélection.</td></tr><tr><td><kbd>Cmd</kbd> + <kbd>V</kbd></td><td>Coller. Les éléments restent sélectionnés et se déplacent immédiatement.</td></tr></tbody></table>
+        <h3>Supprimer</h3><p>Sur ordinateur, <kbd>Cmd</kbd> + <kbd>X</kbd> retire la sélection. Dans l’éditeur mobile en paysage, l’outil de suppression retire l’élément touché ou toute la sélection. Chaque sélecteur possède aussi sa commande de suppression.</p>
+        <h3>Copier entre des onglets</h3><p>Les éléments sélectionnés peuvent être copiés via le presse-papiers entre deux onglets ou fenêtres. Si le navigateur bloque le presse-papiers système, BaraBeat Studio utilise en plus un presse-papiers local dans l’onglet ouvert.</p>
+        <h3>Grille lors du déplacement</h3><p>Pendant le glissement, l’élément suit librement le pointeur ; au relâchement, il rejoint la position appropriée la plus proche. Cela vaut pour notes, reprises, In/Out, ShortBar et sélecteurs.</p>
+        <h3>Sélection sur iPhone</h3><p>Dans l’éditeur en paysage, activez l’outil de sélection puis tracez un cadre. Déplacez, dupliquez ou supprimez ensuite l’ensemble. La sélection de texte iOS est désactivée dans la partition afin d’éviter les conflits de gestes.</p>
+      </section>
+      <section id="player">
+        <h2>7. Lecteur audio</h2>
+        <p>Le lecteur audio joue un entraînement ou un Arrangement. Dans sa vue autonome, il peut aussi lire certaines parties d’une partition.</p>
+        <h3>Commandes</h3><ul><li><strong>BPM</strong> règle le tempo en battements par minute.</li><li><strong>Play</strong> démarre ou arrête la lecture.</li><li><strong>Partie</strong> choisit des instruments ou groupes dans le lecteur autonome.</li><li><strong>Exporter en WAV</strong> produit un fichier WAV de l’entraînement ou de l’Arrangement si le bouton est proposé dans la configuration. Il peut être masqué sur smartphone, car les navigateurs mobiles gèrent différemment les téléchargements.</li></ul>
+        <h3>Instruments et volumes</h3><p>En mode entraînement et Arrangement, <strong>Volume</strong> ouvre le mixeur. Les parties de Djembe, Kenkeni, Sangban, Dununba, Ballet Dununs et Shekere se règlent ou se coupent séparément. Pour chaque instrument, Bass, Tone, Slap ou Mute peuvent aussi être équilibrés entre eux.</p>
+        <h3>Latence Bluetooth</h3><p><strong>Latence Bluetooth ms</strong> décale l’affichage par rapport au son afin que la ligne rouge et la frappe entendue coïncident avec un casque Bluetooth. Sur iPhone, ce réglage est accessible par <strong>Latence</strong> et enregistré sur l’appareil.</p>
+        <h3>Notes défilantes</h3><p>Sous le lecteur, les notes vont de droite à gauche sous une ligne rouge fixe. La frappe sonne au passage du symbole. Barres de mesure, fond du Pattern, nom de l’instrument et du Pattern facilitent l’orientation.</p><p>La droite de l’en-tête indique, selon le mode, le nombre de répétitions ou le temps restant. Pendant une progression du tempo, elle indique d’abord les répétitions restantes de cette progression.</p>
+      </section>
+      <section id="practice">
+        <h2>8. Mode entraînement</h2><p>Le mode entraînement sert à répéter des Patterns. Il lit les Patterns de la partition et construit une boucle d’entraînement.</p>
+        <h3>Sélection de Pattern</h3><p>Elle s’ouvre ou se ferme et comprend :</p><ul><li><strong>Réglages</strong> pour le début de l’Accompagnement, les répétitions, le minuteur, Swing, Feel, Mute et la latence.</li><li><strong>Sélectionner l’Accompagnement</strong> pour les Patterns joués en parallèle comme rythme de base.</li><li><strong>Sélectionner les parties d’entraînement</strong> pour Calls, Intros, Solos, Échauffements, pauses et Patterns d’accompagnement à travailler.</li></ul><p>Sur ordinateur, <strong>Réglages</strong> est d’abord replié, les deux sélections sont dépliées. Sur smartphone, les trois restent d’abord repliées pour privilégier le lecteur et les notes défilantes.</p>
+        <h3>Scénarios d’entraînement</h3><p>Plusieurs scénarios peuvent être enregistrés avec une partition. Ils contiennent les réglages, les accompagnements, les parties, l’ordre, les répétitions, le minuteur, la progression du tempo, les volumes et d’autres valeurs.</p><p>Le scénario actif se choisit près de <strong>Mode entraînement</strong> ou dans la sélection. La liste est alphabétique. <strong>Réglages actuels</strong> signifie qu’aucun scénario enregistré n’est actif.</p><p><strong>Nouveau</strong> crée un scénario, <strong>Enregistrer</strong> actualise celui sélectionné et <strong>Supprimer</strong> le retire. Ces actions actualisent aussi la copie locale de la partition.</p>
+        <h3>Début de l’Accompagnement</h3><p>Il peut commencer immédiatement, après Call, après Intro ou après Call et Intro. Un Call ou une Intro déjà choisi comme partie n’est pas ajouté deux fois. Pauses et ShortBars sont pris en compte pour que les Accompagnements repartent ensemble.</p>
+        <h3>Arrêter l’Accompagnement pendant Call/Intro</h3><p>Cette option concerne les rythmes dont l’Accompagnement s’interrompt pendant un Call ou une Intro avant de reprendre.</p>
+        <h3>Parties et ordre</h3><p>Plusieurs parties peuvent être sélectionnées et glissées dans l’ordre voulu. Le nombre de répétitions d’un bloc détermine combien de fois son Pattern est joué dans la séquence. L’accompagnement peut aussi jouer seul entre les parties.</p>
+        <h3>Répétitions et minuteur</h3><ul><li><strong>Répétitions</strong> fixe le nombre de boucles.</li><li><strong>Minuteur</strong> peut définir une durée en minutes.</li><li>Avec le minuteur, la boucle en cours se termine au lieu de s’arrêter au milieu d’un Pattern.</li></ul>
+        <h3>Progression du tempo</h3><p>Définissez un tempo initial, un tempo cible, le nombre de répétitions entre les augmentations et leur valeur. La progression se joue d’abord entièrement ; les répétitions normales ou le minuteur suivent.</p><p>Le lecteur affiche les BPM actuels pendant la progression.</p>
+        <h3>Alternance des mains et silence H2H = sourdine</h3><p>Le mode d’alternance des mains peut être choisi pour chaque Pattern de Djembe, par exemple <strong>Auto</strong>, <strong>H2H</strong> ou d’autres modes. Avec <strong>Silence H2H = sourdine</strong>, les notes vides deviennent des frappes Mute discrètes dont le volume peut dépendre de l’instrument.</p>
+        <h3>Volume</h3><p>Un clic sur le nom d’instrument des notes défilantes ouvre son volume. Un autre panneau règle Bass, Tone, Slap ou Mute les uns par rapport aux autres.</p>
+        <h3>Pulsation Shekere</h3><p>Shekere compte quatre pulsations avant le départ. <strong>Pulsation Shekere</strong> peut aussi accentuer chaque battement pendant la lecture. La fonction existe dans l’entraînement et l’Arrangement ; Shekere a son propre volume.</p>
+      </section>
+      <section id="arrangement">
+        <h2>9. Arrangement</h2><p>L’Arrangement est la timeline des séquences complètes. Les Patterns de la Bibliothèque de Patterns sont glissés dans des sections puis joués à la suite ou en parallèle.</p>
+        <h3>Bibliothèque de Patterns</h3><p>Tous les Patterns trouvés dans la partition apparaissent à gauche. Glissez-en un dans la timeline ou ajoutez-le à la fin avec le bouton plus.</p>
+        <h3>Sections</h3><p>Une section contient un ou plusieurs Patterns. Ceux d’une même ligne sont joués en parallèle. Le nombre de répétitions à gauche fixe la durée de la section. Les Accompagnements plus courts peuvent continuer à boucler lorsqu’un Accompagnement plus long détermine les passages.</p>
+        <h3>Ajouter en parallèle</h3><p>Une zone de dépôt parallèle apparaît seulement si l’emploi musical est possible. Un instrument ne peut pas jouer simultanément deux Patterns principaux différents du même type, sauf si un Solo remplace précisément un Accompagnement.</p>
+        <h3>Cellules de Solo</h3><p>Une grille de Solo apparaît pour les sections d’Accompagnement répétées. Chaque cellule correspond à un passage ; un Solo déposé n’y joue qu’à ce passage.</p><ul><li>Si le Solo est plus court, le reste est silencieux.</li><li>S’il est plus long, la section se prolonge.</li><li>Si le même instrument joue Accompagnement et Solo, l’Accompagnement s’interrompt pendant le Solo puis reprend.</li><li><strong>In</strong> et <strong>Out</strong> s’appliquent aussi aux Solos.</li></ul>
+        <h3>Déplacer des sections</h3><p>Les sections montent ou descendent dans la timeline afin de réorganiser l’Arrangement sans reconstruire les Patterns.</p>
+        <h3>BPM dans l’Arrangement</h3><p>Chaque section peut avoir ses propres BPM. Le changement se fait progressivement sur environ deux mesures et reste valable jusqu’au prochain changement.</p>
+        <h3>Shekere et volumes</h3><p>La pulsation Shekere est disponible dans l’Arrangement. Profil Swing, Feel et volumes s’ouvrent au-dessus de la timeline. Les volumes sont communs à l’entraînement et l’Arrangement et sont enregistrés avec la partition.</p>
+        <h3>Annuler et rétablir</h3><p>Les changements de timeline utilisent le même historique que l’éditeur et les réglages. <kbd>Cmd</kbd> + <kbd>Z</kbd> annule et <kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd> rétablit.</p>
+      </section>
+      <section id="sound">
+        <h2>10. Son, Swing et Feel</h2><p>BaraBeat Studio propose plusieurs niveaux de réglage sonore.</p>
+        <h3>Volume des instruments</h3><p>Le volume global de chaque instrument, y compris Shekere, se règle dans les notes défilantes du mode entraînement. Ces valeurs sont enregistrées avec la partition.</p>
+        <h3>Volume des frappes par instrument</h3><p>Les frappes d’un instrument peuvent être équilibrées : Bass, Tone, Slap, Mute ou frappes étouffées. Cela compense des samples enregistrés à des niveaux différents.</p>
+        <h3>Swing</h3><p><strong>Profil Swing</strong> ouvre un panneau qui montre et règle le déplacement des subdivisions. Les notes peuvent aussi être glissées horizontalement ; le décalage maximal est limité à 50&nbsp;% de la distance vers la position voisine. Le profil vaut pour tous les Patterns de la partition ; il n’existe pas de Swing séparé par Pattern.</p>
+        <h3>Feel</h3><p>Le panneau Feel avance ou retarde chaque instrument de quelques millisecondes. Les noms complets rendent la partie concernée explicite.</p>
+        <div class="hint"><strong>En pratique :</strong> Swing modifie la répartition interne d’une pulsation. Feel décale légèrement des instruments entiers. Les deux peuvent rendre le rythme plus vivant, mais doivent rester subtils.</div>
+      </section>
+      <section id="mobile">
+        <h2>11. Utilisation sur smartphone</h2><p>Sur smartphone, BaraBeat Studio ouvre, affiche, lit immédiatement, entraîne et modifie des partitions. L’affichage et l’édition changent automatiquement avec l’orientation. Une timeline d’Arrangement existante peut être lue mais pas encore modifiée sur mobile.</p>
+        <h3>Commandes mobiles</h3><p>La barre de menu ne montre que les commandes utiles. <strong>Fichier</strong> contient Ouvrir, Enregistrer, Enregistrer sous, le mode d’emploi et Déconnexion. Le bouton permanent <strong>Retour à la partition</strong> quitte le mode d’emploi. En entraînement, <strong>Sélection de Pattern</strong> et <strong>Latence</strong> sont aussi disponibles. Si la partition contient un Arrangement, <strong>Lire l’Arrangement</strong> ouvre son lecteur dans un panneau.</p>
+        <h3>Portrait et paysage</h3><ul><li><strong>Portrait :</strong> lecture compacte, une mesure par ligne, lecture immédiate, entraînement et lecture d’Arrangements.</li><li><strong>Paysage :</strong> éditeur mobile avec grille agrandie, menu Partition et palette horizontale.</li></ul>
+        <h3>Partition mobile</h3><p>Les partitions de plusieurs pages s’affichent page par page, sans réduire toute la pile à la hauteur de l’écran. Chaque mesure a sa ligne. Les Patterns de plusieurs mesures sont regroupés ; instrument et nom n’apparaissent qu’au début.</p><p>Dans les notes défilantes, instrument et Pattern tiennent sur une ligne. La ligne rouge ne traverse que les lignes de notes pour laisser les noms lisibles.</p>
+        <h3>Modifier en paysage</h3><ol><li>Tournez l’iPhone en paysage.</li><li>Choisissez une note ou un signe dans la palette du bas, puis touchez la position de grille.</li><li>Déplacez directement les éléments existants ; ils rejoignent la grille au relâchement.</li><li>Tracez un cadre avec l’outil de sélection, puis déplacez, dupliquez ou supprimez l’ensemble.</li><li><strong>Insérer instrument et fonction</strong> ajoute les deux sélecteurs à une mesure libre. Ils peuvent ensuite être modifiés, déplacés ou supprimés.</li><li>Les flèches de la ligne des sélecteurs déplacent tout le Pattern.</li><li>Modifiez le nom du rythme en haut ; l’outil texte insère des commentaires.</li><li>Enregistrez avec <strong>Fichier → Enregistrer</strong> ou <strong>Enregistrer sous</strong>.</li></ol>
+        <div class="hint"><strong>Gestes :</strong> La palette reste en bas et défile horizontalement. Un double toucher sur une reprise ouvre son réglage. Le clavier iOS peut apparaître ; sa fermeture ne change pas l’échelle de la partition.</div>
+        <h3>Lecture immédiate sur iPhone</h3><p>Les cases de Pattern, BPM et Play sont disponibles. Plusieurs instruments jouent en parallèle, les Patterns d’un même instrument à la suite. Les notes qui sonnent sont surlignées. L’en-tête reste visible pour pouvoir arrêter à tout moment.</p>
+        <h3>Utilisation hors ligne</h3><ol><li>Ouvrez une fois complètement BaraBeat Studio par une connexion <strong>HTTPS</strong>.</li><li>Attendez <strong>Prêt hors ligne</strong> : interface, lecteur et sons sont préparés.</li><li>Chargez auparavant du serveur les partitions nécessaires.</li><li>Ajoutez éventuellement l’app dans Safari avec <strong>Partager &gt; Sur l’écran d’accueil</strong>.</li></ol><p>Hors connexion, les partitions locales peuvent être ouvertes, affichées, modifiées, lues et enregistrées localement. La liste serveur et les opérations serveur exigent Internet.</p>
+        <h3>Arrière-plan et écran verrouillé</h3><p>Sur les appareils compatibles, BaraBeat Studio utilise Media Session et une session audio de lecture. Le son peut continuer écran verrouillé. L’écran affiche titre, logo et commandes Play, Pause et Stop selon iOS, le navigateur et la sortie audio.</p>
+        <div class="warning"><strong>Sauvegardez avant suppression :</strong> Safari et l’app de l’écran d’accueil peuvent utiliser des stockages séparés. Supprimer l’app peut effacer partitions locales, scénarios, réglages et données hors ligne. La rajouter ne les restaure pas. Publiez auparavant les partitions importantes sur le serveur ; les scénarios intégrés sont inclus. Les fichiers serveur restent intacts.</div>
+        <h3>Performances et mémoire</h3><p>iOS Safari est sensible à l’audio et aux nombreux éléments DOM. Le lecteur limite donc le prérendu des répétitions et des notes défilantes et évite de conserver plusieurs fois les samples.</p>
+      </section>
+      <section id="workflows">
+        <h2>12. Procédures courantes</h2>
+        <h3>Noter un nouveau Pattern</h3><ol><li>Créez une partition binaire, ternaire ou 9/8 et nommez le rythme.</li><li>Placez le sélecteur d’instrument, par exemple <em>Djembe 1</em>.</li><li>Placez le sélecteur de fonction, par exemple <em>Pattern d’accompagnement</em>, <em>Call</em> ou <em>Solo 1</em>.</li><li>Glissez les notes de la palette sur les lignes.</li><li>Ajoutez au besoin <strong>In</strong>, <strong>Out</strong>, <strong>Reprise</strong>, <strong>ShortBar</strong> ou triolet/quartolet.</li><li>Enregistrez.</li></ol>
+        <h3>Enregistrer et rouvrir</h3><ol><li><strong>Fichier → Enregistrer</strong> actualise la copie locale ; <strong>Enregistrer sous</strong> crée une version.</li><li>Dans <strong>Fichier → Ouvrir</strong>, choisissez <strong>Local</strong>.</li><li>Ouvrez le dossier, sélectionnez et chargez la partition.</li><li>Pour une version serveur, choisissez <strong>Serveur</strong> ; le chargement crée une copie locale.</li></ol>
+        <h3>Exporter SVG ou PDF</h3><ol><li>Ouvrez <strong>Fichier → Exporter</strong>.</li><li>Choisissez nom et <strong>SVG</strong> ou <strong>PDF</strong>.</li><li>Lancez, puis ouvrez le PDF pour imprimer.</li></ol>
+        <h3>Modifier sur iPhone</h3><ol><li>Ouvrez la partition et tournez l’iPhone.</li><li>Dans une nouvelle mesure, touchez l’outil des sélecteurs puis <strong>Insérer instrument et fonction ici</strong>.</li><li>Choisissez instrument et type de Pattern.</li><li>Choisissez une note et touchez sa position.</li><li>Déplacez-la ou sélectionnez plusieurs éléments.</li><li>Utilisez <strong>Enregistrer</strong> ou <strong>Enregistrer sous</strong>.</li></ol>
+        <h3>Vérifier immédiatement un Pattern</h3><ol><li>Cochez le Pattern.</li><li>Ajoutez-en d’autres si besoin.</li><li>Réglez les BPM.</li><li>Appuyez sur Play ; la sélection boucle et les notes sonores sont surlignées.</li><li>Appuyez de nouveau pour arrêter.</li></ol>
+        <h3>Travailler un Pattern</h3><ol><li>Ouvrez le mode entraînement.</li><li>Ouvrez la sélection.</li><li>Choisissez un Accompagnement.</li><li>Choisissez et ordonnez les parties.</li><li>Réglez répétitions ou minuteur.</li><li>Enregistrez éventuellement un scénario.</li><li>Appuyez sur Play.</li></ol>
+        <h3>Construire un Arrangement</h3><ol><li>Ouvrez l’Arrangement.</li><li>Glissez les Patterns de la Bibliothèque dans la timeline.</li><li>Placez-les dans la même section pour les jouer en parallèle.</li><li>Réglez les répétitions.</li><li>Placez les Solos dans leurs cellules.</li><li>Contrôlez BPM, Swing, Feel et volumes.</li><li>Lisez ou exportez en WAV.</li></ol>
+      </section>
+      <section id="troubleshooting">
+        <h2>13. Dépannage</h2>
+        <h3>Un Pattern n’est pas reconnu</h3><ul><li>Vérifiez les sélecteurs d’instrument et de fonction au-dessus du Pattern.</li><li>Vérifiez que les notes sont sur la grille.</li><li>En 9/8, placez In, Out et ShortBar sur des positions adaptées.</li></ul>
+        <h3>La lecture semble décalée</h3><ul><li>Vérifiez la latence Bluetooth.</li><li>Contrôlez les valeurs Feel.</li><li>Aux transitions, vérifiez In/Out et ShortBar.</li></ul>
+        <h3>Les notes défilantes présentent des blancs</h3><ul><li>Recherchez des répétitions très longues ou trop de Patterns simultanés.</li><li>Sur iPhone/Safari, utilisez des valeurs réalistes.</li><li>Enregistrez et rouvrez les nouveaux fichiers pour actualiser les métadonnées.</li><li>Aux transitions Call, Intro, ShortBar ou Out d’Accompagnement, vérifiez que le scénario voulu est enregistré.</li></ul>
+        <h3>La timeline indique « mixte »</h3><p>Cela peut arriver lorsque des Patterns parallèles ont des répétitions différentes. Les groupes d’Accompagnement d’un seul passage prolongés dans une section ne devraient plus être indiqués comme « mixte ».</p>
+        <h3>Un sample manque</h3><p>Le lecteur doit afficher l’erreur. Vérifiez le nom dans le dossier sonore et la présence du fichier sur le serveur.</p>
+        <h3>L’éditeur mobile n’apparaît pas</h3><p>Il ne s’active sur iPhone qu’en paysage. Désactivez le verrouillage d’orientation et retournez l’appareil. Le portrait conserve volontairement la lecture compacte.</p>
+        <h3>Aucun son sur iPhone</h3><p>Vérifiez volume, sortie audio et Bluetooth. Une session audio de lecture permet normalement le son en mode silencieux. Après un changement d’iOS ou de navigateur, touchez de nouveau Play pour autoriser la sortie.</p>
+        <h3>Données hors ligne absentes après réinstallation</h3><p>iOS peut créer un nouveau stockage après suppression et ajout de l’app. Rechargez les partitions du serveur. Les fichiers uniquement locaux ne reviennent que s’ils ont été sauvegardés.</p>
+        <h3>Un fichier serveur n’est pas à la version attendue</h3><p>Rouvrez le dialogue pour actualiser la liste. Consultez état et modification. <strong>Charger la version du serveur</strong> remplace la copie locale après confirmation.</p>
+        <h3>Impossible d’actualiser ou supprimer une publication</h3><p>Ces actions exigent le jeton de publication local. Utilisez le navigateur ou l’app qui a publié. Un fichier seulement chargé du serveur est lisible, sans droit de gestion automatique.</p>
+        <h3>La langue choisie ne modifie pas la partition</h3><p>C’est normal : seuls commandes et messages sont traduits. Noms de rythmes, textes libres, noms de Patterns et données musicales restent intacts.</p>
+        <h3>SVG ou PDF introuvable</h3><p>L’export est remis au navigateur comme téléchargement. Vérifiez le dossier ou, sur iPhone, Fichiers et la liste Safari. Les restrictions peuvent demander une confirmation.</p>
+      </section>
+      <section id="glossary">
+        <h2>14. Glossaire</h2><table><thead><tr><th>Terme</th><th>Signification</th></tr></thead><tbody>
+          <tr><td><strong>Djembe</strong></td><td>Tambour-gobelet ouest-africain ; BaraBeat distingue notamment Bass, Tone et Slap.</td></tr><tr><td><strong>Kenkeni</strong></td><td>Le plus aigu des trois tambours du set Dunun.</td></tr><tr><td><strong>Sangban</strong></td><td>Le tambour médian du set Dunun.</td></tr><tr><td><strong>Dununba</strong></td><td>Le plus grave des trois tambours du set Dunun.</td></tr><tr><td><strong>Ballet Dununs</strong></td><td>Partie de BaraBeat pour l’ensemble formé par Kenkeni, Sangban et Dununba.</td></tr><tr><td><strong>Bass</strong></td><td>Frappe grave du Djembe ; selon la partie, le carré peut aussi désigner un tambour Dunun.</td></tr><tr><td><strong>Tone</strong></td><td>Frappe ouverte du Djembe au bord de la peau.</td></tr><tr><td><strong>Slap</strong></td><td>Frappe claire du Djembe ; sur les parties Dunun, la croix correspond à la cloche.</td></tr><tr><td><strong>Flam</strong></td><td>Deux frappes jouées très rapidement l’une après l’autre.</td></tr><tr><td><strong>Call</strong></td><td>Phrase-signal annonçant une séquence ou un changement.</td></tr><tr><td><strong>Intro / Outro</strong></td><td>Pattern d’ouverture ou de conclusion d’un rythme.</td></tr><tr><td><strong>Solo</strong></td><td>Pattern autonome superposé à un Accompagnement en entraînement ou Arrangement.</td></tr><tr><td><strong>Pattern</strong></td><td>Passage musical de la partition nommé par instrument et fonction.</td></tr><tr><td><strong>Pattern d’accompagnement</strong></td><td>Pattern utilisé comme Accompagnement récurrent ou rythme de base.</td></tr><tr><td><strong>Accompagnement</strong></td><td>Un ou plusieurs Patterns joués parallèlement à la partie d’entraînement.</td></tr><tr><td><strong>Échauffement</strong></td><td>Passage d’exercice ou de progression noté et lu comme type de Pattern propre.</td></tr><tr><td><strong>Swing</strong></td><td>Décalage rythmique des subdivisions dans une pulsation.</td></tr><tr><td><strong>Feel</strong></td><td>Caractère de jeu et de timing ; dans BaraBeat, léger décalage temporel entre instruments.</td></tr><tr><td><strong>Alternance des mains</strong></td><td>Ordre des mains droite et gauche dans un Pattern de Djembe.</td></tr><tr><td><strong>BPM</strong></td><td>Battements par minute, valeur de tempo.</td></tr><tr><td><strong>Shekere</strong></td><td>Instrument à hochet servant au décompte et à l’accent facultatif.</td></tr><tr><td><strong>In / Out</strong></td><td>Marques d’anacrouse et de fin volontaire d’une partie.</td></tr><tr><td><strong>Partie d’entraînement</strong></td><td>Pattern travaillé de manière ciblée.</td></tr><tr><td><strong>Scénario d’entraînement</strong></td><td>Combinaison enregistrée de réglages, Accompagnements, parties, volumes et timing.</td></tr><tr><td><strong>Arrangement</strong></td><td>Séquence de sections dans la timeline.</td></tr><tr><td><strong>Overlay</strong></td><td>Solo placé sur un Accompagnement pendant un passage précis.</td></tr><tr><td><strong>ShortBar</strong></td><td>Mesure raccourcie dont les positions vides sont marquées visuellement.</td></tr><tr><td><strong>Triolet / Quartolet</strong></td><td>Subdivision supplémentaire d’un battement : triolet en binaire, quartolet en ternaire et 9/8.</td></tr>
+        </tbody></table><p class="footer-note">État : août 2026. Ce mode d’emploi peut être ouvert dans le navigateur ou imprimé.</p>
+      </section>
+    </article>
+  </main>
+  <div class="manual-language-switcher">
+    <label for="manualLanguageSelect">Langue</label>
+    <select id="manualLanguageSelect">
+      <option value="de.html" data-language="de">Deutsch</option>
+      <option value="en.html" data-language="en">English</option>
+      <option value="fr.html" data-language="fr" selected>Français</option>
+      <option value="es.html" data-language="es">Español</option>
+      <option value="pt.html" data-language="pt">Português</option>
+    </select>
+  </div>
+  <footer class="manual-legal-footer" aria-label="Rechtliche Informationen">
+    <span class="manual-copyright">© 2020–2026 Art &amp; Werbeteam GmbH · BaraBeat</span>
+    <span aria-hidden="true">·</span>
+    <a href="../../legal/offline/impressum.html" target="_self" data-online-href="../../impressum.php">Impressum</a>
+    <span aria-hidden="true">·</span>
+    <a href="../../legal/offline/datenschutz.html" target="_self" data-online-href="../../datenschutz.php">Datenschutz</a>
+  </footer>
+  <script src="../../legal/navigation.js"></script>
+  <script src="../assets/manual.js"></script>
+</body>
+</html>

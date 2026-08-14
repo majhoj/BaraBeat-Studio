@@ -563,6 +563,7 @@
     "unsupported": "Ce navigateur ne prend pas en charge le mode hors ligne.",
     "httpsRequired": "L'installation hors ligne nécessite HTTPS.",
     "ready": "Prêt hors ligne.",
+    "onlineOnly": "Cette fonction nécessite une connexion Internet.",
     "prepareFailed": "Les données hors ligne n'ont pas pu être entièrement préparées.",
     "setupFailed": "Le mode hors ligne n'a pas pu être configuré."
   },

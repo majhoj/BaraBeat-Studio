@@ -422,7 +422,7 @@ function resolvePatternSourceInstrumentName(bar, labelInfo) {
 }
 
 function buildPatternDisplayName(pattern, occurrenceIndex) {
-    const labelText = pattern.labelName || pattern.labelType || 'Passage';
+    const labelText = getTimelinePatternLabel(pattern);
     const instrumentText = pattern.sourceInstrument || pattern.instrument || 'Instrument';
     return 'P' + occurrenceIndex + ' - ' + instrumentText + ' / ' + labelText;
 }
@@ -2091,7 +2091,7 @@ function buildPatternDisplayLabelMap(patternLibrary) {
 
     patternGroups.forEach(function (patternGroup, groupIndex) {
         const firstPattern = patternGroup.patterns[0];
-        const labelText = firstPattern.labelName || firstPattern.labelType || 'Passage';
+        const labelText = getTimelinePatternLabel(firstPattern);
         const instrumentText = firstPattern.sourceInstrument || firstPattern.instrument || 'Instrument';
         const displayName = 'P' + (groupIndex + 1) + ' - ' + instrumentText + ' / ' + labelText;
 

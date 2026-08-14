@@ -1,0 +1,12 @@
+<?php
+if (!defined('BARABEAT_MANUAL_RENDER')) { http_response_code(404); exit; }
+?>      <section id="symbols">
+        <h2>5. Symboles et signes spéciaux</h2>
+        <p>Les principaux signes correspondent à la légende de la partition.</p>
+        <table><thead><tr><th>Signe</th><th>Signification</th></tr></thead><tbody>
+          <tr><td>Tone</td><td>Tone ouvert du Djembe.</td></tr><tr><td>Bass</td><td>Frappe Bass du Djembe ou frappe de Dununba, selon la partie.</td></tr><tr><td>Slap / cloche</td><td>Slap au Djembe, cloche au Kenkeni, Sangban, Dununba ou Ballet Dununs.</td></tr><tr><td>Flam</td><td>Deux frappes très rapprochées, superposées dans les notes défilantes.</td></tr><tr><td>Tone étouffé / Slap étouffé</td><td>Frappes étouffées, soulignées dans la partition.</td></tr><tr><td>In</td><td>Anacrouse ou point d’entrée. La note sous In peut précéder le Pattern proprement dit.</td></tr><tr><td>Out</td><td>Point de sortie. La note au-dessus de Out est encore jouée, puis la partie s’arrête.</td></tr><tr><td>Reprise</td><td>Répétition interne ; le nombre indique combien de fois.</td></tr><tr><td>ShortBar</td><td>Raccourcit une mesure sans réduire sa largeur visuelle ; les unités omises sont en pointillés.</td></tr><tr><td>Triolet / quartolet</td><td>Signes de subdivisions régulières. Une partition binaire affiche <strong>T</strong>, une partition ternaire ou 9/8 affiche <strong>Q</strong>.</td></tr>
+        </tbody></table>
+        <div class="warning"><strong>ShortBar :</strong> Il supprime les quatre dernières unités d’un rythme binaire et les trois dernières d’un rythme ternaire ou 9/8. La structure visuelle reste stable, tandis que l’audio et les notes défilantes respectent la durée raccourcie.</div>
+        <div class="hint"><strong>Out dans un Pattern d’accompagnement :</strong> Dans l’Arrangement, Out peut marquer une sortie volontaire. En mode entraînement, il est généralement ignoré pour maintenir les boucles. Il peut toutefois s’appliquer si l’Accompagnement doit s’arrêter avant Call/Intro ou si un Pattern d’accompagnement joué comme partie d’entraînement doit sortir au dernier passage avant le Call/Intro suivant.</div>
+        <p>Le symbole triolet/quartolet s’adapte au rythme dans la palette et la légende. Il comprend trois points et une lettre : <strong>T</strong> ou <strong>Q</strong>. Après un clic, choisissez la frappe de chaque note. Le symbole composé apparaît près de la palette et peut être glissé sur la partition.</p>
+      </section>

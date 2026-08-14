@@ -563,6 +563,7 @@
     "unsupported": "Dieser Browser unterstützt den Offline-Modus nicht.",
     "httpsRequired": "Offline-Installation benötigt HTTPS.",
     "ready": "Offline bereit.",
+    "onlineOnly": "Diese Funktion benötigt eine Online-Verbindung.",
     "prepareFailed": "Offline-Daten konnten nicht vollständig vorbereitet werden.",
     "setupFailed": "Offline-Modus konnte nicht eingerichtet werden."
   },

@@ -5,10 +5,15 @@ if (!defined('BARABEAT_MANUAL_RENDER')) {
     exit;
 }
 
-function barabeat_manual_escape($value)
-{
-    return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+if (!function_exists('barabeat_manual_escape')) {
+    function barabeat_manual_escape($value)
+    {
+        return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+    }
 }
+
+$manualLegalBaseUrl = isset($manualLegalBaseUrl) ? (string) $manualLegalBaseUrl : '';
+$manualLegalOfflineBaseUrl = isset($manualLegalOfflineBaseUrl) ? (string) $manualLegalOfflineBaseUrl : 'legal/offline/';
 
 ?><!doctype html>
 <html lang="<?php echo barabeat_manual_escape($manualLanguage); ?>">
@@ -18,8 +23,8 @@ function barabeat_manual_escape($value)
   <title><?php echo barabeat_manual_escape($manualStrings['pageTitle']); ?></title>
   <link rel="stylesheet" href="<?php echo barabeat_manual_escape($manualAssetBaseUrl . '/manual.css'); ?>">
 </head>
-<body>
-  <a id="manualBackLink" class="manual-back-link" href="<?php echo barabeat_manual_escape($manualBackUrl); ?>" aria-label="<?php echo barabeat_manual_escape($manualStrings['backAriaLabel']); ?>"><?php echo barabeat_manual_escape($manualStrings['backLabel']); ?></a>
+<body<?php echo !empty($manualStaticBuild) ? ' data-manual-static="true"' : ''; ?>>
+  <a id="manualBackLink" class="manual-back-link" href="<?php echo barabeat_manual_escape($manualBackUrl); ?>" data-barabeat-return aria-label="<?php echo barabeat_manual_escape($manualStrings['backAriaLabel']); ?>"><?php echo barabeat_manual_escape($manualStrings['backLabel']); ?></a>
   <header>
     <div class="wrap">
       <h1><?php echo barabeat_manual_escape($manualStrings['headerTitle']); ?></h1>
@@ -32,7 +37,7 @@ function barabeat_manual_escape($value)
 
     <article>
 <?php foreach ($manualSections as $manualSection): ?>
-<?php if ($manualSection['legacyId'] !== $manualSection['id']): ?>
+<?php if ($manualLanguage === 'de' && $manualSection['legacyId'] !== $manualSection['id']): ?>
       <span id="<?php echo barabeat_manual_escape($manualSection['legacyId']); ?>" aria-hidden="true" style="display:block;height:0;overflow:hidden"></span>
 <?php endif; ?>
 <?php require $manualContentRoot . '/' . $manualSection['file']; ?>
@@ -40,6 +45,14 @@ function barabeat_manual_escape($value)
     </article>
   </main>
 <?php require __DIR__ . '/language-switcher.php'; ?>
+  <footer class="manual-legal-footer" aria-label="Rechtliche Informationen">
+    <span class="manual-copyright">© 2020–<?php echo date('Y'); ?> Art &amp; Werbeteam GmbH · BaraBeat</span>
+    <span aria-hidden="true">·</span>
+    <a href="<?php echo barabeat_manual_escape($manualLegalOfflineBaseUrl . 'impressum.html'); ?>" target="_self" data-online-href="<?php echo barabeat_manual_escape($manualLegalBaseUrl . 'impressum.php'); ?>">Impressum</a>
+    <span aria-hidden="true">·</span>
+    <a href="<?php echo barabeat_manual_escape($manualLegalOfflineBaseUrl . 'datenschutz.html'); ?>" target="_self" data-online-href="<?php echo barabeat_manual_escape($manualLegalBaseUrl . 'datenschutz.php'); ?>">Datenschutz</a>
+  </footer>
+  <script src="<?php echo barabeat_manual_escape($manualLegalBaseUrl . 'legal/navigation.js'); ?>"></script>
   <script src="<?php echo barabeat_manual_escape($manualAssetBaseUrl . '/manual.js'); ?>"></script>
 </body>
 </html>

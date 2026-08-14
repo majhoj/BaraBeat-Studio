@@ -151,8 +151,17 @@
   function setLanguage(language) {
     activeLanguage = resolveLanguage(language);
     storeLanguage(activeLanguage);
-    if (global.location && typeof global.location.reload === 'function') {
-      global.location.reload();
+    if (global.document && global.document.documentElement) {
+      global.document.documentElement.lang = activeLanguage;
+      applyTranslations(global.document);
+    }
+    if (typeof global.CustomEvent === 'function') {
+      global.dispatchEvent(new CustomEvent('barabeat-language-change', {
+        detail: {
+          language: activeLanguage,
+          locale: getLocale()
+        }
+      }));
     }
   }
 
@@ -175,9 +184,15 @@
     });
     scope.querySelectorAll('[data-barabeat-language-select]').forEach(function (select) {
       select.value = activeLanguage;
-      select.addEventListener('change', function () {
-        setLanguage(select.value);
-      });
+      if (select.dataset.barabeatLanguageBound !== '1') {
+        select.dataset.barabeatLanguageBound = '1';
+        select.addEventListener('change', function () {
+          setLanguage(select.value);
+        });
+      }
+    });
+    scope.querySelectorAll('[data-barabeat-manual-link]').forEach(function (link) {
+      link.setAttribute('href', 'manual/offline/' + activeLanguage + '.html');
     });
   }
 

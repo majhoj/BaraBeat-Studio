@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BaraBeat Studio User Guide</title>
+  <link rel="stylesheet" href="../assets/manual.css">
+</head>
+<body data-manual-static="true">
+  <a id="manualBackLink" class="manual-back-link" href="../../index.php" data-barabeat-return aria-label="Back to the score">← Back to the score</a>
+  <header>
+    <div class="wrap">
+      <h1>BaraBeat Studio</h1>
+      <p>User guide for the score editor, instant playback, practice mode, audio player and Arrangement.</p>
+    </div>
+  </header>
+
+  <main>
+    <nav aria-label="Contents">
+      <h2>Contents</h2>
+      <a href="#quickstart">Quick start</a>
+      <a href="#interface">Interface</a>
+      <a href="#files">Files</a>
+      <a href="#editor">Editing the score</a>
+      <a href="#symbols">Symbols and special marks</a>
+      <a href="#selection">Selection, copying and undo</a>
+      <a href="#player">Audio player</a>
+      <a href="#practice">Practice mode</a>
+      <a href="#arrangement">Arrangement</a>
+      <a href="#sound">Sound, Swing and Feel</a>
+      <a href="#mobile">Smartphone use</a>
+      <a href="#workflows">Typical workflows</a>
+      <a href="#troubleshooting">Troubleshooting</a>
+      <a href="#glossary">Glossary</a>
+      <p class="toc-note">This guide describes the development status of August 2026.</p>
+    </nav>
+
+    <article>
+      <section id="quickstart">
+        <h2>1. Quick start</h2>
+        <p>BaraBeat Studio is an editor and player for Djembe and Dunun notation. You can notate Patterns such as Call, Intro, Accompaniment Pattern, Solo or Échauffement and listen to them immediately.</p>
+
+        <h3>BaraBeat in under 3 minutes</h3>
+        <p>The video shows the essential steps from the first entry in the score to playing and saving a rhythm. You can then follow the individual quick-start steps at your own pace.</p>
+        <video
+          class="manual-quickstart-video"
+          controls
+          playsinline
+          preload="metadata"
+          poster="../assets/poster.png">
+          <source
+            src="../assets/barabeat-quickstart.mp4"
+            type="video/mp4">
+          Your browser does not support video playback.
+        </video>
+
+        <div class="workflow">
+          <h3>Fast workflow</h3>
+          <ol>
+            <li>Use <strong>File</strong> to open an existing score, or use <strong>Score</strong> to create a new one.</li>
+            <li>Enter the <strong>rhythm name</strong> at the top of the score.</li>
+            <li>Label the part with the instrument and function choosers, for example <em>Djembe 1</em> and <em>Accompaniment Pattern</em>.</li>
+            <li>Place notes and, if required, control marks from the palette on the grid.</li>
+            <li>Activate the selection box in front of the Pattern you want to hear.</li>
+            <li>Set the BPM and start <strong>instant playback</strong> with the Play button.</li>
+            <li>Use <strong>File → Save</strong> to store your work; use <strong>Save as</strong> for a new name or a copy.</li>
+          </ol>
+        </div>
+
+        <p>For systematic training, switch to <strong>practice mode</strong>; build longer sequences in the <strong>Arrangement</strong>. On smartphones, portrait orientation is mainly for reading and playback, while landscape orientation is for editing.</p>
+      </section>
+      <section id="interface">
+        <h2>2. Interface</h2>
+        <p>The application consists of the score, a movable palette, the main menu and optional work views for practice mode and Arrangement.</p>
+
+        <h3>Main menu</h3>
+        <table>
+          <thead><tr><th>Menu</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td><strong>File</strong></td><td>Open and save scores, manage them locally or on the server, export them and select the language. On smartphones, the user guide is also available here.</td></tr>
+            <tr><td><strong>Score</strong></td><td>Create a binary, ternary or 9/8 score and add or delete pages.</td></tr>
+            <tr><td><strong>Insert</strong></td><td>Insert additional elements or templates.</td></tr>
+            <tr><td><strong>Tools</strong></td><td>On the desktop, open practice mode, Arrangement, the user guide and template selection.</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Language</h3>
+        <p>Under <strong>File → Language</strong>, you can select <strong>Deutsch</strong>, <strong>English</strong>, <strong>Français</strong>, <strong>Español</strong> or <strong>Português</strong>. BaraBeat Studio remembers the selection and uses it again the next time you open the application. Language selection changes visible controls and messages only; musical data, free text and saved scores are neither translated nor modified.</p>
+
+        <h3>Sign-in</h3>
+        <p>If access protection is enabled, BaraBeat Studio first asks for a password. Sign-in remains valid in that browser or Home Screen app until you choose <strong>File → Sign out</strong> or delete the browser data. Sign out after working on a shared device.</p>
+
+        <h3>Administration: temporary access</h3>
+        <p>After signing in normally, you can use <strong>File → Open access for 5 min</strong> to suspend password protection temporarily for all visitors. This also applies to automated browsers, API requests and testing tools without a sign-in or cookie. A confirmation prevents accidental activation. The button shows the remaining time and can close the access window early; protection is restored automatically after five minutes.</p>
+        <p>During this window, BaraBeat Studio marks responses with <code>noindex</code> and <code>no-store</code>. Automated tools may access the application, but search engines should neither index nor cache the temporarily open application.</p>
+
+        <h3>Templates</h3>
+        <p>Under <strong>Tools → Template</strong>, you can switch between visual presets including <strong>Clear</strong>, <strong>Playful</strong> and <strong>Earthy</strong>. Templates change the visual mood of the interface, not the musical data.</p>
+      </section>
+      <section id="files">
+        <h2>3. Opening and saving files</h2>
+        <p>Scores are stored as <code>.bbs</code> files. Older <code>.txt</code> scores can still be opened.</p>
+
+        <h3>Open</h3>
+        <ul>
+          <li><strong>Local</strong> shows scores stored in this browser or Home Screen app. They can be organised in folders and subfolders.</li>
+          <li><strong>Server</strong> shows scores from the <code>Noten/</code> folder. The server list is refreshed whenever the dialog opens.</li>
+          <li>When loading from the server, BaraBeat Studio remembers the download time and server-file version. If it subsequently changes on the server, <strong>Server changed since then</strong> appears. Local editing is shown separately as <strong>Locally changed</strong> with its time.</li>
+          <li>When required, the notice above the file list offers <strong>Load server version</strong>.</li>
+          <li>On smartphones, the file view is simplified so that opening and deleting local files remain easy to reach.</li>
+        </ul>
+
+        <h3>Save</h3>
+        <ul>
+          <li><strong>Save</strong> overwrites the currently open score.</li>
+          <li><strong>Save as</strong> is intended for new names or copies.</li>
+          <li><strong>Save as</strong> is also available on iPhone, allowing scores created or changed in the mobile editor to be stored locally or on the server.</li>
+          <li>You can create and rename folders in the local library. A folder can only be deleted when it contains no scores or subfolders.</li>
+          <li>A successful save produces a brief status message. Error messages remain visible.</li>
+        </ul>
+
+        <h3>Publish on the server</h3>
+        <p>Saving to the server publishes the score and also keeps it as a local file. BaraBeat Studio stores a publish token in that local copy. The token proves later that you are allowed to update or withdraw the publication.</p>
+        <ul>
+          <li>Saving the same published file to the server again updates its publication.</li>
+          <li>Using a new name creates a new publication.</li>
+          <li><strong>Delete publication</strong> removes the server version; the local file remains.</li>
+          <li>Without the publish token, the server file can still be read but cannot be updated or deleted as your publication. Use the browser or Home Screen app from which it was published.</li>
+        </ul>
+        <p>The status column distinguishes local files, publications and locally changed versions. For server files, BaraBeat Studio also shows whether the publication has changed since it was last loaded.</p>
+
+        <h3>SVG, PDF and printing</h3>
+        <p>Under <strong>File → Export</strong>, enter a file name and select the format:</p>
+        <ul>
+          <li><strong>SVG</strong> is a scalable vector file suitable for further editing or high-quality display.</li>
+          <li><strong>PDF</strong> is suitable for sharing and printing with a consistent page layout.</li>
+        </ul>
+        <p>To print, open the exported PDF and use the browser or operating system print command. BaraBeat Studio does not have a separate print dialog.</p>
+
+        <div class="hint"><strong>Note:</strong> The score stores not only the drawn notes but also practice settings, saved practice scenarios, Pattern selections, the Arrangement timeline, volumes, Swing, Feel and other metadata.</div>
+      </section>
+      <section id="editor">
+        <h2>4. Editing the score</h2>
+        <p>The score is the basis of all other functions. Patterns are created from passages labelled with an instrument chooser and a function chooser.</p>
+
+        <h3>Score types</h3>
+        <table>
+          <thead><tr><th>Type</th><th>Grid</th><th>Typical use</th></tr></thead>
+          <tbody>
+            <tr><td>Binary</td><td>Four subdivisions per pulse</td><td>Many straight Djembe and Dunun rhythms</td></tr>
+            <tr><td>Ternary</td><td>Three subdivisions per pulse</td><td>Triplet-based rhythms</td></tr>
+            <tr><td>9/8</td><td>Three groups of three</td><td>Special 9/8 rhythms such as Koreduga</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Multi-page scores</h3>
+        <p>A score can have several pages. Each page displays ten lines. If more lines are needed, use <strong>Add page</strong>. The legend is placed on the last page, and page numbers such as <code>1/2</code> and <code>2/2</code> appear at the lower right.</p>
+
+        <h3>Palette</h3>
+        <p>The palette contains note symbols, choosers and control marks. On the desktop it remains visible while scrolling and can be moved when required. In the mobile landscape editor it appears as a horizontally scrollable toolbar at the bottom of the display.</p>
+
+        <h3>Setting the instrument and function</h3>
+        <p>The instrument chooser sets the voice, for example Djembe, Kenkeni, Sangban, Dununba or Ballet Dununs. The function chooser describes the Pattern’s role, such as Call, Intro, Accompaniment Pattern, Solo, Échauffement or Outro. For <strong>Accompaniment Pattern</strong> and <strong>Solo</strong>, you can enter a custom label such as <em>Accompaniment Pattern 2</em> or <em>Solo 1</em>. This custom label reappears in the input field when you edit it later.</p>
+        <p>In BaraBeat Studio, <strong>Ballet Dununs</strong> denotes the combined part or jointly played set of Kenkeni, Sangban and Dununba.</p>
+
+        <h3>Rhythm name</h3>
+        <p>The rhythm name appears at the top of the score and can be edited directly. On startup, the last loaded title is restored if the browser still has that information.</p>
+
+        <h3>Instant playback from the score</h3>
+        <p>A BPM field and Play button appear next to the rhythm name. Small selection boxes before the Patterns mark what should be played directly from the score. They become active as soon as a measure is recognised as playable through an instrument, Pattern name or notes; saving and reloading first is unnecessary. On iPhone, the header with rhythm name and Play button stays visible while scrolling.</p>
+        <ul>
+          <li>One selected Pattern loops until you press Stop.</li>
+          <li>Patterns on different instruments play in parallel.</li>
+          <li>Patterns on the same instrument play in sequence.</li>
+          <li>A selected Accompaniment continues while an additional Solo plays in parallel. An Out in the Accompaniment is ignored to keep the loop seamless.</li>
+          <li>Notes currently sounding are briefly highlighted in the score.</li>
+        </ul>
+
+        <h3>Moving a complete Pattern</h3>
+        <p>A complete Pattern, including notes, choosers and additional marks, can be moved up or down. Use the arrows at the beginning of the Pattern. This is available in both the desktop editor and the mobile landscape editor.</p>
+      </section>
+      <section id="symbols">
+        <h2>5. Symbols and special marks</h2>
+        <p>The principal symbols correspond to the legend in the score.</p>
+        <table>
+          <thead><tr><th>Symbol</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td>Tone</td><td>Open Djembe Tone.</td></tr>
+            <tr><td>Bass</td><td>Djembe Bass stroke or Dununba stroke, depending on the instrument part.</td></tr>
+            <tr><td>Slap / bell</td><td>Slap on Djembe; bell on Kenkeni, Sangban, Dununba or Ballet Dununs.</td></tr>
+            <tr><td>Flam</td><td>Two closely spaced strokes. Flams overlap in the moving-note display.</td></tr>
+            <tr><td>Muffled Tone / muffled Slap</td><td>Muffled strokes, marked by an underline in the score.</td></tr>
+            <tr><td>In</td><td>Pickup or entry point. The note below the In may occur before the Pattern proper.</td></tr>
+            <tr><td>Out</td><td>Exit point. The note above the Out is still played, after which the voice ends.</td></tr>
+            <tr><td>Repeat</td><td>Internal repeat within the Pattern. The number by the mark gives the repeat count.</td></tr>
+            <tr><td>ShortBar</td><td>Shortens a measure without making it visually narrower. Omitted units are shown with dashed lines.</td></tr>
+            <tr><td>Triplet / quadruplet</td><td>Additional symbols for even subdivisions. Binary scores show a <strong>T</strong> for triplets; ternary and 9/8 scores show a <strong>Q</strong> for quadruplets.</td></tr>
+          </tbody>
+        </table>
+        <div class="warning"><strong>ShortBar:</strong> In binary rhythms, ShortBar omits the final four units; in ternary and 9/8 rhythms, it omits the final three. The visual structure remains stable while audio and moving notes observe the shortened length.</div>
+        <div class="hint"><strong>Out in an Accompaniment Pattern:</strong> In an Arrangement, an Out can mark a deliberate exit in an Accompaniment. In practice mode, an Out in an Accompaniment Pattern is normally ignored so that loops continue. It may apply when the Accompaniment is explicitly set to stop before Call/Intro, or when an Accompaniment Pattern used as a practice part should exit on its final pass before the next Call/Intro.</div>
+        <p>The triplet/quadruplet symbol changes with the score type in the palette and legend. Its compact form uses three dots and a letter: <strong>T</strong> for triplet or <strong>Q</strong> for quadruplet. After clicking the symbol, select the stroke for each individual note. The completed compound symbol is created beside the palette and can then be dragged onto the score.</p>
+      </section>
+      <section id="selection">
+        <h2>6. Selection, copying and undo</h2>
+        <p>Elements can be moved individually or marked together with a selection rectangle. After moving, the selection remains active until you click outside it.</p>
+        <h3>Keyboard</h3>
+        <table>
+          <thead><tr><th>Key</th><th>Function</th></tr></thead>
+          <tbody>
+            <tr><td><kbd>Alt</kbd> while dragging</td><td>Clone an element.</td></tr>
+            <tr><td><kbd>Cmd</kbd> + <kbd>Z</kbd></td><td>Undo.</td></tr>
+            <tr><td><kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd></td><td>Redo.</td></tr>
+            <tr><td><kbd>Cmd</kbd> + <kbd>C</kbd></td><td>Copy selection.</td></tr>
+            <tr><td><kbd>Cmd</kbd> + <kbd>X</kbd></td><td>Cut selection.</td></tr>
+            <tr><td><kbd>Cmd</kbd> + <kbd>V</kbd></td><td>Paste. Pasted elements remain selected and can be moved immediately.</td></tr>
+          </tbody>
+        </table>
+        <h3>Delete</h3>
+        <p>On the desktop, use <kbd>Cmd</kbd> + <kbd>X</kbd> to cut and remove a selection. In the mobile landscape editor, the delete tool removes either the tapped element or the whole current selection. Choosers can also be removed with their own delete control.</p>
+        <h3>Copying between tabs</h3>
+        <p>Selected score elements can be copied through the clipboard between two browser tabs or windows. If the browser blocks access to the system clipboard, BaraBeat Studio also uses a local clipboard in the open tab.</p>
+        <h3>Grid behaviour while moving</h3>
+        <p>While dragging, an element follows the pointer smoothly. When released, it snaps to the nearest sensible position. This applies to notes, repeat marks, In/Out, ShortBar and choosers.</p>
+        <h3>Selection on iPhone</h3>
+        <p>In the mobile landscape editor, activate the selection tool in the lower palette and draw a rectangle around the required elements. You can move the selection together, copy it with the duplicate tool or remove it with the delete tool. Normal iOS text selection is suppressed in the score area so that its gestures do not conflict with the editor.</p>
+      </section>
+      <section id="player">
+        <h2>7. Audio player</h2>
+        <p>The audio player plays a practice session or Arrangement. In its standalone view, it can also play selected voices from a score.</p>
+        <h3>Controls</h3>
+        <ul>
+          <li><strong>BPM</strong> controls the tempo in beats per minute.</li>
+          <li><strong>Play</strong> starts or stops playback.</li>
+          <li><strong>Voice</strong> selects individual instruments or groups in the standalone player.</li>
+          <li><strong>Export WAV</strong> renders the current practice session or Arrangement as a WAV file when this button is available in the current configuration. It may be hidden on smartphones because mobile browsers handle downloads differently.</li>
+        </ul>
+        <h3>Instruments and volumes</h3>
+        <p>In practice mode and Arrangement, <strong>Volume</strong> opens the instrument mixer. Djembe voices, Kenkeni, Sangban, Dununba, Ballet Dununs and Shekere can be adjusted or muted separately. For individual instruments, the relative levels of strokes such as Bass, Tone, Slap or Mute can also be set.</p>
+        <h3>Bluetooth latency</h3>
+        <p>Practice mode includes <strong>Bluetooth latency ms</strong>. It offsets the display relative to the audio so that the red line and audible stroke coincide with Bluetooth headphones. On iPhone, the setting is available under <strong>Latency</strong> and is saved on the device.</p>
+        <h3>Moving notes</h3>
+        <p>Below the player, the notes being played move from right to left beneath a fixed red line. A stroke sounds when its symbol reaches the line. Bar lines, Pattern shading, instrument name and Pattern name aid orientation.</p>
+        <p>Depending on the mode, the right side of the header shows the number of remaining repeats or the remaining practice time. With tempo progression active, it first shows the remaining progression repeats.</p>
+      </section>
+      <section id="practice">
+        <h2>8. Practice mode</h2>
+        <p>Practice mode is designed for repeated training of individual Patterns. It reads Patterns from the score and builds a practice loop.</p>
+        <h3>Pattern selection</h3>
+        <p>Pattern selection can be opened or closed. It has three main areas:</p>
+        <ul>
+          <li><strong>Settings</strong> for Accompaniment start, repeats, timer, Swing, Feel, Mute and latency.</li>
+          <li><strong>Select Accompaniment</strong> for Patterns that run in parallel as the foundation rhythm.</li>
+          <li><strong>Select practice parts</strong> for Calls, Intros, Solos, Échauffements, rests and Accompaniment Patterns to be practised.</li>
+        </ul>
+        <p>On the desktop, <strong>Settings</strong> initially opens collapsed; <strong>Select Accompaniment</strong> and <strong>Select practice parts</strong> are expanded. On smartphones all three initially remain collapsed so that the player and moving notes stay prominent.</p>
+        <h3>Practice scenarios</h3>
+        <p>Several practice scenarios can be saved for one score. A scenario contains the current settings, selected Accompaniments and practice parts, order, repeats, timer, tempo progression, volumes and other values. Scenarios are saved with the score.</p>
+        <p>Select the active scenario beside <strong>Practice mode</strong> at the top or in Pattern selection. The list is alphabetical. <strong>Current settings</strong> means that no saved scenario is currently active.</p>
+        <p><strong>New</strong> saves the current configuration under a new name. <strong>Save</strong> updates the selected scenario and <strong>Delete</strong> removes it. These actions also update the locally saved score.</p>
+        <h3>Accompaniment starts</h3>
+        <p>The Accompaniment can start immediately, after Call, after Intro or after Call and Intro. If Call or Intro are already selected as practice parts, they are not added twice. Rests and ShortBars are observed so that the Accompaniments restart together afterwards.</p>
+        <h3>Accompaniment stops at Call/Intro</h3>
+        <p>This option is intended for rhythms in which the Accompaniment pauses for a Call or Intro and then resumes.</p>
+        <h3>Practice parts and order</h3>
+        <p>You can select several practice parts and drag them into the required order. The repeat count in an individual block determines how often that Pattern is played within the practice sequence. Optionally, the Accompaniment can play alone between practice parts.</p>
+        <h3>Repeats and timer</h3>
+        <ul>
+          <li><strong>Repeats</strong> sets how often the practice loop is played.</li>
+          <li><strong>Timer</strong> can instead set a practice duration in minutes.</li>
+          <li>When the timer is active, the current practice loop finishes rather than stopping in the middle of a Pattern.</li>
+        </ul>
+        <h3>Tempo progression</h3>
+        <p>Tempo progression provides a start tempo and a target tempo. You can also specify after how many repeats the tempo rises and by how much. The progression is completed first; normal repeats or timer duration continue afterwards.</p>
+        <p>The audio player displays the current BPM while the progression is running.</p>
+        <h3>Sticking and H2H rest = Mute</h3>
+        <p>Sticking can be selected for each Djembe Pattern, for example <strong>Auto</strong>, <strong>H2H</strong> or other modes. With <strong>H2H rest = Mute</strong>, empty notes become quiet Mute strokes. Their level can be set separately for each instrument.</p>
+        <h3>Volume in practice mode</h3>
+        <p>Clicking an instrument name beside the moving notes opens its volume control. A further overlay for individual stroke types can be opened there, allowing Bass, Tone, Slap or Mute to be adjusted relative to one another.</p>
+        <h3>Shekere beat</h3>
+        <p>Before a practice session starts, Shekere counts in four beats. <strong>Shekere beat</strong> can also accent every beat during playback. This is available in practice mode and Arrangement; Shekere has its own volume setting.</p>
+      </section>
+      <section id="arrangement">
+        <h2>9. Arrangement</h2>
+        <p>The Arrangement is the timeline for complete sequences. Patterns from the Pattern library are dragged into sections and played there in sequence or in parallel.</p>
+        <h3>Pattern library</h3>
+        <p>All Patterns found in the score appear on the left. Drag a Pattern into the timeline or use the plus button to append it.</p>
+        <h3>Sections</h3>
+        <p>A section contains one or more Patterns. Patterns in the same row play in parallel. The repeat count on the left determines how often the section runs. Shorter Accompaniments can continue cycling when a longer Accompaniment determines the number of passes.</p>
+        <h3>Adding in parallel</h3>
+        <p>When you drag a Pattern into an existing section, a parallel drop zone appears only when the Pattern can be used there musically. An instrument cannot play two different main Patterns of the same type at once, except when a Solo deliberately replaces an Accompaniment.</p>
+        <h3>Solo cells</h3>
+        <p>Accompaniment sections with several repeats show a Solo grid. Each cell represents one pass. A Solo dropped into a cell plays in parallel with the Accompaniment only during that pass.</p>
+        <ul>
+          <li>If the Solo is shorter than the Accompaniment pass, the remainder is silent.</li>
+          <li>If the Solo is longer, the section continues for the required duration.</li>
+          <li>If the same instrument plays Accompaniment and Solo, the Accompaniment pauses during the Solo and resumes afterwards.</li>
+          <li><strong>In</strong> and <strong>Out</strong> are also observed for Solos.</li>
+        </ul>
+        <h3>Moving sections</h3>
+        <p>Sections can be moved up or down in the timeline, allowing an Arrangement to be reorganised without rebuilding its Patterns.</p>
+        <h3>BPM in the Arrangement</h3>
+        <p>Each section can have its own BPM. A tempo change glides to the new BPM over about two measures and remains in effect for subsequent sections until another change is set.</p>
+        <h3>Shekere and volumes</h3>
+        <p>Shekere beat is also available in the Arrangement. Swing profile, Feel and volumes open from the controls above the timeline. Instrument volumes are shared by practice mode and Arrangement and saved with the score.</p>
+        <h3>Undo and redo</h3>
+        <p>Timeline changes are recorded in the same history as editor and practice-setting changes. On the desktop, <kbd>Cmd</kbd> + <kbd>Z</kbd> undoes the last step; <kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd> redoes it.</p>
+      </section>
+      <section id="sound">
+        <h2>10. Sound, Swing and Feel</h2>
+        <p>BaraBeat Studio provides several levels of sound adjustment.</p>
+        <h3>Instrument volume</h3>
+        <p>The overall level of individual instruments, including Shekere, can be set from the moving notes in practice mode. These values are saved with the score.</p>
+        <h3>Stroke volume per instrument</h3>
+        <p>The different strokes of an instrument can also be balanced relative to one another, for example Bass, Tone, Slap, Mute or muffled strokes. This is useful when samples were recorded at different levels.</p>
+        <h3>Swing</h3>
+        <p><strong>Swing profile</strong> opens an overlay in which subdivision displacement is displayed and adjusted. Note symbols can also be dragged horizontally; the maximum offset is limited to 50&nbsp;% of the distance to the neighbouring grid position. The profile applies to all Patterns in the score; there are no separate Swing values per Pattern.</p>
+        <h3>Feel</h3>
+        <p>The Feel overlay moves individual instruments forward or backward by milliseconds. Instrument names are written in full so that the adjusted part is unambiguous.</p>
+        <div class="hint"><strong>In practice:</strong> Swing changes the internal distribution within a pulse. Feel shifts complete instruments slightly relative to one another. Together they can make a rhythm more lively, but should be used carefully.</div>
+      </section>
+      <section id="mobile">
+        <h2>11. Using BaraBeat on smartphones</h2>
+        <p>On smartphones, BaraBeat Studio can open, display, play instantly, practise and edit scores. Display and editing functions switch automatically with device orientation. An existing Arrangement timeline can be played on mobile but cannot yet be edited there.</p>
+        <h3>Mobile operation</h3>
+        <p>The menu bar shows only commands relevant to the current mode. Under <strong>File</strong> you will find Open, Save, Save as, the user guide and Sign out. The persistent <strong>Back to the score</strong> button returns from the mobile guide to the application. In practice mode, <strong>Pattern selection</strong> and <strong>Latency</strong> are also available. If the score contains an Arrangement, <strong>Play Arrangement</strong> appears outside practice mode and opens the player in an overlay.</p>
+        <h3>Portrait and landscape</h3>
+        <ul>
+          <li><strong>Portrait:</strong> compact reading view with one measure per row, instant playback, practice mode and playback of existing Arrangements.</li>
+          <li><strong>Landscape:</strong> mobile score editor with a larger measure grid, Score menu and horizontal palette.</li>
+        </ul>
+        <h3>Mobile score view</h3>
+        <p>Multi-page scores are displayed page by page, rather than shrinking the entire stack to one screen height. Each measure has its own row. Multi-measure Patterns are grouped compactly in portrait view; instrument and Pattern name appear only at the start.</p>
+        <p>In the moving notes, instrument and Pattern name share one compact line. The red play line is drawn only across the actual note rows so that longer names remain readable.</p>
+        <h3>Editing notes in landscape</h3>
+        <ol>
+          <li>Turn the iPhone to landscape. The landscape editor appears automatically.</li>
+          <li>Select a note or control mark in the lower palette, then tap the required grid position.</li>
+          <li>Existing notes and marks can be touched directly, moved and snapped to the grid on release.</li>
+          <li>Draw a rectangle with the selection tool. The selection can then be moved, duplicated or deleted together.</li>
+          <li>Use <strong>Insert instrument and function</strong> to add both choosers to an empty measure. Existing choosers can be changed, moved or deleted.</li>
+          <li>The arrows in the chooser row move a complete Pattern with all associated elements up or down.</li>
+          <li>Edit the rhythm name directly at the top. The text tool inserts comments in a measure; existing text can be changed in the displayed input field.</li>
+          <li>Use <strong>File → Save</strong> or <strong>Save as</strong> to store the changes.</li>
+        </ol>
+        <div class="hint"><strong>Touch operation:</strong> The palette remains at the bottom and scrolls horizontally. Double-tapping a repeat mark opens its settings as on the desktop. The iOS keyboard may appear for inputs; closing it keeps the score scale unchanged.</div>
+        <h3>Instant playback on iPhone</h3>
+        <p>Pattern selection boxes, BPM and Play are also available on mobile. Several instruments can play in parallel; Patterns on the same instrument are handled in sequence. Sounding notes are briefly highlighted. The header remains visible while scrolling so playback can always be stopped.</p>
+        <h3>Offline use</h3>
+        <ol>
+          <li>Open BaraBeat Studio fully once on iPhone over an <strong>HTTPS connection</strong>.</li>
+          <li>Wait for <strong>Offline ready</strong>. The interface, audio player and sounds are then prepared on the device.</li>
+          <li>Load required scores from the server once in advance. They will then be in the local library.</li>
+          <li>Optionally add it as a web app in Safari with <strong>Share &gt; Add to Home Screen</strong>.</li>
+        </ol>
+        <p>Without a connection, local scores can be opened, displayed, edited and played, and saved locally. The server list, loading again from the server and saving to the server still require an internet connection.</p>
+        <h3>Background and Lock Screen</h3>
+        <p>On supported iPhones and browsers, BaraBeat Studio uses Media Session and a playback audio session. Audio can therefore continue with the screen locked. The Lock Screen shows the title, BaraBeat logo and playback controls; Play, Pause and Stop can be used there. The controls available depend on iOS, browser and output device.</p>
+        <div class="warning"><strong>Back up local data before deleting:</strong> Safari and an added Home Screen app may use separate local storage areas. Deleting the Home Screen item can remove its local scores, practice scenarios, settings and offline data. Adding it again does not restore them automatically. Save important scores to the server first; embedded practice scenarios are stored with the file. Server files are unaffected.</div>
+        <h3>Performance and memory</h3>
+        <p>iOS Safari is sensitive to audio and large numbers of DOM elements. The player therefore conserves memory: repeats are not unnecessarily prerendered in full, moving notes are built in a limited window and samples are not held more than necessary.</p>
+      </section>
+      <section id="workflows">
+        <h2>12. Typical workflows</h2>
+        <h3>Notating a new Pattern</h3>
+        <ol>
+          <li>Create a new binary, ternary or 9/8 score and enter the rhythm name.</li>
+          <li>Set the instrument chooser, for example <em>Djembe 1</em>.</li>
+          <li>Set the function chooser, for example <em>Accompaniment Pattern</em>, <em>Call</em> or <em>Solo 1</em>.</li>
+          <li>Drag notes from the palette onto the staff.</li>
+          <li>Add <strong>In</strong>, <strong>Out</strong>, <strong>Repeat</strong>, <strong>ShortBar</strong> or the triplet/quadruplet symbol if required.</li>
+          <li>Save.</li>
+        </ol>
+        <h3>Saving and reopening</h3>
+        <ol>
+          <li>Use <strong>File → Save</strong> to update the current local file or <strong>Save as</strong> to create a new version.</li>
+          <li>Under <strong>File → Open</strong>, select <strong>Local</strong>.</li>
+          <li>Open the appropriate folder if required, select the score and load it.</li>
+          <li>To open a server version, switch to <strong>Server</strong>. Loading creates a local version.</li>
+        </ol>
+        <h3>Exporting SVG or PDF</h3>
+        <ol><li>Open <strong>File → Export</strong>.</li><li>Choose a file name and <strong>SVG</strong> or <strong>PDF</strong>.</li><li>Start the export. To print, open the PDF in the browser or operating system.</li></ol>
+        <h3>Editing on iPhone</h3>
+        <ol>
+          <li>Open the score and turn the iPhone to landscape.</li>
+          <li>For a new measure, first tap the chooser tool in the lower palette and then <strong>Insert instrument and function here</strong>.</li>
+          <li>Select the instrument and Pattern type.</li>
+          <li>Select a note symbol in the palette and tap its required position in the measure.</li>
+          <li>Move elements directly or mark several with the selection tool.</li>
+          <li>Use <strong>File → Save</strong> or <strong>Save as</strong>.</li>
+        </ol>
+        <h3>Checking a Pattern instantly</h3>
+        <ol><li>Activate the selection box before the Pattern.</li><li>Select further Patterns if required.</li><li>Set the BPM at the top of the score.</li><li>Press Play. The selection loops and sounding notes are highlighted briefly.</li><li>Press the button again to stop.</li></ol>
+        <h3>Practising a Pattern</h3>
+        <ol><li>Open practice mode.</li><li>Open Pattern selection.</li><li>Select an Accompaniment.</li><li>Select and order one or more practice parts.</li><li>Set repeats or timer.</li><li>Optionally save a practice scenario for later use.</li><li>Press Play.</li></ol>
+        <h3>Building an Arrangement</h3>
+        <ol><li>Open Arrangement.</li><li>Drag Patterns from the Pattern library into the timeline.</li><li>Drag Patterns into the same section when they should play in parallel.</li><li>Set repeats.</li><li>Place Solos in Solo cells.</li><li>Check BPM, Swing, Feel and volumes.</li><li>Play or export as WAV.</li></ol>
+      </section>
+      <section id="troubleshooting">
+        <h2>13. Troubleshooting</h2>
+        <h3>A Pattern is not recognised</h3>
+        <ul><li>Check that the instrument and function choosers are positioned correctly above the Pattern.</li><li>Check that notes sit on the grid.</li><li>For 9/8 rhythms, make sure In, Out and ShortBar use suitable grid positions.</li></ul>
+        <h3>Playback sounds displaced</h3>
+        <ul><li>Check Bluetooth latency.</li><li>Check Feel values.</li><li>At Pattern transitions, check In/Out and ShortBar.</li></ul>
+        <h3>The moving notes show gaps</h3>
+        <ul><li>Check whether very long repeats or many simultaneous Patterns are active.</li><li>On iPhone/Safari, test with realistic repeat values.</li><li>For newly constructed files, save and reopen so metadata is updated cleanly.</li><li>At transitions involving Call, Intro, ShortBar or Accompaniment Out, check that the intended practice case has actually been saved as a scenario.</li></ul>
+        <h3>The timeline shows “mixed”</h3>
+        <p>This can appear when parallel Patterns in a row have different repeat structures. One-pass Accompaniment groups carried through a longer section should no longer be shown as “mixed”.</p>
+        <h3>A sample is missing</h3>
+        <p>If a sample is missing or cannot be loaded, the player should display an error. Check its spelling in the sound folder and whether the file exists on the server.</p>
+        <h3>The mobile editor does not appear</h3>
+        <p>The iPhone editor is enabled only in landscape. Make sure orientation lock is off and rotate the iPhone again. Portrait intentionally retains the compact reading and playback view.</p>
+        <h3>There is no sound on iPhone</h3>
+        <p>First check volume, audio output and Bluetooth. On supported devices, BaraBeat Studio uses a playback audio session so audio can work in silent mode. After an iOS or browser change, another tap on Play may still be required to authorise audio output.</p>
+        <h3>Offline data is missing after reinstallation</h3>
+        <p>If the Home Screen app was removed and added again, iOS may have created a new local storage area. Reload the required scores from the server. Purely local files can only be restored if they were backed up beforehand.</p>
+        <h3>A server file does not show the expected version</h3>
+        <p>Reopen the file dialog to refresh the server list. Check the status and modification columns for local edits or a changed server version. <strong>Load server version</strong> replaces the local version after confirmation.</p>
+        <h3>A publication cannot be updated or deleted</h3>
+        <p>These actions require the publish token in the local file. Open it in the browser or Home Screen app from which it was published. A file merely loaded from the server can be read but does not automatically have management permission.</p>
+        <h3>The selected language does not change the score</h3>
+        <p>This is intentional: language selection translates controls and messages only. Rhythm names, free text, Pattern labels and musical data remain unchanged.</p>
+        <h3>The SVG or PDF cannot be found</h3>
+        <p>The export is sent to the browser as a download. Check the download folder or, on iPhone, Files and Safari’s download display. Browser pop-up or download restrictions may require another confirmation.</p>
+      </section>
+      <section id="glossary">
+        <h2>14. Glossary</h2>
+        <table>
+          <thead><tr><th>Term</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Djembe</strong></td><td>West African goblet drum; BaraBeat particularly distinguishes Bass, Tone and Slap.</td></tr>
+            <tr><td><strong>Kenkeni</strong></td><td>The highest of the three drums in the Dunun set.</td></tr>
+            <tr><td><strong>Sangban</strong></td><td>The middle of the three drums in the Dunun set.</td></tr>
+            <tr><td><strong>Dununba</strong></td><td>The lowest of the three drums in the Dunun set.</td></tr>
+            <tr><td><strong>Ballet Dununs</strong></td><td>BaraBeat part for the jointly played set of Kenkeni, Sangban and Dununba.</td></tr>
+            <tr><td><strong>Bass</strong></td><td>Low Djembe stroke; depending on the part, the square symbol may also denote a Dunun drum.</td></tr>
+            <tr><td><strong>Tone</strong></td><td>Open Djembe stroke at the edge of the head.</td></tr>
+            <tr><td><strong>Slap</strong></td><td>Bright Djembe stroke; on Dunun parts, the cross represents the bell.</td></tr>
+            <tr><td><strong>Flam</strong></td><td>Two strokes played in very close succession.</td></tr>
+            <tr><td><strong>Call</strong></td><td>Signal phrase that can announce a sequence or introduce a change.</td></tr>
+            <tr><td><strong>Intro / Outro</strong></td><td>Opening or closing Pattern of a rhythm.</td></tr>
+            <tr><td><strong>Solo</strong></td><td>Independent Pattern that can lie over an Accompaniment in practice mode or Arrangement.</td></tr>
+            <tr><td><strong>Pattern</strong></td><td>A musical passage in the score labelled by instrument and function.</td></tr>
+            <tr><td><strong>Accompaniment Pattern</strong></td><td>A Pattern used as a recurring Accompaniment or foundation rhythm.</td></tr>
+            <tr><td><strong>Accompaniment</strong></td><td>One or more Patterns that run in parallel with the practice part.</td></tr>
+            <tr><td><strong>Échauffement</strong></td><td>Practice or intensification passage that can be notated and played as its own Pattern type.</td></tr>
+            <tr><td><strong>Swing</strong></td><td>Rhythmic displacement of subdivisions within a pulse.</td></tr>
+            <tr><td><strong>Feel</strong></td><td>Timing and playing character; in BaraBeat, the fine timing displacement of complete instruments relative to one another.</td></tr>
+            <tr><td><strong>Sticking</strong></td><td>Definition of the order in which right and left hands play a Djembe Pattern.</td></tr>
+            <tr><td><strong>BPM</strong></td><td>Beats per minute; the tempo value for playback and practice.</td></tr>
+            <tr><td><strong>Shekere</strong></td><td>Rattle instrument used for count-in and optional beat accent.</td></tr>
+            <tr><td><strong>In / Out</strong></td><td>Marks for a pickup or the deliberate end of a voice.</td></tr>
+            <tr><td><strong>Practice part</strong></td><td>A Pattern selected for focused training.</td></tr>
+            <tr><td><strong>Practice scenario</strong></td><td>A saved combination of settings, Accompaniments, practice parts, volumes and timing values.</td></tr>
+            <tr><td><strong>Arrangement</strong></td><td>A sequence of sections in the timeline.</td></tr>
+            <tr><td><strong>Overlay</strong></td><td>A Solo placed over an Accompaniment during a specific pass.</td></tr>
+            <tr><td><strong>ShortBar</strong></td><td>A shortened measure with visually marked empty positions.</td></tr>
+            <tr><td><strong>Triplet / Quadruplet</strong></td><td>An additional subdivision of a beat. Binary scores use triplets; ternary and 9/8 scores use quadruplets.</td></tr>
+          </tbody>
+        </table>
+        <p class="footer-note">Status: August 2026. This guide can be opened in a browser or printed.</p>
+      </section>
+    </article>
+  </main>
+  <div class="manual-language-switcher">
+    <label for="manualLanguageSelect">Language</label>
+    <select id="manualLanguageSelect">
+      <option value="de.html" data-language="de">Deutsch</option>
+      <option value="en.html" data-language="en" selected>English</option>
+      <option value="fr.html" data-language="fr">Français</option>
+      <option value="es.html" data-language="es">Español</option>
+      <option value="pt.html" data-language="pt">Português</option>
+    </select>
+  </div>
+  <footer class="manual-legal-footer" aria-label="Rechtliche Informationen">
+    <span class="manual-copyright">© 2020–2026 Art &amp; Werbeteam GmbH · BaraBeat</span>
+    <span aria-hidden="true">·</span>
+    <a href="../../legal/offline/impressum.html" target="_self" data-online-href="../../impressum.php">Impressum</a>
+    <span aria-hidden="true">·</span>
+    <a href="../../legal/offline/datenschutz.html" target="_self" data-online-href="../../datenschutz.php">Datenschutz</a>
+  </footer>
+  <script src="../../legal/navigation.js"></script>
+  <script src="../assets/manual.js"></script>
+</body>
+</html>

@@ -246,6 +246,43 @@ function barabeat_access_csrf_token()
     return (string) $_SESSION['barabeat_access_csrf'];
 }
 
+function barabeat_access_write_error($responseType, $statusCode, $message)
+{
+    http_response_code($statusCode);
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    if ($responseType === 'json') {
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode([
+            'success' => false,
+            'message' => $message,
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    } else {
+        header('Content-Type: text/plain; charset=UTF-8');
+        echo $message;
+    }
+    exit;
+}
+
+function barabeat_require_write_csrf($responseType = 'json')
+{
+    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+        barabeat_access_write_error($responseType, 405, barabeat_t('auth.postOnly'));
+    }
+
+    $config = barabeat_access_config();
+    if (empty($config['enabled']) || barabeat_access_window_is_open()) {
+        return true;
+    }
+
+    $providedToken = (string) ($_POST['csrfToken'] ?? $_POST['csrf'] ?? '');
+    if ($providedToken === '' || !hash_equals(barabeat_access_csrf_token(), $providedToken)) {
+        barabeat_access_write_error($responseType, 403, barabeat_t('auth.sessionExpired'));
+    }
+
+    return true;
+}
+
 function barabeat_access_logout()
 {
     barabeat_access_start_session();
@@ -322,6 +359,11 @@ function barabeat_access_render_login($errorMessage = '', $configurationMissing 
     $basePath = barabeat_access_base_path();
     $formAction = htmlspecialchars($basePath . 'index.php', ENT_QUOTES, 'UTF-8');
     $logoPath = htmlspecialchars($basePath . 'Assets/pwa-icon-192.png', ENT_QUOTES, 'UTF-8');
+    $imprintPath = htmlspecialchars($basePath . 'impressum.php', ENT_QUOTES, 'UTF-8');
+    $privacyPath = htmlspecialchars($basePath . 'datenschutz.php', ENT_QUOTES, 'UTF-8');
+    $imprintOfflinePath = htmlspecialchars($basePath . 'legal/offline/impressum.html', ENT_QUOTES, 'UTF-8');
+    $privacyOfflinePath = htmlspecialchars($basePath . 'legal/offline/datenschutz.html', ENT_QUOTES, 'UTF-8');
+    $legalNavigationPath = htmlspecialchars($basePath . 'legal/navigation.js', ENT_QUOTES, 'UTF-8');
     $safeError = htmlspecialchars($errorMessage, ENT_QUOTES, 'UTF-8');
     $csrfToken = htmlspecialchars(barabeat_access_csrf_token(), ENT_QUOTES, 'UTF-8');
     ?>
@@ -348,6 +390,9 @@ function barabeat_access_render_login($errorMessage = '', $configurationMissing 
         button:hover { background: #19583f; }
         .message { margin: 0 0 16px; padding: 10px 12px; border-left: 4px solid #9b3e2f; background: #f8e4df; color: #7d2f23; }
         .config { border-left-color: #a86b17; background: #fff0cf; color: #6c4613; }
+        .legal-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px 10px; margin-top: 22px; padding-top: 16px; border-top: 1px solid #dbc3a6; color: #765f4b; font-size: 14px; }
+        .legal-links a { color: #5f3d22; text-underline-offset: 2px; }
+        .legal-links a:focus-visible { outline: 3px solid rgba(40, 126, 91, 0.35); outline-offset: 3px; border-radius: 2px; }
         @media (max-width: 520px), (hover: none) and (pointer: coarse) {
             body { padding: 14px; }
             main { padding: 22px; }
@@ -378,7 +423,15 @@ function barabeat_access_render_login($errorMessage = '', $configurationMissing 
                 <button type="submit"><?php echo htmlspecialchars(barabeat_t('auth.signIn'), ENT_QUOTES, 'UTF-8'); ?></button>
             </form>
         <?php endif; ?>
+        <nav class="legal-links" aria-label="Rechtliche Informationen">
+            <span class="access-copyright">© 2020–<?php echo date('Y'); ?> Art &amp; Werbeteam GmbH · BaraBeat</span>
+            <span aria-hidden="true">·</span>
+            <a href="<?php echo $imprintOfflinePath; ?>" target="_blank" rel="opener" data-online-href="<?php echo $imprintPath; ?>">Impressum</a>
+            <span aria-hidden="true">·</span>
+            <a href="<?php echo $privacyOfflinePath; ?>" target="_blank" rel="opener" data-online-href="<?php echo $privacyPath; ?>">Datenschutz</a>
+        </nav>
     </main>
+    <script src="<?php echo $legalNavigationPath; ?>"></script>
 </body>
 </html>
     <?php
@@ -425,6 +478,8 @@ function barabeat_require_access($responseType = 'page')
 
     $loginError = barabeat_access_handle_login();
     if (barabeat_access_is_authenticated()) {
+        header('Cache-Control: private, no-store, no-cache, must-revalidate, max-age=0');
+        header('Pragma: no-cache');
         return;
     }
 

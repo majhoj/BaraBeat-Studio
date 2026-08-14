@@ -1,17 +1,23 @@
     (function () {
-      var backLink = document.getElementById('manualBackLink');
-      if (!backLink) {
+      var languageSelect = document.getElementById('manualLanguageSelect');
+      if (!languageSelect) {
         return;
       }
-      backLink.addEventListener('click', function (event) {
+      languageSelect.addEventListener('change', function () {
+        var option = languageSelect.options[languageSelect.selectedIndex];
+        var language = option ? option.getAttribute('data-language') : '';
         try {
-          var referrer = document.referrer ? new URL(document.referrer) : null;
-          if (referrer && referrer.origin === window.location.origin && window.history.length > 1) {
-            event.preventDefault();
-            window.history.back();
+          if (language && window.localStorage) {
+            window.localStorage.setItem('barabeat_language', language);
+          }
+          if (language) {
+            var secure = window.location.protocol === 'https:' ? '; Secure' : '';
+            document.cookie = 'barabeat_language=' + encodeURIComponent(language) +
+              '; Max-Age=31536000; Path=/; SameSite=Lax' + secure;
           }
         } catch (error) {
-          // Der normale Link zu index.php bleibt als Fallback erhalten.
+          // The server-side cookie remains the persistence fallback.
         }
+        window.location.href = languageSelect.value + (window.location.hash || '');
       });
     }());

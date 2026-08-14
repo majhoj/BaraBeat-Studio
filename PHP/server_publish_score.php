@@ -2,6 +2,7 @@
 require_once __DIR__ . '/access_control.php';
 require_once __DIR__ . '/edition_config.php';
 barabeat_require_access('json');
+barabeat_require_write_csrf('json');
 
 header('Content-Type: application/json; charset=UTF-8');
 
@@ -12,7 +13,12 @@ function respond_json($statusCode, $payload) {
 }
 
 function normalize_score_filename($rawName) {
-    $baseName = basename(trim($rawName));
+    $rawName = trim((string) $rawName);
+    if ($rawName === '' || preg_match('/[\\\\\/\x00-\x1F\x7F]/', $rawName)) {
+        return '';
+    }
+
+    $baseName = basename($rawName);
     $baseName = preg_replace('/\.(bbs|txt)$/i', '', $baseName);
     $baseName = trim($baseName);
 
@@ -37,15 +43,21 @@ if ($notesDir === false || !is_dir($notesDir)) {
 }
 
 $filePath = $notesDir . DIRECTORY_SEPARATOR . $fileName;
-if (file_exists($filePath)) {
+$fileHandle = @fopen($filePath, 'x');
+if ($fileHandle === false && file_exists($filePath)) {
     respond_json(409, [
         'success' => false,
         'message' => barabeat_t('error.serverScoreExists', ['fileName' => $fileName])
     ]);
 }
+if ($fileHandle === false) {
+    respond_json(500, ['success' => false, 'message' => barabeat_t('error.serverFileSaveFailed')]);
+}
 
 $metaDir = $notesDir . DIRECTORY_SEPARATOR . '.meta';
-if (!is_dir($metaDir) && !mkdir($metaDir, 0755, true)) {
+if (!is_dir($metaDir) && !mkdir($metaDir, 0755, true) && !is_dir($metaDir)) {
+    fclose($fileHandle);
+    @unlink($filePath);
     respond_json(500, ['success' => false, 'message' => barabeat_t('error.metadataDirectoryCreateFailed')]);
 }
 
@@ -58,9 +70,25 @@ $meta = [
     'updatedAt' => $timestamp
 ];
 
-if (file_put_contents($filePath, $content, LOCK_EX) === false) {
+if (!flock($fileHandle, LOCK_EX)) {
+    fclose($fileHandle);
+    @unlink($filePath);
     respond_json(500, ['success' => false, 'message' => barabeat_t('error.serverFileSaveFailed')]);
 }
+$remainingContent = (string) $content;
+while ($remainingContent !== '') {
+    $writtenBytes = fwrite($fileHandle, $remainingContent);
+    if ($writtenBytes === false || $writtenBytes === 0) {
+        flock($fileHandle, LOCK_UN);
+        fclose($fileHandle);
+        @unlink($filePath);
+        respond_json(500, ['success' => false, 'message' => barabeat_t('error.serverFileSaveFailed')]);
+    }
+    $remainingContent = (string) substr($remainingContent, $writtenBytes);
+}
+fflush($fileHandle);
+flock($fileHandle, LOCK_UN);
+fclose($fileHandle);
 
 $metaPath = $metaDir . DIRECTORY_SEPARATOR . $fileName . '.json';
 if (file_put_contents($metaPath, json_encode($meta, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX) === false) {

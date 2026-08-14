@@ -563,6 +563,7 @@
     "unsupported": "Este navegador no admite el modo sin conexión.",
     "httpsRequired": "La instalación sin conexión requiere HTTPS.",
     "ready": "Listo sin conexión.",
+    "onlineOnly": "Esta función requiere una conexión a Internet.",
     "prepareFailed": "No se pudieron preparar por completo los datos sin conexión.",
     "setupFailed": "No se pudo configurar el modo sin conexión."
   },
