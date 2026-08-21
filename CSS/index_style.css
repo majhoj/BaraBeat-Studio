@@ -3680,6 +3680,8 @@ body.is-timeline-dragging .timeline-dropzone-inline {
         z-index: 70;
         max-height: none;
         overflow: auto;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior-y: contain;
         padding: 10px;
         border: 0;
         border-radius: 0;
@@ -3769,9 +3771,8 @@ body.is-timeline-dragging .timeline-dropzone-inline {
         grid-template-columns: none;
         height: auto;
         min-height: 0;
-        max-height: min(58vh, calc(100dvh - 250px));
-        overflow-y: auto;
-        overscroll-behavior: contain;
+        max-height: none;
+        overflow: visible;
         padding: 0 2px 8px;
     }
 
@@ -3844,9 +3845,8 @@ body.is-timeline-dragging .timeline-dropzone-inline {
     .practice-column .timeline-pattern-list {
         display: grid;
         grid-template-columns: 1fr;
-        max-height: 42vh;
-        overflow-y: auto;
-        overscroll-behavior: contain;
+        max-height: none;
+        overflow: visible;
         padding-right: 3px;
     }
 

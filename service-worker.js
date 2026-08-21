@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'barabeat-studio-offline-v19-cold-start';
+const CACHE_NAME = 'barabeat-studio-offline-v20-mobile-practice-scroll';
 const APP_SHELL = [
   './app-shell.html',
   './manifest.webmanifest',
