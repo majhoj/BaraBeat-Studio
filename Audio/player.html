@@ -212,6 +212,9 @@ function notifyEmbeddedPlaybackStep(playbackStep, scheduledTime) {
     return;
   }
   const sectionContext = getPlaybackSectionContext(playbackStep);
+  const isFinalSectionRepeat = !sectionContext || !sectionContext.section
+    ? true
+    : sectionContext.loopCycleIndex === sectionContext.section.repeatCount - 1;
   window.parent.postMessage({
     type: 'barabeat-audio-step',
     launchKey: playerLaunchKey,
@@ -220,6 +223,7 @@ function notifyEmbeddedPlaybackStep(playbackStep, scheduledTime) {
       ? String(sectionContext.section.runtimeKey || '')
       : '',
     localStep: sectionContext ? Math.max(0, Number(sectionContext.localStep) || 0) : 0,
+    isFinalSectionRepeat: isFinalSectionRepeat,
     delayMs: Math.max(0, (scheduledTime - instr._audioCtx.currentTime) * 1000)
   }, window.location.origin);
 }
@@ -898,6 +902,7 @@ function createOrderedSection(label) {
     practiceTargetInstruments: [],
     isLeadIn: false,
     overlapsPracticeCountIn: false,
+    overlapTailLength: 0,
     repeatCount: 1,
     playbackLength: 0,
     length: 0,
@@ -992,6 +997,33 @@ function getPatternOutStep(pattern) {
   return matchedOutStep;
 }
 
+function getPatternOutBarEndStep(pattern) {
+  const patternBars = expandPatternBars(pattern);
+  if (patternBars.length === 0) {
+    return null;
+  }
+
+  let stepOffset = 0;
+  let matchedOutBarEndStep = null;
+
+  for (let barIndex = 0; barIndex < patternBars.length; barIndex++) {
+    const bar = patternBars[barIndex];
+    const barNotes = getBarPlayableNotes(bar);
+    const barControls = bar && Array.isArray(bar.controls) ? bar.controls : [];
+    const hasOutControl = barControls.some(function (control) {
+      return control && control.type === 'out';
+    });
+
+    if (hasOutControl) {
+      matchedOutBarEndStep = stepOffset + barNotes.length;
+    }
+
+    stepOffset += barNotes.length;
+  }
+
+  return matchedOutBarEndStep;
+}
+
 function getPatternControlStep(pattern, controlType) {
   const patternBars = expandPatternBars(pattern);
   if (patternBars.length === 0) {
@@ -1029,6 +1061,10 @@ function getPatternControlStep(pattern, controlType) {
 
 function getPatternInStep(pattern) {
   return getPatternControlStep(pattern, 'in');
+}
+
+function getPatternOverlapStep(pattern) {
+  return getPatternControlStep(pattern, 'overlap');
 }
 
 function getTimelineStepsPerBar() {
@@ -1133,7 +1169,7 @@ function mergeTimelineEntriesIntoPreviousSectionAtStart(sections, entryDataList)
       );
       consumedByInstrument[instrumentName] = Math.max(
         consumedByInstrument[instrumentName] || 0,
-        getTimelineEntryPickupEndStep(entryData)
+        getTimelineEntrySkippedStartStep(entryData)
       );
       if (instrumentName.indexOf('Djembe_') === 0) {
         hostSection.trackHandModes[instrumentName] = String(entryData.handMode || '');
@@ -1254,18 +1290,24 @@ function mergeTimelineEntryPickupsIntoPreviousSection(sections, entryDataList, o
   return {};
 }
 
-function applyOutToPatternNotes(patternNotes, outStep) {
+function applyOutToPatternNotes(patternNotes, outStep, outBarEndStep) {
   const safeNotes = Array.isArray(patternNotes) ? patternNotes.slice() : [];
   if (outStep === null || outStep === undefined) {
     return safeNotes;
   }
 
   const safeOutStep = Math.max(0, Math.min(safeNotes.length - 1, Number(outStep) || 0));
-  for (let stepIndex = safeOutStep + 1; stepIndex < safeNotes.length; stepIndex++) {
+  const safeOutBarEndStep = outBarEndStep === null || outBarEndStep === undefined
+    ? safeNotes.length
+    : Math.max(
+        safeOutStep + 1,
+        Math.min(safeNotes.length, Math.round(Number(outBarEndStep) || 0))
+      );
+  for (let stepIndex = safeOutStep + 1; stepIndex < safeOutBarEndStep; stepIndex++) {
     safeNotes[stepIndex] = 'f';
   }
 
-  return safeNotes;
+  return safeNotes.slice(0, safeOutBarEndStep);
 }
 
 function getPatternNotesLength(entryData) {
@@ -1323,12 +1365,30 @@ function getTimelineEntryOutStep(entryData, effectiveNotesLength) {
   return outStep;
 }
 
+function getTimelineEntryOutBarEndStep(entryData, effectiveNotesLength) {
+  if (!entryData || entryData.patternOutBarEndStep === null || entryData.patternOutBarEndStep === undefined) {
+    return null;
+  }
+
+  const skippedStartStep = getTimelineEntrySkippedStartStep(entryData);
+  const sourceLength = Math.max(0, getPatternNotesLength(entryData) - skippedStartStep);
+  const safeEffectiveLength = Math.max(0, Number(effectiveNotesLength) || 0);
+  const normalizedPatternOutBarEndStep = Math.max(
+    0,
+    Math.round(Number(entryData.patternOutBarEndStep) || 0) - skippedStartStep
+  );
+  const outBarEndStep = safeEffectiveLength > sourceLength && sourceLength > 0
+    ? safeEffectiveLength - sourceLength + normalizedPatternOutBarEndStep
+    : normalizedPatternOutBarEndStep;
+
+  return Math.min(safeEffectiveLength, outBarEndStep);
+}
+
 function getTimelineEntrySkippedStartStep(entryData) {
   if (!entryData) {
     return 0;
   }
-  if (entryData.label === 'Begleitung' &&
-      !(isSheetQuickPlayMode && entryData.patternInStep !== null && entryData.patternInStep !== undefined)) {
+  if (entryData.label === 'Begleitung') {
     return 0;
   }
   return getTimelineEntryPickupEndStep(entryData);
@@ -1373,10 +1433,40 @@ function getTimelineEntryEffectiveNotes(entryData, shouldApplyOut, loopToLength)
   }
 
   if (shouldApplyOut && entryData && entryData.patternOutStep !== null) {
-    effectiveNotes = applyOutToPatternNotes(effectiveNotes, getTimelineEntryOutStep(entryData, effectiveNotes.length));
+    effectiveNotes = applyOutToPatternNotes(
+      effectiveNotes,
+      getTimelineEntryOutStep(entryData, effectiveNotes.length),
+      getTimelineEntryOutBarEndStep(entryData, effectiveNotes.length)
+    );
   }
 
   return effectiveNotes;
+}
+
+function getTimelineEntryOverlapTailLength(entryData, effectiveNotesLength) {
+  if (isPracticeMode || isSheetQuickPlayMode || !entryData ||
+      entryData.patternOverlapStep === null || entryData.patternOverlapStep === undefined) {
+    return 0;
+  }
+
+  const skippedStartStep = getTimelineEntrySkippedStartStep(entryData);
+  const sourceLength = Math.max(0, getPatternNotesLength(entryData) - skippedStartStep);
+  const overlapStartStep = Math.max(
+    0,
+    Math.min(sourceLength, Math.round(Number(entryData.patternOverlapStep) || 0) - skippedStartStep)
+  );
+  const sourceTailLength = Math.max(0, sourceLength - overlapStartStep);
+  return Math.min(Math.max(0, Math.round(Number(effectiveNotesLength) || 0)), sourceTailLength);
+}
+
+function applyTimelineEntryOverlapToSection(section, entryData, effectiveNotesLength) {
+  if (!section) {
+    return;
+  }
+  section.overlapTailLength = Math.max(
+    Math.max(0, Number(section.overlapTailLength) || 0),
+    getTimelineEntryOverlapTailLength(entryData, effectiveNotesLength)
+  );
 }
 
 function mergeNotesIntoTrack(targetNotes, sourceNotes, offset) {
@@ -1530,6 +1620,7 @@ function appendEntryToSection(section, entryData) {
       section.trackHandModes[instrumentName] = String(entryData.handMode || '');
     }
   });
+  applyTimelineEntryOverlapToSection(section, entryData, getPatternNotesLength(entryData));
 }
 
 function greatestCommonDivisor(leftValue, rightValue) {
@@ -1996,6 +2087,73 @@ function finalizeSectionLengths(sections) {
   });
 }
 
+function materializeOrderedSectionTracks(section) {
+  const unitLength = Math.max(0, Math.round(Number(section && section.length) || 0));
+  const repeatCount = normalizeSectionRepeatCount(section && section.repeatCount);
+  return trackInstrumentNames.reduce(function (trackMap, instrumentName) {
+    const unitNotes = padNotesToLength(
+      Array.isArray(section && section.trackNotes[instrumentName])
+        ? section.trackNotes[instrumentName].slice(0, unitLength)
+        : [],
+      unitLength
+    );
+    const materializedNotes = [];
+    for (let repeatIndex = 0; repeatIndex < repeatCount; repeatIndex++) {
+      materializedNotes.push.apply(materializedNotes, unitNotes);
+    }
+    trackMap[instrumentName] = materializedNotes;
+    return trackMap;
+  }, {});
+}
+
+function applyTimelineSectionOverlaps(sections) {
+  if (isPracticeMode || isSheetQuickPlayMode || !Array.isArray(sections)) {
+    return;
+  }
+
+  let sectionIndex = 0;
+  while (sectionIndex < sections.length - 1) {
+    const currentSection = sections[sectionIndex];
+    const nextSection = sections[sectionIndex + 1];
+    const overlapTailLength = Math.min(
+      Math.max(0, Math.round(Number(currentSection && currentSection.overlapTailLength) || 0)),
+      Math.max(0, Math.round(Number(currentSection && currentSection.playbackLength) || 0))
+    );
+    if (overlapTailLength <= 0 || !nextSection) {
+      sectionIndex += 1;
+      continue;
+    }
+
+    const currentTracks = materializeOrderedSectionTracks(currentSection);
+    const nextTracks = materializeOrderedSectionTracks(nextSection);
+    const currentPlaybackLength = Math.max(0, Math.round(Number(currentSection.playbackLength) || 0));
+    const nextPlaybackLength = Math.max(0, Math.round(Number(nextSection.playbackLength) || 0));
+    const prefixLength = Math.max(0, currentPlaybackLength - overlapTailLength);
+    const mergedNextLength = Math.max(nextPlaybackLength, overlapTailLength);
+
+    trackInstrumentNames.forEach(function (instrumentName) {
+      const overlapNotes = currentTracks[instrumentName].slice(prefixLength, currentPlaybackLength);
+      currentSection.trackNotes[instrumentName] = currentTracks[instrumentName].slice(0, prefixLength);
+      nextSection.trackNotes[instrumentName] = padNotesToLength(
+        mergeNotesIntoTrack(nextTracks[instrumentName], overlapNotes, 0),
+        mergedNextLength
+      );
+    });
+
+    currentSection.repeatCount = 1;
+    currentSection.fixedLength = prefixLength;
+    currentSection.overlapTailLength = 0;
+    nextSection.repeatCount = 1;
+    nextSection.fixedLength = mergedNextLength;
+
+    if (prefixLength <= 0) {
+      sections.splice(sectionIndex, 1);
+      continue;
+    }
+    sectionIndex += 1;
+  }
+}
+
 function applyOrderedSectionTempoTargets(sections) {
   let activeTempo = Math.max(30, Math.min(180, Number(currentBaseTempo) || initialTempo || 100));
   const tempoRampSteps = Math.max(1, getTimelineStepsPerBar() * 2);
@@ -2242,6 +2400,8 @@ function buildTimelineSections(config) {
       : flattenPatternNotes(pattern);
     const patternInStep = getPatternInStep(pattern);
     const patternOutStep = getPatternOutStep(pattern);
+    const patternOutBarEndStep = getPatternOutBarEndStep(pattern);
+    const patternOverlapStep = getPatternOverlapStep(pattern);
     expandedEntries.push({
       label: sectionLabel,
       labelName: pattern.labelName || pattern.label || '',
@@ -2258,7 +2418,9 @@ function buildTimelineSections(config) {
       startsContinuingAccompaniment: startsContinuingAccompaniment,
       patternNotes: patternNotes,
       patternInStep: patternInStep,
-      patternOutStep: patternOutStep
+      patternOutStep: patternOutStep,
+      patternOutBarEndStep: patternOutBarEndStep,
+      patternOverlapStep: patternOverlapStep
     });
   });
 
@@ -2390,6 +2552,7 @@ function buildTimelineSections(config) {
               ? getTimelineOverlayReplacementStart(repeatEntries, entryData)
               : 0;
             const notesToMerge = effectiveNotes;
+            applyTimelineEntryOverlapToSection(repeatedSection, entryData, effectiveNotes.length);
 
             entryData.targetInstruments.forEach(function (instrumentName) {
               if (repeatedSection.sectionTargets.indexOf(instrumentName) === -1) {
@@ -2484,6 +2647,7 @@ function buildTimelineSections(config) {
           ? getTimelineOverlayReplacementStart(blockEntries, entryData)
           : 0;
         const notesToMerge = effectiveNotes;
+        applyTimelineEntryOverlapToSection(mergedSection, entryData, effectiveNotes.length);
 
         entryData.targetInstruments.forEach(function (instrumentName) {
           if (mergedSection.sectionTargets.indexOf(instrumentName) === -1) {
@@ -2611,6 +2775,8 @@ function buildTimelineSections(config) {
   }
 
   applyContinuingAccompanimentsToSections(sections);
+  finalizeSectionLengths(sections);
+  applyTimelineSectionOverlaps(sections);
   finalizeSectionLengths(sections);
 
   return sections;

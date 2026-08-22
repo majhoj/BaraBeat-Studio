@@ -651,10 +651,10 @@ var paletteOriginX,
     paletteOffsetY = 0;
 
 // Paletten-Elemente
-var ton, bass, slap, flam_ton, flam_slap, flam_bass_slap, ton_g, slap_g, In, Out, ShortBar, Triplet, text_z_g, repeatMarkerGroup;
+var ton, bass, slap, flam_ton, flam_slap, flam_bass_slap, ton_g, slap_g, In, Out, ShortBar, Overlap, Triplet, text_z_g, repeatMarkerGroup;
 
 // Geklonte Paletten-Elemente
-var ton_c, bass_c, slap_c, flam_ton_c, flam_slap_c, flam_bass_slap_c, ton_g_c, slap_g_c, In_c, Out_c, ShortBar_c, Triplet_c, repeatMarkerLegendClone;
+var ton_c, bass_c, slap_c, flam_ton_c, flam_slap_c, flam_bass_slap_c, ton_g_c, slap_g_c, In_c, Out_c, ShortBar_c, Overlap_c, Triplet_c, repeatMarkerLegendClone;
 
 // Touch-Status und geladener Titel
 var textTouchStartX,
@@ -673,6 +673,7 @@ var x, insertedElement,
     in_c, in_a, in_b,
     out_c, out_a, out_b,
     shortbar_c, shortbar_a, shortbar_b, shortbar_v1, shortbar_v2,
+    overlap_c, overlap_a, overlap_b, overlap_d,
     textPaletteBox, textPaletteHorizontalLine, textPaletteVerticalLine;
 
 // Wiederholungszeichen und Paletten-Positionen
@@ -696,6 +697,7 @@ var insertTone,
     insertInMarker,
     insertOutMarker,
     insertShortBarMarker,
+    insertOverlapMarker,
     insertTripletMarker,
     captureTextTouchStart,
     handleTextTouchEnd,
@@ -703,7 +705,7 @@ var insertTone,
     cycleRepeatCount,
     insertRepeatMarker;
 
-const canvasElementSelector = "#edit, #tone, #bass, #slap, #tone_muffled, #slap_muffled, #tone_flam, #slap_flam, #bass_slap_flam, #in, #out, #shortbar, #triplet, #quartuplet, #edit_text, #wiederholung";
+const canvasElementSelector = "#edit, #tone, #bass, #slap, #tone_muffled, #slap_muffled, #tone_flam, #slap_flam, #bass_slap_flam, #in, #out, #shortbar, #overlap, #triplet, #quartuplet, #edit_text, #wiederholung";
 const instrumentChooserSelector = ".instrument-chooser, #instrumentChooser";
 const functionChooserSelector = ".function-chooser, #functionChooser";
 const chooserSelector = instrumentChooserSelector + ", " + functionChooserSelector;
@@ -2478,7 +2480,7 @@ function getSheetElementMoveBarIndex(element, readConfig, totalBarCount, headerS
             readConfig,
             zeilenAnzahl
         );
-        if (elementId === 'shortbar' || elementId === 'in' || elementId === 'out') {
+        if (elementId === 'shortbar' || elementId === 'in' || elementId === 'out' || elementId === 'overlap') {
             positionInfo.rawLineSlotIndex = getControlLineSlotIndex(position.x, readConfig, elementId);
             positionInfo.lineSlotIndex = positionInfo.rawLineSlotIndex;
             if (positionInfo.lineSlotIndex > readConfig.stepsPerBar) {
@@ -2814,9 +2816,13 @@ function scheduleSheetQuickPlayNoteHighlights(message) {
         ? sheetQuickPlayState.highlightSectionsByRuntimeKey[runtimeKey]
         : null;
     const localStep = Math.max(0, Math.round(Number(message && message.localStep) || 0));
-    const refs = section && Array.isArray(section.highlightSteps)
+    const refsAtStep = section && Array.isArray(section.highlightSteps)
         ? (section.highlightSteps[localStep] || [])
         : [];
+    const isFinalSectionRepeat = !message || message.isFinalSectionRepeat !== false;
+    const refs = refsAtStep.filter(function (ref) {
+        return ref && !(isFinalSectionRepeat && ref.mutedOnFinalRepeat);
+    });
     if (refs.length === 0) {
         return;
     }
@@ -3554,20 +3560,27 @@ function buildSheetQuickPlayConfiguredSections(preparedPatterns) {
                     patternRepeatCount > 1
                 ? sourceOutStep + (patternUnitLength * (patternRepeatCount - 1))
                 : sourceOutStep;
+            const label = pattern.labelType || pattern.label || 'Begleitung';
+            const labelName = pattern.labelName || pattern.name || label;
             const pickupEndStep = getSheetQuickPlayPickupEndStep(patternNotes, inStep, stepsPerBar);
+            const keepFullAccompanimentAfterPickup = pickupEndStep > 0 &&
+                hasHostSection &&
+                label === 'Begleitung';
             let pickupNotes = buildSheetQuickPlayPickupNotes(patternNotes, inStep, stepsPerBar);
-            let mainNotes = pickupEndStep > 0 ? patternNotes.slice(pickupEndStep) : patternNotes.slice();
+            let mainNotes = pickupEndStep > 0 && !keepFullAccompanimentAfterPickup
+                ? patternNotes.slice(pickupEndStep)
+                : patternNotes.slice();
             let pickupHighlightRefs = buildSheetQuickPlayPickupHighlightRefs(
                 patternHighlightRefs,
                 inStep,
                 stepsPerBar
             );
-            let mainHighlightRefs = pickupEndStep > 0
+            let mainHighlightRefs = pickupEndStep > 0 && !keepFullAccompanimentAfterPickup
                 ? patternHighlightRefs.slice(pickupEndStep)
                 : patternHighlightRefs.slice();
-            let sectionStartStep = pickupEndStep > 0 ? pickupEndStep : 0;
-            const label = pattern.labelType || pattern.label || 'Begleitung';
-            const labelName = pattern.labelName || pattern.name || label;
+            let sectionStartStep = pickupEndStep > 0 && !keepFullAccompanimentAfterPickup
+                ? pickupEndStep
+                : 0;
 
             if (pickupEndStep > 0 && !hasHostSection && group.length === 1) {
                 const safeInStep = Math.max(0, Math.min(patternNotes.length - 1, Number(inStep) || 0));
@@ -3582,6 +3595,25 @@ function buildSheetQuickPlayConfiguredSections(preparedPatterns) {
                 mainHighlightRefs = pickupHighlightRefs.concat(mainHighlightRefs);
                 pickupNotes = [];
                 pickupHighlightRefs = [];
+            }
+
+            const shouldIgnoreOutForAccompanimentLoop = label === 'Begleitung' && groups.length === 1;
+            const hasApplicableOut = !shouldIgnoreOutForAccompanimentLoop &&
+                outStep !== null &&
+                outStep !== undefined &&
+                Number(outStep) >= sectionStartStep;
+            const sectionOutStep = hasApplicableOut
+                ? Math.max(0, Math.round(Number(outStep) || 0) - sectionStartStep)
+                : null;
+            if (sectionOutStep !== null) {
+                mainHighlightRefs = mainHighlightRefs.map(function (sourceRef, noteIndex) {
+                    if (!sourceRef || noteIndex <= sectionOutStep) {
+                        return sourceRef;
+                    }
+                    return Object.assign({}, sourceRef, {
+                        mutedOnFinalRepeat: true
+                    });
+                });
             }
 
             section.fixedLength = Math.max(
@@ -3627,15 +3659,8 @@ function buildSheetQuickPlayConfiguredSections(preparedPatterns) {
                 if (!section.trackNotes[instrumentName]) {
                     return;
                 }
-                const shouldIgnoreOutForAccompanimentLoop = label === 'Begleitung';
-                if (!shouldIgnoreOutForAccompanimentLoop &&
-                        outStep !== null &&
-                        outStep !== undefined &&
-                        Number(outStep) >= sectionStartStep) {
-                    section.finalRepeatOutSteps[instrumentName] = Math.max(
-                        0,
-                        Math.round(Number(outStep) || 0) - sectionStartStep
-                    );
+                if (sectionOutStep !== null) {
+                    section.finalRepeatOutSteps[instrumentName] = sectionOutStep;
                     section.finalRepeatOutStepTypes[instrumentName] = label || '';
                     section.forceFinalOutAtSectionEnd = true;
                 }
@@ -4716,7 +4741,7 @@ function createTupletElementFromPalette(noteTypes, tupletType) {
 }
 
 // Kartusche
-paletteFrame = s.rect(paletteOriginX - 12, paletteOriginY - 14, 26, 330, 3, 3).attr({ fill: "lightgrey", stroke: "black", strokeWidth: 0.5 });
+paletteFrame = s.rect(paletteOriginX - 12, paletteOriginY - 14, 26, 360, 3, 3).attr({ fill: "lightgrey", stroke: "black", strokeWidth: 0.5 });
 
 // Tone
 ton = s.circle(paletteOriginX + 1, paletteOriginY + 1, 7);
@@ -4862,6 +4887,17 @@ x = paletteOriginX + 1;
 y = paletteOriginY + 292;
 Triplet = createTripletPaletteSymbol(s, x, y);
 
+// Überlappung: Der markierte Schlussteil läuft parallel zum nächsten Abschnitt.
+x = paletteOriginX + 1;
+y = paletteOriginY + 329;
+overlap_c = s.rect(x - 10, y - 9, 20, 18).attr({ opacity: 0.001 });
+overlap_a = s.line(x - 6, y, x + 6, y).attr({ stroke: "black", strokeWidth: 2 });
+overlap_b = s.polygon(x - 9, y, x - 3, y - 4, x - 3, y + 4);
+overlap_d = s.polygon(x + 9, y, x + 3, y - 4, x + 3, y + 4);
+Overlap = s.g(overlap_a, overlap_b, overlap_d, overlap_c).attr({
+    'data-overlap-anchor-y': y
+});
+
 // Legende schreiben
 function addLegendEntry(symbol, label, symbolX, symbolY, labelOffsetX, labelOffsetY, legendOffsetX, legendOffsetY) {
     const shiftedSymbolX = symbolX + legendOffsetX;
@@ -4904,6 +4940,7 @@ function renderLegend(initialChooserX) {
     ShortBar_c = addLegendEntry(ShortBar, 'ShortBar', 521, 938, 44, 439, legendOffsetX, legendOffsetY);
     repeatMarkerLegendClone = addLegendEntry(repeatMarkerGroup, uiText('score.legend.repeat'), 605, 968, 44, 409, legendOffsetX, legendOffsetY);
     Triplet_c = addLegendEntry(Triplet, tupletDisplay.label, 730, 900, 46, 477, legendOffsetX, legendOffsetY);
+    Overlap_c = addLegendEntry(Overlap, uiText('score.legend.overlap'), 818, 868, 48, 509, legendOffsetX, legendOffsetY);
 }
 
 renderLegend(125);
@@ -4915,9 +4952,9 @@ function getPaletteBoundsForOffset(offsetX, offsetY) {
         x: paletteOriginX - 14,
         y: paletteOriginY - 16,
         x2: paletteOriginX + 48,
-        y2: paletteOriginY + 318,
+        y2: paletteOriginY + 348,
         width: 62,
-        height: 334
+        height: 364
     };
     const bounds = paletteBaseBounds || fallbackBounds;
     return {
@@ -5055,7 +5092,7 @@ function schedulePaletteViewportFollow() {
 }
 
 // Kartusche zeichnen
-paletteGroup = s.g(paletteFrame, ton, bass, slap, ton_g, slap_g, flam_ton, flam_slap, flam_bass_slap, In, Out, ShortBar, Triplet, text_z_g, repeatMarkerGroup)
+paletteGroup = s.g(paletteFrame, ton, bass, slap, ton_g, slap_g, flam_ton, flam_slap, flam_bass_slap, In, Out, ShortBar, Overlap, Triplet, text_z_g, repeatMarkerGroup)
     .addClass('editor-palette');
 paletteBaseBounds = paletteGroup.getBBox();
 paletteGroup.drag(move1, sel_start, stop1);
@@ -5075,6 +5112,7 @@ insertShortBarMarker = bindPaletteInsert(ShortBar, function () { return ShortBar
     updateShortBarMarkerVisual(shortBarElement);
     snapElementToVerticalTarget(shortBarElement);
 });
+insertOverlapMarker = bindPaletteInsert(Overlap, function () { return Overlap_c; }, "overlap", function () { return gridSizeX; }, 0);
 insertTripletMarker = openTupletDialog;
 Triplet.click(openTupletDialog);
 Triplet.touchstart(openTupletDialog);
@@ -5423,7 +5461,7 @@ async function exportCurrentSheetAsPdf() {
 
 
 const noteElementIds = ['tone', 'bass', 'slap', 'tone_muffled', 'slap_muffled', 'slap_muffled', 'tone_flam', 'slap_flam', 'bass_slap_flam'];
-const controlElementIds = ['in', 'out', 'shortbar', 'wiederholung'];
+const controlElementIds = ['in', 'out', 'shortbar', 'overlap', 'wiederholung'];
 const tupletElementIds = ['triplet', 'quartuplet'];
 
 let notenText = "eee";
@@ -5543,7 +5581,7 @@ function getElementReadPosition(element) {
 }
 
 function getControlLineSlotIndex(centerX, readConfig, controlType) {
-    if (controlType === 'in' || controlType === 'out') {
+    if (controlType === 'in' || controlType === 'out' || controlType === 'overlap') {
         return readConfig.getLineSlotIndex(centerX);
     }
     if (controlType === 'shortbar') {
@@ -5959,7 +5997,9 @@ function buildBarSummary(rhythmBars) {
                 .map(function (control) {
                     const controlLabel = control.type === 'in'
                         ? 'In'
-                        : (control.type === 'shortbar' ? 'ShortBar' : 'Out');
+                        : (control.type === 'shortbar'
+                            ? 'ShortBar'
+                            : (control.type === 'overlap' ? uiText('score.legend.overlap') : 'Out'));
                     return controlLabel + '@' + (control.stepIndex + 1);
                 })
                 .join(', ');
@@ -6626,6 +6666,34 @@ function appendMobileSheetRepeatMarker(svgEl, x, y, repeatText, includeHitbox) {
 
 function appendMobileSheetControlMarker(svgEl, control, x, staffTopY, noteY) {
     const controlType = control && control.type;
+    if (controlType === 'overlap') {
+        const markerY = noteY + 37;
+        svgEl.appendChild(createMobileSheetSvgElement('rect', {
+            x: x - 13,
+            y: markerY - 10,
+            width: 26,
+            height: 20,
+            fill: '#fff',
+            opacity: 0.001
+        }));
+        svgEl.appendChild(createMobileSheetSvgElement('line', {
+            x1: x - 7,
+            y1: markerY,
+            x2: x + 7,
+            y2: markerY,
+            stroke: '#111',
+            'stroke-width': 2
+        }));
+        svgEl.appendChild(createMobileSheetSvgElement('polygon', {
+            points: (x - 11) + ',' + markerY + ' ' + (x - 4) + ',' + (markerY - 5) + ' ' + (x - 4) + ',' + (markerY + 5),
+            fill: '#111'
+        }));
+        svgEl.appendChild(createMobileSheetSvgElement('polygon', {
+            points: (x + 11) + ',' + markerY + ' ' + (x + 4) + ',' + (markerY - 5) + ' ' + (x + 4) + ',' + (markerY + 5),
+            fill: '#111'
+        }));
+        return;
+    }
     if (controlType === 'shortbar') {
         const shortBarTopY = staffTopY - 2;
         const shortBarBottomY = noteY + 24;
@@ -6743,6 +6811,7 @@ const mobileSheetEditorTools = [
     { id: 'in', label: 'In' },
     { id: 'out', label: 'Out' },
     { id: 'shortbar', label: 'ShortBar' },
+    { id: 'overlap', labelKey: 'score.legend.overlap' },
     { id: 'wiederholung', labelKey: 'score.legend.repeat' },
     { id: 'tuplet', labelKey: 'score.tuplet.tripletOrQuartuplet' },
     { id: 'edit_text', labelKey: 'editor.insertTextField' },
@@ -6769,6 +6838,10 @@ function createMobileSheetEditorToolIcon(toolId, iconMode) {
     }
     if (toolId === 'in' || toolId === 'out') {
         appendMobileSheetControlMarker(svgEl, { type: toolId }, 15, 5, -5);
+        return svgEl;
+    }
+    if (toolId === 'overlap') {
+        appendMobileSheetControlMarker(svgEl, { type: toolId }, 15, 5, -12);
         return svgEl;
     }
     if (toolId === 'shortbar') {
@@ -7760,7 +7833,8 @@ function insertMobileSheetEditorElement(toolId, sourceBarIndex, sourceStepIndex,
         bass_slap_flam: flam_bass_slap_c,
         in: In_c,
         out: Out_c,
-        shortbar: ShortBar_c
+        shortbar: ShortBar_c,
+        overlap: Overlap_c
     };
 
     if (toolId === 'tuplet') {
@@ -8969,7 +9043,7 @@ function callPHPScript_lesen(anzahl, options) {
 
         const elementPosition = getElementReadPosition(el);
         const rawPositionInfo = getBarIndexFromPosition(elementPosition.x, elementPosition.y, readConfig, anzahl);
-        if (elementId === 'shortbar' || elementId === 'in' || elementId === 'out') {
+        if (elementId === 'shortbar' || elementId === 'in' || elementId === 'out' || elementId === 'overlap') {
             rawPositionInfo.rawLineSlotIndex = getControlLineSlotIndex(elementPosition.x, readConfig, elementId);
             rawPositionInfo.lineSlotIndex = rawPositionInfo.rawLineSlotIndex;
             if (rawPositionInfo.lineSlotIndex > readConfig.stepsPerBar) {

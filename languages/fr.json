@@ -268,7 +268,8 @@
       "bassSlapFlamPlural": "Flam Bass et Slap"
     },
     "legend": {
-      "repeat": "Répétition"
+      "repeat": "Répétition",
+      "overlap": "Chevauchement"
     },
     "readout": {
       "binary": "binaire",

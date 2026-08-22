@@ -648,7 +648,7 @@ function isNoteLineControlElement(element) {
     return false;
   }
   var elementId = element.attr("id");
-  return elementId === "in" || elementId === "out";
+  return elementId === "in" || elementId === "out" || elementId === "overlap";
 }
 
 function getElementTranslateY(element) {
