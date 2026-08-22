@@ -13,6 +13,18 @@ var editorClipboardStorageKey = "barabeat.editorClipboard";
 var editorClipboardPayloadStorageKey = "barabeat.editorClipboardPayload";
 var editorClipboardSystemType = "barabeat.editorSelection";
 var editorClipboardTabId = "tab-" + Date.now() + "-" + Math.random().toString(36).slice(2);
+var editorPastePointerState = {
+  x: 0,
+  y: 0,
+  hasPosition: false,
+  leftButtonDown: false,
+};
+var editorPastePlacementState = {
+  active: false,
+  selectionGroup: null,
+  baseCenterX: 0,
+  baseCenterY: 0,
+};
 var selectionDragState = {
   currentDx: undefined,
   currentDy: undefined,
@@ -401,6 +413,132 @@ function getSvgPointerPosition(event, fallbackX, fallbackY) {
     y: sourceEvent.clientY - svgBounds.top,
   };
 }
+
+function editorPointerTargetsScore(event) {
+  return Boolean(
+    event &&
+    event.target &&
+    s &&
+    s.node &&
+    (event.target === s.node || s.node.contains(event.target))
+  );
+}
+
+function rememberEditorPastePointer(event, allowOutsideScore) {
+  if (!allowOutsideScore && !editorPointerTargetsScore(event)) {
+    return false;
+  }
+  var pointerPosition = getSvgPointerPosition(event);
+  if (!Number.isFinite(pointerPosition.x) || !Number.isFinite(pointerPosition.y)) {
+    return false;
+  }
+  editorPastePointerState.x = pointerPosition.x;
+  editorPastePointerState.y = pointerPosition.y;
+  editorPastePointerState.hasPosition = true;
+  return true;
+}
+
+function moveActivePastePlacement(pointerPosition) {
+  var placement = editorPastePlacementState;
+  if (
+    !placement.active ||
+    !placement.selectionGroup ||
+    placement.selectionGroup !== selections ||
+    !pointerPosition
+  ) {
+    return;
+  }
+  var deltaX = pointerPosition.x - placement.baseCenterX;
+  var deltaY = pointerPosition.y - placement.baseCenterY;
+  placement.selectionGroup.transform("t" + deltaX + "," + deltaY);
+  selectionDragState.currentDx = deltaX;
+  selectionDragState.currentDy = deltaY;
+  selectionDragState.selectionWasDragged = true;
+}
+
+function finishEditorPastePlacement() {
+  var placement = editorPastePlacementState;
+  if (!placement.active) {
+    return;
+  }
+  var selectionGroup = placement.selectionGroup;
+  placement.active = false;
+  placement.selectionGroup = null;
+  if (selectionGroup && selectionGroup === selections) {
+    snapSelectionElementsAndKeepSelection(selectionGroup);
+  }
+}
+
+function getEditorPasteTargetPosition() {
+  if (editorPastePointerState.hasPosition) {
+    return {
+      x: editorPastePointerState.x,
+      y: editorPastePointerState.y,
+    };
+  }
+  if (!s || !s.node || typeof s.node.getBoundingClientRect !== "function") {
+    return null;
+  }
+  var svgBounds = s.node.getBoundingClientRect();
+  var viewportWidth = window.innerWidth || document.documentElement.clientWidth || svgBounds.width;
+  var viewportHeight = window.innerHeight || document.documentElement.clientHeight || svgBounds.height;
+  var clientX = Math.max(svgBounds.left, Math.min(svgBounds.right, viewportWidth / 2));
+  var clientY = Math.max(svgBounds.top, Math.min(svgBounds.bottom, viewportHeight / 2));
+  return getSvgPointerPosition({ clientX: clientX, clientY: clientY });
+}
+
+function placePastedSelectionAtPointer(targetPosition, followPointer) {
+  if (!selections || !targetPosition) {
+    return false;
+  }
+  var selectionBounds = selections.getBBox();
+  editorPastePlacementState.active = true;
+  editorPastePlacementState.selectionGroup = selections;
+  editorPastePlacementState.baseCenterX = selectionBounds.cx;
+  editorPastePlacementState.baseCenterY = selectionBounds.cy;
+  moveActivePastePlacement(targetPosition);
+  if (!followPointer) {
+    finishEditorPastePlacement();
+  }
+  return true;
+}
+
+window.addEventListener("pointerdown", function (event) {
+  if (event.button !== 0 || !editorPointerTargetsScore(event)) {
+    return;
+  }
+  editorPastePointerState.leftButtonDown = true;
+  rememberEditorPastePointer(event, false);
+}, true);
+
+window.addEventListener("pointermove", function (event) {
+  var placementActive = editorPastePlacementState.active;
+  if (!rememberEditorPastePointer(event, placementActive)) {
+    return;
+  }
+  if (placementActive) {
+    moveActivePastePlacement(editorPastePointerState);
+    if (event.cancelable) {
+      event.preventDefault();
+    }
+  }
+}, true);
+
+window.addEventListener("pointerup", function (event) {
+  if (event.button === 0) {
+    editorPastePointerState.leftButtonDown = false;
+    if (editorPastePlacementState.active) {
+      rememberEditorPastePointer(event, true);
+      moveActivePastePlacement(editorPastePointerState);
+      finishEditorPastePlacement();
+    }
+  }
+}, true);
+
+window.addEventListener("pointercancel", function () {
+  editorPastePointerState.leftButtonDown = false;
+  finishEditorPastePlacement();
+}, true);
 
 function shadow_start(x, y, event) {
   var pointerPosition = getSvgPointerPosition(event, x, y);
@@ -1070,13 +1208,6 @@ function copySelectedElementsToEditorClipboard() {
   return true;
 }
 
-function offsetPastedElements(pastedSelectableElements, offsetX, offsetY) {
-  pastedSelectableElements.forEach(function (ele) {
-    var currentTranslate = getElementTranslate(ele);
-    ele.transform("t" + (currentTranslate.x + offsetX) + ", " + (currentTranslate.y + offsetY));
-  });
-}
-
 function selectPastedElements(pastedSelectableElements) {
   if (!pastedSelectableElements.length) {
     return;
@@ -1099,7 +1230,7 @@ function clearSelectionBox() {
   }
 }
 
-function pasteActiveCopiedSelection() {
+function pasteActiveCopiedSelection(targetPosition, followPointer) {
   if (!selections) {
     return false;
   }
@@ -1122,9 +1253,9 @@ function pasteActiveCopiedSelection() {
   var pastedSelectableElements = sourceElements.map(function (ele) {
     return appendBoundClone(ele);
   });
-  offsetPastedElements(pastedSelectableElements, gridSize * 2, 0);
 
   selectPastedElements(pastedSelectableElements);
+  placePastedSelectionAtPointer(targetPosition, followPointer);
   return true;
 }
 
@@ -1153,7 +1284,13 @@ function pasteEditorClipboardElements(markupOverride, options) {
   if (!markup || typeof Snap === "undefined" || !s) {
     return false;
   }
-  if (!pasteOptions.skipActiveSelection && sourceAction === "copy" && pasteActiveCopiedSelection()) {
+  var targetPosition = pasteOptions.targetPosition || getEditorPasteTargetPosition();
+  var followPointer = Boolean(pasteOptions.followPointer);
+  if (
+    !pasteOptions.skipActiveSelection &&
+    sourceAction === "copy" &&
+    pasteActiveCopiedSelection(targetPosition, followPointer)
+  ) {
     return true;
   }
 
@@ -1169,7 +1306,6 @@ function pasteEditorClipboardElements(markupOverride, options) {
       pastedSelectableElements.push(ele);
     });
   }
-  var shouldOffsetPaste = sourceAction === "copy" && selections && pastedSelectableElements.length;
   if (typeof recordHistorySnapshot === "function") {
     recordHistorySnapshot();
   }
@@ -1180,21 +1316,28 @@ function pasteEditorClipboardElements(markupOverride, options) {
   if (typeof bindLoadedScoreElements === "function") {
     bindLoadedScoreElements();
   }
-  if (shouldOffsetPaste) {
-    offsetPastedElements(pastedSelectableElements, gridSize * 2, 0);
-  }
   selectPastedElements(pastedSelectableElements);
+  placePastedSelectionAtPointer(targetPosition, followPointer);
   return true;
 }
 
 function pasteEditorClipboardElementsFromSystemOrLocal() {
+  finishEditorPastePlacement();
+  var requestedTargetPosition = getEditorPasteTargetPosition();
+  var requestedFollowPointer = editorPastePointerState.leftButtonDown;
   readEditorClipboardFromSystemClipboard().then(function (payload) {
+    var followPointer = requestedFollowPointer && editorPastePointerState.leftButtonDown;
+    var targetPosition = requestedFollowPointer
+      ? getEditorPasteTargetPosition()
+      : requestedTargetPosition;
     if (payload && payload.markup) {
       editorClipboardMarkup = payload.markup;
       editorClipboardSourceAction = payload.sourceAction || "copy";
       pasteEditorClipboardElements(payload.markup, {
         sourceAction: editorClipboardSourceAction,
         skipActiveSelection: payload.sourceTabId !== editorClipboardTabId,
+        targetPosition: targetPosition,
+        followPointer: followPointer,
       });
       return;
     }
@@ -1206,11 +1349,16 @@ function pasteEditorClipboardElementsFromSystemOrLocal() {
       pasteEditorClipboardElements(storedPayload.markup, {
         sourceAction: editorClipboardSourceAction,
         skipActiveSelection: storedPayload.sourceTabId !== editorClipboardTabId,
+        targetPosition: targetPosition,
+        followPointer: followPointer,
       });
       return;
     }
 
-    pasteEditorClipboardElements();
+    pasteEditorClipboardElements(undefined, {
+      targetPosition: targetPosition,
+      followPointer: followPointer,
+    });
   });
 }
 

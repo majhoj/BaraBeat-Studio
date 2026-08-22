@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'barabeat-studio-offline-v20-mobile-practice-scroll';
+const CACHE_NAME = 'barabeat-studio-offline-v23-mobile-paste-selection';
 const APP_SHELL = [
   './app-shell.html',
   './manifest.webmanifest',

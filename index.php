@@ -6725,8 +6725,11 @@ const mobileSheetEditorState = {
     activeTool: '',
     pendingTupletTarget: null,
     selectedSourceElements: [],
-    movingChooserSourceBarIndex: null
+    movingChooserSourceBarIndex: null,
+    clipboardItems: []
 };
+
+const mobileSheetEditorClipboardStorageKey = 'barabeat.mobileEditorClipboard';
 
 const mobileSheetEditorTools = [
     { id: 'tone', labelKey: 'score.note.tone' },
@@ -6745,11 +6748,12 @@ const mobileSheetEditorTools = [
     { id: 'edit_text', labelKey: 'editor.insertTextField' },
     { id: 'chooser', labelKey: 'editor.insertInstrumentAndFunction' },
     { id: 'select', labelKey: 'editor.selectNotes' },
+    { id: 'clipboard', labelKey: 'editor.copySelection' },
     { id: 'duplicate', labelKey: 'editor.duplicateSelection' },
     { id: 'delete', labelKey: 'editor.deleteElement' }
 ];
 
-function createMobileSheetEditorToolIcon(toolId) {
+function createMobileSheetEditorToolIcon(toolId, iconMode) {
     const svgEl = createMobileSheetSvgElement('svg', {
         viewBox: '0 0 30 30',
         width: 30,
@@ -6903,6 +6907,41 @@ function createMobileSheetEditorToolIcon(toolId) {
         return svgEl;
     }
 
+    if (toolId === 'clipboard') {
+        if (iconMode === 'paste') {
+            svgEl.appendChild(createMobileSheetSvgElement('path', {
+                d: 'M10 7h3c0-2 4-2 4 0h3v4H10V7zm-2 3h2v3h10v-3h2v16H8V10zm4 7h6m-3-3 3 3-3 3',
+                fill: '#fff',
+                stroke: '#111',
+                'stroke-width': 1.7,
+                'stroke-linecap': 'round',
+                'stroke-linejoin': 'round'
+            }));
+        } else {
+            svgEl.appendChild(createMobileSheetSvgElement('rect', {
+                x: 10,
+                y: 6,
+                width: 14,
+                height: 14,
+                rx: 1,
+                fill: '#fff',
+                stroke: '#111',
+                'stroke-width': 1.7
+            }));
+            svgEl.appendChild(createMobileSheetSvgElement('rect', {
+                x: 6,
+                y: 10,
+                width: 14,
+                height: 14,
+                rx: 1,
+                fill: '#fff',
+                stroke: '#111',
+                'stroke-width': 1.7
+            }));
+        }
+        return svgEl;
+    }
+
     svgEl.appendChild(createMobileSheetSvgElement('path', {
         d: 'M10 9h10l-1 16h-8L10 9zm2-4h6l1 2h4v2H7V7h4l1-2zm1 7v10m4-10v10',
         fill: 'none',
@@ -6924,6 +6963,64 @@ function getMobileSheetSelectedSourceElements() {
         return element && element.node && element.node.parentNode;
     });
     return mobileSheetEditorState.selectedSourceElements;
+}
+
+function normalizeMobileSheetClipboardItems(items) {
+    return (Array.isArray(items) ? items : []).filter(function (item) {
+        return item &&
+            typeof item.markup === 'string' &&
+            item.markup &&
+            Number.isFinite(Number(item.sourceBarIndex)) &&
+            Number.isFinite(Number(item.sourceStepIndex));
+    }).map(function (item) {
+        return {
+            markup: item.markup,
+            sourceBarIndex: Math.max(1, Math.round(Number(item.sourceBarIndex))),
+            sourceStepIndex: Math.max(0, Math.round(Number(item.sourceStepIndex))),
+            offsetX: Number(item.offsetX) || 0,
+            lineOffsetY: Number(item.lineOffsetY) || 0
+        };
+    });
+}
+
+function readStoredMobileSheetClipboardItems() {
+    try {
+        const storedPayload = JSON.parse(
+            window.localStorage.getItem(mobileSheetEditorClipboardStorageKey) || 'null'
+        );
+        return normalizeMobileSheetClipboardItems(storedPayload && storedPayload.items);
+    } catch (error) {
+        return [];
+    }
+}
+
+function getMobileSheetClipboardItems() {
+    if (mobileSheetEditorState.clipboardItems.length === 0) {
+        mobileSheetEditorState.clipboardItems = readStoredMobileSheetClipboardItems();
+    }
+    return mobileSheetEditorState.clipboardItems;
+}
+
+function getMobileSheetClipboardButtonMode() {
+    if (getMobileSheetSelectedSourceElements().length > 0) {
+        return 'copy';
+    }
+    return getMobileSheetClipboardItems().length > 0 ? 'paste' : 'copy';
+}
+
+function updateMobileSheetClipboardButton(buttonEl) {
+    if (!buttonEl) {
+        return;
+    }
+    const mode = getMobileSheetClipboardButtonMode();
+    const hasSelection = getMobileSheetSelectedSourceElements().length > 0;
+    const hasClipboard = getMobileSheetClipboardItems().length > 0;
+    const label = uiText(mode === 'copy' ? 'editor.copySelection' : 'editor.pasteSelection');
+    buttonEl.dataset.clipboardMode = mode;
+    buttonEl.disabled = mode === 'copy' ? !hasSelection : !hasClipboard;
+    buttonEl.replaceChildren(createMobileSheetEditorToolIcon('clipboard', mode));
+    buttonEl.title = label;
+    buttonEl.setAttribute('aria-label', label);
 }
 
 function updateMobileSheetEditorPaletteState() {
@@ -6954,7 +7051,12 @@ function updateMobileSheetEditorPaletteState() {
             : uiText('editor.insertInstrumentAndFunction');
     });
     document.querySelectorAll('.mobile-sheet-editor-tool').forEach(function (buttonEl) {
-        const isActive = buttonEl.dataset.toolId === mobileSheetEditorState.activeTool;
+        if (buttonEl.dataset.toolId === 'clipboard') {
+            updateMobileSheetClipboardButton(buttonEl);
+        }
+        const isActive = buttonEl.dataset.toolId === 'clipboard'
+            ? mobileSheetEditorState.activeTool === 'paste'
+            : buttonEl.dataset.toolId === mobileSheetEditorState.activeTool;
         buttonEl.classList.toggle('is-active', isActive);
         buttonEl.setAttribute('aria-pressed', isActive ? 'true' : 'false');
         if (buttonEl.dataset.toolId === 'duplicate') {
@@ -6974,14 +7076,21 @@ function createMobileSheetEditorPalette() {
         buttonEl.type = 'button';
         buttonEl.className = 'mobile-sheet-editor-tool';
         buttonEl.dataset.toolId = tool.id;
-        buttonEl.appendChild(createMobileSheetEditorToolIcon(tool.id));
+        const clipboardMode = tool.id === 'clipboard' ? getMobileSheetClipboardButtonMode() : '';
+        buttonEl.appendChild(createMobileSheetEditorToolIcon(tool.id, clipboardMode));
         const toolLabel = tool.labelKey ? uiText(tool.labelKey) : tool.label;
         buttonEl.title = toolLabel;
         buttonEl.setAttribute('aria-label', toolLabel);
-        buttonEl.setAttribute('aria-pressed', mobileSheetEditorState.activeTool === tool.id ? 'true' : 'false');
-        buttonEl.classList.toggle('is-active', mobileSheetEditorState.activeTool === tool.id);
+        const toolIsActive = tool.id === 'clipboard'
+            ? mobileSheetEditorState.activeTool === 'paste'
+            : mobileSheetEditorState.activeTool === tool.id;
+        buttonEl.setAttribute('aria-pressed', toolIsActive ? 'true' : 'false');
+        buttonEl.classList.toggle('is-active', toolIsActive);
         if (tool.id === 'duplicate') {
             buttonEl.disabled = getMobileSheetSelectedSourceElements().length === 0;
+        }
+        if (tool.id === 'clipboard') {
+            updateMobileSheetClipboardButton(buttonEl);
         }
         buttonEl.addEventListener('click', function () {
             if (tool.id === 'delete' && getMobileSheetSelectedSourceElements().length > 0) {
@@ -6990,6 +7099,14 @@ function createMobileSheetEditorPalette() {
             }
             if (tool.id === 'duplicate') {
                 duplicateMobileSheetEditorSelection();
+                return;
+            }
+            if (tool.id === 'clipboard') {
+                if (buttonEl.dataset.clipboardMode === 'copy') {
+                    copyMobileSheetEditorSelection();
+                } else {
+                    setMobileSheetEditorTool('paste');
+                }
                 return;
             }
             setMobileSheetEditorTool(tool.id);
@@ -7259,6 +7376,133 @@ function setMobileSheetSelectionFromNoteElements(noteElements) {
     });
     mobileSheetEditorState.selectedSourceElements = selectedElements;
     updateMobileSheetSelectionClasses();
+}
+
+function copyMobileSheetEditorSelection() {
+    const selectedElements = getMobileSheetSelectedSourceElements().slice();
+    const clipboardItems = [];
+    selectedElements.forEach(function (element) {
+        const descriptor = getMobileSheetSourceNoteDescriptor(element);
+        if (!descriptor) {
+            return;
+        }
+        const sourcePosition = getElementReadPosition(element);
+        const sourceLineIndex = Math.floor((descriptor.sourceBarIndex - 1) / 2);
+        const canonicalPosition = getMobileSheetSourcePosition(
+            descriptor.sourceBarIndex,
+            descriptor.sourceStepIndex,
+            element.attr('id'),
+            ''
+        );
+        clipboardItems.push({
+            markup: typeof serializeEditorElementForStorage === 'function'
+                ? serializeEditorElementForStorage(element)
+                : element.toString(),
+            sourceBarIndex: descriptor.sourceBarIndex,
+            sourceStepIndex: descriptor.sourceStepIndex,
+            offsetX: sourcePosition.x - canonicalPosition.x,
+            lineOffsetY: sourcePosition.y - getSheetLineBaseY(sourceLineIndex)
+        });
+    });
+    if (clipboardItems.length === 0) {
+        return false;
+    }
+
+    mobileSheetEditorState.clipboardItems = clipboardItems;
+    try {
+        window.localStorage.setItem(mobileSheetEditorClipboardStorageKey, JSON.stringify({
+            version: 1,
+            createdAt: Date.now(),
+            items: clipboardItems
+        }));
+    } catch (error) {
+        // The in-memory clipboard remains available in restricted browser contexts.
+    }
+    if (typeof writeEditorClipboard === 'function') {
+        writeEditorClipboard(clipboardItems.map(function (item) { return item.markup; }).join(''), 'copy');
+    }
+
+    mobileSheetEditorState.activeTool = '';
+    mobileSheetEditorState.selectedSourceElements = [];
+    updateMobileSheetSelectionClasses();
+    return true;
+}
+
+function pasteMobileSheetEditorSelection(targetBarIndex, targetStepIndex) {
+    const clipboardItems = getMobileSheetClipboardItems().slice();
+    if (clipboardItems.length === 0 || typeof Snap === 'undefined' || !s) {
+        return false;
+    }
+
+    const stepsPerBar = getMobileSheetStepsPerBar();
+    const sourceAnchor = Math.min.apply(Math, clipboardItems.map(function (item) {
+        return (item.sourceBarIndex - 1) * stepsPerBar + item.sourceStepIndex;
+    }));
+    const targetAnchor = (Math.max(1, Number(targetBarIndex)) - 1) * stepsPerBar +
+        Math.max(0, Number(targetStepIndex));
+    const maximumBarCount = Math.max(1, Number(zeilenAnzahl) || 1) * 2;
+    const targetItems = clipboardItems.map(function (item) {
+        const sourceAbsoluteStep = (item.sourceBarIndex - 1) * stepsPerBar + item.sourceStepIndex;
+        const targetAbsoluteStep = targetAnchor + sourceAbsoluteStep - sourceAnchor;
+        return {
+            barIndex: Math.floor(targetAbsoluteStep / stepsPerBar) + 1,
+            stepIndex: ((targetAbsoluteStep % stepsPerBar) + stepsPerBar) % stepsPerBar,
+            source: item
+        };
+    });
+    if (targetItems.some(function (item) {
+        return item.barIndex < 1 || item.barIndex > maximumBarCount;
+    })) {
+        alert(uiText('editor.pasteOutsideScore'));
+        return false;
+    }
+
+    let parsedElements;
+    try {
+        parsedElements = Snap.parseStr(clipboardItems.map(function (item) {
+            return item.markup;
+        }).join(''));
+    } catch (error) {
+        return false;
+    }
+    const pastedElements = [];
+    if (parsedElements && typeof parsedElements.selectAll === 'function') {
+        parsedElements.selectAll(selectableElementSelector).forEach(function (element) {
+            pastedElements.push(element);
+        });
+    }
+    if (pastedElements.length !== targetItems.length) {
+        return false;
+    }
+
+    recordHistorySnapshot();
+    s.append(parsedElements);
+    pastedElements.forEach(function (element, elementIndex) {
+        const targetItem = targetItems[elementIndex];
+        const targetPosition = getMobileSheetSourcePosition(
+            targetItem.barIndex,
+            targetItem.stepIndex,
+            element.attr('id'),
+            ''
+        );
+        const targetLineIndex = Math.floor((targetItem.barIndex - 1) / 2);
+        moveSheetElementAnchorTo(
+            element,
+            targetPosition.x + targetItem.source.offsetX,
+            getSheetLineBaseY(targetLineIndex) + targetItem.source.lineOffsetY,
+            false
+        );
+        if (typeof bindClonedElement === 'function') {
+            bindClonedElement(element);
+        } else {
+            element.drag(move, sel_start, stop_m);
+        }
+    });
+
+    mobileSheetEditorState.activeTool = 'select';
+    mobileSheetEditorState.selectedSourceElements = pastedElements;
+    refreshMobileSheetEditorView();
+    return true;
 }
 
 function deleteMobileSheetEditorSelection() {
@@ -8272,6 +8516,13 @@ function createMobileSheetBarElement(bar, barIndex, previousBar, nextBar) {
                 return;
             }
             if (activeTool === 'select') {
+                return;
+            }
+            if (activeTool === 'paste') {
+                const pasteStepIndex = getMobileSheetStepFromPointer(svgEl, event.clientX);
+                if (pasteMobileSheetEditorSelection(sourceBarIndex, pasteStepIndex)) {
+                    event.preventDefault();
+                }
                 return;
             }
             const sourceNode = event.target && event.target.closest
