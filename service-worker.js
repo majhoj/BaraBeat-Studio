@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'barabeat-studio-offline-v30-overlap-control';
+const CACHE_NAME = 'barabeat-studio-offline-v35-internal-pattern-transition';
 const APP_SHELL = [
   './app-shell.html',
   './manifest.webmanifest',

@@ -5168,7 +5168,7 @@ cycleRepeatCount = function () {
         zahl = 1;
     } else {
         zahl++;
-        if (zahl > 4) {
+        if (zahl > 8) {
             zahl = 0;
         }
     }
