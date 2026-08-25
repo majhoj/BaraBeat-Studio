@@ -1431,6 +1431,12 @@ function hasTimelineEntryLeadingPickup(entryData) {
     return false;
   }
 
+  // Bei Begleitpattern markiert ein In hinter dem Out den Auftakt des
+  // folgenden Durchlaufs und bleibt deshalb ein echter Patternauftakt.
+  if (entryData.label === 'Begleitung') {
+    return true;
+  }
+
   const inStep = Math.max(0, Math.round(Number(entryData.patternInStep) || 0));
   const earlierBoundarySteps = [entryData.patternOutStep, entryData.patternOverlapStep]
     .filter(function (boundaryStep) {
@@ -1729,6 +1735,24 @@ function padNotesToLength(sourceNotes, targetLength) {
     paddedNotes.push('f');
   }
   return paddedNotes;
+}
+
+function padTimelineAccompanimentOutForParallelSection(effectiveNotes, entryData, entryDataList) {
+  const entries = Array.isArray(entryDataList) ? entryDataList : [];
+  if (!entryData || entryData.label !== 'Begleitung' || entries.length <= 1) {
+    return effectiveNotes;
+  }
+
+  return padNotesToLength(effectiveNotes, getMaxPatternNotesLength(entries));
+}
+
+function getTimelineParallelAccompanimentLoopLength(entryData, entryDataList, shouldApplyOut) {
+  const entries = Array.isArray(entryDataList) ? entryDataList : [];
+  if (!shouldApplyOut || !entryData || entryData.label !== 'Begleitung' || entries.length <= 1) {
+    return 0;
+  }
+
+  return getMaxPatternNotesLength(entries);
 }
 
 function loopNotesFromOffset(sourceNotes, targetLength, startOffset) {
@@ -2603,18 +2627,28 @@ function buildTimelineSections(config) {
               isLastRepeatedParallelUnit &&
               shouldApplyOutToTimelineEntry(entryData);
             const shouldApplyOut = shouldLimitSectionAtOut || shouldApplyOutBeforeOverlay;
+            const parallelAccompanimentLoopLength = getTimelineParallelAccompanimentLoopLength(
+              entryData,
+              repeatEntries,
+              shouldApplyOut
+            );
             const effectiveNotes = getTimelineEntryEffectiveNotes(
               entryData,
               shouldApplyOut,
-              repeatShouldPadToLongest ? repeatTargetLength : 0
+              Math.max(
+                repeatShouldPadToLongest ? repeatTargetLength : 0,
+                parallelAccompanimentLoopLength
+              )
             );
-            if (shouldLimitSectionAtOut) {
+            if (shouldLimitSectionAtOut && entryData.label !== 'Begleitung') {
               limitTimelineSectionLengthAtOut(repeatedSection, effectiveNotes.length);
             }
             const overlayReplacementStart = isTimelineOverlayEntryData(entryData)
               ? getTimelineOverlayReplacementStart(repeatEntries, entryData)
               : 0;
-            const notesToMerge = effectiveNotes;
+            const notesToMerge = shouldApplyOut
+              ? padTimelineAccompanimentOutForParallelSection(effectiveNotes, entryData, repeatEntries)
+              : effectiveNotes;
             applyTimelineEntryOverlapToSection(repeatedSection, entryData, effectiveNotes.length);
 
             entryData.targetInstruments.forEach(function (instrumentName) {
@@ -2702,18 +2736,28 @@ function buildTimelineSections(config) {
           hasTimelineOverlayForEntryTargets(blockEntries, entryData);
         const shouldLimitSectionAtOut = shouldApplyOutToTimelineEntry(entryData);
         const shouldApplyOut = shouldLimitSectionAtOut || shouldApplyOutBeforeOverlay;
+        const parallelAccompanimentLoopLength = getTimelineParallelAccompanimentLoopLength(
+          entryData,
+          blockEntries,
+          shouldApplyOut
+        );
         const effectiveNotes = getTimelineEntryEffectiveNotes(
           entryData,
           shouldApplyOut,
-          currentBlockShouldPadToLongest ? blockTargetLength : 0
+          Math.max(
+            currentBlockShouldPadToLongest ? blockTargetLength : 0,
+            parallelAccompanimentLoopLength
+          )
         );
-        if (shouldLimitSectionAtOut) {
+        if (shouldLimitSectionAtOut && entryData.label !== 'Begleitung') {
           limitTimelineSectionLengthAtOut(mergedSection, effectiveNotes.length);
         }
         const overlayReplacementStart = isTimelineOverlayEntryData(entryData)
           ? getTimelineOverlayReplacementStart(blockEntries, entryData)
           : 0;
-        const notesToMerge = effectiveNotes;
+        const notesToMerge = shouldApplyOut
+          ? padTimelineAccompanimentOutForParallelSection(effectiveNotes, entryData, blockEntries)
+          : effectiveNotes;
         applyTimelineEntryOverlapToSection(mergedSection, entryData, effectiveNotes.length);
 
         entryData.targetInstruments.forEach(function (instrumentName) {

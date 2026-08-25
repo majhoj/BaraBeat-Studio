@@ -23,8 +23,16 @@ function extractFunction(source, functionName) {
 }
 
 assert(
-  playerSource.includes('if (shouldLimitSectionAtOut) {\n              limitTimelineSectionLengthAtOut(repeatedSection, effectiveNotes.length);'),
-  'Parallele Arrangement-Abschnitte werden nicht am Out beendet.'
+  playerSource.includes("if (shouldLimitSectionAtOut && entryData.label !== 'Begleitung') {\n              limitTimelineSectionLengthAtOut(repeatedSection, effectiveNotes.length);"),
+  'Das Out einer Begleitung begrenzt weiterhin den gesamten parallelen Abschnitt.'
+);
+assert(
+  playerSource.includes('padTimelineAccompanimentOutForParallelSection(effectiveNotes, entryData, repeatEntries)'),
+  'Die gekürzte Begleitspur wird im wiederholten Parallelabschnitt nicht mit Stille aufgefüllt.'
+);
+assert(
+  playerSource.includes('getTimelineParallelAccompanimentLoopLength(\n              entryData,\n              repeatEntries,\n              shouldApplyOut'),
+  'Das Out der Begleitung wird weiterhin auf deren ersten statt auf den letzten parallelen Zyklus angewendet.'
 );
 assert(
   playerSource.includes('if (currentCycleHasAppliedOut) {\n          limitTimelineSectionLengthAtOut('),
@@ -52,6 +60,16 @@ context.getTimelineStepsPerBar = function () {
   'limitTimelineSectionLengthAtOut',
   'trimTimelineSectionTracksToFixedLength',
   'getPatternNotesLength',
+  'getTimelineEntryPlaybackLength',
+  'getMaxPatternNotesLength',
+  'applyOutToPatternNotes',
+  'getTimelineEntryOutStep',
+  'getTimelineEntryOutBarEndStep',
+  'getTimelineEntryEffectiveNotes',
+  'loopNotesToLength',
+  'padNotesToLength',
+  'padTimelineAccompanimentOutForParallelSection',
+  'getTimelineParallelAccompanimentLoopLength',
   'hasTimelineEntryLeadingPickup',
   'getTimelineEntryPickupEndStep',
   'getTimelineEntrySkippedStartStep',
@@ -74,23 +92,43 @@ vm.runInContext('limitTimelineSectionLengthAtOut(section, 24);', context);
 
 assert(section.fixedLength === 24, 'Der stumme zweite Takt wurde nicht aus der Abschnittsdauer entfernt.');
 
-context.longerParallelSection = {
-  trackNotes: {
-    Djembe_1: new Array(24).fill('f'),
-    Djembe_2: new Array(48).fill('f')
-  },
-  fixedLength: 0
+context.shortOutAccompaniment = {
+  label: 'Begleitung',
+  patternNotes: new Array(24).fill('x'),
+  patternInStep: null,
+  patternOutStep: 18,
+  patternOutBarEndStep: 24,
+  patternOverlapStep: null
 };
-vm.runInContext('limitTimelineSectionLengthAtOut(longerParallelSection, 24);', context);
-vm.runInContext('trimTimelineSectionTracksToFixedLength(longerParallelSection);', context);
-assert(
-  context.longerParallelSection.fixedLength === 24,
-  'Eine längere parallele Spur hält den Abschnitt nach dem Out weiterhin offen.'
+context.longParallelAccompaniment = {
+  label: 'Begleitung',
+  patternNotes: new Array(48).fill('f')
+};
+const parallelAccompanimentLoopLength = vm.runInContext(
+  'getTimelineParallelAccompanimentLoopLength(shortOutAccompaniment, [shortOutAccompaniment, longParallelAccompaniment], true);',
+  context
 );
 assert(
-  context.longerParallelSection.trackNotes.Djembe_1.length === 24 &&
-    context.longerParallelSection.trackNotes.Djembe_2.length === 24,
-  'Noten hinter dem Out bleiben intern erhalten und verschieben den folgenden Abschnitt.'
+  parallelAccompanimentLoopLength === 48,
+  'Die kürzere Begleitung wird vor ihrem Out nicht bis zur gemeinsamen Abschnittslänge wiederholt.'
+);
+context.parallelAccompanimentLoopLength = parallelAccompanimentLoopLength;
+context.shortOutNotes = vm.runInContext(
+  'getTimelineEntryEffectiveNotes(shortOutAccompaniment, true, parallelAccompanimentLoopLength);',
+  context
+);
+const paddedAccompanimentOut = vm.runInContext(
+  'padTimelineAccompanimentOutForParallelSection(shortOutNotes, shortOutAccompaniment, [shortOutAccompaniment, longParallelAccompaniment]);',
+  context
+);
+assert(
+  paddedAccompanimentOut.length === 48,
+  'Das Out einer Begleitspur verkürzt weiterhin eine längere parallele Begleitung.'
+);
+assert(
+  paddedAccompanimentOut.slice(0, 43).every(function (noteValue) { return noteValue === 'x'; }) &&
+    paddedAccompanimentOut.slice(43).every(function (noteValue) { return noteValue === 'f'; }),
+  'Das Out greift nicht erst im letzten Zyklus oder die Begleitspur bleibt danach hörbar.'
 );
 
 context.leadingPickup = {
@@ -104,6 +142,23 @@ context.leadingPickup = {
 assert(
   vm.runInContext('hasTimelineEntryLeadingPickup(leadingPickup);', context) === true,
   'Ein echter Auftakt am Patternanfang wird nicht mehr erkannt.'
+);
+
+context.accompanimentPickupAfterOut = {
+  label: 'Begleitung',
+  patternNotes: new Array(24).fill('f'),
+  patternInStep: 22,
+  patternOutStep: 18,
+  patternOutBarEndStep: 24,
+  patternOverlapStep: null
+};
+assert(
+  vm.runInContext('hasTimelineEntryLeadingPickup(accompanimentPickupAfterOut);', context) === true,
+  'Das In eines zyklischen Begleitpatterns wird hinter dessen Out nicht als Auftakt erkannt.'
+);
+assert(
+  vm.runInContext('getTimelineEntrySkippedStartStep(accompanimentPickupAfterOut);', context) === 0,
+  'Das Begleitpattern wird nach seinem Auftakt fälschlich am Anfang gekürzt.'
 );
 
 context.internalTransition = {

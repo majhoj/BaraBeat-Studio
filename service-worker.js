@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'barabeat-studio-offline-v35-internal-pattern-transition';
+const CACHE_NAME = 'barabeat-studio-offline-v38-parallel-accompaniment-loop-out';
 const APP_SHELL = [
   './app-shell.html',
   './manifest.webmanifest',
