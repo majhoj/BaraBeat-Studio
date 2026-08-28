@@ -30,6 +30,7 @@ const timelineState = {
     sourceLibraryGroups: [],
     entries: [],
     accompanimentSegments: [],
+    minimumBarCount: 0,
     sheetLoop: false,
     sheetLoopCount: false,
     tempo: 100,
@@ -120,6 +121,14 @@ function normalizeTimelineTempo(rawValue) {
 }
 
 function normalizeTimelineGapBeforeBars(rawValue) {
+    const numericValue = Number(rawValue);
+    if (!Number.isFinite(numericValue) || numericValue <= 0) {
+        return 0;
+    }
+    return Math.max(0, Math.min(999, Math.round(numericValue)));
+}
+
+function normalizeTimelineMinimumBarCount(rawValue) {
     const numericValue = Number(rawValue);
     if (!Number.isFinite(numericValue) || numericValue <= 0) {
         return 0;
@@ -1096,6 +1105,11 @@ function buildTimelinePlayerPayload(patternLibrary, timelineEntries) {
         ? getResolvedTimelineLoopCount()
         : false;
 
+    const timelineLayout = buildTimelineHorizontalLayout(buildTimelineVisualRows(
+        buildTimelineDisplayGroups(timelineEntries, patternLibrary),
+        patternLibrary
+    ));
+
     return [{
         Name: titel.attr('text'),
         Rhythmus: rhythm,
@@ -1159,6 +1173,7 @@ function buildTimelinePlayerPayload(patternLibrary, timelineEntries) {
                 targetInstruments: Array.isArray(entry.targetInstruments) ? entry.targetInstruments.slice() : []
             };
         }),
+        TimelineTrailingBars: Math.max(0, timelineLayout.totalBars - timelineLayout.naturalTotalBars),
         AccompanimentSegments: timelineState.accompanimentSegments.map(serializeTimelineAccompanimentSegment)
     }];
 }
@@ -1189,6 +1204,7 @@ function updateTimelineMetadataNode() {
         swingProfile: normalizeAllTimelineSwingProfiles(timelineState.swingProfile),
         feelOffsets: normalizeTimelineFeelOffsets(timelineState.feelOffsets),
         practice: typeof buildPracticeMetadata === 'function' ? buildPracticeMetadata() : null,
+        minimumBarCount: normalizeTimelineMinimumBarCount(timelineState.minimumBarCount),
         accompanimentSegments: timelineState.accompanimentSegments.map(serializeTimelineAccompanimentSegment),
         entries: metadataEntries.map(function (entry) {
             return {
@@ -1288,6 +1304,9 @@ function syncTimelineStateFromReadResult(readResult, options) {
             syncOptions.persistedAccompanimentSegments
         )
         : [];
+    timelineState.minimumBarCount = hasCompatiblePersistedVersion
+        ? normalizeTimelineMinimumBarCount(syncOptions.persistedMinimumBarCount)
+        : 0;
     timelineState.sheetLoopCount = sheetLoopCount;
     timelineState.sheetLoop = sheetLoopCount === 'loop';
     syncTimelineBlockIdSequence(timelineState.entries);
@@ -1328,6 +1347,7 @@ function buildCurrentTimelineSyncOptions() {
         swingProfile: normalizeAllTimelineSwingProfiles(timelineState.swingProfile),
         feelOffsets: normalizeTimelineFeelOffsets(timelineState.feelOffsets),
         persistedPractice: typeof buildPracticeMetadata === 'function' ? buildPracticeMetadata() : null,
+        persistedMinimumBarCount: normalizeTimelineMinimumBarCount(timelineState.minimumBarCount),
         persistedAccompanimentSegments: timelineState.accompanimentSegments.map(serializeTimelineAccompanimentSegment),
         persistedEntries: timelineState.entries.map(function (entry) {
             return {
@@ -3835,9 +3855,13 @@ function buildTimelineHorizontalLayout(visualRows) {
         });
     });
 
-    const totalBars = Math.max.apply(null, clips.map(function (clip) {
+    const naturalTotalBars = Math.max.apply(null, clips.map(function (clip) {
         return clip.startBar + clip.barCount - 1;
     }).concat(rows.length ? nextStartBar - 1 : 8, 8));
+    const totalBars = Math.max(
+        naturalTotalBars,
+        normalizeTimelineMinimumBarCount(timelineState.minimumBarCount)
+    );
     const usedTargets = timelineTrackTargets.filter(function (targetInstrument) {
         return clips.some(function (clip) {
             return clip.targetInstrument === targetInstrument;
@@ -3847,9 +3871,29 @@ function buildTimelineHorizontalLayout(visualRows) {
     return {
         rows: rows,
         clips: clips,
+        naturalTotalBars: naturalTotalBars,
         totalBars: totalBars,
         usedTargets: usedTargets.length > 0 ? usedTargets : timelineTrackTargets.slice(0, 1)
     };
+}
+
+function addTimelineBar(layout) {
+    const currentTotalBars = Math.max(1, Number(layout && layout.totalBars) || 1);
+    if (currentTotalBars >= 999) {
+        return;
+    }
+    if (typeof recordArrangementHistorySnapshot === 'function') {
+        recordArrangementHistorySnapshot();
+    }
+    timelineState.minimumBarCount = currentTotalBars + 1;
+    updateTimelineMetadataNode();
+    renderTimelinePanel();
+    window.requestAnimationFrame(function () {
+        const scrollEl = document.querySelector('#timelineSequence .timeline-track-scroll');
+        if (scrollEl) {
+            scrollEl.scrollLeft = Math.max(0, scrollEl.scrollWidth - scrollEl.clientWidth);
+        }
+    });
 }
 
 function assignTimelineTrackClipLayers(clips) {
@@ -4486,6 +4530,17 @@ function renderTimelineSequence() {
         bindTimelineRulerBarDropTarget(barEl, layout, barNumber);
         rulerCanvasEl.appendChild(barEl);
     }
+    const addBarButtonEl = document.createElement('button');
+    addBarButtonEl.type = 'button';
+    addBarButtonEl.className = 'timeline-track-add-bar';
+    addBarButtonEl.textContent = '+';
+    addBarButtonEl.title = timelineText('arrangement.addBar');
+    addBarButtonEl.setAttribute('aria-label', timelineText('arrangement.addBar'));
+    addBarButtonEl.disabled = layout.totalBars >= 999;
+    addBarButtonEl.addEventListener('click', function () {
+        addTimelineBar(layout);
+    });
+    rulerCanvasEl.appendChild(addBarButtonEl);
     rulerRowEl.append(rulerLabelEl, rulerCanvasEl);
     scrollEl.appendChild(rulerRowEl);
 

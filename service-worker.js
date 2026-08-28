@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'barabeat-studio-offline-v56-standalone-audio-lookahead';
+const CACHE_NAME = 'barabeat-studio-offline-v57-timeline-add-bar';
 const APP_SHELL = [
   './app-shell.html',
   './manifest.webmanifest',

@@ -460,6 +460,7 @@
     "timelineNote": "Die Timeline bestimmt die Wiedergabereihenfolge. Djembe-Zuordnung passiert hier.",
     "tracks": "Spuren",
     "barLabel": "Takt",
+    "addBar": "Takt hinzufügen",
     "accompanimentLanes": "Durchgehende Begleitspuren",
     "accompanimentLanesNote": "Begleitpattern hier einmal ablegen und Starttakt sowie Länge festlegen.",
     "accompanimentStartBar": "Start",

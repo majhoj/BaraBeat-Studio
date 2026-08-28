@@ -3158,6 +3158,7 @@ body.is-timeline-dragging .timeline-overlay-cell {
 .timeline-track-editor {
     --timeline-track-bar-width: 108px;
     --timeline-track-label-width: 112px;
+    --timeline-track-add-bar-width: 42px;
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -3183,7 +3184,6 @@ body.is-timeline-dragging .timeline-overlay-cell {
     padding-bottom: var(--timeline-track-details-clearance, 0);
 }
 
-.timeline-track-ruler-row,
 .timeline-track-row {
     display: grid;
     grid-template-columns: var(--timeline-track-label-width)
@@ -3191,6 +3191,20 @@ body.is-timeline-dragging .timeline-overlay-cell {
     min-width: calc(
         var(--timeline-track-label-width) +
         var(--timeline-track-total-bars, 1) * var(--timeline-track-bar-width)
+    );
+}
+
+.timeline-track-ruler-row {
+    display: grid;
+    grid-template-columns: var(--timeline-track-label-width)
+        calc(
+            var(--timeline-track-total-bars, 1) * var(--timeline-track-bar-width) +
+            var(--timeline-track-add-bar-width)
+        );
+    min-width: calc(
+        var(--timeline-track-label-width) +
+        var(--timeline-track-total-bars, 1) * var(--timeline-track-bar-width) +
+        var(--timeline-track-add-bar-width)
     );
 }
 
@@ -3216,8 +3230,40 @@ body.is-timeline-dragging .timeline-overlay-cell {
 .timeline-track-ruler-canvas {
     position: relative;
     display: grid;
-    grid-template-columns: repeat(var(--timeline-track-total-bars, 1), var(--timeline-track-bar-width));
+    grid-template-columns:
+        repeat(var(--timeline-track-total-bars, 1), var(--timeline-track-bar-width))
+        var(--timeline-track-add-bar-width);
     min-height: 30px;
+}
+
+.timeline-track-add-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    min-height: 30px;
+    padding: 0;
+    border: 0;
+    border-right: 1px solid var(--ui-border);
+    border-radius: 0;
+    background: var(--ui-active-bg);
+    color: var(--ui-text);
+    font: inherit;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.timeline-track-add-bar:hover,
+.timeline-track-add-bar:focus-visible {
+    background: var(--ui-soft-bg);
+    box-shadow: inset 0 0 0 2px var(--ui-border-strong);
+    outline: 0;
+}
+
+.timeline-track-add-bar:disabled {
+    cursor: default;
+    opacity: 0.45;
 }
 
 .timeline-track-ruler-canvas > span {

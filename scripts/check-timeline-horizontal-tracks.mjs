@@ -83,6 +83,7 @@ const sangbanGroup = {
 const context = vm.createContext({
   timelineState: {
     sourcePatterns: Object.values(patterns),
+    minimumBarCount: 0,
     accompanimentSegments: [{
       patternId: 'doundoun',
       targetInstrument: 'Doundoun',
@@ -97,6 +98,7 @@ context.isTimelineOverlayGroup = () => false;
 context.getTimelineRowRepeatInfo = () => ({ repeatCount: 1 });
 context.normalizeTimelineGroupRepeatCount = value => Math.max(1, Number(value) || 1);
 context.normalizeTimelineGapBeforeBars = value => Math.max(0, Math.round(Number(value) || 0));
+context.normalizeTimelineMinimumBarCount = value => Math.max(0, Math.round(Number(value) || 0));
 context.buildTimelineContinuationBlocks = () => ({ blocks: [] });
 context.getTimelineGroupKey = group => String(group.startIndex) + ':' + String(group.endIndex);
 context.getTimelineGroupTargets = group => group.entries[0].targetInstruments.slice();
@@ -136,6 +138,12 @@ assert(doundounClip && doundounClip.startBar === 2 && doundounClip.barCount === 
   'Eine durchgehende Spur verliert ihre globale Start- oder Längenangabe.');
 assert(layout.usedTargets.join(',') === 'Djembe_1,Sangban,Doundoun',
   'Die tatsächlich verwendeten Instrumentenspuren werden nicht korrekt ermittelt.');
+
+context.timelineState.minimumBarCount = 24;
+const manuallyExtendedLayout = vm.runInContext('buildTimelineHorizontalLayout(visualRows);', context);
+assert(manuallyExtendedLayout.naturalTotalBars === 19 && manuallyExtendedLayout.totalBars === 24,
+  'Die manuell erweiterte Timeline behält ihre natürliche Länge oder Mindestlänge nicht korrekt bei.');
+context.timelineState.minimumBarCount = 0;
 
 context.repeatedLibraryPattern = {
   id: 'repeated-library-pattern',
@@ -265,6 +273,10 @@ assert(timelineSource.includes("endLabelEl.className = 'timeline-track-clip-labe
   'Lange Pattern-Clips erhalten keine zusätzliche rechtsbündige Beschriftung.');
 assert(timelineSource.includes('bindTimelineRulerBarDropTarget(barEl, layout, barNumber)'),
   'Die Taktfelder der Zeitleiste sind keine Dropziele.');
+assert(timelineSource.includes("addBarButtonEl.className = 'timeline-track-add-bar'"),
+  'Hinter dem letzten Takt fehlt das Feld zum manuellen Hinzufügen eines Taktes.');
+assert(timelineSource.includes('TimelineTrailingBars:'),
+  'Manuell ergänzte Leertakte werden nicht an den Player übergeben.');
 assert(timelineSource.includes("type: 'timeline-accompaniment-segment'"),
   'Vorhandene Begleitblöcke besitzen keinen Drag-Payload.');
 assert(timelineSource.includes("dragSurfaceEl.className = 'timeline-track-drag-surface'"),
@@ -283,5 +295,7 @@ assert(timelineStyles.includes('.timeline-track-segment-clip > strong'),
   'Die Namenszeile der durchgehenden Begleitsegmente fehlt.');
 assert(timelineStyles.includes('.timeline-track-ruler-bar.is-drop-target'),
   'Die aktive Takt-Dropzone wird nicht sichtbar hervorgehoben.');
+assert(timelineStyles.includes('.timeline-track-add-bar'),
+  'Das Feld zum Hinzufügen eines Taktes ist nicht gestaltet.');
 
 console.log('Horizontale Timeline: Taktpositionen, Wiederholungslängen und Instrumentenspuren geprüft.');

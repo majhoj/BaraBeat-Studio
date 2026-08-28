@@ -460,6 +460,7 @@
     "timelineNote": "The timeline determines the playback order. Djembe assignments are made here.",
     "tracks": "Tracks",
     "barLabel": "Bar",
+    "addBar": "Add bar",
     "accompanimentLanes": "Continuous accompaniment tracks",
     "accompanimentLanesNote": "Drop an accompaniment Pattern here once, then set its start bar and length.",
     "accompanimentStartBar": "Start",

@@ -460,6 +460,7 @@
     "timelineNote": "La línea de tiempo determina el orden de reproducción. Aquí se asignan los Djembes.",
     "tracks": "Pistas",
     "barLabel": "Compás",
+    "addBar": "Añadir compás",
     "accompanimentLanes": "Pistas de acompañamiento continuas",
     "accompanimentLanesNote": "Suelta una vez un Pattern de acompañamiento y define su compás inicial y su duración.",
     "accompanimentStartBar": "Inicio",

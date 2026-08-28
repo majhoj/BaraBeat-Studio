@@ -31,6 +31,14 @@ assert(
   timelineSource.includes('accompanimentSegments: timelineState.accompanimentSegments.map'),
   'Die Begleitspuren werden nicht im Notenblatt gespeichert.'
 );
+assert(
+  timelineSource.includes('TimelineTrailingBars: Math.max(0, timelineLayout.totalBars - timelineLayout.naturalTotalBars)'),
+  'Die manuell ergänzten Leertakte werden nicht als Player-Differenz berechnet.'
+);
+assert(
+  playerSource.includes('sections.push(createTimelineGapSection(trailingBars, trailingTempo, sections.length))'),
+  'Der Player hängt die manuell ergänzten Leertakte nicht an das Arrangement an.'
+);
 const resizeHandleSource = extractFunction(timelineSource, 'bindTimelineAccompanimentResizeHandle');
 assert(
   resizeHandleSource.includes("getPropertyValue('--timeline-track-bar-width')"),

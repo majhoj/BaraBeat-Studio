@@ -11433,6 +11433,9 @@ function onSVGLoaded(data) {
             Array.isArray(persistedTimelineMetadata.accompanimentSegments)
             ? persistedTimelineMetadata.accompanimentSegments
             : [];
+        const persistedMinimumBarCount = persistedTimelineMetadata
+            ? persistedTimelineMetadata.minimumBarCount
+            : 0;
         timelineState.tempo = normalizeTimelineTempo(
             persistedTimelineMetadata ? persistedTimelineMetadata.tempo : 100
         );
@@ -11451,6 +11454,7 @@ function onSVGLoaded(data) {
             swingProfile: timelineState.swingProfile,
             feelOffsets: timelineState.feelOffsets,
             persistedPractice: persistedTimelineMetadata ? persistedTimelineMetadata.practice : null,
+            persistedMinimumBarCount: persistedMinimumBarCount,
             persistedAccompanimentSegments: persistedAccompanimentSegments,
             persistedEntries: persistedEntries,
             persistedVersion: persistedTimelineMetadata ? persistedTimelineMetadata.version : null,

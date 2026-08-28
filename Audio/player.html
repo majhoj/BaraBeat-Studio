@@ -3052,6 +3052,14 @@ function buildTimelineSections(config) {
   applyExplicitTimelineAccompanimentSegments(sections, config, patternById);
   finalizeSectionLengths(sections);
 
+  const trailingBars = normalizeTimelineGapBeforeBars(config.TimelineTrailingBars);
+  if (trailingBars > 0) {
+    const trailingTempo = sections.length > 0
+      ? sections[sections.length - 1].sectionTempo
+      : null;
+    sections.push(createTimelineGapSection(trailingBars, trailingTempo, sections.length));
+  }
+
   return sections;
 }
 

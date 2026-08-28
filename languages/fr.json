@@ -460,6 +460,7 @@
     "timelineNote": "La timeline détermine l'ordre de lecture. Les affectations des Djembes se font ici.",
     "tracks": "Pistes",
     "barLabel": "Mesure",
+    "addBar": "Ajouter une mesure",
     "accompanimentLanes": "Pistes d'accompagnement continues",
     "accompanimentLanesNote": "Déposez une fois un Pattern d'accompagnement, puis définissez sa mesure de départ et sa longueur.",
     "accompanimentStartBar": "Départ",
