@@ -211,6 +211,9 @@ function notifyEmbeddedPlaybackStep(playbackStep, scheduledTime) {
   if (!embeddedPlayer || !window.parent || window.parent === window || !instr || !instr._audioCtx) {
     return;
   }
+  if (isTimelineMode && !isPracticeMode && !isSheetQuickPlayMode) {
+    return;
+  }
   const sectionContext = getPlaybackSectionContext(playbackStep);
   const isFinalSectionRepeat = !sectionContext || !sectionContext.section
     ? true
@@ -1075,6 +1078,28 @@ function getTimelineStepsPerBar() {
     return 18;
   }
   return 32;
+}
+
+function normalizeTimelineGapBeforeBars(rawValue) {
+  const numericValue = Number(rawValue);
+  if (!Number.isFinite(numericValue) || numericValue <= 0) {
+    return 0;
+  }
+  return Math.max(0, Math.min(999, Math.round(numericValue)));
+}
+
+function createTimelineGapSection(barCount, sectionTempo, sectionIndex) {
+  const normalizedBarCount = normalizeTimelineGapBeforeBars(barCount);
+  const gapLength = normalizedBarCount * getTimelineStepsPerBar();
+  const section = createOrderedSection('Leer');
+  section.labelName = 'Leer';
+  section.runtimeKey = 'timeline-gap::' + String(sectionIndex);
+  section.sectionTempo = normalizeSectionTempo(sectionTempo);
+  section.fixedLength = gapLength;
+  trackInstrumentNames.forEach(function (instrumentName) {
+    section.trackNotes[instrumentName] = new Array(gapLength).fill('f');
+  });
+  return section;
 }
 
 function buildTimelinePickupNotes(notes, inStep, options) {
@@ -2326,6 +2351,122 @@ function isTimelineContinuationMarker(markerValue) {
   return markerValue === 'continue';
 }
 
+function applyExplicitTimelineAccompanimentSegments(sections, config, patternById) {
+  const segments = Array.isArray(config && config.AccompanimentSegments)
+    ? config.AccompanimentSegments
+    : [];
+  if (!Array.isArray(sections) || sections.length === 0 || segments.length === 0) {
+    return;
+  }
+
+  sections.forEach(function (section) {
+    const repeatCount = normalizeSectionRepeatCount(section && section.repeatCount);
+    if (repeatCount <= 1) {
+      return;
+    }
+    section.trackNotes = materializeOrderedSectionTracks(section);
+    section.length = Math.max(0, Math.round(Number(section.playbackLength) || 0));
+    section.fixedLength = section.length;
+    section.repeatCount = 1;
+    section.playbackLength = section.length;
+  });
+
+  const sectionOffsets = [];
+  let totalTimelineLength = 0;
+  sections.forEach(function (section) {
+    const sectionLength = Math.max(0, Math.round(Number(section && section.length) || 0));
+    sectionOffsets.push(totalTimelineLength);
+    totalTimelineLength += sectionLength;
+  });
+
+  const stepsPerBar = getTimelineStepsPerBar();
+  if (stepsPerBar <= 0 || totalTimelineLength <= 0) {
+    return;
+  }
+
+  const timelineBarStartSteps = [];
+  sections.forEach(function (section, sectionIndex) {
+    const sectionStartStep = sectionOffsets[sectionIndex];
+    const sectionLength = Math.max(0, Math.round(Number(section && section.length) || 0));
+    for (let localStep = 0; localStep < sectionLength; localStep += stepsPerBar) {
+      const barStartStep = sectionStartStep + localStep;
+      if (timelineBarStartSteps[timelineBarStartSteps.length - 1] !== barStartStep) {
+        timelineBarStartSteps.push(barStartStep);
+      }
+    }
+  });
+  timelineBarStartSteps.push(totalTimelineLength);
+
+  segments
+    .slice()
+    .sort(function (leftSegment, rightSegment) {
+      return Number(leftSegment && leftSegment.startBar) - Number(rightSegment && rightSegment.startBar);
+    })
+    .forEach(function (segment) {
+      const pattern = patternById[segment && segment.patternId] || null;
+      const targetInstrument = normalizeTimelineTargetInstrument(segment && segment.targetInstrument);
+      if (!pattern || pattern.label !== 'Begleitung' || trackInstrumentNames.indexOf(targetInstrument) === -1) {
+        return;
+      }
+
+      const startBar = Math.max(1, Math.round(Number(segment.startBar) || 1));
+      const barCount = Math.max(1, Math.round(Number(segment.barCount) || 1));
+      const startBarIndex = startBar - 1;
+      const segmentStartStep = timelineBarStartSteps[startBarIndex];
+      const segmentEndStep = timelineBarStartSteps[Math.min(
+        timelineBarStartSteps.length - 1,
+        startBarIndex + barCount
+      )];
+      if (segmentStartStep === undefined || segmentEndStep === undefined) {
+        return;
+      }
+      const segmentLength = Math.max(0, segmentEndStep - segmentStartStep);
+      if (segmentLength <= 0) {
+        return;
+      }
+
+      const entryData = {
+        label: pattern.label,
+        patternNotes: flattenPatternNotes(pattern),
+        patternInStep: getPatternInStep(pattern),
+        patternOutStep: getPatternOutStep(pattern),
+        patternOutBarEndStep: getPatternOutBarEndStep(pattern),
+        patternOverlapStep: getPatternOverlapStep(pattern)
+      };
+      const segmentNotes = getTimelineEntryEffectiveNotes(entryData, true, segmentLength);
+
+      sections.forEach(function (section, sectionIndex) {
+        const sectionStartStep = sectionOffsets[sectionIndex];
+        const sectionEndStep = sectionStartStep + Math.max(0, Number(section.length) || 0);
+        const overlapStartStep = Math.max(sectionStartStep, segmentStartStep);
+        const overlapEndStep = Math.min(sectionEndStep, segmentStartStep + segmentLength);
+        if (overlapEndStep <= overlapStartStep) {
+          return;
+        }
+
+        const localStartStep = overlapStartStep - sectionStartStep;
+        const sourceStartStep = overlapStartStep - segmentStartStep;
+        const overlapLength = overlapEndStep - overlapStartStep;
+        section.trackNotes[targetInstrument] = padNotesToLength(
+          Array.isArray(section.trackNotes[targetInstrument])
+            ? section.trackNotes[targetInstrument].slice(0, section.length)
+            : [],
+          section.length
+        );
+        for (let noteIndex = 0; noteIndex < overlapLength; noteIndex++) {
+          section.trackNotes[targetInstrument][localStartStep + noteIndex] =
+            segmentNotes[sourceStartStep + noteIndex] || 'f';
+        }
+        if (!Array.isArray(section.sectionTargets)) {
+          section.sectionTargets = [];
+        }
+        if (section.sectionTargets.indexOf(targetInstrument) === -1) {
+          section.sectionTargets.push(targetInstrument);
+        }
+      });
+    });
+}
+
 function patternStartsContinuingAccompaniment(pattern) {
   if (isSheetQuickPlayMode) {
     return false;
@@ -2490,6 +2631,7 @@ function buildTimelineSections(config) {
       labelName: pattern.labelName || pattern.label || '',
       blockId: String(entry.blockId || ''),
       parallelGroupId: String(entry.parallelGroupId || ''),
+      gapBeforeBars: normalizeTimelineGapBeforeBars(entry.gapBeforeBars),
       overlayRepeatIndex: entry.overlayRepeatIndex === null || entry.overlayRepeatIndex === undefined
         ? null
         : Math.max(0, Math.round(Number(entry.overlayRepeatIndex) || 0)),
@@ -2539,6 +2681,12 @@ function buildTimelineSections(config) {
     }
 
     const blockEntries = playbackEntries.slice(blockStartIndex, blockEndIndex);
+    const gapBeforeBars = Math.max.apply(null, blockEntries.map(function (entryData) {
+      return normalizeTimelineGapBeforeBars(entryData.gapBeforeBars);
+    }).concat(0));
+    if (gapBeforeBars > 0) {
+      sections.push(createTimelineGapSection(gapBeforeBars, blockSectionTempo, sections.length));
+    }
     const nextBlockEntries = getTimelinePlaybackBlockEntries(playbackEntries, blockEndIndex);
     const currentBlockContainsEchauffement = hasTimelineEntryLabel(blockEntries, 'Echauffement');
     const nextAccompanimentTargets = getTimelineAccompanimentTargets(nextBlockEntries);
@@ -2900,6 +3048,8 @@ function buildTimelineSections(config) {
   finalizeSectionLengths(sections);
   applyTimelineSectionOverlaps(sections);
   sections.forEach(trimTimelineSectionTracksToFixedLength);
+  finalizeSectionLengths(sections);
+  applyExplicitTimelineAccompanimentSegments(sections, config, patternById);
   finalizeSectionLengths(sections);
 
   return sections;
@@ -3335,9 +3485,30 @@ if (soloTrackControl) {
   }, false);
 }
 
+function isStandaloneAppPlayback() {
+  const candidateWindows = [window];
+  if (embeddedPlayer && window.parent && window.parent !== window) {
+    candidateWindows.push(window.parent);
+  }
+
+  return candidateWindows.some(function (candidateWindow) {
+    try {
+      return Boolean(
+        candidateWindow.navigator && candidateWindow.navigator.standalone === true ||
+        candidateWindow.matchMedia && candidateWindow.matchMedia('(display-mode: standalone)').matches
+      );
+    } catch (error) {
+      return false;
+    }
+  });
+}
+
 const lookahead = 25;                 // ms
-const foregroundScheduleAheadTime = 0.25; // sec
+const standaloneAppPlayback = isStandaloneAppPlayback();
+const foregroundScheduleAheadTime = standaloneAppPlayback ? 2.0 : 0.25; // sec
 const backgroundScheduleAheadTime = 4.0;  // sec
+const maximumSchedulerLag = 0.12; // sec
+const schedulerRecoveryDelay = 0.04; // sec
 const playerStartDelay = 0.18; // sec
 const practiceLeadInDelay = isPracticeMode && !isSheetQuickPlayMode ? 3.0 : 0; // sec
 const practiceCountInBeats = 4;
@@ -3458,6 +3629,14 @@ function warmUpAudioContext(audioCtx) {
   const gainNode = audioCtx.createGain();
   gainNode.gain.value = 0.0001;
   oscillator.connect(gainNode).connect(audioCtx.destination);
+  oscillator.onended = function () {
+    try {
+      oscillator.disconnect();
+      gainNode.disconnect();
+    } catch (error) {
+      // The warm-up graph may already be disconnected.
+    }
+  };
   oscillator.start(audioCtx.currentTime);
   oscillator.stop(audioCtx.currentTime + 0.08);
 }
@@ -3714,6 +3893,12 @@ function scheduleShekereHit(scheduledTime, gainValue) {
     activePracticeCountInSources = activePracticeCountInSources.filter(function (source) {
       return source !== sampleSource;
     });
+    try {
+      sampleSource.disconnect();
+      gainNode.disconnect();
+    } catch (error) {
+      // The short-lived count-in graph may already be disconnected.
+    }
   };
   activePracticeCountInSources.push(sampleSource);
   sampleSource.start(scheduledTime);
@@ -3917,13 +4102,17 @@ function scheduleNote(kenkeniNote, sangbanNote, doundounNote, dreierbassNote, dj
   const doundounMuffledGain = doundounGain * 1.4;
   const doundounKlickGain = doundounGain * 0.75;
   const doundounBellGain = doundounGain * 0.7;
-  const kenkeniTime = Math.max(0, time + getFeelOffsetSeconds('Kenkeni'));
-  const sangbanTime = Math.max(0, time + getFeelOffsetSeconds('Sangban'));
-  const doundounTime = Math.max(0, time + getFeelOffsetSeconds('Doundoun'));
-  const dreierbassTime = Math.max(0, time + getFeelOffsetSeconds('Dreierbass'));
-  const djembe1Time = Math.max(0, time + getFeelOffsetSeconds('Djembe_1'));
-  const djembe2Time = Math.max(0, time + getFeelOffsetSeconds('Djembe_2'));
-  const djembe3Time = Math.max(0, time + getFeelOffsetSeconds('Djembe_3'));
+  const minimumNoteTime = instr && instr._audioCtx
+    ? instr._audioCtx.currentTime + 0.02
+    : 0;
+  const anchoredStepTime = Math.max(time, minimumNoteTime);
+  const kenkeniTime = Math.max(minimumNoteTime, anchoredStepTime + getFeelOffsetSeconds('Kenkeni'));
+  const sangbanTime = Math.max(minimumNoteTime, anchoredStepTime + getFeelOffsetSeconds('Sangban'));
+  const doundounTime = Math.max(minimumNoteTime, anchoredStepTime + getFeelOffsetSeconds('Doundoun'));
+  const dreierbassTime = Math.max(minimumNoteTime, anchoredStepTime + getFeelOffsetSeconds('Dreierbass'));
+  const djembe1Time = Math.max(minimumNoteTime, anchoredStepTime + getFeelOffsetSeconds('Djembe_1'));
+  const djembe2Time = Math.max(minimumNoteTime, anchoredStepTime + getFeelOffsetSeconds('Djembe_2'));
+  const djembe3Time = Math.max(minimumNoteTime, anchoredStepTime + getFeelOffsetSeconds('Djembe_3'));
   function applyToneGain(trackName, toneKey, baseGain) {
     return baseGain * getPracticeInstrumentToneVolume(trackName, toneKey);
   }
@@ -4568,6 +4757,19 @@ function scheduler() {
     ? backgroundScheduleAheadTime
     : foregroundScheduleAheadTime;
 
+  allInstruments.forEach(function (instrumentInstance) {
+    if (instrumentInstance && typeof instrumentInstance.pruneExpiredSources === 'function') {
+      instrumentInstance.pruneExpiredSources();
+    }
+  });
+
+  // Standalone WebKit may throttle JavaScript timers after longer playback.
+  // Continue from the current sequence step instead of squeezing overdue
+  // notes onto one audio timestamp.
+  if (standaloneAppPlayback && nextNoteTime < dTime - maximumSchedulerLag) {
+    nextNoteTime = dTime + schedulerRecoveryDelay;
+  }
+
   while (nextNoteTime < dTime + scheduleAheadTime) {
     applyPendingPracticeSectionsIfReady();
     markPracticeTimerFinalLoopIfNeeded(nextNoteTime);
@@ -5191,7 +5393,6 @@ function createSheetQuickPlayGestureAudioContext() {
     return;
   }
 
-  configureBarabeatAudioSession();
   const previousAudioContext = window.sharedAudioContext;
   const gestureAudioContext = new AudioContextConstructor();
   window.sharedAudioContext = gestureAudioContext;
@@ -5221,6 +5422,7 @@ async function startAudioPlayback() {
     return true;
   }
 
+  configureBarabeatAudioSession();
   configureBarabeatMediaMetadata();
 
   // Mobile Safari may report a preloaded context as running while its clock

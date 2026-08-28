@@ -2164,9 +2164,11 @@ function clear_all() {
     removeCanvasElements("#notenlinien, .sheet-quick-play-overlay, .shp, " + chooserSelector + ", " + timelineMetadataSelector);
     timelineState.nextBlockId = 1;
     timelineState.nextParallelGroupId = 1;
+    timelineState.nextAccompanimentSegmentId = 1;
     timelineState.sourcePatterns = [];
     timelineState.sourceLibraryGroups = [];
     timelineState.entries = [];
+    timelineState.accompanimentSegments = [];
     timelineState.sourceHash = '';
     timelineState.sheetHash = '';
     timelineState.sheetLoop = false;
@@ -11427,6 +11429,10 @@ function onSVGLoaded(data) {
         const persistedEntries = persistedTimelineMetadata && Array.isArray(persistedTimelineMetadata.entries)
             ? persistedTimelineMetadata.entries
             : [];
+        const persistedAccompanimentSegments = persistedTimelineMetadata &&
+            Array.isArray(persistedTimelineMetadata.accompanimentSegments)
+            ? persistedTimelineMetadata.accompanimentSegments
+            : [];
         timelineState.tempo = normalizeTimelineTempo(
             persistedTimelineMetadata ? persistedTimelineMetadata.tempo : 100
         );
@@ -11445,6 +11451,7 @@ function onSVGLoaded(data) {
             swingProfile: timelineState.swingProfile,
             feelOffsets: timelineState.feelOffsets,
             persistedPractice: persistedTimelineMetadata ? persistedTimelineMetadata.practice : null,
+            persistedAccompanimentSegments: persistedAccompanimentSegments,
             persistedEntries: persistedEntries,
             persistedVersion: persistedTimelineMetadata ? persistedTimelineMetadata.version : null,
             persistedSourceHash: persistedTimelineMetadata ? persistedTimelineMetadata.sourceHash : ''

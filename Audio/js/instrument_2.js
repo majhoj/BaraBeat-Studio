@@ -30,6 +30,8 @@ class Instrumente {
     this._audioCtx = window.sharedAudioContext;
     this._snd = {};
     this._activeSources = [];
+    this._activeSourceEndTimes = new Map();
+    this._gainNodesByValue = new Map();
     this._outputNode = this._audioCtx.createGain();
     this._panNode = typeof this._audioCtx.createStereoPanner === 'function'
       ? this._audioCtx.createStereoPanner()
@@ -155,39 +157,75 @@ class Instrumente {
   }
 
   play(name, time_i, gainMultiplier = 1) {
-    configureBarabeatAudioSession();
-
     if (Object.prototype.hasOwnProperty.call(this._snd, name)) {
-      const sampleSource = this._audioCtx.createBufferSource();
-      const vol_tone = this._audioCtx.createGain();
-
-      sampleSource.buffer = this._snd[name];
+      this.pruneExpiredSources();
       const numericGain = Number(gainMultiplier);
-      vol_tone.gain.value = this._vol * Math.max(0, Number.isFinite(numericGain) ? numericGain : 1);
-
-      if (this._panNode) {
-        sampleSource.connect(vol_tone).connect(this._panNode);
-      } else {
-        sampleSource.connect(vol_tone).connect(this._outputNode);
+      const finalGain = this._vol * Math.max(0, Number.isFinite(numericGain) ? numericGain : 1);
+      if (finalGain <= 0) {
+        return;
       }
+      const sampleSource = this._audioCtx.createBufferSource();
+      sampleSource.buffer = this._snd[name];
+      sampleSource.connect(this.getSharedGainNode(finalGain));
 
-      sampleSource.onended = () => {
-        this._activeSources = this._activeSources.filter((source) => source !== sampleSource);
-      };
+      sampleSource.onended = () => this.releaseActiveSource(sampleSource);
       this._activeSources.push(sampleSource);
-      sampleSource.start(Math.max(time_i, this._audioCtx.currentTime + 0.02));
+      const startTime = Math.max(time_i, this._audioCtx.currentTime + 0.02);
+      const bufferDuration = Math.max(0, Number(sampleSource.buffer && sampleSource.buffer.duration) || 0);
+      this._activeSourceEndTimes.set(sampleSource, startTime + bufferDuration + 0.25);
+      sampleSource.start(startTime);
+    }
+  }
+
+  pruneExpiredSources() {
+    const currentTime = Number(this._audioCtx && this._audioCtx.currentTime) || 0;
+    this._activeSources.slice().forEach((sampleSource) => {
+      const expectedEndTime = this._activeSourceEndTimes.get(sampleSource);
+      if (Number.isFinite(expectedEndTime) && expectedEndTime <= currentTime) {
+        this.releaseActiveSource(sampleSource);
+      }
+    });
+  }
+
+  getSharedGainNode(gainValue) {
+    const normalizedGain = Math.max(0, Number(gainValue) || 0);
+    const gainKey = normalizedGain.toFixed(6);
+    let gainNode = this._gainNodesByValue.get(gainKey);
+    if (gainNode) {
+      return gainNode;
+    }
+
+    gainNode = this._audioCtx.createGain();
+    gainNode.gain.value = normalizedGain;
+    gainNode.connect(this._panNode || this._outputNode);
+    this._gainNodesByValue.set(gainKey, gainNode);
+    return gainNode;
+  }
+
+  releaseActiveSource(sampleSource) {
+    const sourceIndex = this._activeSources.indexOf(sampleSource);
+    if (sourceIndex !== -1) {
+      this._activeSources.splice(sourceIndex, 1);
+    }
+    this._activeSourceEndTimes.delete(sampleSource);
+
+    try {
+      sampleSource.onended = null;
+      sampleSource.disconnect();
+    } catch (error) {
+      // Web Audio nodes may already be disconnected.
     }
   }
 
   stopActiveSources(stopTime) {
-    this._activeSources.forEach((sampleSource) => {
+    this._activeSources.slice().forEach((sampleSource) => {
       try {
         sampleSource.stop(Math.max(stopTime, this._audioCtx.currentTime));
       } catch (error) {
         // The source may already be stopped; that is harmless here.
       }
+      this.releaseActiveSource(sampleSource);
     });
-    this._activeSources = [];
   }
 
   replaceAudioContext(audioContext) {
@@ -196,6 +234,9 @@ class Instrumente {
     }
 
     try {
+      this._gainNodesByValue.forEach(function (gainNode) {
+        gainNode.disconnect();
+      });
       if (this._panNode) {
         this._panNode.disconnect();
       }
@@ -208,6 +249,8 @@ class Instrumente {
 
     this._audioCtx = audioContext;
     this._activeSources = [];
+    this._activeSourceEndTimes = new Map();
+    this._gainNodesByValue = new Map();
     this._outputNode = this._audioCtx.createGain();
     this._panNode = typeof this._audioCtx.createStereoPanner === 'function'
       ? this._audioCtx.createStereoPanner()
@@ -229,6 +272,14 @@ class Instrumente {
       sampleSource.buffer = this._snd[name];
       mutedGain.gain.value = 0.0001;
       sampleSource.connect(mutedGain).connect(this._audioCtx.destination);
+      sampleSource.onended = function () {
+        try {
+          sampleSource.disconnect();
+          mutedGain.disconnect();
+        } catch (error) {
+          // The warm-up graph may already be disconnected.
+        }
+      };
       sampleSource.start(warmUpTime);
       sampleSource.stop(warmUpTime + 0.08);
     });

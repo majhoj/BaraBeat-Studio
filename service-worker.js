@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'barabeat-studio-offline-v38-parallel-accompaniment-loop-out';
+const CACHE_NAME = 'barabeat-studio-offline-v56-standalone-audio-lookahead';
 const APP_SHELL = [
   './app-shell.html',
   './manifest.webmanifest',

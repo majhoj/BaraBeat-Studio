@@ -458,6 +458,16 @@
     "patternLibraryNote": "Cada pasaje de la partitura aparece aquí una vez. Arrástralo o usa + para añadirlo al final de la línea de tiempo.",
     "timelineTitle": "Línea de tiempo",
     "timelineNote": "La línea de tiempo determina el orden de reproducción. Aquí se asignan los Djembes.",
+    "tracks": "Pistas",
+    "barLabel": "Compás",
+    "accompanimentLanes": "Pistas de acompañamiento continuas",
+    "accompanimentLanesNote": "Suelta una vez un Pattern de acompañamiento y define su compás inicial y su duración.",
+    "accompanimentStartBar": "Inicio",
+    "accompanimentBarCount": "Compases",
+    "accompanimentGap": "{count} compases vacíos",
+    "removeAccompanimentSegment": "Quitar segmento de acompañamiento",
+    "resizeAccompanimentSegment": "Alargar o acortar el segmento de acompañamiento en compases",
+    "resizePattern": "Alargar o acortar el Pattern arrastrándolo",
     "pattern": "Pattern",
     "passage": "Pasaje",
     "settings": "Ajustes",
@@ -486,7 +496,8 @@
     "drop": {
       "append": "Suelta el Pattern aquí",
       "insert": "Insertar aquí",
-      "parallel": "Añadir en paralelo"
+      "parallel": "Añadir en paralelo",
+      "accompanimentLane": "Suelta aquí el Pattern de acompañamiento"
     },
     "type": {
       "accompaniment": "Acompañamiento",

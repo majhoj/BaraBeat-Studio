@@ -458,6 +458,16 @@
     "patternLibraryNote": "Chaque passage de la partition apparaît ici une fois. Faites-le glisser ou utilisez + pour l'ajouter à la fin de la timeline.",
     "timelineTitle": "Timeline",
     "timelineNote": "La timeline détermine l'ordre de lecture. Les affectations des Djembes se font ici.",
+    "tracks": "Pistes",
+    "barLabel": "Mesure",
+    "accompanimentLanes": "Pistes d'accompagnement continues",
+    "accompanimentLanesNote": "Déposez une fois un Pattern d'accompagnement, puis définissez sa mesure de départ et sa longueur.",
+    "accompanimentStartBar": "Départ",
+    "accompanimentBarCount": "Mesures",
+    "accompanimentGap": "{count} mesures vides",
+    "removeAccompanimentSegment": "Retirer le segment d'accompagnement",
+    "resizeAccompanimentSegment": "Allonger ou raccourcir le segment d'accompagnement en mesures",
+    "resizePattern": "Allonger ou raccourcir le Pattern en le faisant glisser",
     "pattern": "Pattern",
     "passage": "Passage",
     "settings": "Réglages",
@@ -486,7 +496,8 @@
     "drop": {
       "append": "Déposer le Pattern ici",
       "insert": "Insérer ici",
-      "parallel": "Ajouter en parallèle"
+      "parallel": "Ajouter en parallèle",
+      "accompanimentLane": "Déposer le Pattern d'accompagnement ici"
     },
     "type": {
       "accompaniment": "Accompagnement",

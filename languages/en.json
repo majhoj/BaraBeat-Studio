@@ -458,6 +458,16 @@
     "patternLibraryNote": "Each Pattern from the score appears here once. Drag it or use + to add it to the end of the timeline.",
     "timelineTitle": "Timeline",
     "timelineNote": "The timeline determines the playback order. Djembe assignments are made here.",
+    "tracks": "Tracks",
+    "barLabel": "Bar",
+    "accompanimentLanes": "Continuous accompaniment tracks",
+    "accompanimentLanesNote": "Drop an accompaniment Pattern here once, then set its start bar and length.",
+    "accompanimentStartBar": "Start",
+    "accompanimentBarCount": "Bars",
+    "accompanimentGap": "{count} empty bars",
+    "removeAccompanimentSegment": "Remove accompaniment segment",
+    "resizeAccompanimentSegment": "Extend or shorten the accompaniment segment in bars",
+    "resizePattern": "Extend or shorten the Pattern by dragging",
     "pattern": "Pattern",
     "passage": "Pattern",
     "settings": "Settings",
@@ -486,7 +496,8 @@
     "drop": {
       "append": "Drop pattern here",
       "insert": "Insert here",
-      "parallel": "Add in parallel"
+      "parallel": "Add in parallel",
+      "accompanimentLane": "Drop accompaniment Pattern here"
     },
     "type": {
       "accompaniment": "Accompaniment",

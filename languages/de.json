@@ -458,6 +458,16 @@
     "patternLibraryNote": "Jede Passage aus dem Notenblatt erscheint hier einmal. Ziehen oder über + ans Ende der Timeline anfügen.",
     "timelineTitle": "Timeline",
     "timelineNote": "Die Timeline bestimmt die Wiedergabereihenfolge. Djembe-Zuordnung passiert hier.",
+    "tracks": "Spuren",
+    "barLabel": "Takt",
+    "accompanimentLanes": "Durchgehende Begleitspuren",
+    "accompanimentLanesNote": "Begleitpattern hier einmal ablegen und Starttakt sowie Länge festlegen.",
+    "accompanimentStartBar": "Start",
+    "accompanimentBarCount": "Takte",
+    "accompanimentGap": "{count} Takte frei",
+    "removeAccompanimentSegment": "Begleitsegment entfernen",
+    "resizeAccompanimentSegment": "Begleitsegment in Takten verlängern oder verkürzen",
+    "resizePattern": "Pattern durch Ziehen verlängern oder verkürzen",
     "pattern": "Pattern",
     "passage": "Passage",
     "settings": "Einstellungen",
@@ -486,7 +496,8 @@
     "drop": {
       "append": "Pattern hier ablegen",
       "insert": "Hier einfügen",
-      "parallel": "Parallel hier"
+      "parallel": "Parallel hier",
+      "accompanimentLane": "Begleitpattern hier ablegen"
     },
     "type": {
       "accompaniment": "Begleitung",
