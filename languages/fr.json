@@ -461,6 +461,7 @@
     "tracks": "Pistes",
     "barLabel": "Mesure",
     "addBar": "Ajouter une mesure",
+    "startPlaybackAtBar": "Démarrer la lecture à la mesure {number}",
     "accompanimentLanes": "Pistes d'accompagnement continues",
     "accompanimentLanesNote": "Déposez une fois un Pattern d'accompagnement, puis définissez sa mesure de départ et sa longueur.",
     "accompanimentStartBar": "Départ",

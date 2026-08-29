@@ -2169,6 +2169,8 @@ function clear_all() {
     timelineState.sourceLibraryGroups = [];
     timelineState.entries = [];
     timelineState.accompanimentSegments = [];
+    timelineState.minimumBarCount = 0;
+    timelineState.playbackStartBar = 1;
     timelineState.sourceHash = '';
     timelineState.sheetHash = '';
     timelineState.sheetLoop = false;
@@ -11436,6 +11438,9 @@ function onSVGLoaded(data) {
         const persistedMinimumBarCount = persistedTimelineMetadata
             ? persistedTimelineMetadata.minimumBarCount
             : 0;
+        const persistedPlaybackStartBar = persistedTimelineMetadata
+            ? persistedTimelineMetadata.playbackStartBar
+            : 1;
         timelineState.tempo = normalizeTimelineTempo(
             persistedTimelineMetadata ? persistedTimelineMetadata.tempo : 100
         );
@@ -11455,6 +11460,7 @@ function onSVGLoaded(data) {
             feelOffsets: timelineState.feelOffsets,
             persistedPractice: persistedTimelineMetadata ? persistedTimelineMetadata.practice : null,
             persistedMinimumBarCount: persistedMinimumBarCount,
+            persistedPlaybackStartBar: persistedPlaybackStartBar,
             persistedAccompanimentSegments: persistedAccompanimentSegments,
             persistedEntries: persistedEntries,
             persistedVersion: persistedTimelineMetadata ? persistedTimelineMetadata.version : null,

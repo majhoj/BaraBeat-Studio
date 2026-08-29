@@ -7,6 +7,7 @@ const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(scriptDirectory, '..');
 const timelineSource = fs.readFileSync(path.join(projectRoot, 'JS/timeline.js'), 'utf8');
 const timelineStyles = fs.readFileSync(path.join(projectRoot, 'CSS/index_style.css'), 'utf8');
+const playerSource = fs.readFileSync(path.join(projectRoot, 'Audio/player.html'), 'utf8');
 
 function assert(condition, message) {
   if (!condition) {
@@ -143,6 +144,8 @@ context.timelineState.minimumBarCount = 24;
 const manuallyExtendedLayout = vm.runInContext('buildTimelineHorizontalLayout(visualRows);', context);
 assert(manuallyExtendedLayout.naturalTotalBars === 19 && manuallyExtendedLayout.totalBars === 24,
   'Die manuell erweiterte Timeline behält ihre natürliche Länge oder Mindestlänge nicht korrekt bei.');
+assert(manuallyExtendedLayout.playbackTotalBars === 24,
+  'Die sichtbare Gesamtlänge der Timeline wird nicht an die Wiedergabelänge übergeben.');
 context.timelineState.minimumBarCount = 0;
 
 context.repeatedLibraryPattern = {
@@ -277,6 +280,14 @@ assert(timelineSource.includes("addBarButtonEl.className = 'timeline-track-add-b
   'Hinter dem letzten Takt fehlt das Feld zum manuellen Hinzufügen eines Taktes.');
 assert(timelineSource.includes('TimelineTrailingBars:'),
   'Manuell ergänzte Leertakte werden nicht an den Player übergeben.');
+assert(timelineSource.includes('TimelineTotalBars:'),
+  'Die vollständige sichtbare Taktzahl wird nicht an den Player übergeben.');
+assert(timelineSource.includes('TimelineStartBar: normalizeTimelinePlaybackStartBar(timelineState.playbackStartBar)'),
+  'Der markierte Starttakt wird nicht an den Arrangement-Player übergeben.');
+assert(timelineSource.includes('playbackStartBar: normalizeTimelinePlaybackStartBar(timelineState.playbackStartBar)'),
+  'Der markierte Starttakt wird nicht im Notenblatt gespeichert.');
+assert(timelineSource.includes("barEl.classList.toggle('is-playback-start'"),
+  'Der gewählte Starttakt wird in der Taktleiste nicht markiert.');
 assert(timelineSource.includes("type: 'timeline-accompaniment-segment'"),
   'Vorhandene Begleitblöcke besitzen keinen Drag-Payload.');
 assert(timelineSource.includes("dragSurfaceEl.className = 'timeline-track-drag-surface'"),
@@ -297,5 +308,61 @@ assert(timelineStyles.includes('.timeline-track-ruler-bar.is-drop-target'),
   'Die aktive Takt-Dropzone wird nicht sichtbar hervorgehoben.');
 assert(timelineStyles.includes('.timeline-track-add-bar'),
   'Das Feld zum Hinzufügen eines Taktes ist nicht gestaltet.');
+assert(timelineStyles.includes('.timeline-track-ruler-bar.is-playback-start'),
+  'Die sichtbare Startmarke der Timeline ist nicht gestaltet.');
+
+const playerContext = vm.createContext({});
+playerContext.getTimelineStepsPerBar = function () { return 24; };
+vm.runInContext(extractFunction(playerSource, 'getTimelinePlaybackStartStep'), playerContext);
+playerContext.playbackSections = [
+  { startStep: 0, playbackLength: 9 },
+  { startStep: 9, playbackLength: 72 }
+];
+assert(
+  vm.runInContext('getTimelinePlaybackStartStep(playbackSections, 2);', playerContext) === 9,
+  'Der Player beginnt nach einem verkürzten ersten Takt nicht am Anfang von Takt 2.'
+);
+assert(
+  vm.runInContext('getTimelinePlaybackStartStep(playbackSections, 4);', playerContext) === 57,
+  'Der Player rechnet einen späteren markierten Takt nicht in den richtigen Wiedergabeschritt um.'
+);
+playerContext.pickupSections = [
+  { startStep: 0, playbackLength: 9 },
+  { startStep: 9, playbackLength: 72, leadingPickupSteps: 3 }
+];
+assert(
+  vm.runInContext('getTimelinePlaybackStartStep(pickupSections, 2);', playerContext) === 6,
+  'Der Player berücksichtigt den Auftakt eines am markierten Takt beginnenden Patterns nicht.'
+);
+playerContext.segmentPickupSections = [
+  {
+    startStep: 0,
+    playbackLength: 72,
+    timelinePickupLeads: [{ targetOffset: 24, leadSteps: 2 }]
+  }
+];
+assert(
+  vm.runInContext('getTimelinePlaybackStartStep(segmentPickupSections, 2);', playerContext) === 22,
+  'Der Player berücksichtigt den Auftakt einer am markierten Takt beginnenden Begleitspur nicht.'
+);
+
+const stopContext = vm.createContext({
+  isTimelineMode: true,
+  oneShotLength: 100,
+  globalPlaybackStep: 100,
+  timelinePlaybackStartStep: 80,
+  timelineLoopCount: 1,
+  orderedFallbackLoopLength: 24
+});
+vm.runInContext(extractFunction(playerSource, 'shouldStopTimelineAtOneShotEnd'), stopContext);
+assert(
+  vm.runInContext('shouldStopTimelineAtOneShotEnd();', stopContext) === true,
+  'Ein markierter Teilstart läuft hinter dem tatsächlichen Ende des Arrangements weiter.'
+);
+stopContext.timelinePlaybackStartStep = 0;
+assert(
+  vm.runInContext('shouldStopTimelineAtOneShotEnd();', stopContext) === false,
+  'Die bestehende äußere Wiederholung wird auch bei einem normalen Start an Takt 1 unterdrückt.'
+);
 
 console.log('Horizontale Timeline: Taktpositionen, Wiederholungslängen und Instrumentenspuren geprüft.');

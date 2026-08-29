@@ -461,6 +461,7 @@
     "tracks": "Pistas",
     "barLabel": "Compás",
     "addBar": "Añadir compás",
+    "startPlaybackAtBar": "Iniciar la reproducción en el compás {number}",
     "accompanimentLanes": "Pistas de acompañamiento continuas",
     "accompanimentLanesNote": "Suelta una vez un Pattern de acompañamiento y define su compás inicial y su duración.",
     "accompanimentStartBar": "Inicio",

@@ -461,6 +461,7 @@
     "tracks": "Faixas",
     "barLabel": "Compasso",
     "addBar": "Adicionar compasso",
+    "startPlaybackAtBar": "Iniciar a reprodução no compasso {number}",
     "accompanimentLanes": "Faixas de acompanhamento contínuas",
     "accompanimentLanesNote": "Solte uma vez um Pattern de acompanhamento e defina o compasso inicial e a duração.",
     "accompanimentStartBar": "Início",

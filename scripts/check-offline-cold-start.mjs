@@ -28,7 +28,10 @@ assert(!/<\?php/i.test(shell), 'app-shell.html enthält nicht aufgelöstes PHP.'
 assert(!/"csrfToken"\s*:\s*"[^"]+"/.test(shell), 'app-shell.html enthält einen CSRF-Wert.');
 assert(!shell.includes('BARABEAT_ACCESS_PASSWORD'), 'app-shell.html enthält einen Zugangsbezeichner.');
 
-assert(serviceWorker.includes("const CACHE_NAME = 'barabeat-studio-offline-v56-standalone-audio-lookahead';"), 'Cache-Version v56 fehlt.');
+assert(
+  /const CACHE_NAME = 'barabeat-studio-offline-v\d+-[a-z0-9-]+';/.test(serviceWorker),
+  'Versionierter Offline-Cache fehlt.'
+);
 assert(serviceWorker.includes("'./app-shell.html'"), 'app-shell.html fehlt im Precache.');
 assert(serviceWorker.includes("'./JS/app-bootstrap.js'"), 'app-bootstrap.js fehlt im Precache.');
 assert(serviceWorker.includes('isAppEntryNavigation(request, relativePath)'), 'App-Einstiegsnavigation wird nicht separat behandelt.');

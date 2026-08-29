@@ -461,6 +461,7 @@
     "tracks": "Tracks",
     "barLabel": "Bar",
     "addBar": "Add bar",
+    "startPlaybackAtBar": "Start playback at bar {number}",
     "accompanimentLanes": "Continuous accompaniment tracks",
     "accompanimentLanesNote": "Drop an accompaniment Pattern here once, then set its start bar and length.",
     "accompanimentStartBar": "Start",

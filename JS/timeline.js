@@ -2,7 +2,7 @@
 const timelineDjembeTargets = ['Djembe_1', 'Djembe_2', 'Djembe_3'];
 const timelineBassTargets = ['Kenkeni', 'Sangban', 'Doundoun'];
 const timelineTrackTargets = timelineDjembeTargets.concat(timelineBassTargets);
-const timelineMetadataVersion = 9;
+const timelineMetadataVersion = 10;
 const minimumCompatibleTimelineMetadataVersion = 7;
 const defaultTimelineSwingProfiles = {
     binaer: [0, 0, 0, 0],
@@ -31,6 +31,7 @@ const timelineState = {
     entries: [],
     accompanimentSegments: [],
     minimumBarCount: 0,
+    playbackStartBar: 1,
     sheetLoop: false,
     sheetLoopCount: false,
     tempo: 100,
@@ -134,6 +135,14 @@ function normalizeTimelineMinimumBarCount(rawValue) {
         return 0;
     }
     return Math.max(0, Math.min(999, Math.round(numericValue)));
+}
+
+function normalizeTimelinePlaybackStartBar(rawValue) {
+    const numericValue = Number(rawValue);
+    if (!Number.isFinite(numericValue)) {
+        return 1;
+    }
+    return Math.max(1, Math.min(999, Math.round(numericValue)));
 }
 
 function normalizeTimelineAccompanimentStartBar(rawValue) {
@@ -1173,6 +1182,8 @@ function buildTimelinePlayerPayload(patternLibrary, timelineEntries) {
                 targetInstruments: Array.isArray(entry.targetInstruments) ? entry.targetInstruments.slice() : []
             };
         }),
+        TimelineStartBar: normalizeTimelinePlaybackStartBar(timelineState.playbackStartBar),
+        TimelineTotalBars: Math.max(0, Math.round(Number(timelineLayout.playbackTotalBars) || 0)),
         TimelineTrailingBars: Math.max(0, timelineLayout.totalBars - timelineLayout.naturalTotalBars),
         AccompanimentSegments: timelineState.accompanimentSegments.map(serializeTimelineAccompanimentSegment)
     }];
@@ -1205,6 +1216,7 @@ function updateTimelineMetadataNode() {
         feelOffsets: normalizeTimelineFeelOffsets(timelineState.feelOffsets),
         practice: typeof buildPracticeMetadata === 'function' ? buildPracticeMetadata() : null,
         minimumBarCount: normalizeTimelineMinimumBarCount(timelineState.minimumBarCount),
+        playbackStartBar: normalizeTimelinePlaybackStartBar(timelineState.playbackStartBar),
         accompanimentSegments: timelineState.accompanimentSegments.map(serializeTimelineAccompanimentSegment),
         entries: metadataEntries.map(function (entry) {
             return {
@@ -1307,6 +1319,9 @@ function syncTimelineStateFromReadResult(readResult, options) {
     timelineState.minimumBarCount = hasCompatiblePersistedVersion
         ? normalizeTimelineMinimumBarCount(syncOptions.persistedMinimumBarCount)
         : 0;
+    timelineState.playbackStartBar = hasCompatiblePersistedVersion
+        ? normalizeTimelinePlaybackStartBar(syncOptions.persistedPlaybackStartBar)
+        : 1;
     timelineState.sheetLoopCount = sheetLoopCount;
     timelineState.sheetLoop = sheetLoopCount === 'loop';
     syncTimelineBlockIdSequence(timelineState.entries);
@@ -1348,6 +1363,7 @@ function buildCurrentTimelineSyncOptions() {
         feelOffsets: normalizeTimelineFeelOffsets(timelineState.feelOffsets),
         persistedPractice: typeof buildPracticeMetadata === 'function' ? buildPracticeMetadata() : null,
         persistedMinimumBarCount: normalizeTimelineMinimumBarCount(timelineState.minimumBarCount),
+        persistedPlaybackStartBar: normalizeTimelinePlaybackStartBar(timelineState.playbackStartBar),
         persistedAccompanimentSegments: timelineState.accompanimentSegments.map(serializeTimelineAccompanimentSegment),
         persistedEntries: timelineState.entries.map(function (entry) {
             return {
@@ -3855,13 +3871,16 @@ function buildTimelineHorizontalLayout(visualRows) {
         });
     });
 
-    const naturalTotalBars = Math.max.apply(null, clips.map(function (clip) {
+    const contentTotalBars = Math.max.apply(null, clips.map(function (clip) {
         return clip.startBar + clip.barCount - 1;
-    }).concat(rows.length ? nextStartBar - 1 : 8, 8));
+    }).concat(rows.length ? nextStartBar - 1 : 0, 0));
+    const naturalTotalBars = Math.max(contentTotalBars, 8);
+    const minimumBarCount = normalizeTimelineMinimumBarCount(timelineState.minimumBarCount);
     const totalBars = Math.max(
         naturalTotalBars,
-        normalizeTimelineMinimumBarCount(timelineState.minimumBarCount)
+        minimumBarCount
     );
+    const playbackTotalBars = Math.max(contentTotalBars, minimumBarCount);
     const usedTargets = timelineTrackTargets.filter(function (targetInstrument) {
         return clips.some(function (clip) {
             return clip.targetInstrument === targetInstrument;
@@ -3872,6 +3891,7 @@ function buildTimelineHorizontalLayout(visualRows) {
         rows: rows,
         clips: clips,
         naturalTotalBars: naturalTotalBars,
+        playbackTotalBars: playbackTotalBars,
         totalBars: totalBars,
         usedTargets: usedTargets.length > 0 ? usedTargets : timelineTrackTargets.slice(0, 1)
     };
@@ -4427,6 +4447,38 @@ function bindTimelineRulerBarDropTarget(barEl, layout, barNumber) {
     });
 }
 
+function setTimelinePlaybackStartBar(barNumber) {
+    const normalizedBarNumber = normalizeTimelinePlaybackStartBar(barNumber);
+    if (timelineState.playbackStartBar === normalizedBarNumber) {
+        return;
+    }
+    if (typeof recordArrangementHistorySnapshot === 'function') {
+        recordArrangementHistorySnapshot();
+    }
+    timelineState.playbackStartBar = normalizedBarNumber;
+    updateTimelineMetadataNode();
+    renderTimelineSequence();
+}
+
+function bindTimelinePlaybackStartBar(barEl, barNumber) {
+    const selectStartBar = function () {
+        if (timelineActiveDragPayload || document.body.classList.contains('is-timeline-dragging')) {
+            return;
+        }
+        setTimelinePlaybackStartBar(barNumber);
+    };
+    barEl.setAttribute('role', 'button');
+    barEl.tabIndex = 0;
+    barEl.addEventListener('click', selectStartBar);
+    barEl.addEventListener('keydown', function (event) {
+        if (event.key !== 'Enter' && event.key !== ' ') {
+            return;
+        }
+        event.preventDefault();
+        selectStartBar();
+    });
+}
+
 function bindTimelineTrackLaneDrop(dropEl, targetInstrument, totalBars) {
     dropEl.addEventListener('dragover', function (event) {
         const payload = timelineActiveDragPayload || getTimelineDragPayload(event.dataTransfer.getData('text/plain'));
@@ -4503,6 +4555,11 @@ function renderTimelineSequence() {
     const entryGroups = buildTimelineDisplayGroups(timelineState.entries, timelineState.sourcePatterns);
     const visualRows = buildTimelineVisualRows(entryGroups, timelineState.sourcePatterns);
     const layout = buildTimelineHorizontalLayout(visualRows);
+    const playbackStartBar = Math.min(
+        layout.totalBars,
+        normalizeTimelinePlaybackStartBar(timelineState.playbackStartBar)
+    );
+    timelineState.playbackStartBar = playbackStartBar;
     sequenceEl.innerHTML = '';
 
     const editorEl = document.createElement('section');
@@ -4527,7 +4584,13 @@ function renderTimelineSequence() {
         barEl.className = 'timeline-track-ruler-bar';
         barEl.dataset.timelineBar = String(barNumber);
         barEl.textContent = String(barNumber);
+        const startLabel = timelineText('arrangement.startPlaybackAtBar', { number: barNumber });
+        barEl.title = startLabel;
+        barEl.setAttribute('aria-label', startLabel);
+        barEl.setAttribute('aria-pressed', barNumber === playbackStartBar ? 'true' : 'false');
+        barEl.classList.toggle('is-playback-start', barNumber === playbackStartBar);
         bindTimelineRulerBarDropTarget(barEl, layout, barNumber);
+        bindTimelinePlaybackStartBar(barEl, barNumber);
         rulerCanvasEl.appendChild(barEl);
     }
     const addBarButtonEl = document.createElement('button');

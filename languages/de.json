@@ -461,6 +461,7 @@
     "tracks": "Spuren",
     "barLabel": "Takt",
     "addBar": "Takt hinzufügen",
+    "startPlaybackAtBar": "Wiedergabe ab Takt {number}",
     "accompanimentLanes": "Durchgehende Begleitspuren",
     "accompanimentLanesNote": "Begleitpattern hier einmal ablegen und Starttakt sowie Länge festlegen.",
     "accompanimentStartBar": "Start",

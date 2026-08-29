@@ -906,6 +906,8 @@ function createOrderedSection(label) {
     isLeadIn: false,
     overlapsPracticeCountIn: false,
     overlapTailLength: 0,
+    leadingPickupSteps: 0,
+    timelinePickupLeads: [],
     repeatCount: 1,
     playbackLength: 0,
     length: 0,
@@ -1493,6 +1495,25 @@ function getTimelineEntryPickupEndStep(entryData) {
 
   const safeInStep = Math.max(0, Math.min(sourceLength - 1, Number(entryData.patternInStep) || 0));
   return Math.min(sourceLength, (Math.floor(safeInStep / stepsPerBar) + 1) * stepsPerBar);
+}
+
+function getTimelineEntryPickupLeadSteps(entryData) {
+  if (!hasTimelineEntryLeadingPickup(entryData)) {
+    return 0;
+  }
+
+  const pickupEndStep = getTimelineEntryPickupEndStep(entryData);
+  const inStep = Math.max(0, Math.round(Number(entryData.patternInStep) || 0));
+  return Math.max(0, pickupEndStep - inStep);
+}
+
+function assignTimelineSectionPickupLead(section, entryDataList) {
+  if (!section) {
+    return;
+  }
+  section.leadingPickupSteps = Math.max.apply(null, (Array.isArray(entryDataList) ? entryDataList : [])
+    .map(getTimelineEntryPickupLeadSteps)
+    .concat(0));
 }
 
 function getTimelineEntryEffectiveNotes(entryData, shouldApplyOut, loopToLength) {
@@ -2351,6 +2372,72 @@ function isTimelineContinuationMarker(markerValue) {
   return markerValue === 'continue';
 }
 
+function writeTimelineTrackRange(sections, sectionOffsets, targetInstrument, rangeStartStep, sourceNotes, replaceSilence) {
+  const safeSourceNotes = Array.isArray(sourceNotes) ? sourceNotes : [];
+  const safeRangeStartStep = Math.round(Number(rangeStartStep) || 0);
+  const shouldReplaceSilence = replaceSilence !== false;
+  if (!Array.isArray(sections) || safeSourceNotes.length === 0) {
+    return;
+  }
+
+  sections.forEach(function (section, sectionIndex) {
+    const sectionStartStep = sectionOffsets[sectionIndex];
+    const sectionEndStep = sectionStartStep + Math.max(0, Number(section.length) || 0);
+    const overlapStartStep = Math.max(sectionStartStep, safeRangeStartStep);
+    const overlapEndStep = Math.min(sectionEndStep, safeRangeStartStep + safeSourceNotes.length);
+    if (overlapEndStep <= overlapStartStep) {
+      return;
+    }
+
+    const localStartStep = overlapStartStep - sectionStartStep;
+    const sourceStartStep = overlapStartStep - safeRangeStartStep;
+    const overlapLength = overlapEndStep - overlapStartStep;
+    section.trackNotes[targetInstrument] = padNotesToLength(
+      Array.isArray(section.trackNotes[targetInstrument])
+        ? section.trackNotes[targetInstrument].slice(0, section.length)
+        : [],
+      section.length
+    );
+    for (let noteIndex = 0; noteIndex < overlapLength; noteIndex++) {
+      const sourceNote = safeSourceNotes[sourceStartStep + noteIndex] || 'f';
+      if (shouldReplaceSilence || sourceNote !== 'f') {
+        section.trackNotes[targetInstrument][localStartStep + noteIndex] = sourceNote;
+      }
+    }
+    if (!Array.isArray(section.sectionTargets)) {
+      section.sectionTargets = [];
+    }
+    if (section.sectionTargets.indexOf(targetInstrument) === -1) {
+      section.sectionTargets.push(targetInstrument);
+    }
+  });
+}
+
+function registerTimelinePickupLeadAtStep(sections, sectionOffsets, targetStep, leadSteps) {
+  const safeTargetStep = Math.max(0, Math.round(Number(targetStep) || 0));
+  const safeLeadSteps = Math.max(0, Math.round(Number(leadSteps) || 0));
+  if (!Array.isArray(sections) || safeLeadSteps <= 0) {
+    return;
+  }
+
+  for (let sectionIndex = sections.length - 1; sectionIndex >= 0; sectionIndex--) {
+    const section = sections[sectionIndex];
+    const sectionStartStep = Math.max(0, Math.round(Number(sectionOffsets[sectionIndex]) || 0));
+    const sectionLength = Math.max(0, Math.round(Number(section && section.length) || 0));
+    if (safeTargetStep < sectionStartStep || safeTargetStep > sectionStartStep + sectionLength) {
+      continue;
+    }
+    if (!Array.isArray(section.timelinePickupLeads)) {
+      section.timelinePickupLeads = [];
+    }
+    section.timelinePickupLeads.push({
+      targetOffset: safeTargetStep - sectionStartStep,
+      leadSteps: safeLeadSteps
+    });
+    return;
+  }
+}
+
 function applyExplicitTimelineAccompanimentSegments(sections, config, patternById) {
   const segments = Array.isArray(config && config.AccompanimentSegments)
     ? config.AccompanimentSegments
@@ -2434,37 +2521,79 @@ function applyExplicitTimelineAccompanimentSegments(sections, config, patternByI
         patternOverlapStep: getPatternOverlapStep(pattern)
       };
       const segmentNotes = getTimelineEntryEffectiveNotes(entryData, true, segmentLength);
-
-      sections.forEach(function (section, sectionIndex) {
-        const sectionStartStep = sectionOffsets[sectionIndex];
-        const sectionEndStep = sectionStartStep + Math.max(0, Number(section.length) || 0);
-        const overlapStartStep = Math.max(sectionStartStep, segmentStartStep);
-        const overlapEndStep = Math.min(sectionEndStep, segmentStartStep + segmentLength);
-        if (overlapEndStep <= overlapStartStep) {
-          return;
-        }
-
-        const localStartStep = overlapStartStep - sectionStartStep;
-        const sourceStartStep = overlapStartStep - segmentStartStep;
-        const overlapLength = overlapEndStep - overlapStartStep;
-        section.trackNotes[targetInstrument] = padNotesToLength(
-          Array.isArray(section.trackNotes[targetInstrument])
-            ? section.trackNotes[targetInstrument].slice(0, section.length)
-            : [],
-          section.length
+      const pickupNotes = buildTimelinePickupNotes(entryData.patternNotes, entryData.patternInStep);
+      if (pickupNotes.length > 0 && segmentStartStep > 0) {
+        const availablePickupLength = Math.min(pickupNotes.length, segmentStartStep);
+        const availablePickupNotes = pickupNotes.slice(pickupNotes.length - availablePickupLength);
+        writeTimelineTrackRange(
+          sections,
+          sectionOffsets,
+          targetInstrument,
+          segmentStartStep - availablePickupLength,
+          availablePickupNotes,
+          false
         );
-        for (let noteIndex = 0; noteIndex < overlapLength; noteIndex++) {
-          section.trackNotes[targetInstrument][localStartStep + noteIndex] =
-            segmentNotes[sourceStartStep + noteIndex] || 'f';
+        const firstPickupNoteIndex = availablePickupNotes.findIndex(function (noteValue) {
+          return noteValue && noteValue !== 'f';
+        });
+        if (firstPickupNoteIndex !== -1) {
+          registerTimelinePickupLeadAtStep(
+            sections,
+            sectionOffsets,
+            segmentStartStep,
+            availablePickupLength - firstPickupNoteIndex
+          );
         }
-        if (!Array.isArray(section.sectionTargets)) {
-          section.sectionTargets = [];
-        }
-        if (section.sectionTargets.indexOf(targetInstrument) === -1) {
-          section.sectionTargets.push(targetInstrument);
-        }
-      });
+      }
+      writeTimelineTrackRange(
+        sections,
+        sectionOffsets,
+        targetInstrument,
+        segmentStartStep,
+        segmentNotes,
+        true
+      );
     });
+}
+
+function ensureTimelinePlaybackBarCapacity(sections, config) {
+  if (!Array.isArray(sections)) {
+    return;
+  }
+
+  const stepsPerBar = getTimelineStepsPerBar();
+  if (stepsPerBar <= 0) {
+    return;
+  }
+
+  const currentBarCount = sections.reduce(function (barCount, section) {
+    const sectionLength = Math.max(0, Math.round(Number(section && section.length) || 0));
+    return barCount + Math.ceil(sectionLength / stepsPerBar);
+  }, 0);
+  const segmentBarCount = (Array.isArray(config && config.AccompanimentSegments)
+    ? config.AccompanimentSegments
+    : []).reduce(function (barCount, segment) {
+      const startBar = Math.max(1, Math.round(Number(segment && segment.startBar) || 1));
+      const segmentLength = Math.max(1, Math.round(Number(segment && segment.barCount) || 1));
+      return Math.max(barCount, startBar + segmentLength - 1);
+    }, 0);
+  const configuredTotalBars = Math.max(0, Math.round(Number(config && config.TimelineTotalBars) || 0));
+  const legacyTrailingBars = normalizeTimelineGapBeforeBars(config && config.TimelineTrailingBars);
+  const requiredBarCount = Math.max(
+    currentBarCount,
+    segmentBarCount,
+    configuredTotalBars,
+    configuredTotalBars > 0 ? 0 : currentBarCount + legacyTrailingBars
+  );
+  const missingBarCount = Math.max(0, requiredBarCount - currentBarCount);
+  if (missingBarCount <= 0) {
+    return;
+  }
+
+  const trailingTempo = sections.length > 0
+    ? sections[sections.length - 1].sectionTempo
+    : null;
+  sections.push(createTimelineGapSection(missingBarCount, trailingTempo, sections.length));
 }
 
 function patternStartsContinuingAccompaniment(pattern) {
@@ -2839,6 +2968,7 @@ function buildTimelineSections(config) {
             repeatedSection.labelName
           ].join('::');
           normalizeSectionTrackLoops(repeatedSection);
+          assignTimelineSectionPickupLead(repeatedSection, repeatEntries);
           if (repeatIndex === 0 && hasNonOverlayTimelineInEntry(repeatEntries)) {
             mergeTimelineEntryPickupsIntoPreviousSection(sections, repeatEntries, {
               alignFullPatternToPreviousSectionStart: !isSheetQuickPlayMode,
@@ -2947,6 +3077,7 @@ function buildTimelineSections(config) {
         mergedSection.labelName
       ].join('::');
       normalizeSectionTrackLoops(mergedSection);
+      assignTimelineSectionPickupLead(mergedSection, blockEntries);
       const consumedByInstrument = mergeTimelineEntryPickupsIntoPreviousSection(sections, blockEntries, {
         alignFullPatternToPreviousSectionStart: !isSheetQuickPlayMode && !isPracticeBlock && !currentBlockContainsOverlay,
         allowStandalonePickup: true,
@@ -3011,6 +3142,7 @@ function buildTimelineSections(config) {
             return laneData.entries[occurrenceIndex];
           })
           .filter(Boolean);
+        assignTimelineSectionPickupLead(currentCycleSection, cycleEntries);
         const consumedByInstrument = mergeTimelineEntryPickupsIntoPreviousSection(sections, cycleEntries, {
           alignFullPatternToPreviousSectionStart: true
         });
@@ -3049,16 +3181,10 @@ function buildTimelineSections(config) {
   applyTimelineSectionOverlaps(sections);
   sections.forEach(trimTimelineSectionTracksToFixedLength);
   finalizeSectionLengths(sections);
+  ensureTimelinePlaybackBarCapacity(sections, config);
+  finalizeSectionLengths(sections);
   applyExplicitTimelineAccompanimentSegments(sections, config, patternById);
   finalizeSectionLengths(sections);
-
-  const trailingBars = normalizeTimelineGapBeforeBars(config.TimelineTrailingBars);
-  if (trailingBars > 0) {
-    const trailingTempo = sections.length > 0
-      ? sections[sections.length - 1].sectionTempo
-      : null;
-    sections.push(createTimelineGapSection(trailingBars, trailingTempo, sections.length));
-  }
 
   return sections;
 }
@@ -3525,6 +3651,7 @@ let nextNoteTime = 0.0;
 let timerID;
 let instr;
 let globalPlaybackStep = 0;
+let timelinePlaybackStartStep = 0;
 let practiceStopAudioTime = 0;
 let practiceTimerFinalLoopStartStep = null;
 
@@ -3626,6 +3753,66 @@ function recalculateOrderedSectionTiming() {
 }
 
 recalculateOrderedSectionTiming();
+
+function getTimelinePlaybackStartStep(sections, rawStartBar) {
+  const targetBar = Math.max(1, Math.round(Number(rawStartBar) || 1));
+  const stepsPerBar = getTimelineStepsPerBar();
+  if (!Array.isArray(sections) || sections.length === 0 || targetBar <= 1 || stepsPerBar <= 0) {
+    return 0;
+  }
+
+  let currentBar = 1;
+  let targetStartStep = 0;
+  let foundTargetBar = false;
+  for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
+    const section = sections[sectionIndex];
+    const sectionStartStep = Math.max(0, Math.round(Number(section && section.startStep) || 0));
+    const sectionPlaybackLength = Math.max(0, Math.round(Number(section && section.playbackLength) || 0));
+    for (let localStep = 0; localStep < sectionPlaybackLength; localStep += stepsPerBar) {
+      targetStartStep = sectionStartStep + localStep;
+      if (currentBar === targetBar) {
+        foundTargetBar = true;
+        break;
+      }
+      currentBar += 1;
+    }
+    if (foundTargetBar) {
+      break;
+    }
+  }
+
+  let pickupLeadSteps = 0;
+  sections.forEach(function (section) {
+    const sectionStartStep = Math.max(0, Math.round(Number(section && section.startStep) || 0));
+    if (sectionStartStep === targetStartStep) {
+      pickupLeadSteps = Math.max(
+        pickupLeadSteps,
+        Math.max(0, Math.round(Number(section && section.leadingPickupSteps) || 0))
+      );
+    }
+    (Array.isArray(section && section.timelinePickupLeads) ? section.timelinePickupLeads : [])
+      .forEach(function (pickupData) {
+        const pickupTargetStep = sectionStartStep +
+          Math.max(0, Math.round(Number(pickupData && pickupData.targetOffset) || 0));
+        if (pickupTargetStep === targetStartStep) {
+          pickupLeadSteps = Math.max(
+            pickupLeadSteps,
+            Math.max(0, Math.round(Number(pickupData && pickupData.leadSteps) || 0))
+          );
+        }
+      });
+  });
+
+  return Math.max(0, targetStartStep - pickupLeadSteps);
+}
+
+function initializeTimelinePlaybackStartStep() {
+  timelinePlaybackStartStep = isTimelineMode && !isPracticeMode && !isSheetQuickPlayMode
+    ? getTimelinePlaybackStartStep(orderedSections, playerConfig.TimelineStartBar)
+    : 0;
+}
+
+initializeTimelinePlaybackStartStep();
 const djembeHandStates = {
   Djembe_1: { nextHand: 'R', leadHand: 'R', lastHand: '', lastSectionKey: '' },
   Djembe_2: { nextHand: 'R', leadHand: 'R', lastHand: '', lastSectionKey: '' },
@@ -4752,6 +4939,10 @@ function shouldStopTimelineAtOneShotEnd() {
     return false;
   }
 
+  if (timelinePlaybackStartStep > 0) {
+    return true;
+  }
+
   if (!timelineLoopCount) {
     return true;
   }
@@ -5457,7 +5648,7 @@ async function startAudioPlayback() {
     return false;
   }
 
-  globalPlaybackStep = 0;
+  globalPlaybackStep = timelinePlaybackStartStep;
   resetDjembeHandStates();
 
   const dTime = instr._audioCtx.currentTime;
