@@ -3295,6 +3295,7 @@ function buildPracticePlayerPayload() {
         payload[0].PracticeH2HRestMute = Boolean(practiceState.h2hRestMute);
         payload[0].PracticeInstrumentVolumes = normalizePracticeInstrumentVolumes(practiceState.instrumentVolumes);
         payload[0].PracticeInstrumentToneVolumes = normalizePracticeInstrumentToneVolumes(practiceState.instrumentToneVolumes);
+        payload[0].TimelineStopAtEnd = false;
         payload[0].TimelineLoop = false;
         payload[0].TimelineLoopCount = practiceState.timerMinutes > 0
             ? 'loop'

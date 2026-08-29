@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'barabeat-studio-offline-v62-timeline-total-bars';
+const CACHE_NAME = 'barabeat-studio-offline-v64-arrangement-end';
 const APP_SHELL = [
   './app-shell.html',
   './manifest.webmanifest',

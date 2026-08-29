@@ -696,6 +696,7 @@ function expandPatternBars(pattern) {
 
 const repeatRanges = sanitizeRepeatRanges(playerConfig.RepeatRanges);
 const isTimelineMode = Boolean(playerConfig.TimelineMode);
+const timelineStopAtEnd = Boolean(playerConfig.TimelineStopAtEnd);
 let timelineLoopCount = normalizeTimelineLoopCountValue(
   playerConfig.TimelineLoopCount !== undefined ? playerConfig.TimelineLoopCount : playerConfig.TimelineLoop
 );
@@ -4939,6 +4940,10 @@ function shouldStopTimelineAtOneShotEnd() {
     return false;
   }
 
+  if (timelineStopAtEnd && !isPracticeMode && !isSheetQuickPlayMode) {
+    return true;
+  }
+
   if (timelinePlaybackStartStep > 0) {
     return true;
   }
@@ -5130,6 +5135,10 @@ function getExportStepCount() {
       exportStep += 1;
     }
     return Math.max(1, exportStep);
+  }
+
+  if (timelineStopAtEnd && isTimelineMode && !isPracticeMode && !isSheetQuickPlayMode) {
+    return oneShotLength;
   }
 
   if (timelineLoopCount && timelineLoopCount !== 'loop' && timelinePlaybackLength > 0) {

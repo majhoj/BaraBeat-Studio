@@ -45,10 +45,11 @@ const patterns = {
           start: repeatStarts[barIndex] || false,
           end: repeatEnds[barIndex] || false
         },
-        controls: []
+        controls: barIndex === 12 ? [{ type: 'overlap', stepIndex: 0 }] : []
       };
     })
   },
+  solo2a: { id: 'solo2a', labelType: 'Solo', bars: [{}, {}] },
   djembe: { id: 'djembe', labelType: 'Begleitung', bars: [{}] },
   sangban: { id: 'sangban', labelType: 'Begleitung', bars: [{}, {}] },
   doundoun: { id: 'doundoun', labelType: 'Begleitung', bars: [{}] }
@@ -190,10 +191,28 @@ assert(vm.runInContext('getTimelineGroupBarCount(soloRepeatGroup);', context) ==
 
 context.solo2Group = {
   patternId: 'solo2',
-  entries: [{ patternId: 'solo2' }]
+  entries: [{ patternId: 'solo2', targetInstruments: ['Djembe_1'] }]
 };
-assert(vm.runInContext('getTimelineGroupBarCount(solo2Group);', context) === 43,
-  'Solo 2 belegt mit seinen inneren Wiederholungen nicht die erwarteten 43 Takte.');
+assert(vm.runInContext('getTimelineExpandedPatternBars(findPatternById("solo2")).length;', context) === 43,
+  'Solo 2 besitzt nach seinen inneren Wiederholungen nicht die erwarteten 43 ausgeschriebenen Takte.');
+assert(vm.runInContext('getTimelineGroupBarCount(solo2Group);', context) === 42,
+  'Der letzte Ueberlappungstakt von Solo 2 wird in der Timeline nicht ausschliesslich Solo 2a zugerechnet.');
+
+context.djiaHandoffRows = [[{
+  patternId: 'call',
+  entries: Array.from({ length: 17 }, () => ({
+    patternId: 'call',
+    targetInstruments: ['Djembe_1']
+  }))
+}], [context.solo2Group], [{
+  patternId: 'solo2a',
+  entries: [{ patternId: 'solo2a', targetInstruments: ['Djembe_1'] }]
+}]];
+const djiaHandoffLayout = vm.runInContext('buildTimelineHorizontalLayout(djiaHandoffRows);', context);
+assert(djiaHandoffLayout.rows[1].startBar === 18 && djiaHandoffLayout.rows[1].endBar === 60,
+  'Solo 2 endet nach dem Ueberlappungsabzug nicht mit Takt 59.');
+assert(djiaHandoffLayout.rows[2].startBar === 60,
+  'Solo 2a beginnt nach der Uebergabe nicht mit dem gemeinsamen Takt 60.');
 
 djembeGroup.gapBeforeBars = 1;
 sangbanGroup.gapBeforeBars = 1;
@@ -348,6 +367,9 @@ assert(
 
 const stopContext = vm.createContext({
   isTimelineMode: true,
+  isPracticeMode: false,
+  isSheetQuickPlayMode: false,
+  timelineStopAtEnd: true,
   oneShotLength: 100,
   globalPlaybackStep: 100,
   timelinePlaybackStartStep: 80,
@@ -361,8 +383,18 @@ assert(
 );
 stopContext.timelinePlaybackStartStep = 0;
 assert(
-  vm.runInContext('shouldStopTimelineAtOneShotEnd();', stopContext) === false,
-  'Die bestehende äußere Wiederholung wird auch bei einem normalen Start an Takt 1 unterdrückt.'
+  vm.runInContext('shouldStopTimelineAtOneShotEnd();', stopContext) === true,
+  'Ein horizontales Arrangement läuft bei einem normalen Start hinter seinem tatsächlichen Ende weiter.'
 );
+stopContext.timelineStopAtEnd = false;
+assert(
+  vm.runInContext('shouldStopTimelineAtOneShotEnd();', stopContext) === false,
+  'Die alte äußere Wiederholungslogik bleibt für Legacy-Payloads nicht verfügbar.'
+);
+
+assert(timelineSource.includes('TimelineStopAtEnd: true'),
+  'Das aktuelle Arrangement kennzeichnet seine feste Timeline-Grenze nicht im Player-Payload.');
+assert(playerSource.includes('timelineStopAtEnd && !isPracticeMode && !isSheetQuickPlayMode'),
+  'Der Player trennt das Arrangement-Ende nicht von den Loop-Regeln für Üben und Sofort-Spielen.');
 
 console.log('Horizontale Timeline: Taktpositionen, Wiederholungslängen und Instrumentenspuren geprüft.');

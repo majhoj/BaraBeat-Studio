@@ -4119,6 +4119,7 @@ function buildSheetQuickPlayPayload() {
             return sectionsByKey;
         }, {});
         payload[0].PracticeMode = true;
+        payload[0].TimelineStopAtEnd = false;
         payload[0].TimelineLoop = true;
         payload[0].TimelineLoopCount = 'loop';
         payload[0].SheetQuickPlayMode = true;

@@ -29,8 +29,8 @@
     <script src="JS/serverLibrary.js?v=1786693550"></script>
     <script src="JS/selection_drag_7.js?v=1787398090"></script>
     <script src="JS/functions.js?v=1786564504"></script>
-    <script src="JS/timeline.js?v=1787998191"></script>
-    <script src="JS/practice.js?v=1786518672"></script>
+    <script src="JS/timeline.js?v=1788026230"></script>
+    <script src="JS/practice.js?v=1788026230"></script>
     <script src="JS/offline.js?v=1786652138" defer></script>
     <script src="legal/navigation.js?v=1786657981" defer></script>
     <link rel="stylesheet" href="CSS/index_style.css?v=1787992792">
@@ -4041,6 +4041,7 @@ function buildSheetQuickPlayPayload() {
             return sectionsByKey;
         }, {});
         payload[0].PracticeMode = true;
+        payload[0].TimelineStopAtEnd = false;
         payload[0].TimelineLoop = true;
         payload[0].TimelineLoopCount = 'loop';
         payload[0].SheetQuickPlayMode = true;

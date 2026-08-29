@@ -1123,6 +1123,7 @@ function buildTimelinePlayerPayload(patternLibrary, timelineEntries) {
         Name: titel.attr('text'),
         Rhythmus: rhythm,
         TimelineMode: true,
+        TimelineStopAtEnd: true,
         TimelineLoop: timelineLoopCount === 'loop',
         TimelineLoopCount: timelineLoopCount,
         Tempo: normalizeTimelineTempo(timelineState.tempo),
@@ -3724,7 +3725,17 @@ function getTimelinePatternBarCountAtFinalOut(pattern) {
             outBarIndex = barIndex;
         }
     });
-    return outBarIndex === -1 ? fullBarCount : outBarIndex + 1;
+    const barCountAtFinalOut = outBarIndex === -1 ? fullBarCount : outBarIndex + 1;
+    const finalCountedBar = bars[barCountAtFinalOut - 1];
+    const handsFinalBarToNextPattern = barCountAtFinalOut > 1 &&
+        Array.isArray(finalCountedBar && finalCountedBar.controls) &&
+        finalCountedBar.controls.some(function (control) {
+            return control && control.type === 'overlap';
+        });
+
+    // The marked final bar is the first bar of the following pattern, not an
+    // additional timeline bar of the current pattern.
+    return handsFinalBarToNextPattern ? barCountAtFinalOut - 1 : barCountAtFinalOut;
 }
 
 function getTimelineGroupBarCount(group) {
