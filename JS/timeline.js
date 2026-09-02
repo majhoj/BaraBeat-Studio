@@ -3710,7 +3710,24 @@ function getTimelineExpandedPatternBars(pattern) {
         : bars;
 }
 
-function getTimelinePatternBarCountAtFinalOut(pattern) {
+function getTimelinePatternBarCountWithOverlapHandoff(pattern, bars, barCount, shouldHandOffOverlap) {
+    const normalizedBarCount = Math.max(1, Math.min(
+        Array.isArray(bars) ? bars.length : 0,
+        Math.round(Number(barCount) || 1)
+    ));
+    if (!shouldHandOffOverlap || !pattern || pattern.labelType === 'Begleitung' || normalizedBarCount <= 1) {
+        return normalizedBarCount;
+    }
+
+    const finalCountedBar = bars[normalizedBarCount - 1];
+    const handsFinalBarToNextPattern = Array.isArray(finalCountedBar && finalCountedBar.controls) &&
+        finalCountedBar.controls.some(function (control) {
+            return control && control.type === 'overlap';
+        });
+    return handsFinalBarToNextPattern ? normalizedBarCount - 1 : normalizedBarCount;
+}
+
+function getTimelinePatternBarCountAtFinalOut(pattern, shouldHandOffOverlap) {
     const bars = getTimelineExpandedPatternBars(pattern);
     const fullBarCount = Math.max(1, bars.length);
     if (!pattern || pattern.labelType === 'Begleitung') {
@@ -3726,35 +3743,35 @@ function getTimelinePatternBarCountAtFinalOut(pattern) {
         }
     });
     const barCountAtFinalOut = outBarIndex === -1 ? fullBarCount : outBarIndex + 1;
-    const finalCountedBar = bars[barCountAtFinalOut - 1];
-    const handsFinalBarToNextPattern = barCountAtFinalOut > 1 &&
-        Array.isArray(finalCountedBar && finalCountedBar.controls) &&
-        finalCountedBar.controls.some(function (control) {
-            return control && control.type === 'overlap';
-        });
-
-    // The marked final bar is the first bar of the following pattern, not an
-    // additional timeline bar of the current pattern.
-    return handsFinalBarToNextPattern ? barCountAtFinalOut - 1 : barCountAtFinalOut;
+    return getTimelinePatternBarCountWithOverlapHandoff(
+        pattern,
+        bars,
+        barCountAtFinalOut,
+        shouldHandOffOverlap !== false
+    );
 }
 
-function getTimelineGroupBarCount(group) {
+function getTimelineGroupBarCount(group, shouldHandOffFinalOverlap) {
     const entries = group && Array.isArray(group.entries) ? group.entries : [];
     return entries.reduce(function (barCount, entry, entryIndex) {
         const pattern = findPatternById(entry && entry.patternId);
-        const fullBarCount = Math.max(1, getTimelineExpandedPatternBars(pattern).length);
-        const entryBarCount = entryIndex === entries.length - 1
-            ? getTimelinePatternBarCountAtFinalOut(pattern)
-            : fullBarCount;
+        const bars = getTimelineExpandedPatternBars(pattern);
+        const fullBarCount = Math.max(1, bars.length);
+        const isLastEntry = entryIndex === entries.length - 1;
+        const entryBarCount = isLastEntry
+            ? getTimelinePatternBarCountAtFinalOut(pattern, shouldHandOffFinalOverlap !== false)
+            : getTimelinePatternBarCountWithOverlapHandoff(pattern, bars, fullBarCount, true);
         return barCount + entryBarCount;
     }, 0);
 }
 
-function getTimelineRowBarCount(rowGroups) {
+function getTimelineRowBarCount(rowGroups, shouldHandOffFinalOverlap) {
     const baseGroups = (Array.isArray(rowGroups) ? rowGroups : []).filter(function (group) {
         return group && !isTimelineOverlayGroup(group);
     });
-    return Math.max.apply(null, baseGroups.map(getTimelineGroupBarCount).concat(1));
+    return Math.max.apply(null, baseGroups.map(function (group) {
+        return getTimelineGroupBarCount(group, shouldHandOffFinalOverlap);
+    }).concat(1));
 }
 
 function getTimelineRowGapBeforeBars(rowGroups) {
@@ -3797,10 +3814,12 @@ function setTimelineRowGapBeforeBars(rowGroups, nextGapBeforeBars) {
 function buildTimelineHorizontalLayout(visualRows) {
     const rows = [];
     let nextStartBar = 1;
+    const timelineRows = Array.isArray(visualRows) ? visualRows : [];
 
-    (Array.isArray(visualRows) ? visualRows : []).forEach(function (rowGroups, rowIndex) {
+    timelineRows.forEach(function (rowGroups, rowIndex) {
         const gapBeforeBars = getTimelineRowGapBeforeBars(rowGroups);
-        const barCount = getTimelineRowBarCount(rowGroups);
+        const shouldHandOffFinalOverlap = rowIndex < timelineRows.length - 1;
+        const barCount = getTimelineRowBarCount(rowGroups, shouldHandOffFinalOverlap);
         nextStartBar += gapBeforeBars;
         rows.push({
             rowIndex: rowIndex,
@@ -3808,6 +3827,7 @@ function buildTimelineHorizontalLayout(visualRows) {
             startBar: nextStartBar,
             gapBeforeBars: gapBeforeBars,
             barCount: barCount,
+            shouldHandOffFinalOverlap: shouldHandOffFinalOverlap,
             endBar: nextStartBar + barCount
         });
         nextStartBar += barCount;
@@ -3833,7 +3853,10 @@ function buildTimelineHorizontalLayout(visualRows) {
 
             const continuationBlock = continuationByGroupKey[getTimelineGroupKey(group)];
             let startBar = rowLayout.startBar;
-            let barCount = Math.max(1, getTimelineGroupBarCount(group));
+            let barCount = Math.max(1, getTimelineGroupBarCount(
+                group,
+                rowLayout.shouldHandOffFinalOverlap
+            ));
 
             if (continuationBlock) {
                 const startRow = rows[continuationBlock.startRowIndex] || rowLayout;
@@ -3860,6 +3883,7 @@ function buildTimelineHorizontalLayout(visualRows) {
                     rowGroups: rowLayout.rowGroups,
                     rowIndex: rowLayout.rowIndex,
                     pattern: pattern,
+                    shouldHandOffFinalOverlap: rowLayout.shouldHandOffFinalOverlap,
                     isOverlay: isTimelineOverlayGroup(group)
                 });
             });
@@ -3982,7 +4006,7 @@ function appendTimelineTrackRepeatControl(entryCard, group) {
     };
 }
 
-function bindTimelineEntryResizeHandle(handleEl, entryCard, group, repeatControl) {
+function bindTimelineEntryResizeHandle(handleEl, entryCard, group, repeatControl, shouldHandOffFinalOverlap) {
     if (!handleEl || !entryCard || !group || !repeatControl) {
         return;
     }
@@ -4002,7 +4026,7 @@ function bindTimelineEntryResizeHandle(handleEl, entryCard, group, repeatControl
         const startRepeatCount = normalizeTimelineGroupRepeatCount(
             repeatControl.repeatInfo.repeatCount || 1
         );
-        const totalBarCount = Math.max(1, getTimelineGroupBarCount(group));
+        const totalBarCount = Math.max(1, getTimelineGroupBarCount(group, shouldHandOffFinalOverlap));
         const unitBarCount = Math.max(1, totalBarCount / startRepeatCount);
         let previewRepeatCount = startRepeatCount;
         entryCard.draggable = false;
@@ -4239,7 +4263,13 @@ function createTimelineTrackEntryClip(clip, patternDisplayInfo, layout) {
         resizeHandleEl.setAttribute('aria-label', timelineText('arrangement.resizePattern'));
         resizeHandleEl.title = timelineText('arrangement.resizePattern');
         resizeHandleEl.draggable = false;
-        bindTimelineEntryResizeHandle(resizeHandleEl, entryCard, clip.group, repeatControl);
+        bindTimelineEntryResizeHandle(
+            resizeHandleEl,
+            entryCard,
+            clip.group,
+            repeatControl,
+            clip.shouldHandOffFinalOverlap
+        );
         entryCard.appendChild(resizeHandleEl);
     }
     appendTimelineTrackDragSurface(entryCard, patternLabel, {

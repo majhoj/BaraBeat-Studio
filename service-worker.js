@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'barabeat-studio-offline-v64-arrangement-end';
+const CACHE_NAME = 'barabeat-studio-offline-v65-repeated-overlap-bars';
 const APP_SHELL = [
   './app-shell.html',
   './manifest.webmanifest',

@@ -50,6 +50,11 @@ const patterns = {
     })
   },
   solo2a: { id: 'solo2a', labelType: 'Solo', bars: [{}, {}] },
+  solo4: {
+    id: 'solo4',
+    labelType: 'Solo',
+    bars: [{ controls: [] }, { controls: [] }, { controls: [{ type: 'overlap', stepIndex: 0 }] }]
+  },
   djembe: { id: 'djembe', labelType: 'Begleitung', bars: [{}] },
   sangban: { id: 'sangban', labelType: 'Begleitung', bars: [{}, {}] },
   doundoun: { id: 'doundoun', labelType: 'Begleitung', bars: [{}] }
@@ -112,6 +117,7 @@ vm.runInContext(extractFunction(timelineSource, 'expandTimelineBarsWithRepeats')
 vm.runInContext(extractFunction(timelineSource, 'getTimelineRepeatMarkerList'), context);
 vm.runInContext(extractFunction(timelineSource, 'buildTimelinePatternRepeatRanges'), context);
 vm.runInContext(extractFunction(timelineSource, 'getTimelineExpandedPatternBars'), context);
+vm.runInContext(extractFunction(timelineSource, 'getTimelinePatternBarCountWithOverlapHandoff'), context);
 vm.runInContext(extractFunction(timelineSource, 'getTimelinePatternBarCountAtFinalOut'), context);
 vm.runInContext(extractFunction(timelineSource, 'getTimelineGroupBarCount'), context);
 vm.runInContext(extractFunction(timelineSource, 'getTimelineRowBarCount'), context);
@@ -213,6 +219,26 @@ assert(djiaHandoffLayout.rows[1].startBar === 18 && djiaHandoffLayout.rows[1].en
   'Solo 2 endet nach dem Ueberlappungsabzug nicht mit Takt 59.');
 assert(djiaHandoffLayout.rows[2].startBar === 60,
   'Solo 2a beginnt nach der Uebergabe nicht mit dem gemeinsamen Takt 60.');
+
+context.solo4Group = {
+  patternId: 'solo4',
+  entries: Array.from({ length: 5 }, () => ({
+    patternId: 'solo4',
+    targetInstruments: ['Djembe_1']
+  }))
+};
+assert(vm.runInContext('getTimelineGroupBarCount(solo4Group, false);', context) === 11,
+  'Fuenf Solo-4-Durchlaeufe teilen ihre vier inneren Ueberlappungstakte nicht korrekt.');
+assert(vm.runInContext('getTimelineGroupBarCount(solo4Group, true);', context) === 10,
+  'Der letzte Solo-4-Durchlauf uebergibt seinen Schlusstakt nicht an ein folgendes Pattern.');
+context.solo4FinalRows = [[context.solo4Group]];
+const solo4FinalLayout = vm.runInContext('buildTimelineHorizontalLayout(solo4FinalRows);', context);
+assert(solo4FinalLayout.rows[0].barCount === 11,
+  'Solo 4 behaelt am Ende des Arrangements seinen letzten Takt nicht bei.');
+context.solo4HandoffRows = [[context.solo4Group], [callGroup]];
+const solo4HandoffLayout = vm.runInContext('buildTimelineHorizontalLayout(solo4HandoffRows);', context);
+assert(solo4HandoffLayout.rows[0].barCount === 10 && solo4HandoffLayout.rows[1].startBar === 11,
+  'Solo 4 und das folgende Pattern teilen ihren Uebergangstakt nicht korrekt.');
 
 djembeGroup.gapBeforeBars = 1;
 sangbanGroup.gapBeforeBars = 1;
