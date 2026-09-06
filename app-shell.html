@@ -29,11 +29,11 @@
     <script src="JS/serverLibrary.js?v=1786693550"></script>
     <script src="JS/selection_drag_7.js?v=1787398090"></script>
     <script src="JS/functions.js?v=1786564504"></script>
-    <script src="JS/timeline.js?v=1788685672"></script>
+    <script src="JS/timeline.js?v=1788707810"></script>
     <script src="JS/practice.js?v=1788026230"></script>
     <script src="JS/offline.js?v=1786652138" defer></script>
     <script src="legal/navigation.js?v=1786657981" defer></script>
-    <link rel="stylesheet" href="CSS/index_style.css?v=1788685672">
+    <link rel="stylesheet" href="CSS/index_style.css?v=1788707811">
 </head>
 
 <body class="app-body" data-offline-boot="true">
@@ -271,11 +271,11 @@
             </section>
         </div>
         <div class="timeline-panel-body">
-            <section class="timeline-column">
-                <h3 data-i18n="arrangement.patternLibrary">Pattern-Bibliothek</h3>
+            <details class="timeline-column timeline-library-column" open>
+                <summary><h3 data-i18n="arrangement.patternLibrary">Pattern-Bibliothek</h3></summary>
                 <p class="timeline-column-note" data-i18n="arrangement.patternLibraryNote">Jede Passage aus dem Notenblatt erscheint hier einmal. Ziehen oder über + ans Ende der Timeline anfügen.</p>
                 <div id="timelinePatternList" class="timeline-pattern-list"></div>
-            </section>
+            </details>
             <section class="timeline-column">
                 <h3 data-i18n="arrangement.timelineTitle">Timeline</h3>
                 <p class="timeline-column-note" data-i18n="arrangement.timelineNote">Die Timeline bestimmt die Wiedergabereihenfolge. Djembe-Zuordnung passiert hier.</p>

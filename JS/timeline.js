@@ -49,6 +49,7 @@ let timelinePlaybackHighlightGeneration = 0;
 const timelinePlaybackHighlightTimers = new Set();
 let timelinePlaybackScrollAnimation = null;
 let timelinePlaybackScrollFrame = null;
+let timelineTrackViewportObserver = null;
 
 function stopTimelinePlaybackScrollAnimation() {
     if (timelinePlaybackScrollFrame !== null) {
@@ -84,6 +85,9 @@ function scrollTimelinePlaybackBarIntoView(barEl, progress = 0) {
 
     trackScrollEl.classList.add('is-following-playback');
     const labelEl = trackScrollEl.querySelector('.timeline-track-ruler-label');
+    const viewportEl = trackScrollEl.closest('.timeline-track-viewport');
+    const playheadEl = viewportEl && viewportEl.querySelector('.timeline-track-playhead');
+    const playheadBounds = playheadEl && playheadEl.getBoundingClientRect();
     let scrollEl = trackScrollEl;
     let scrollGeometry = null;
     // A surrounding column may own the horizontal overflow instead of the track.
@@ -112,7 +116,9 @@ function scrollTimelinePlaybackBarIntoView(barEl, progress = 0) {
                 const barBounds = barEl.getBoundingClientRect();
                 if (scrollEl === trackScrollEl ||
                         barBounds.left < visibleLeft || barBounds.right > visibleRight) {
-                    const baseLeft = scrollEl.scrollLeft + (barBounds.left - visibleLeft) / scale;
+                    const anchorLeft = scrollEl === trackScrollEl && playheadBounds && playheadBounds.width > 0
+                        ? playheadBounds.left : visibleLeft;
+                    const baseLeft = scrollEl.scrollLeft + (barBounds.left - anchorLeft) / scale;
                     const barWidth = barBounds.width / scale;
                     scrollEl.scrollLeft = Math.max(0, Math.min(
                         maximumScrollLeft,
@@ -2891,9 +2897,21 @@ function renderTimelinePatternLibrary() {
         ? timelineState.sourceLibraryGroups
         : patternDisplayInfo.groups;
     listEl.innerHTML = '';
+    let instrumentRowEl = null;
+    let previousInstrument = null;
 
     patternGroups.forEach(function (patternGroup) {
         const firstPattern = patternGroup.patterns[0];
+        const instrument = firstPattern.sourceInstrument || firstPattern.instrument || 'Instrument';
+        if (!instrumentRowEl || instrument !== previousInstrument) {
+            instrumentRowEl = document.createElement('div');
+            instrumentRowEl.className = 'timeline-library-instrument-row';
+            instrumentRowEl.dataset.instrument = instrument;
+            instrumentRowEl.setAttribute('role', 'group');
+            instrumentRowEl.setAttribute('aria-label', getTimelineInstrumentLabel(instrument));
+            listEl.appendChild(instrumentRowEl);
+            previousInstrument = instrument;
+        }
         const blockSummary = buildTimelineGroupSummary({
             entries: patternGroup.entries || []
         }, timelineState.sourcePatterns);
@@ -2957,7 +2975,7 @@ function renderTimelinePatternLibrary() {
         actionWrap.appendChild(addButton);
         card.appendChild(patternTitle);
         card.appendChild(actionWrap);
-        listEl.appendChild(card);
+        instrumentRowEl.appendChild(card);
     });
 }
 
@@ -3423,8 +3441,11 @@ function alignPatternLibraryCardWidths() {
         cardEl.style.width = '';
     });
 
-    const availableWidth = Math.max(180, Math.floor(listEl.clientWidth));
-    const targetWidth = availableWidth;
+    if (listEl.clientWidth <= 0) {
+        return;
+    }
+
+    const targetWidth = Math.min(294, Math.floor(listEl.clientWidth));
     document.documentElement.style.setProperty('--timeline-library-card-width', targetWidth + 'px');
 
     cards.forEach(function (cardEl) {
@@ -4849,6 +4870,10 @@ function renderTimelineSequence() {
         normalizeTimelinePlaybackStartBar(timelineState.playbackStartBar)
     );
     timelineState.playbackStartBar = playbackStartBar;
+    if (timelineTrackViewportObserver) {
+        timelineTrackViewportObserver.disconnect();
+        timelineTrackViewportObserver = null;
+    }
     sequenceEl.innerHTML = '';
 
     const editorEl = document.createElement('section');
@@ -4857,9 +4882,16 @@ function renderTimelineSequence() {
     headingEl.textContent = timelineText('arrangement.tracks');
     editorEl.appendChild(headingEl);
 
+    const viewportEl = document.createElement('div');
+    viewportEl.className = 'timeline-track-viewport';
     const scrollEl = document.createElement('div');
     scrollEl.className = 'timeline-track-scroll';
     scrollEl.style.setProperty('--timeline-track-total-bars', String(layout.totalBars));
+    const contentEl = document.createElement('div');
+    contentEl.className = 'timeline-track-content';
+    const playheadEl = document.createElement('div');
+    playheadEl.className = 'timeline-track-playhead';
+    playheadEl.setAttribute('aria-hidden', 'true');
 
     const rulerRowEl = document.createElement('div');
     rulerRowEl.className = 'timeline-track-ruler-row';
@@ -4898,7 +4930,7 @@ function renderTimelineSequence() {
     });
     rulerCanvasEl.appendChild(addBarButtonEl);
     rulerRowEl.append(rulerLabelEl, rulerCanvasEl);
-    scrollEl.appendChild(rulerRowEl);
+    contentEl.appendChild(rulerRowEl);
 
     layout.usedTargets.forEach(function (targetInstrument) {
         const laneEl = document.createElement('div');
@@ -4948,11 +4980,22 @@ function renderTimelineSequence() {
         bindTimelineTrackLaneDrop(laneDropEl, targetInstrument, layout.totalBars);
         laneCanvasEl.appendChild(laneDropEl);
         laneEl.append(laneLabelEl, laneCanvasEl);
-        scrollEl.appendChild(laneEl);
+        contentEl.appendChild(laneEl);
     });
 
-    editorEl.appendChild(scrollEl);
+    scrollEl.appendChild(contentEl);
+    viewportEl.append(scrollEl, playheadEl);
+    editorEl.appendChild(viewportEl);
     sequenceEl.appendChild(editorEl);
+    // Follow the actual row height, excluding the scrollbar and open detail panels.
+    const updatePlayheadHeight = function () {
+        playheadEl.style.height = contentEl.offsetHeight + 'px';
+    };
+    updatePlayheadHeight();
+    if (typeof ResizeObserver === 'function') {
+        timelineTrackViewportObserver = new ResizeObserver(updatePlayheadHeight);
+        timelineTrackViewportObserver.observe(contentEl);
+    }
     scrollEl.scrollLeft = previousScrollLeft;
     const playingBarEl = scrollEl.querySelector('.timeline-track-ruler-bar.is-playing');
     if (playingBarEl) {

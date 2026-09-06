@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'barabeat-studio-offline-v70-timeline-continuous-scroll';
+const CACHE_NAME = 'barabeat-studio-offline-v72-timeline-library-rows';
 const APP_SHELL = [
   './app-shell.html',
   './manifest.webmanifest',

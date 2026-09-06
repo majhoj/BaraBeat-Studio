@@ -348,11 +348,11 @@ $offlineFallbackEditionConfigJson = json_encode(
             </section>
         </div>
         <div class="timeline-panel-body">
-            <section class="timeline-column">
-                <h3 data-i18n="arrangement.patternLibrary"><?php echo htmlspecialchars(barabeat_t('arrangement.patternLibrary'), ENT_QUOTES, 'UTF-8'); ?></h3>
+            <details class="timeline-column timeline-library-column" open>
+                <summary><h3 data-i18n="arrangement.patternLibrary"><?php echo htmlspecialchars(barabeat_t('arrangement.patternLibrary'), ENT_QUOTES, 'UTF-8'); ?></h3></summary>
                 <p class="timeline-column-note" data-i18n="arrangement.patternLibraryNote"><?php echo htmlspecialchars(barabeat_t('arrangement.patternLibraryNote'), ENT_QUOTES, 'UTF-8'); ?></p>
                 <div id="timelinePatternList" class="timeline-pattern-list"></div>
-            </section>
+            </details>
             <section class="timeline-column">
                 <h3 data-i18n="arrangement.timelineTitle"><?php echo htmlspecialchars(barabeat_t('arrangement.timelineTitle'), ENT_QUOTES, 'UTF-8'); ?></h3>
                 <p class="timeline-column-note" data-i18n="arrangement.timelineNote"><?php echo htmlspecialchars(barabeat_t('arrangement.timelineNote'), ENT_QUOTES, 'UTF-8'); ?></p>

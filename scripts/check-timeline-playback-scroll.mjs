@@ -7,16 +7,24 @@ const start = source.indexOf('function scrollTimelinePlaybackBarIntoView(');
 const end = source.indexOf('\nfunction ', start + 1);
 assert(start >= 0 && end > start, 'Timeline scroll function missing');
 
-function createLayout({ trackWidth = 600, columnWidth = 600, scale = 1 } = {}) {
+function createLayout({ trackWidth = 600, columnWidth = 600, scale = 1, leadBars = 0 } = {}) {
   const panel = makeElement(null, 0, 1000, 1000, 'auto');
   const column = makeElement(panel, 200, columnWidth, Math.max(columnWidth, trackWidth), 'auto');
-  const track = makeElement(column, 0, trackWidth, 112 + 120 * 108 + 42, 'auto');
+  const viewport = makeElement(column, 0, trackWidth, trackWidth, 'visible');
+  const track = makeElement(viewport, 0, trackWidth, 112 + (120 + leadBars) * 108 + 42, 'auto');
   const label = {
     getBoundingClientRect() {
       const left = track.getBoundingClientRect().left;
       return { left, right: left + 112 * scale, width: 112 * scale };
     }
   };
+  const playhead = {
+    getBoundingClientRect() {
+      const left = label.getBoundingClientRect().right + leadBars * 108 * scale;
+      return { left, right: left + scale, width: leadBars ? scale : 0 };
+    }
+  };
+  viewport.querySelector = () => playhead;
   let currentBar = 1;
   let hidden = false;
   const bar = {
@@ -24,11 +32,11 @@ function createLayout({ trackWidth = 600, columnWidth = 600, scale = 1 } = {}) {
     getBoundingClientRect() {
       if (hidden) return { left: 0, right: 0, width: 0 };
       const left = track.getBoundingClientRect().left +
-        (112 + (currentBar - 1) * 108 - track.scrollLeft) * scale;
+        (112 + (currentBar - 1 + leadBars) * 108 - track.scrollLeft) * scale;
       return { left, right: left + 108 * scale, width: 108 * scale };
     }
   };
-  track.closest = () => panel;
+  track.closest = selector => selector === '#timelinePanel' ? panel : viewport;
   track.querySelector = () => label;
 
   function makeElement(parentElement, offset, width, scrollWidth, overflowX) {
@@ -90,9 +98,10 @@ function createLayout({ trackWidth = 600, columnWidth = 600, scale = 1 } = {}) {
     },
     assertAnchored() {
       this.assertVisible();
-      const expectedLeft = Math.max(column.getBoundingClientRect().left, label.getBoundingClientRect().right);
+      const expectedLeft = Math.max(column.getBoundingClientRect().left, label.getBoundingClientRect().right) +
+        leadBars * 108 * scale;
       assert(Math.abs(bar.getBoundingClientRect().left - expectedLeft) < 1,
-        `Bar ${currentBar} must start directly next to the instrument column`);
+        `Bar ${currentBar} must start at the playback anchor`);
     }
   };
 }
@@ -145,7 +154,17 @@ hidden.hide();
 hidden.follow(99);
 assert.equal(hidden.track.scrollLeft, 0, 'A hidden timeline must not scroll');
 
-for (const layout of [normal, clipped, scaled, outerScroll]) {
+const desktop = createLayout({ leadBars: 2 });
+const desktopScaled = createLayout({ leadBars: 2, scale: 0.75 });
+for (const layout of [desktop, desktopScaled]) {
+  for (const number of [1, 2, 99, 120, 1]) {
+    layout.follow(number);
+    layout.assertAnchored();
+    assert.equal(layout.track.scrollLeft, (number - 1) * 108, 'Visual lead-in must not add musical bars');
+  }
+}
+
+for (const layout of [normal, clipped, scaled, outerScroll, desktop, desktopScaled]) {
   for (const barNumber of [1, 99, 120]) {
     for (const progress of [0, 0.25, 0.5, 0.75, 1]) {
       const geometry = layout.follow(barNumber, progress);
