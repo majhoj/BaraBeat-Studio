@@ -29,11 +29,11 @@
     <script src="JS/serverLibrary.js?v=1786693550"></script>
     <script src="JS/selection_drag_7.js?v=1787398090"></script>
     <script src="JS/functions.js?v=1786564504"></script>
-    <script src="JS/timeline.js?v=1788329929"></script>
+    <script src="JS/timeline.js?v=1788685672"></script>
     <script src="JS/practice.js?v=1788026230"></script>
     <script src="JS/offline.js?v=1786652138" defer></script>
     <script src="legal/navigation.js?v=1786657981" defer></script>
-    <link rel="stylesheet" href="CSS/index_style.css?v=1787992792">
+    <link rel="stylesheet" href="CSS/index_style.css?v=1788685672">
 </head>
 
 <body class="app-body" data-offline-boot="true">
@@ -9157,6 +9157,9 @@ function clearTimelineAudioPlayer() {
     window.clearTimeout(timelineAudioRefreshTimer);
     timelineAudioPayloadSignature = '';
     timelineAudioPlaybackState = 'stopped';
+    if (typeof clearTimelinePlaybackBarHighlight === 'function') {
+        clearTimelinePlaybackBarHighlight();
+    }
     if (playerPanelEl) {
         playerPanelEl.hidden = true;
     }

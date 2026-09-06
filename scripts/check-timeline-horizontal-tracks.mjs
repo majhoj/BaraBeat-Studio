@@ -333,6 +333,14 @@ assert(timelineSource.includes('playbackStartBar: normalizeTimelinePlaybackStart
   'Der markierte Starttakt wird nicht im Notenblatt gespeichert.');
 assert(timelineSource.includes("barEl.classList.toggle('is-playback-start'"),
   'Der gewählte Starttakt wird in der Taktleiste nicht markiert.');
+assert(timelineSource.includes("barEl.classList.toggle('is-playing'"),
+  'Der gerade wiedergegebene Takt wird in der Taktleiste nicht markiert.');
+assert(timelineSource.includes('refreshTimelinePlaybackScroll(currentBarEl)'),
+  'Die Timeline folgt dem gerade wiedergegebenen Takt nicht.');
+assert(timelineSource.includes("window.addEventListener('message', handleTimelinePlaybackMessage)"),
+  'Die Timeline empfängt Player-Taktmeldungen nicht unabhängig von der App-Shell.');
+assert(timelineSource.includes("String(frameEl.dataset.audioLaunchKey || '')"),
+  'Timeline-Taktmeldungen werden nicht gegen den aktuellen Player-Start abgesichert.');
 assert(timelineSource.includes("type: 'timeline-accompaniment-segment'"),
   'Vorhandene Begleitblöcke besitzen keinen Drag-Payload.');
 assert(timelineSource.includes("dragSurfaceEl.className = 'timeline-track-drag-surface'"),
@@ -355,10 +363,13 @@ assert(timelineStyles.includes('.timeline-track-add-bar'),
   'Das Feld zum Hinzufügen eines Taktes ist nicht gestaltet.');
 assert(timelineStyles.includes('.timeline-track-ruler-bar.is-playback-start'),
   'Die sichtbare Startmarke der Timeline ist nicht gestaltet.');
+assert(timelineStyles.includes('.timeline-track-ruler-bar.is-playing'),
+  'Die sichtbare Wiedergabemarkierung der Timeline ist nicht gestaltet.');
 
 const playerContext = vm.createContext({});
 playerContext.getTimelineStepsPerBar = function () { return 24; };
 vm.runInContext(extractFunction(playerSource, 'getTimelinePlaybackStartStep'), playerContext);
+vm.runInContext(extractFunction(playerSource, 'getTimelinePlaybackBarForStep'), playerContext);
 playerContext.playbackSections = [
   { startStep: 0, playbackLength: 9 },
   { startStep: 9, playbackLength: 72 }
@@ -370,6 +381,13 @@ assert(
 assert(
   vm.runInContext('getTimelinePlaybackStartStep(playbackSections, 4);', playerContext) === 57,
   'Der Player rechnet einen späteren markierten Takt nicht in den richtigen Wiedergabeschritt um.'
+);
+assert(
+  vm.runInContext('getTimelinePlaybackBarForStep(playbackSections, 8);', playerContext) === 1 &&
+    vm.runInContext('getTimelinePlaybackBarForStep(playbackSections, 9);', playerContext) === 2 &&
+    vm.runInContext('getTimelinePlaybackBarForStep(playbackSections, 33);', playerContext) === 3 &&
+    vm.runInContext('getTimelinePlaybackBarForStep(playbackSections, 57);', playerContext) === 4,
+  'Der Player meldet bei verkürzten Abschnitten nicht die korrekte sichtbare Taktnummer.'
 );
 playerContext.pickupSections = [
   { startStep: 0, playbackLength: 9 },

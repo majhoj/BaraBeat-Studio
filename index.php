@@ -9235,6 +9235,9 @@ function clearTimelineAudioPlayer() {
     window.clearTimeout(timelineAudioRefreshTimer);
     timelineAudioPayloadSignature = '';
     timelineAudioPlaybackState = 'stopped';
+    if (typeof clearTimelinePlaybackBarHighlight === 'function') {
+        clearTimelinePlaybackBarHighlight();
+    }
     if (playerPanelEl) {
         playerPanelEl.hidden = true;
     }

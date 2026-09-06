@@ -12,6 +12,8 @@
     --ui-radius: 10px;
     --ui-radius-small: 7px;
     --ui-font: sans-serif;
+    --timeline-playing-bg: #dcefe5;
+    --timeline-playing-border: #2f8778;
 }
 
 body[data-ui-theme="playful"] {
@@ -25,6 +27,8 @@ body[data-ui-theme="playful"] {
     --ui-text-soft: #5f7069;
     --ui-shadow: 0 14px 34px rgba(49, 93, 82, 0.18);
     --ui-shadow-soft: 0 5px 16px rgba(49, 93, 82, 0.12);
+    --timeline-playing-bg: #d9f3e4;
+    --timeline-playing-border: #23815e;
     background: #fff4dc;
 }
 
@@ -105,6 +109,8 @@ body[data-ui-theme="earth"] {
     --ui-text-soft: #6a5b49;
     --ui-shadow: 0 12px 30px rgba(75, 54, 34, 0.18);
     --ui-shadow-soft: 0 5px 16px rgba(75, 54, 34, 0.12);
+    --timeline-playing-bg: #e8edd8;
+    --timeline-playing-border: #6f7f3d;
     background: #f0dfc4;
 }
 
@@ -2582,6 +2588,15 @@ body[data-ui-theme="earth"] .app-menu-panel #temporaryAccessButton.is-open {
     color: var(--ui-text);
 }
 
+#timelinePanel > .timeline-panel-body {
+    grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
+}
+
+#timelinePanel .timeline-column,
+#timelineSequence {
+    min-width: 0;
+}
+
 #practicePatternChooser.practice-panel-body {
     height: auto;
     min-height: 0;
@@ -3162,6 +3177,8 @@ body.is-timeline-dragging .timeline-overlay-cell {
     display: flex;
     flex-direction: column;
     gap: 6px;
+    width: 100%;
+    max-width: 100%;
     min-width: 0;
 }
 
@@ -3173,6 +3190,9 @@ body.is-timeline-dragging .timeline-overlay-cell {
 
 .timeline-track-scroll {
     width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    scroll-behavior: auto;
     overflow-x: auto;
     overflow-y: visible;
     border: 1px solid var(--ui-border);
@@ -3182,6 +3202,17 @@ body.is-timeline-dragging .timeline-overlay-cell {
 
 .timeline-track-scroll.has-open-track-details {
     padding-bottom: var(--timeline-track-details-clearance, 0);
+}
+
+/* Leave enough horizontal room to scroll through the entire final bar. */
+.timeline-track-scroll.is-following-playback::after {
+    content: '';
+    display: block;
+    height: 1px;
+    width: calc(
+        var(--timeline-track-total-bars, 1) * var(--timeline-track-bar-width) + 100%
+    );
+    pointer-events: none;
 }
 
 .timeline-track-row {
@@ -3295,6 +3326,14 @@ body.is-timeline-dragging .timeline-overlay-cell {
     border-top: 4px solid transparent;
     border-bottom: 4px solid transparent;
     border-left: 7px solid var(--ui-text);
+}
+
+.timeline-track-ruler-bar.is-playing {
+    z-index: 1;
+    background: var(--timeline-playing-bg);
+    color: var(--ui-text);
+    font-weight: 700;
+    box-shadow: inset 0 0 0 2px var(--timeline-playing-border);
 }
 
 .timeline-track-ruler-bar:focus-visible {
@@ -4409,6 +4448,10 @@ body.is-timeline-dragging .timeline-dropzone-inline {
         display: grid;
         grid-template-columns: 1fr;
         gap: 10px;
+    }
+
+    #timelinePanel > .timeline-panel-body {
+        grid-template-columns: minmax(0, 1fr);
     }
 
     .practice-panel-body {

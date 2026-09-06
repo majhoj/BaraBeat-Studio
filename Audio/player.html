@@ -176,6 +176,12 @@ let isPlaying = false;
 let audioIsReady = false;
 let hasWaitedAfterFirstResume = false;
 let hasPrimedAudioOutput = false;
+let lastNotifiedTimelineBar = null;
+let lastNotifiedTimelineTempo = null;
+
+window.getEmbeddedTimelinePlaybackTime = function () {
+  return instr && instr._audioCtx ? instr._audioCtx.currentTime : null;
+};
 
 function applyAudioTheme(themeName) {
   document.body.classList.toggle('audio-theme-playful', themeName === 'playful');
@@ -211,9 +217,20 @@ function notifyEmbeddedPlaybackStep(playbackStep, scheduledTime) {
   if (!embeddedPlayer || !window.parent || window.parent === window || !instr || !instr._audioCtx) {
     return;
   }
-  if (isTimelineMode && !isPracticeMode && !isSheetQuickPlayMode) {
+  const isArrangementPlayback = isTimelineMode && !isPracticeMode && !isSheetQuickPlayMode;
+  const timelineBar = isArrangementPlayback
+    ? getTimelinePlaybackBarForStep(orderedSections, playbackStep)
+    : null;
+  const timelineTempo = isArrangementPlayback ? getEffectiveTempoForStep(playbackStep) : null;
+  if (isArrangementPlayback && timelineBar === lastNotifiedTimelineBar &&
+      timelineTempo === lastNotifiedTimelineTempo) {
     return;
   }
+  lastNotifiedTimelineBar = timelineBar;
+  lastNotifiedTimelineTempo = timelineTempo;
+  const barTiming = isArrangementPlayback
+    ? getTimelinePlaybackBarTiming(orderedSections, playbackStep)
+    : null;
   const sectionContext = getPlaybackSectionContext(playbackStep);
   const isFinalSectionRepeat = !sectionContext || !sectionContext.section
     ? true
@@ -222,6 +239,10 @@ function notifyEmbeddedPlaybackStep(playbackStep, scheduledTime) {
     type: 'barabeat-audio-step',
     launchKey: playerLaunchKey,
     playbackStep: playbackStep,
+    timelineBar: timelineBar,
+    timelineScheduledTime: isArrangementPlayback ? scheduledTime : null,
+    timelineBarDurationMs: barTiming ? barTiming.durationMs : 0,
+    timelineBarProgress: barTiming ? barTiming.progress : 0,
     runtimeKey: sectionContext && sectionContext.section
       ? String(sectionContext.section.runtimeKey || '')
       : '',
@@ -3807,6 +3828,64 @@ function getTimelinePlaybackStartStep(sections, rawStartBar) {
   return Math.max(0, targetStartStep - pickupLeadSteps);
 }
 
+function getTimelinePlaybackBarForStep(sections, rawPlaybackStep) {
+  const playbackStep = Math.max(0, Math.round(Number(rawPlaybackStep) || 0));
+  const stepsPerBar = getTimelineStepsPerBar();
+  if (!Array.isArray(sections) || sections.length === 0 || stepsPerBar <= 0) {
+    return 1;
+  }
+
+  let currentBar = 1;
+  let lastBar = 1;
+  for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
+    const section = sections[sectionIndex];
+    const sectionStartStep = Math.max(0, Math.round(Number(section && section.startStep) || 0));
+    const sectionPlaybackLength = Math.max(0, Math.round(Number(section && section.playbackLength) || 0));
+    const sectionEndStep = sectionStartStep + sectionPlaybackLength;
+    for (let localStep = 0; localStep < sectionPlaybackLength; localStep += stepsPerBar) {
+      const barStartStep = sectionStartStep + localStep;
+      const barEndStep = Math.min(sectionEndStep, barStartStep + stepsPerBar);
+      lastBar = currentBar;
+      if (playbackStep >= barStartStep && playbackStep < barEndStep) {
+        return currentBar;
+      }
+      currentBar += 1;
+    }
+  }
+
+  return lastBar;
+}
+
+function getTimelinePlaybackBarTiming(sections, rawPlaybackStep) {
+  const playbackStep = Math.max(0, Math.round(Number(rawPlaybackStep) || 0));
+  const stepsPerBar = getTimelineStepsPerBar();
+  if (!Array.isArray(sections) || stepsPerBar <= 0) {
+    return null;
+  }
+  for (const section of sections) {
+    const sectionStart = Math.max(0, Math.round(Number(section && section.startStep) || 0));
+    const sectionEnd = sectionStart + Math.max(0, Math.round(Number(section && section.playbackLength) || 0));
+    if (playbackStep < sectionStart || playbackStep >= sectionEnd) {
+      continue;
+    }
+    const barStart = sectionStart + Math.floor((playbackStep - sectionStart) / stepsPerBar) * stepsPerBar;
+    const barEnd = Math.min(sectionEnd, barStart + stepsPerBar);
+    let elapsed = 0;
+    let remaining = 0;
+    // Use the same intervals as the scheduler, including swing and shortened bars.
+    for (let step = barStart; step < barEnd; step++) {
+      const interval = getStepInterval(step);
+      if (step < playbackStep) {
+        elapsed += interval;
+      } else {
+        remaining += interval;
+      }
+    }
+    return { durationMs: remaining * 1000, progress: elapsed / (elapsed + remaining) };
+  }
+  return null;
+}
+
 function initializeTimelinePlaybackStartStep() {
   timelinePlaybackStartStep = isTimelineMode && !isPracticeMode && !isSheetQuickPlayMode
     ? getTimelinePlaybackStartStep(orderedSections, playerConfig.TimelineStartBar)
@@ -4972,6 +5051,7 @@ function scheduler() {
   // notes onto one audio timestamp.
   if (standaloneAppPlayback && nextNoteTime < dTime - maximumSchedulerLag) {
     nextNoteTime = dTime + schedulerRecoveryDelay;
+    lastNotifiedTimelineBar = null;
   }
 
   while (nextNoteTime < dTime + scheduleAheadTime) {
@@ -5658,6 +5738,7 @@ async function startAudioPlayback() {
   }
 
   globalPlaybackStep = timelinePlaybackStartStep;
+  lastNotifiedTimelineBar = null;
   resetDjembeHandStates();
 
   const dTime = instr._audioCtx.currentTime;
@@ -5691,6 +5772,7 @@ function stopAudioPlayback() {
   stopAllActiveSources(instr._audioCtx.currentTime);
   practiceStopAudioTime = 0;
   practiceTimerFinalLoopStartStep = null;
+  lastNotifiedTimelineBar = null;
   playButton.dataset.playing = 'false';
   notifyEmbeddedPlaybackState('stopped');
   return true;

@@ -44,6 +44,252 @@ const timelineState = {
     feelOffsets: Object.assign({}, defaultTimelineFeelOffsets)
 };
 let timelineActiveDragPayload = null;
+let timelinePlaybackHighlightedBar = null;
+let timelinePlaybackHighlightGeneration = 0;
+const timelinePlaybackHighlightTimers = new Set();
+let timelinePlaybackScrollAnimation = null;
+let timelinePlaybackScrollFrame = null;
+
+function stopTimelinePlaybackScrollAnimation() {
+    if (timelinePlaybackScrollFrame !== null) {
+        window.cancelAnimationFrame(timelinePlaybackScrollFrame);
+        timelinePlaybackScrollFrame = null;
+    }
+    timelinePlaybackScrollAnimation = null;
+}
+
+function clearTimelinePlaybackBarHighlight() {
+    stopTimelinePlaybackScrollAnimation();
+    timelinePlaybackHighlightGeneration += 1;
+    timelinePlaybackHighlightTimers.forEach(function (timerId) {
+        window.clearTimeout(timerId);
+    });
+    timelinePlaybackHighlightTimers.clear();
+    timelinePlaybackHighlightedBar = null;
+    document.querySelectorAll('.timeline-track-ruler-bar.is-playing').forEach(function (barEl) {
+        barEl.classList.remove('is-playing');
+        barEl.removeAttribute('aria-current');
+    });
+    document.querySelectorAll('.timeline-track-scroll.is-following-playback').forEach(function (scrollEl) {
+        scrollEl.classList.remove('is-following-playback');
+    });
+}
+
+function scrollTimelinePlaybackBarIntoView(barEl, progress = 0) {
+    const trackScrollEl = barEl && barEl.closest('.timeline-track-scroll');
+    const panelEl = trackScrollEl && trackScrollEl.closest('#timelinePanel');
+    if (!trackScrollEl || !panelEl || barEl.getBoundingClientRect().width <= 0) {
+        return;
+    }
+
+    trackScrollEl.classList.add('is-following-playback');
+    const labelEl = trackScrollEl.querySelector('.timeline-track-ruler-label');
+    let scrollEl = trackScrollEl;
+    let scrollGeometry = null;
+    // A surrounding column may own the horizontal overflow instead of the track.
+    while (scrollEl && panelEl.contains(scrollEl)) {
+        const maximumScrollLeft = Math.max(0, scrollEl.scrollWidth - scrollEl.clientWidth);
+        if (maximumScrollLeft > 1 && window.getComputedStyle(scrollEl).overflowX !== 'visible') {
+            const scrollBounds = scrollEl.getBoundingClientRect();
+            const scale = scrollEl.offsetWidth > 0 ? scrollBounds.width / scrollEl.offsetWidth : 1;
+            let visibleLeft = scrollBounds.left + scrollEl.clientLeft * scale;
+            let visibleRight = visibleLeft + scrollEl.clientWidth * scale;
+            let ancestorEl = scrollEl.parentElement;
+            while (ancestorEl && panelEl.contains(ancestorEl)) {
+                if (window.getComputedStyle(ancestorEl).overflowX !== 'visible') {
+                    const ancestorBounds = ancestorEl.getBoundingClientRect();
+                    visibleLeft = Math.max(visibleLeft, ancestorBounds.left);
+                    visibleRight = Math.min(visibleRight, ancestorBounds.right);
+                }
+                ancestorEl = ancestorEl.parentElement;
+            }
+            visibleLeft = Math.max(0, visibleLeft);
+            visibleRight = Math.min(document.documentElement.clientWidth, visibleRight);
+            if (scrollEl === trackScrollEl && labelEl) {
+                visibleLeft = Math.max(visibleLeft, labelEl.getBoundingClientRect().right);
+            }
+            if (visibleRight > visibleLeft && scale > 0) {
+                const barBounds = barEl.getBoundingClientRect();
+                if (scrollEl === trackScrollEl ||
+                        barBounds.left < visibleLeft || barBounds.right > visibleRight) {
+                    const baseLeft = scrollEl.scrollLeft + (barBounds.left - visibleLeft) / scale;
+                    const barWidth = barBounds.width / scale;
+                    scrollEl.scrollLeft = Math.max(0, Math.min(
+                        maximumScrollLeft,
+                        baseLeft + (scrollEl === trackScrollEl ? barWidth * progress : 0)
+                    ));
+                    if (scrollEl === trackScrollEl) {
+                        scrollGeometry = { scrollEl: scrollEl, baseLeft: baseLeft,
+                            barWidth: barWidth, maximumScrollLeft: maximumScrollLeft };
+                    }
+                }
+            }
+        }
+
+        scrollEl = scrollEl.parentElement;
+    }
+    return scrollGeometry;
+}
+
+function getTimelinePlaybackScrollProgress(animation) {
+    let elapsedMs = performance.now() - animation.startTimeMs;
+    if (animation.readAudioTime) {
+        try {
+            const audioTime = animation.readAudioTime();
+            if (Number.isFinite(audioTime)) {
+                elapsedMs = (audioTime - animation.scheduledAudioTime) * 1000;
+            }
+        } catch (error) {
+            // A replaced player frame may no longer expose its audio clock.
+        }
+    }
+    const fraction = Math.max(0, Math.min(1, elapsedMs / animation.durationMs));
+    return animation.startProgress + (1 - animation.startProgress) * fraction;
+}
+
+function animateTimelinePlaybackScroll() {
+    timelinePlaybackScrollFrame = null;
+    const animation = timelinePlaybackScrollAnimation;
+    if (!animation || !animation.geometry || !animation.geometry.scrollEl.isConnected) {
+        return;
+    }
+    const progress = getTimelinePlaybackScrollProgress(animation);
+    const geometry = animation.geometry;
+    // Geometry is measured once per bar, not on every animation frame.
+    geometry.scrollEl.scrollLeft = Math.max(0, Math.min(
+        geometry.maximumScrollLeft, geometry.baseLeft + geometry.barWidth * progress
+    ));
+    if (progress < 1) {
+        timelinePlaybackScrollFrame = window.requestAnimationFrame(animateTimelinePlaybackScroll);
+    }
+}
+
+function refreshTimelinePlaybackScroll(barEl) {
+    const animation = timelinePlaybackScrollAnimation;
+    if (!animation) {
+        scrollTimelinePlaybackBarIntoView(barEl);
+        return;
+    }
+    animation.geometry = scrollTimelinePlaybackBarIntoView(barEl, getTimelinePlaybackScrollProgress(animation));
+    if (timelinePlaybackScrollFrame === null) {
+        animateTimelinePlaybackScroll();
+    }
+}
+
+function setTimelinePlaybackBarHighlight(rawBarNumber, message, startTimeMs) {
+    const barNumber = Math.max(1, Math.round(Number(rawBarNumber) || 1));
+    document.querySelectorAll('.timeline-track-ruler-bar.is-playing').forEach(function (barEl) {
+        const isCurrentBar = Number(barEl.dataset.timelineBar) === barNumber;
+        barEl.classList.toggle('is-playing', isCurrentBar);
+        if (isCurrentBar) {
+            barEl.setAttribute('aria-current', 'true');
+        } else {
+            barEl.removeAttribute('aria-current');
+        }
+    });
+    timelinePlaybackHighlightedBar = barNumber;
+
+    const currentBarEl = document.querySelector(
+        '#timelineSequence .timeline-track-ruler-bar[data-timeline-bar="' + barNumber + '"]'
+    );
+    stopTimelinePlaybackScrollAnimation();
+    if (currentBarEl) {
+        currentBarEl.classList.add('is-playing');
+        currentBarEl.setAttribute('aria-current', 'true');
+        const durationMs = Number(message && message.timelineBarDurationMs);
+        const reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (Number.isFinite(durationMs) && durationMs > 0 && !reducedMotion) {
+            const frameEl = document.getElementById('timelineAudioFrame');
+            const playerWindow = frameEl && frameEl.contentWindow;
+            timelinePlaybackScrollAnimation = {
+                durationMs: durationMs,
+                startProgress: Math.max(0, Math.min(1, Number(message.timelineBarProgress) || 0)),
+                startTimeMs: startTimeMs,
+                scheduledAudioTime: message.timelineScheduledTime,
+                readAudioTime: playerWindow && Number.isFinite(message.timelineScheduledTime) &&
+                    typeof playerWindow.getEmbeddedTimelinePlaybackTime === 'function'
+                    ? playerWindow.getEmbeddedTimelinePlaybackTime.bind(playerWindow) : null,
+                geometry: null
+            };
+        }
+        refreshTimelinePlaybackScroll(currentBarEl);
+    }
+}
+
+function scheduleTimelinePlaybackBarHighlight(message) {
+    const barNumber = Math.round(Number(message && message.timelineBar) || 0);
+    if (barNumber <= 0) {
+        return;
+    }
+    const generation = timelinePlaybackHighlightGeneration;
+    const delayMs = Math.max(0, Number(message && message.delayMs) || 0);
+    const startTimeMs = performance.now() + delayMs;
+    const timerId = window.setTimeout(function () {
+        timelinePlaybackHighlightTimers.delete(timerId);
+        if (generation !== timelinePlaybackHighlightGeneration) {
+            return;
+        }
+        setTimelinePlaybackBarHighlight(barNumber, message, startTimeMs);
+    }, delayMs);
+    timelinePlaybackHighlightTimers.add(timerId);
+}
+
+function scheduleTimelinePlaybackHighlightClear(delayMs) {
+    const generation = timelinePlaybackHighlightGeneration;
+    const timerId = window.setTimeout(function () {
+        timelinePlaybackHighlightTimers.delete(timerId);
+        if (generation === timelinePlaybackHighlightGeneration) {
+            clearTimelinePlaybackBarHighlight();
+        }
+    }, Math.max(0, Number(delayMs) || 0));
+    timelinePlaybackHighlightTimers.add(timerId);
+}
+
+function handleTimelinePlaybackMessage(event) {
+    if (!event || event.origin !== window.location.origin) {
+        return;
+    }
+    const message = event.data || {};
+    if (message.type !== 'barabeat-audio-step' && message.type !== 'barabeat-audio-state') {
+        return;
+    }
+
+    const frameEl = document.getElementById('timelineAudioFrame');
+    if (!frameEl || !frameEl.contentWindow) {
+        return;
+    }
+    const expectedLaunchKey = frameEl.dataset
+        ? String(frameEl.dataset.audioLaunchKey || '')
+        : '';
+    const launchKeyMatches = Boolean(expectedLaunchKey) &&
+        String(message.launchKey || '') === expectedLaunchKey;
+    if (event.source !== frameEl.contentWindow && !launchKeyMatches) {
+        return;
+    }
+    if (expectedLaunchKey && !launchKeyMatches) {
+        return;
+    }
+
+    if (message.type === 'barabeat-audio-step') {
+        scheduleTimelinePlaybackBarHighlight(message);
+        return;
+    }
+    if (message.state === 'playing') {
+        clearTimelinePlaybackBarHighlight();
+    } else if (message.state === 'ended') {
+        scheduleTimelinePlaybackHighlightClear(message.delayMs);
+    } else {
+        clearTimelinePlaybackBarHighlight();
+    }
+}
+
+window.addEventListener('message', handleTimelinePlaybackMessage);
+window.addEventListener('resize', function () {
+    const barEl = document.querySelector('#timelineSequence .timeline-track-ruler-bar.is-playing');
+    if (barEl) {
+        refreshTimelinePlaybackScroll(barEl);
+    }
+});
 
 const timelineTypeLabelKeys = Object.freeze({
     Begleitung: 'arrangement.type.accompaniment',
@@ -4592,6 +4838,8 @@ function createTimelineTrackOverlayDropzone(rowLayout, targetInstrument, repeatI
 
 function renderTimelineSequence() {
     const sequenceEl = document.getElementById('timelineSequence');
+    const previousScrollEl = sequenceEl.querySelector('.timeline-track-scroll');
+    const previousScrollLeft = previousScrollEl ? previousScrollEl.scrollLeft : 0;
     const patternDisplayInfo = buildPatternDisplayLabelMap(timelineState.sourcePatterns);
     const entryGroups = buildTimelineDisplayGroups(timelineState.entries, timelineState.sourcePatterns);
     const visualRows = buildTimelineVisualRows(entryGroups, timelineState.sourcePatterns);
@@ -4630,6 +4878,10 @@ function renderTimelineSequence() {
         barEl.setAttribute('aria-label', startLabel);
         barEl.setAttribute('aria-pressed', barNumber === playbackStartBar ? 'true' : 'false');
         barEl.classList.toggle('is-playback-start', barNumber === playbackStartBar);
+        barEl.classList.toggle('is-playing', barNumber === timelinePlaybackHighlightedBar);
+        if (barNumber === timelinePlaybackHighlightedBar) {
+            barEl.setAttribute('aria-current', 'true');
+        }
         bindTimelineRulerBarDropTarget(barEl, layout, barNumber);
         bindTimelinePlaybackStartBar(barEl, barNumber);
         rulerCanvasEl.appendChild(barEl);
@@ -4701,6 +4953,11 @@ function renderTimelineSequence() {
 
     editorEl.appendChild(scrollEl);
     sequenceEl.appendChild(editorEl);
+    scrollEl.scrollLeft = previousScrollLeft;
+    const playingBarEl = scrollEl.querySelector('.timeline-track-ruler-bar.is-playing');
+    if (playingBarEl) {
+        refreshTimelinePlaybackScroll(playingBarEl);
+    }
 }
 
 function renderTimelinePanel() {

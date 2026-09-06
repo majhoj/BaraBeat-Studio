@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'barabeat-studio-offline-v65-repeated-overlap-bars';
+const CACHE_NAME = 'barabeat-studio-offline-v70-timeline-continuous-scroll';
 const APP_SHELL = [
   './app-shell.html',
   './manifest.webmanifest',
