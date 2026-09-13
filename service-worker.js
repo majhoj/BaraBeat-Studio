@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'barabeat-studio-offline-v72-timeline-library-rows';
+const CACHE_NAME = 'barabeat-studio-offline-v75-sheet-title-font';
 const APP_SHELL = [
   './app-shell.html',
   './manifest.webmanifest',

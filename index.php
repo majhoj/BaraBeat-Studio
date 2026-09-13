@@ -318,6 +318,7 @@ $offlineFallbackEditionConfigJson = json_encode(
     </div>
 
     <div id="sheetQuickPlayControls" class="sheet-quick-play-controls" aria-label="<?php echo htmlspecialchars(barabeat_t('editor.quickPlay.aria'), ENT_QUOTES, 'UTF-8'); ?>" data-i18n-aria-label="editor.quickPlay.aria">
+        <button type="button" id="sheetQuickPlayTitle" class="sheet-quick-play-title" aria-label="<?php echo htmlspecialchars(barabeat_t('editor.rhythmName'), ENT_QUOTES, 'UTF-8'); ?>" data-i18n-aria-label="editor.rhythmName"></button>
         <label for="sheetQuickPlayTempo" data-i18n="editor.quickPlay.tempo"><?php echo htmlspecialchars(barabeat_t('editor.quickPlay.tempo'), ENT_QUOTES, 'UTF-8'); ?></label>
         <input type="number" id="sheetQuickPlayTempo" min="30" max="180" step="1" value="100" />
         <button type="button" id="sheetQuickPlayButton" aria-pressed="false" title="<?php echo htmlspecialchars(barabeat_t('editor.quickPlay.playSelected'), ENT_QUOTES, 'UTF-8'); ?>" data-i18n-title="editor.quickPlay.playSelected">▶</button>
@@ -766,28 +767,30 @@ function setRhythmTitle(titleValue) {
         text: isPlaceholder ? defaultRhythmTitle : String(titleValue).trim(),
         fill: isPlaceholder ? '#8a8a8a' : '#111'
     });
+    updateSheetQuickPlayTitle();
 }
 
-function startInlineRhythmTitleEdit() {
+function startInlineRhythmTitleEdit(anchorEl) {
     if (!titel || !titel.node || document.getElementById('rhythmTitleEditor')) {
         return;
     }
 
     const currentTitle = titel.attr('text') || '';
     const editorEl = document.createElement('input');
-    const titleBounds = titel.node.getBoundingClientRect();
-    const scrollX = window.pageXOffset || document.documentElement.scrollLeft || 0;
-    const scrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
+    const isStickyTitle = anchorEl && anchorEl.id === 'sheetQuickPlayTitle';
+    const titleBounds = (isStickyTitle ? anchorEl : titel.node).getBoundingClientRect();
+    const scrollX = isStickyTitle ? 0 : (window.pageXOffset || document.documentElement.scrollLeft || 0);
+    const scrollY = isStickyTitle ? 0 : (window.pageYOffset || document.documentElement.scrollTop || 0);
 
     editorEl.id = 'rhythmTitleEditor';
     editorEl.type = 'text';
     editorEl.value = isDefaultTitleText(currentTitle) ? '' : currentTitle;
     editorEl.placeholder = defaultRhythmTitle;
     editorEl.setAttribute('aria-label', uiText('editor.rhythmName'));
-    editorEl.style.position = 'absolute';
+    editorEl.style.position = isStickyTitle ? 'fixed' : 'absolute';
     editorEl.style.left = (titleBounds.left + scrollX - 4) + 'px';
     editorEl.style.top = (titleBounds.top + scrollY - 4) + 'px';
-    editorEl.style.width = Math.max(280, titleBounds.width + 80) + 'px';
+    editorEl.style.width = (isStickyTitle ? Math.max(80, titleBounds.width + 8) : Math.max(280, titleBounds.width + 80)) + 'px';
     editorEl.style.height = Math.max(32, titleBounds.height + 8) + 'px';
     editorEl.style.zIndex = '10001';
     editorEl.style.boxSizing = 'border-box';
@@ -2309,7 +2312,7 @@ function drawRhythmSheet(config) {
     }
 }
 
-var titel = s.text(100, y - 100, defaultRhythmTitle).attr({ id: 'basis', 'font-size': 24, 'font-family': 'sans-serif', 'font-weight': 'bold', fill: '#8a8a8a', cursor: 'text' });
+var titel = s.text(100, y - 100, defaultRhythmTitle).attr({ id: 'basis', class: 'sheet-rhythm-title', 'font-size': 24, 'font-family': 'sans-serif', 'font-weight': 'bold', fill: '#8a8a8a', cursor: 'text' });
 titel.click(edit_title);
 titel.dblclick(edit_title);
 
@@ -2618,16 +2621,44 @@ function moveSheetPatternByDirection(rangeId, direction) {
     return true;
 }
 
+function updateSheetQuickPlayTitle() {
+    const titleEl = document.getElementById('sheetQuickPlayTitle');
+    const titleText = titel ? String(titel.attr('text') || '') : '';
+    if (titleEl && titleEl.textContent !== titleText) {
+        titleEl.textContent = titleText;
+        titleEl.title = titleText;
+    }
+}
+
 function positionSheetQuickPlayControls() {
     const controlsEl = document.getElementById('sheetQuickPlayControls');
     if (!controlsEl || !s || !s.node) {
         return;
     }
     if (isMobilePracticeViewport()) {
+        controlsEl.classList.remove('is-sticky');
+        controlsEl.style.width = '';
         return;
     }
 
     const svgBounds = s.node.getBoundingClientRect();
+    const menuEl = document.getElementById('appMenuBar');
+    const stickyTop = (menuEl ? Math.max(0, menuEl.getBoundingClientRect().bottom) : 0) + 8;
+    const isSticky = svgBounds.width > 0 && svgBounds.top + 44 < stickyTop;
+    controlsEl.classList.toggle('is-sticky', isSticky);
+    updateSheetQuickPlayTitle();
+    if (isSticky) {
+        const viewportWidth = document.documentElement.clientWidth;
+        const titleBounds = titel && titel.node ? titel.node.getBoundingClientRect() : null;
+        const titleInset = controlsEl.clientLeft + (parseFloat(window.getComputedStyle(controlsEl).paddingLeft) || 0);
+        const left = Math.max(8, titleBounds ? titleBounds.left - titleInset : svgBounds.left + 40);
+        const right = Math.min(viewportWidth - 8, svgBounds.right - 40);
+        controlsEl.style.left = left + 'px';
+        controlsEl.style.top = stickyTop + 'px';
+        controlsEl.style.width = Math.max(0, right - left) + 'px';
+        return;
+    }
+    controlsEl.style.width = '';
     const scrollX = window.pageXOffset || document.documentElement.scrollLeft || 0;
     const scrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
     controlsEl.style.left = (svgBounds.left + scrollX + svgBounds.width - controlsEl.offsetWidth - 40) + 'px';
@@ -10333,6 +10364,9 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     document.querySelector('#sheetQuickPlayButton').addEventListener('click', function () {
         toggleSheetQuickPlay();
+    });
+    document.querySelector('#sheetQuickPlayTitle').addEventListener('click', function () {
+        startInlineRhythmTitleEdit(this);
     });
     document.querySelector('#sheetQuickPlayTempo').addEventListener('change', function () {
         getSheetQuickPlayTempo();

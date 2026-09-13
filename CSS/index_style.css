@@ -625,6 +625,47 @@ body[data-ui-theme="earth"] .app-menu-panel #temporaryAccessButton.is-open {
     background: #f2b36c;
 }
 
+.sheet-quick-play-controls .sheet-quick-play-title {
+    display: none;
+    flex: 1 1 auto;
+    min-width: 0;
+    width: auto;
+    height: auto;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--ui-text);
+    font: 700 24px var(--ui-font);
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: text;
+}
+
+.sheet-quick-play-controls.is-sticky {
+    position: fixed;
+    box-sizing: border-box;
+    background: var(--ui-panel-bg);
+}
+
+.sheet-quick-play-controls.is-sticky .sheet-quick-play-title {
+    display: block;
+}
+
+@media screen {
+    .sheet-quick-play-controls.is-sticky ~ #myRect1 .sheet-rhythm-title {
+        visibility: hidden;
+    }
+}
+
+.sheet-quick-play-controls > label,
+.sheet-quick-play-controls > input,
+#sheetQuickPlayButton {
+    flex-shrink: 0;
+}
+
 .sheet-quick-play-frame {
     position: fixed;
     left: -10000px;
