@@ -3495,10 +3495,15 @@ function buildSheetQuickPlayPatternGroups(preparedPatterns) {
     return groups;
 }
 
-function trimSheetQuickPlayStandalonePickupNotes(pickupNotes) {
-    const notes = Array.isArray(pickupNotes) ? pickupNotes : [];
-    const firstPlayableIndex = notes.findIndex(isSheetQuickPlayPlayableNote);
-    return firstPlayableIndex >= 0 ? notes.slice(firstPlayableIndex) : [];
+function hasSheetQuickPlayAccompanimentPickup(pattern) {
+    if ((pattern.labelType || pattern.label) !== 'Begleitung') {
+        return false;
+    }
+    return getSheetQuickPlayPickupEndStep(
+        getSheetQuickPlayPatternNotes(pattern),
+        getSheetQuickPlayPatternInStep(pattern),
+        getReadRhythmConfig().stepsPerBar
+    ) > 0;
 }
 
 function mergeSheetQuickPlayPickupIntoHostSection(hostSection, pickupSection) {
@@ -3557,6 +3562,9 @@ function buildSheetQuickPlayConfiguredSections(preparedPatterns) {
         const labelNames = [];
         const parallelAccompanimentLoops = [];
         const hasParallelPatterns = group.length > 1;
+        const hasAccompanimentPickup = group.some(function (entry) {
+            return hasSheetQuickPlayAccompanimentPickup(entry.pattern);
+        });
         const section = createSheetQuickPlaySection(
             'Begleitung',
             '',
@@ -3598,8 +3606,8 @@ function buildSheetQuickPlayConfiguredSections(preparedPatterns) {
             const label = pattern.labelType || pattern.label || 'Begleitung';
             const labelName = pattern.labelName || pattern.name || label;
             const pickupEndStep = getSheetQuickPlayPickupEndStep(patternNotes, inStep, stepsPerBar);
+            // An accompaniment keeps its complete cycle after the initial pickup, even without OUT.
             const keepFullAccompanimentAfterPickup = pickupEndStep > 0 &&
-                hasHostSection &&
                 label === 'Begleitung';
             let pickupNotes = buildSheetQuickPlayPickupNotes(patternNotes, inStep, stepsPerBar);
             let mainNotes = pickupEndStep > 0 && !keepFullAccompanimentAfterPickup
@@ -3617,14 +3625,14 @@ function buildSheetQuickPlayConfiguredSections(preparedPatterns) {
                 ? pickupEndStep
                 : 0;
 
-            if (pickupEndStep > 0 && !hasHostSection && group.length === 1) {
+            if (pickupEndStep > 0 && !hasHostSection && !hasAccompanimentPickup && group.length === 1) {
                 const safeInStep = Math.max(0, Math.min(patternNotes.length - 1, Number(inStep) || 0));
                 pickupNotes = [];
                 mainNotes = patternNotes.slice(safeInStep);
                 pickupHighlightRefs = [];
                 mainHighlightRefs = patternHighlightRefs.slice(safeInStep);
                 sectionStartStep = safeInStep;
-            } else if (pickupEndStep > 0 && !hasHostSection) {
+            } else if (pickupEndStep > 0 && !hasHostSection && !hasAccompanimentPickup) {
                 sectionStartStep = Math.max(0, pickupEndStep - stepsPerBar);
                 mainNotes = pickupNotes.concat(mainNotes);
                 mainHighlightRefs = pickupHighlightRefs.concat(mainHighlightRefs);
@@ -3632,8 +3640,9 @@ function buildSheetQuickPlayConfiguredSections(preparedPatterns) {
                 pickupHighlightRefs = [];
             }
 
-            const shouldIgnoreOutForAccompanimentLoop = label === 'Begleitung' && groups.length === 1;
-            const hasApplicableOut = !shouldIgnoreOutForAccompanimentLoop &&
+            const shouldIgnoreOutForContinuousLoop = groups.length === 1 &&
+                (label === 'Begleitung' || /^Solo(?:\s|$)/i.test(String(label || '')));
+            const hasApplicableOut = !shouldIgnoreOutForContinuousLoop &&
                 outStep !== null &&
                 outStep !== undefined &&
                 Number(outStep) >= sectionStartStep;
@@ -3727,11 +3736,16 @@ function buildSheetQuickPlayConfiguredSections(preparedPatterns) {
             if (hostSection) {
                 mergeSheetQuickPlayPickupIntoHostSection(hostSection, pickupSection);
             } else {
+                // Trim the shared lead-in, keeping all instruments and highlights on one grid.
+                const firstPickupStep = Math.min.apply(null, getSheetQuickPlayTrackNames().map(function (instrumentName) {
+                    return pickupSection.trackNotes[instrumentName].findIndex(isSheetQuickPlayPlayableNote);
+                }).filter(function (stepIndex) {
+                    return stepIndex >= 0;
+                }));
                 getSheetQuickPlayTrackNames().forEach(function (instrumentName) {
-                    pickupSection.trackNotes[instrumentName] = trimSheetQuickPlayStandalonePickupNotes(
-                        pickupSection.trackNotes[instrumentName]
-                    );
+                    pickupSection.trackNotes[instrumentName] = pickupSection.trackNotes[instrumentName].slice(firstPickupStep);
                 });
+                pickupSection.highlightSteps = pickupSection.highlightSteps.slice(firstPickupStep);
                 pickupSection.fixedLength = 0;
                 if (sheetQuickPlaySectionHasNotes(pickupSection)) {
                     sections.push(pickupSection);

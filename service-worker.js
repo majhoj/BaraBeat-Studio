@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'barabeat-studio-offline-v75-sheet-title-font';
+const CACHE_NAME = 'barabeat-studio-offline-v78-numbered-solo-loops';
 const APP_SHELL = [
   './app-shell.html',
   './manifest.webmanifest',

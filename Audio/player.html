@@ -3992,7 +3992,9 @@ function getNeunaerSwingStepOffsets() {
 }
 
 function getPlaybackSectionContext(playbackStep) {
-  if (isSheetQuickPlayMode && timelineLoopCount && orderedFallbackLoopLength > 0) {
+  // A separate pickup uses the normal one-shot path before the loop begins.
+  if (isSheetQuickPlayMode && timelineLoopCount && orderedFallbackLoopLength > 0 &&
+      !(orderedSections.length > 0 && orderedSections[0].isLeadIn)) {
     let loopStep = playbackStep % orderedFallbackLoopLength;
     const loopCycleIndex = Math.floor(playbackStep / orderedFallbackLoopLength);
     for (let sectionIndex = 0; sectionIndex < orderedFallbackLoopSections.length; sectionIndex++) {
@@ -4179,13 +4181,21 @@ function scheduleShekereHit(scheduledTime, gainValue) {
   sampleSource.start(scheduledTime);
 }
 
+function getPlaybackRhythmStep(playbackStep) {
+  const firstSection = orderedSections[0];
+  // A separate quick-play pickup precedes beat one; it must not move the beat/swing grid.
+  return isSheetQuickPlayMode && firstSection && firstSection.isLeadIn
+    ? playbackStep - firstSection.playbackLength
+    : playbackStep;
+}
+
 function scheduleShekereBeatIfNeeded(playbackStep, scheduledTime) {
   if (!shekereBeatEnabled || !practiceCountInBuffer) {
     return;
   }
 
   const stepsPerBeat = getStepsPerBeatForRhythm();
-  if (stepsPerBeat <= 0 || playbackStep % stepsPerBeat !== 0) {
+  if (stepsPerBeat <= 0 || getPlaybackRhythmStep(playbackStep) % stepsPerBeat !== 0) {
     return;
   }
 
@@ -5180,24 +5190,25 @@ function scheduleCurrentStep(time) {
 function getStepInterval(playbackStep, tempoValue) {
   const stepTempo = getEffectiveTempoForStep(playbackStep);
   const stepDuration = getBaseStepDuration(stepTempo);
+  const rhythmStep = getPlaybackRhythmStep(playbackStep);
   let intervalToNextStep = stepDuration;
 
   if (rhythmType === 'binaer') {
     const stepsPerBeat = 8;
     const beatDuration = stepDuration * stepsPerBeat;
-    const stepInBeat = playbackStep % stepsPerBeat;
+    const stepInBeat = ((rhythmStep % stepsPerBeat) + stepsPerBeat) % stepsPerBeat;
     const binaerOffsets = getBinaerSwingStepOffsets();
     intervalToNextStep = beatDuration * (binaerOffsets[stepInBeat + 1] - binaerOffsets[stepInBeat]);
   } else if (rhythmType === 'tenaer') {
     const stepsPerBeat = 6;
     const beatDuration = stepDuration * stepsPerBeat;
-    const stepInBeat = playbackStep % stepsPerBeat;
+    const stepInBeat = ((rhythmStep % stepsPerBeat) + stepsPerBeat) % stepsPerBeat;
     const tenaerOffsets = getTenaerSwingStepOffsets();
     intervalToNextStep = beatDuration * (tenaerOffsets[stepInBeat + 1] - tenaerOffsets[stepInBeat]);
   } else if (rhythmType === 'neunaer') {
     const stepsPerBeat = 6;
     const beatDuration = stepDuration * stepsPerBeat;
-    const stepInBeat = playbackStep % stepsPerBeat;
+    const stepInBeat = ((rhythmStep % stepsPerBeat) + stepsPerBeat) % stepsPerBeat;
     const neunaerOffsets = getNeunaerSwingStepOffsets();
     intervalToNextStep = beatDuration * (neunaerOffsets[stepInBeat + 1] - neunaerOffsets[stepInBeat]);
   }
