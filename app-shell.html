@@ -3044,6 +3044,7 @@ function buildSheetQuickPlayPreparedPattern(pattern, patternIndex) {
             preparedBarCount: preparedBars.length
         },
         quickPlaySectionRepeatCount: sectionRepeatCount,
+        quickPlayHasCyclicPickup: hasSheetQuickPlayCyclicPickup(pattern),
         bars: preparedBars
     });
 }
@@ -3417,15 +3418,19 @@ function buildSheetQuickPlayPatternGroups(preparedPatterns) {
     return groups;
 }
 
-function hasSheetQuickPlayAccompanimentPickup(pattern) {
-    if ((pattern.labelType || pattern.label) !== 'Begleitung') {
-        return false;
+function hasSheetQuickPlayCyclicPickup(pattern) {
+    if (typeof pattern.quickPlayHasCyclicPickup === 'boolean') {
+        return pattern.quickPlayHasCyclicPickup;
     }
-    return getSheetQuickPlayPickupEndStep(
-        getSheetQuickPlayPatternNotes(pattern),
+    const notes = getSheetQuickPlayPatternNotes(pattern);
+    const pickupEndStep = getSheetQuickPlayPickupEndStep(
+        notes,
         getSheetQuickPlayPatternInStep(pattern),
         getReadRhythmConfig().stepsPerBar
-    ) > 0;
+    );
+    // At the end of a pattern, IN leads back into its cycle instead of discarding it.
+    return pickupEndStep > 0 &&
+        ((pattern.labelType || pattern.label) === 'Begleitung' || pickupEndStep === notes.length);
 }
 
 function mergeSheetQuickPlayPickupIntoHostSection(hostSection, pickupSection) {
@@ -3484,8 +3489,8 @@ function buildSheetQuickPlayConfiguredSections(preparedPatterns) {
         const labelNames = [];
         const parallelAccompanimentLoops = [];
         const hasParallelPatterns = group.length > 1;
-        const hasAccompanimentPickup = group.some(function (entry) {
-            return hasSheetQuickPlayAccompanimentPickup(entry.pattern);
+        const hasCyclicPickup = group.some(function (entry) {
+            return hasSheetQuickPlayCyclicPickup(entry.pattern);
         });
         const section = createSheetQuickPlaySection(
             'Begleitung',
@@ -3528,11 +3533,10 @@ function buildSheetQuickPlayConfiguredSections(preparedPatterns) {
             const label = pattern.labelType || pattern.label || 'Begleitung';
             const labelName = pattern.labelName || pattern.name || label;
             const pickupEndStep = getSheetQuickPlayPickupEndStep(patternNotes, inStep, stepsPerBar);
-            // An accompaniment keeps its complete cycle after the initial pickup, even without OUT.
-            const keepFullAccompanimentAfterPickup = pickupEndStep > 0 &&
-                label === 'Begleitung';
+            const keepFullPatternAfterPickup = pickupEndStep > 0 &&
+                hasSheetQuickPlayCyclicPickup(pattern);
             let pickupNotes = buildSheetQuickPlayPickupNotes(patternNotes, inStep, stepsPerBar);
-            let mainNotes = pickupEndStep > 0 && !keepFullAccompanimentAfterPickup
+            let mainNotes = pickupEndStep > 0 && !keepFullPatternAfterPickup
                 ? patternNotes.slice(pickupEndStep)
                 : patternNotes.slice();
             let pickupHighlightRefs = buildSheetQuickPlayPickupHighlightRefs(
@@ -3540,21 +3544,21 @@ function buildSheetQuickPlayConfiguredSections(preparedPatterns) {
                 inStep,
                 stepsPerBar
             );
-            let mainHighlightRefs = pickupEndStep > 0 && !keepFullAccompanimentAfterPickup
+            let mainHighlightRefs = pickupEndStep > 0 && !keepFullPatternAfterPickup
                 ? patternHighlightRefs.slice(pickupEndStep)
                 : patternHighlightRefs.slice();
-            let sectionStartStep = pickupEndStep > 0 && !keepFullAccompanimentAfterPickup
+            let sectionStartStep = pickupEndStep > 0 && !keepFullPatternAfterPickup
                 ? pickupEndStep
                 : 0;
 
-            if (pickupEndStep > 0 && !hasHostSection && !hasAccompanimentPickup && group.length === 1) {
+            if (pickupEndStep > 0 && !hasHostSection && !hasCyclicPickup && group.length === 1) {
                 const safeInStep = Math.max(0, Math.min(patternNotes.length - 1, Number(inStep) || 0));
                 pickupNotes = [];
                 mainNotes = patternNotes.slice(safeInStep);
                 pickupHighlightRefs = [];
                 mainHighlightRefs = patternHighlightRefs.slice(safeInStep);
                 sectionStartStep = safeInStep;
-            } else if (pickupEndStep > 0 && !hasHostSection && !hasAccompanimentPickup) {
+            } else if (pickupEndStep > 0 && !hasHostSection && !hasCyclicPickup) {
                 sectionStartStep = Math.max(0, pickupEndStep - stepsPerBar);
                 mainNotes = pickupNotes.concat(mainNotes);
                 mainHighlightRefs = pickupHighlightRefs.concat(mainHighlightRefs);
@@ -3598,7 +3602,7 @@ function buildSheetQuickPlayConfiguredSections(preparedPatterns) {
             if (labelName && labelNames.indexOf(labelName) === -1) {
                 labelNames.push(labelName);
             }
-            if (label === 'Begleitung' && mainNotes.length > 0) {
+            if ((label === 'Begleitung' || keepFullPatternAfterPickup) && mainNotes.length > 0) {
                 parallelAccompanimentLoops.push({
                     targetInstruments: targetInstruments.slice(),
                     notes: mainNotes.slice(),

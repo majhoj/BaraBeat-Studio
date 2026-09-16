@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'barabeat-studio-offline-v78-numbered-solo-loops';
+const CACHE_NAME = 'barabeat-studio-offline-v79-named-pattern-pickups';
 const APP_SHELL = [
   './app-shell.html',
   './manifest.webmanifest',

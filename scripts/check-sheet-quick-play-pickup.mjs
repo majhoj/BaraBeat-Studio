@@ -191,6 +191,53 @@ loadPlayer(variationAfterCall);
 assert.equal(notesAt('Djembe_1', 22, 1)[0], 'bass', 'IN still merges into the preceding call');
 assert.deepEqual(notesAt('Djembe_1', 24, 24), variation.bars[0].notes);
 
+// Djaa Djembe: the stored label is "Begkeitpattern 1", with IN at the end of bar 3.
+const djaaBars = [bar(3, { 0: 'slap', 4: 'tone', 6: 'slap', 10: 'bass',
+  12: 'slap', 14: 'tone', 16: 'tone', 18: 'slap', 22: 'bass' }, [{ type: 'in', stepIndex: 22 }])];
+for (const label of ['Begkeitpattern 1', 'Bekleitpattern 1', 'Eigener Rhythmus', 'Begleitpattern 1']) {
+  const customPattern = pattern('djaa-custom', 'Djembe_1', djaaBars, label);
+  const originalCustomPattern = JSON.stringify(customPattern);
+  const customSections = prepare([customPattern]);
+  loadPlayer(customSections);
+  assert.deepEqual(notesAt('Djembe_1', 0, 2), ['bass', 'f']);
+  assert.deepEqual(notesAt('Djembe_1', 2, 72), Array.from({ length: 3 }, () => djaaBars[0].notes).flat(),
+    'Terminal IN must retain the complete loop for the name: ' + label);
+  verifyHighlights(customSections, 0, 74, 'Djembe_1', customPattern);
+  assert.equal(customSections[1].labelName, label, 'Quick play must not rename the pattern');
+  for (const selection of [[customPattern, sangban], [sangban, customPattern]]) {
+    const sections = prepare(selection);
+    loadPlayer(sections);
+    assert.deepEqual(notesAt('Djembe_1', 2, 96), Array.from({ length: 4 }, () => djaaBars[0].notes).flat(),
+      'A freely named cycle must repeat alongside a longer accompaniment');
+    verifyHighlights(sections, 0, 98, 'Djembe_1', customPattern);
+  }
+  loadPlayer(prepare([djembeCall, customPattern]));
+  assert.equal(notesAt('Djembe_1', 22, 1)[0], 'bass');
+  assert.deepEqual(notesAt('Djembe_1', 24, 24), djaaBars[0].notes);
+  assert.equal(JSON.stringify(customPattern), originalCustomPattern);
+}
+const repeatedCustomBars = JSON.parse(JSON.stringify(djaaBars));
+repeatedCustomBars[0].repeat = { start: [1], end: [2] };
+const repeatedCustom = prepare([pattern('djaa-repeated', 'Djembe_1', repeatedCustomBars, 'Eigener Rhythmus')]);
+loadPlayer(repeatedCustom);
+assert.equal(repeatedCustom[1].fixedLength, 72, 'Detect terminal IN before expanding written repeats');
+assert.deepEqual(notesAt('Djembe_1', 2, 144), Array.from({ length: 6 }, () => djaaBars[0].notes).flat());
+const multiBarCustom = pattern('custom-two-bars', 'Djembe_1', [
+  bar(12, { 0: 'bass', 8: 'tone' }), ...djaaBars
+], 'Eigener Rhythmus');
+const multiBarSections = prepare([multiBarCustom]);
+loadPlayer(multiBarSections);
+const multiBarNotes = multiBarCustom.bars.flatMap(item => item.notes);
+assert.equal(multiBarSections[1].fixedLength, 48, 'A terminal IN must preserve earlier bars as well');
+assert.deepEqual(notesAt('Djembe_1', 2, 96), multiBarNotes.concat(multiBarNotes));
+verifyHighlights(multiBarSections, 0, 98, 'Djembe_1', multiBarCustom);
+const customLeadingPickup = prepare([pattern('custom-leading', 'Djembe_1', [
+  bar(10, { 22: 'slap' }, [{ type: 'in', stepIndex: 22 }]),
+  bar(11, { 0: 'bass', 8: 'tone' })
+], 'Eigener Rhythmus')]);
+assert.equal(customLeadingPickup.length, 1, 'A genuine leading pickup keeps its existing behavior');
+assert.deepEqual(Array.from(customLeadingPickup[0].trackNotes.Djembe_1.slice(0, 3)), ['slap', 'f', 'bass']);
+
 // Djembe 1 / Solo 1 (bar 7): the final slap follows the OUT on the bass.
 const soloOne = pattern('solo-1', 'Djembe_1', [
   bar(7, { 0: 'bass', 2: 'slap', 4: 'tone', 8: 'slap', 14: 'slap',
@@ -258,4 +305,4 @@ for (const rhythmType of ['binaer', 'neunaer']) {
 }
 context.isSheetQuickPlayMode = false;
 assert.equal(context.getPlaybackRhythmStep(0), 0, 'Practice and arrangement rhythm grids remain unchanged');
-console.log('Quick play: accompaniment pickups with/without OUT, solo loops, pattern changes, repeats, highlights and beat/swing alignment checked.');
+console.log('Quick play: freely named cyclic pickups, accompaniment/solo loops, pattern changes, repeats, highlights and beat/swing alignment checked.');
