@@ -4,6 +4,7 @@ import vm from 'node:vm';
 
 const editorSource = fs.readFileSync(new URL('../index.php', import.meta.url), 'utf8');
 const playerSource = fs.readFileSync(new URL('../Audio/player.html', import.meta.url), 'utf8');
+const practiceSource = fs.readFileSync(new URL('../JS/practice.js', import.meta.url), 'utf8');
 function extractFunction(source, name) {
   const start = source.indexOf('function ' + name + '(');
   const end = source.indexOf('\nfunction ', start + 1);
@@ -33,6 +34,18 @@ vm.runInContext(extractFunction(editorSource, 'getSheetQuickPlayPositionKey'), c
 vm.runInContext(extractFunction(editorSource, 'mapLabelForPlayer'), context);
 vm.runInContext(extractFunction(editorSource, 'getPlayerLabelInfo'), context);
 context.trackInstrumentNames = Object.keys(context.createSheetQuickPlayTrackMap());
+context.practiceTrackInstrumentNames = context.trackInstrumentNames;
+context.rhythm = 'tenaer';
+context.timelineState = { tempo: 80 };
+context.practiceState = { repeatCount: 1, timerMinutes: 0, accompanimentStart: 'immediate' };
+vm.runInContext(practiceSource.slice(
+  practiceSource.indexOf('function createEmptyPracticeTrackNotes('),
+  practiceSource.indexOf('function notifyPracticeHandModeChanged(')
+), context);
+for (const name of ['normalizePracticeCount', 'normalizePracticeTempo', 'buildPracticeBlocksFromEntries',
+  'shouldPausePracticeAccompanimentForPattern']) {
+  vm.runInContext(extractFunction(practiceSource, name), context);
+}
 for (const name of [
   'createEmptyTrackNoteMap', 'createEmptyTrackHandModeMap', 'createEmptyTrackStepMap',
   'createEmptyTrackTextMap', 'createOrderedSection', 'normalizeSectionRepeatCount',
@@ -40,7 +53,8 @@ for (const name of [
   'padNotesToLength', 'loopNotesToLength', 'greatestCommonDivisor', 'leastCommonMultiple',
   'normalizeSectionTrackLoops', 'finalizeSectionLengths', 'applyOrderedSectionTempoTargets',
   'buildConfiguredPracticeSections', 'isSectionLoopEligible', 'recalculateOrderedSectionTiming',
-  'getPlaybackSectionContext', 'isFinalTimelinePlaybackContext', 'getTrackPlaybackAtStep'
+  'getPlaybackSectionContext', 'isFinalTimelinePlaybackContext', 'getTrackPlaybackAtStep',
+  'getFinalOverlapTailStartStep'
 ]) {
   vm.runInContext(extractFunction(playerSource, name), context);
 }
@@ -306,3 +320,166 @@ for (const rhythmType of ['binaer', 'neunaer']) {
 context.isSheetQuickPlayMode = false;
 assert.equal(context.getPlaybackRhythmStep(0), 0, 'Practice and arrangement rhythm grids remain unchanged');
 console.log('Quick play: freely named cyclic pickups, accompaniment/solo loops, pattern changes, repeats, highlights and beat/swing alignment checked.');
+
+// Djaa Djembe: Solo 5, source bars 12-14; the final slap shares the next downbeat.
+const solo5 = pattern('solo-5', 'Djembe_1', [
+  bar(12, { 8: 'slap_flam', 12: 'tone', 14: 'tone', 18: 'slap_flam' }),
+  bar(13, { 0: 'tone', 2: 'slap', 4: 'tone', 6: 'slap', 8: 'tone', 10: 'slap',
+    12: 'tone', 14: 'slap', 16: 'tone', 18: 'tone', 20: 'slap', 22: 'slap' }),
+  bar(14, { 0: 'slap' }, [{ type: 'out', stepIndex: 0 }, { type: 'overlap', stepIndex: 0 }])
+], 'Solo 5');
+const following = pattern('following', 'Djembe_1', [bar(15, { 4: 'bass', 12: 'tone' })], 'Call');
+context.isSheetQuickPlayMode = true;
+let overlapSections = prepare([solo5, following]);
+loadPlayer(overlapSections);
+assert.equal(context.orderedSections[0].length, 48, 'Quick play must hand off Solo 5 after two bars');
+assert.equal(notesAt('Djembe_1', 48, 1)[0], 'slap', 'The OUT must sound on the following downbeat');
+assert.equal(notesAt('Djembe_1', 52, 1)[0], 'bass', 'The following pattern must already be playing');
+assert(overlapSections[1].highlightSteps[0].some(ref => ref.sourceBarIndex === 14),
+  'The transferred OUT must still highlight its original score position');
+
+overlapSections = prepare([solo5]);
+loadPlayer(overlapSections);
+assert.equal(notesAt('Djembe_1', 0, 1)[0], 'f', 'No outgoing OUT before the first pass');
+for (let cycle = 1; cycle < 5; cycle++) {
+  assert.equal(notesAt('Djembe_1', cycle * 48, 1)[0], 'slap', 'OUT overlaps the next two-bar loop');
+  assert.equal(notesAt('Djembe_1', cycle * 48 + 8, 1)[0], 'slap_flam');
+}
+verifyHighlights(overlapSections, 0, 240, 'Djembe_1', solo5);
+
+context.isSheetQuickPlayMode = false;
+context.timelineLoopCount = false;
+context.findPatternById = id => [solo5, following, sangban].find(item => item.id === id);
+function practiceEntry(source, blockId, repeats = 1, target = true) {
+  return { patternId: source.id, blockId, repeatCount: repeats,
+    isPracticeTarget: target, targetInstruments: source.defaultTargets };
+}
+overlapSections = context.buildPracticeSectionsFromEntries([
+  practiceEntry(solo5, 'solo'), practiceEntry(following, 'call')
+]);
+loadPlayer(overlapSections);
+assert.equal(context.orderedSections[0].length, 48, 'Practice must hand off Solo 5 after two bars');
+assert.equal(notesAt('Djembe_1', 48, 1)[0], 'slap');
+assert.equal(notesAt('Djembe_1', 52, 1)[0], 'bass');
+assert(overlapSections[1].trackTargetFlags.Djembe_1[0], 'The transferred note remains a practice target');
+overlapSections = context.buildPracticeSectionsFromEntries([
+  practiceEntry(solo5, 'solo', 3), practiceEntry(following, 'call')
+]);
+loadPlayer(overlapSections);
+assert.equal(context.orderedSections.at(-1).startStep, 144, 'Each repeat hands its final bar to the next');
+assert.equal(notesAt('Djembe_1', 144, 1)[0], 'slap');
+overlapSections = context.buildPracticeSectionsFromEntries([practiceEntry(solo5, 'solo')]);
+loadPlayer(overlapSections);
+assert.equal(notesAt('Djembe_1', 48, 1)[0], 'slap', 'Without a successor the final OUT must not be lost');
+console.log('Solo 5: practice transitions, repetitions, final OUT, quick-play loop and highlights checked.');
+
+const accompaniment = pattern('continuous', 'Sangban', [
+  bar(20, { 0: 'Bell' }), bar(21, { 0: 'Open' }), bar(22, { 0: 'Muffled' })
+]);
+context.findPatternById = id => [solo5, following, accompaniment].find(item => item.id === id);
+overlapSections = context.buildPracticeSectionsFromEntries([
+  practiceEntry(solo5, 'solo'), practiceEntry(accompaniment, 'solo', 1, false),
+  practiceEntry(following, 'call'), practiceEntry(accompaniment, 'call', 1, false)
+]);
+loadPlayer(overlapSections);
+assert.equal(notesAt('Sangban', 48, 1)[0], 'Muffled',
+  'The accompaniment advances by the shortened section, not an extra overlap bar');
+context.practiceRepeatCountMax = 999;
+context.getPracticeScrollerVisualLoopCopies = () => 4;
+context.getPracticeScrollerSectionVisualRepeatCopies = () => 4;
+context.getPracticeScrollerOuterVisualLoopCopies = (length, count) => count;
+vm.runInContext(extractFunction(practiceSource, 'flattenPracticeScrollerSections'), context);
+const visual = context.flattenPracticeScrollerSections(overlapSections);
+assert.deepEqual(Array.from(visual.trackNotes.Djembe_1), notesAt('Djembe_1', 0, visual.totalSteps),
+  'Moving notes and audio must agree across the overlap');
+assert.equal(visual.trackNotes.Sangban[48], 'Muffled');
+overlapSections = context.buildPracticeSectionsFromEntries([
+  practiceEntry(solo5, 'solo', 3), practiceEntry(accompaniment, 'solo', 3, false),
+  practiceEntry(following, 'call'), practiceEntry(accompaniment, 'call', 1, false)
+]);
+loadPlayer(overlapSections);
+assert.deepEqual(Array.from({ length: 7 }, (_, index) => notesAt('Sangban', index * 24, 1)[0]),
+  ['Bell', 'Open', 'Muffled', 'Bell', 'Open', 'Muffled', 'Bell'],
+  'A three-bar accompaniment keeps its phase across repeated two-bar handoffs');
+
+const nextWithIn = pattern('next-in', 'Djembe_1', [
+  bar(16, { 22: 'bass' }, [{ type: 'in', stepIndex: 22 }]), bar(17, { 4: 'tone' })
+], 'Solo 6');
+context.isSheetQuickPlayMode = true;
+context.timelineLoopCount = 'loop';
+overlapSections = prepare([solo5, nextWithIn]);
+loadPlayer(overlapSections);
+assert.equal(notesAt('Djembe_1', 46, 1)[0], 'bass', 'The next IN precedes the shared downbeat');
+assert.equal(notesAt('Djembe_1', 48, 1)[0], 'slap');
+assert.equal(notesAt('Djembe_1', 52, 1)[0], 'tone');
+context.isSheetQuickPlayMode = false;
+context.timelineLoopCount = false;
+context.findPatternById = id => [solo5, nextWithIn].find(item => item.id === id);
+overlapSections = context.buildPracticeSectionsFromEntries([
+  practiceEntry(solo5, 'solo'), practiceEntry(nextWithIn, 'next')
+]);
+loadPlayer(overlapSections);
+assert.equal(notesAt('Djembe_1', 46, 1)[0], 'bass');
+assert.equal(notesAt('Djembe_1', 48, 1)[0], 'slap');
+assert.equal(notesAt('Djembe_1', 52, 1)[0], 'tone');
+console.log('Overlap: parallel accompaniment phase, moving notes and following IN checked.');
+
+context.practiceState.repeatCount = 4;
+context.timelineLoopCount = 3;
+overlapSections = context.buildPracticeSectionsFromEntries([practiceEntry(solo5, 'solo')]);
+loadPlayer(overlapSections);
+assert.equal(context.timelinePlaybackLength, 4 * 48 + 24, 'Four cycles plus the final OUT bar');
+assert.equal(notesAt('Djembe_1', 0, 1)[0], 'f', 'The first practice pass starts without an outgoing OUT');
+for (let cycle = 1; cycle <= 4; cycle++) {
+  assert.equal(notesAt('Djembe_1', cycle * 48, 1)[0], 'slap', 'The OUT survives every cycle boundary');
+}
+assert.equal(notesAt('Djembe_1', 200, 1)[0], 'f', 'After the final OUT no new solo starts');
+const cyclicVisual = context.flattenPracticeScrollerSections(overlapSections);
+assert.deepEqual(Array.from(cyclicVisual.trackNotes.Djembe_1), notesAt('Djembe_1', 0, cyclicVisual.totalSteps),
+  'Initial cycle, looped cycles and final tail have matching audio and moving notes');
+context.practiceScrollerState = { ...cyclicVisual, loopStartStep: cyclicVisual.loopStartStep };
+vm.runInContext(extractFunction(practiceSource, 'getPracticeScrollerPlaybackSegmentContext'), context);
+assert(context.getPracticeScrollerPlaybackSegmentContext(192).isFinalOverlapTail);
+
+context.practiceState.repeatCount = 999;
+context.timelineLoopCount = 998;
+overlapSections = context.buildPracticeSectionsFromEntries([practiceEntry(solo5, 'solo')]);
+loadPlayer(overlapSections);
+assert.equal(overlapSections.length, 1, 'Outer repeats must not expand hundreds of section copies');
+assert.equal(context.timelinePlaybackLength, 999 * 48 + 24);
+const largeVisual = context.flattenPracticeScrollerSections(overlapSections);
+assert(largeVisual.totalSteps < 400, 'The moving-note buffer stays bounded');
+context.practiceScrollerState = { ...largeVisual };
+assert.equal(context.getPracticeScrollerPlaybackSegmentContext(999 * 48).visualSegmentStart,
+  largeVisual.finalOverlapTail.visualStart, 'The last tail remains reachable after recycling the visual buffer');
+
+context.practiceState.timerMinutes = 1;
+context.timelineLoopCount = 'loop';
+context.practiceTimerFinalLoopStartStep = null;
+overlapSections = context.buildPracticeSectionsFromEntries([practiceEntry(solo5, 'solo')]);
+loadPlayer(overlapSections);
+assert.equal(notesAt('Djembe_1', 48, 1)[0], 'slap');
+context.practiceTimerFinalLoopStartStep = 96;
+assert.equal(notesAt('Djembe_1', 144, 1)[0], 'slap', 'Timed practice retains the final OUT');
+assert.equal(notesAt('Djembe_1', 152, 1)[0], 'f');
+vm.runInContext(extractFunction(playerSource, 'shouldStopForPracticeTimer'), context);
+context.practiceStopAudioTime = 10;
+context.globalPlaybackStep = 144;
+assert.equal(context.shouldStopForPracticeTimer(11), false);
+context.globalPlaybackStep = 168;
+assert.equal(context.shouldStopForPracticeTimer(12), true);
+context.getPracticeScrollerTailSteps = () => 24;
+const timedVisual = context.flattenPracticeScrollerSections(overlapSections);
+context.practiceScrollerState = { ...timedVisual, playbackStartedAt: null, currentStep: 0,
+  playbackEvents: [], playbackAnchor: null, animationFrameId: 1 };
+context.window = { performance: { now: () => 0 } };
+context.practiceState.audioLatencyMs = 0;
+vm.runInContext(extractFunction(practiceSource, 'updatePracticeScrollerPlayback'), context);
+context.updatePracticeScrollerPlayback(144, 0, {
+  runtimeKey: overlapSections.at(-1).finalOverlapTail.runtimeKey, localStep: 0
+});
+assert(context.getPracticeScrollerPlaybackSegmentContext(144).isFinalOverlapTail,
+  'The timed final OUT is displayed in its own ending, not as another solo cycle');
+context.updatePracticeScrollerPlayback(0, 0, { runtimeKey: overlapSections[0].runtimeKey, localStep: 0 });
+assert.equal(context.practiceScrollerState.finalOverlapTail.playbackStart, Infinity, 'Restart clears the timed ending');
+console.log('Practice outer cycles: first pass, 999-repeat bounded buffers, final OUT and timer stop checked.');

@@ -3299,6 +3299,10 @@ function buildConfiguredPracticeSections(config) {
         })
       : [];
     section.forceFinalOutAtSectionEnd = Boolean(configuredSection && configuredSection.forceFinalOutAtSectionEnd);
+    section.firstPassTrackNotes = configuredSection && configuredSection.firstPassTrackNotes || null;
+    section.finalOverlapTail = configuredSection && configuredSection.finalOverlapTail
+      ? buildConfiguredPracticeSections({ PracticeSections: [configuredSection.finalOverlapTail] })[0]
+      : null;
 
     const sourceTrackNotes = configuredSection && configuredSection.trackNotes ? configuredSection.trackNotes : {};
     const sourceTrackHandModes = configuredSection && configuredSection.trackHandModes ? configuredSection.trackHandModes : {};
@@ -3728,6 +3732,7 @@ let orderedTimelineFallbackLoopSections = [];
 let orderedFallbackLoopSections = [];
 let orderedFallbackLoopLength = 0;
 let timelinePlaybackLength = 0;
+let orderedFinalOverlapTail = null;
 
 function recalculateOrderedSectionTiming() {
   orderedSections.forEach(function (section, sectionIndex) {
@@ -3772,6 +3777,18 @@ function recalculateOrderedSectionTiming() {
   timelinePlaybackLength = timelineLoopCount && timelineLoopCount !== 'loop' && orderedFallbackLoopLength > 0
     ? oneShotLength + (orderedFallbackLoopLength * Number(timelineLoopCount))
     : 0;
+  orderedFinalOverlapTail = orderedSections.length > 0
+    ? orderedSections[orderedSections.length - 1].finalOverlapTail || null
+    : null;
+  if (orderedFinalOverlapTail) {
+    const tailTempo = orderedSections[orderedSections.length - 1].tempoTarget;
+    orderedFinalOverlapTail.tempoStart = tailTempo;
+    orderedFinalOverlapTail.tempoTarget = tailTempo;
+    orderedFinalOverlapTail.tempoRampSteps = 0;
+  }
+  if (orderedFinalOverlapTail && timelinePlaybackLength > 0) {
+    timelinePlaybackLength += orderedFinalOverlapTail.length;
+  }
 }
 
 recalculateOrderedSectionTiming();
@@ -3992,6 +4009,17 @@ function getNeunaerSwingStepOffsets() {
 }
 
 function getPlaybackSectionContext(playbackStep) {
+  const finalTailStart = getFinalOverlapTailStartStep();
+  if (orderedFinalOverlapTail && finalTailStart !== null && playbackStep >= finalTailStart) {
+    const tailStep = playbackStep - finalTailStart;
+    return tailStep < orderedFinalOverlapTail.length ? {
+      section: orderedFinalOverlapTail,
+      localStep: tailStep,
+      sectionStep: tailStep,
+      loopCycleIndex: 0,
+      outerLoopIndex: Number(timelineLoopCount) - 1
+    } : null;
+  }
   // A separate pickup uses the normal one-shot path before the loop begins.
   if (isSheetQuickPlayMode && timelineLoopCount && orderedFallbackLoopLength > 0 &&
       !(orderedSections.length > 0 && orderedSections[0].isLeadIn)) {
@@ -4076,6 +4104,18 @@ function isFinalTimelinePlaybackContext(sectionContext) {
   }
 
   return Number(sectionContext.outerLoopIndex) >= loopCount - 1;
+}
+
+function getFinalOverlapTailStartStep() {
+  if (!orderedFinalOverlapTail) {
+    return null;
+  }
+  if (timelineLoopCount !== 'loop') {
+    return timelinePlaybackLength > 0 ? timelinePlaybackLength - orderedFinalOverlapTail.length : null;
+  }
+  return practiceTimerFinalLoopStartStep === null
+    ? null
+    : practiceTimerFinalLoopStartStep + orderedFallbackLoopLength;
 }
 
 function getStepsPerBeatForRhythm() {
@@ -4710,7 +4750,9 @@ function getTrackPlaybackAtStep(trackName, trackState, playbackStep) {
     return {
       note: shouldMuteForOut
         ? null
-        : (sectionContext.section.trackNotes[trackName][sectionContext.localStep] || null),
+        : ((sectionContext.section.firstPassTrackNotes && playbackStep < sectionContext.section.endStep
+            ? sectionContext.section.firstPassTrackNotes[trackName]
+            : sectionContext.section.trackNotes[trackName])[sectionContext.localStep] || null),
       handMode: sectionContext.section.trackHandModes
         ? (sectionContext.section.trackHandModes[trackName] || '')
         : '',
@@ -4990,6 +5032,18 @@ function shouldStopForPracticeTimer(scheduledTime) {
 
   if (orderedFallbackLoopLength <= 0) {
     return true;
+  }
+
+  if (orderedFinalOverlapTail) {
+    if (practiceTimerFinalLoopStartStep === null) {
+      const cycleStart = globalPlaybackStep < oneShotLength
+        ? oneShotLength - orderedFallbackLoopLength
+        : oneShotLength + Math.floor((globalPlaybackStep - oneShotLength) / orderedFallbackLoopLength) * orderedFallbackLoopLength;
+      practiceTimerFinalLoopStartStep = globalPlaybackStep === cycleStart
+        ? cycleStart - orderedFallbackLoopLength
+        : cycleStart;
+    }
+    return globalPlaybackStep >= getFinalOverlapTailStartStep() + orderedFinalOverlapTail.length;
   }
 
   if (globalPlaybackStep < oneShotLength) {

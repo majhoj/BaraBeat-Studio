@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'barabeat-studio-offline-v79-named-pattern-pickups';
+const CACHE_NAME = 'barabeat-studio-offline-v80-practice-quick-play-overlap';
 const APP_SHELL = [
   './app-shell.html',
   './manifest.webmanifest',

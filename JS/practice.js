@@ -181,6 +181,7 @@ const practiceScrollerState = {
     visualTotalSteps: 0,
     visualTailSteps: 0,
     visualLoopCopies: 4,
+    finalOverlapTail: null,
     recycleVisualLoop: false,
     stepsPerBar: 32,
     stepWidth: 18,
@@ -2384,6 +2385,8 @@ function createPracticeSection(block, blockIndex, sectionSuffix) {
             trackPatternLabels: createEmptyPracticeTrackLabelMap(),
             finalRepeatOutSteps: createEmptyPracticeTrackStepMap(),
             finalRepeatOutStepTypes: createEmptyPracticeTrackTextMap(),
+            overlapStartSteps: {},
+            accompanimentLoops: {},
             forceFinalOutAtSectionEnd: false,
             usePracticeTargetAccompanimentOut: false,
             overlapsPracticeCountIn: false,
@@ -2409,6 +2412,8 @@ function clonePracticeSection(section, sectionSuffix) {
         trackPatternLabels: createEmptyPracticeTrackLabelMap(),
         finalRepeatOutSteps: createEmptyPracticeTrackStepMap(),
         finalRepeatOutStepTypes: createEmptyPracticeTrackTextMap(),
+        overlapStartSteps: Object.assign({}, section.overlapStartSteps),
+        accompanimentLoops: Object.assign({}, section.accompanimentLoops),
         forceFinalOutAtSectionEnd: Boolean(section.forceFinalOutAtSectionEnd),
         usePracticeTargetAccompanimentOut: Boolean(section.usePracticeTargetAccompanimentOut),
         overlapsPracticeCountIn: Boolean(section.overlapsPracticeCountIn),
@@ -2483,7 +2488,7 @@ function sectionHasPracticeNotes(section) {
 }
 
 function mergePracticePickupIntoHostSection(hostSection, pickupSection) {
-    const hostLength = getPracticeSectionLength(hostSection);
+    const hostLength = getConfiguredSectionOverlapStart(hostSection) || getPracticeSectionLength(hostSection);
     const stepsPerBar = getPracticeStepsPerBar();
     const pickupLength = getPracticeSectionLength(pickupSection);
     const pickupSpan = Math.max(stepsPerBar, pickupLength);
@@ -2949,6 +2954,177 @@ function practiceEntryAllowsPickup(entry, block) {
     return true;
 }
 
+function getConfiguredSectionOverlapStart(section) {
+    const overlapSteps = section && section.overlapStartSteps || {};
+    const steps = Object.keys(overlapSteps).map(function (track) { return overlapSteps[track]; });
+    const start = Math.max.apply(null, steps.concat(0));
+    return start > 0 && start < getPracticeSectionLength(section) ? start : 0;
+}
+
+function trimConfiguredOverlapSection(section, length) {
+    Object.keys(section.trackNotes).forEach(function (track) {
+        section.trackNotes[track] = section.trackNotes[track].slice(0, length);
+        if (section.trackTargetFlags) {
+            section.trackTargetFlags[track] = (section.trackTargetFlags[track] || []).slice(0, length);
+        }
+        if (section.finalRepeatOutSteps && section.finalRepeatOutSteps[track] >= length) {
+            section.finalRepeatOutSteps[track] = null;
+        }
+    });
+    if (section.highlightSteps) {
+        section.highlightSteps = section.highlightSteps.slice(0, length);
+    }
+    if (section.barStartSteps) {
+        section.barStartSteps = section.barStartSteps.filter(function (step) { return step < length; });
+    }
+    section.fixedLength = length;
+    section.minLength = length;
+    section.overlapStartSteps = {};
+}
+
+function handOffConfiguredSectionOverlap(section, nextSection) {
+    const overlapSteps = section.overlapStartSteps || {};
+    const tracks = Object.keys(overlapSteps);
+    if (!nextSection || tracks.length === 0) {
+        return 0;
+    }
+    const cutStep = getConfiguredSectionOverlapStart(section);
+    if (cutStep <= 0) {
+        return 0;
+    }
+
+    // Only marked voices cross the boundary, not the parallel accompaniment.
+    const tails = {};
+    tracks.forEach(function (track) {
+        const outStep = section.finalRepeatOutSteps && section.finalRepeatOutSteps[track];
+        const endStep = outStep === null || outStep === undefined
+            ? section.trackNotes[track].length
+            : Math.max(cutStep, outStep + 1);
+        tails[track] = section.trackNotes[track].slice(cutStep, endStep);
+    });
+    const tailHighlights = (section.overlapHighlightSteps || []).slice(cutStep);
+    trimConfiguredOverlapSection(section, cutStep);
+    Object.keys(section.accompanimentLoops || {}).forEach(function (track) {
+        const currentLoop = section.accompanimentLoops[track];
+        const nextLoop = nextSection.accompanimentLoops && nextSection.accompanimentLoops[track];
+        if (nextLoop && nextLoop.sourceKey === currentLoop.sourceKey && currentLoop.notes.length > 0) {
+            const nextOffset = (currentLoop.offset + cutStep) % currentLoop.notes.length;
+            nextSection.accompanimentLoops[track] = Object.assign({}, nextLoop, { offset: nextOffset });
+            nextSection.trackNotes[track] = getPracticeLoopedSegment(
+                nextLoop.notes, nextOffset, getPracticeSectionLength(nextSection), 'f'
+            );
+        }
+    });
+    tracks.forEach(function (track) {
+        nextSection.trackNotes[track] = mergePracticeNotesIntoTrack(nextSection.trackNotes[track], tails[track]);
+        if (nextSection.trackTargetFlags) {
+            nextSection.trackTargetFlags[track] = mergePracticeFlagsIntoTrackAtOffset(
+                nextSection.trackTargetFlags[track], tails[track].map(isPlayablePracticeNote), 0
+            );
+        }
+        if (nextSection.trackPatternLabels && section.trackPatternLabels) {
+            (section.trackPatternLabels[track] || []).forEach(function (label) {
+                addPracticeTrackPatternLabel(nextSection.trackPatternLabels, track, label);
+            });
+        }
+        if (nextSection.trackHandModes && !nextSection.trackHandModes[track]) {
+            nextSection.trackHandModes[track] = section.trackHandModes[track] || '';
+        }
+    });
+    if (nextSection.highlightSteps) {
+        tailHighlights.forEach(function (refs, step) {
+            const audibleRefs = (refs || []).filter(function (ref) { return !ref.mutedOnFinalRepeat; });
+            nextSection.highlightSteps[step] = (nextSection.highlightSteps[step] || []).concat(audibleRefs);
+        });
+    }
+    if (nextSection.fixedLength) {
+        nextSection.fixedLength = Math.max(nextSection.fixedLength, getPracticeSectionLength(nextSection));
+    }
+    return cutStep;
+}
+
+function applyConfiguredSectionOverlaps(sourceSections, loop) {
+    const hasOverlap = function (section) {
+        return section && Object.keys(section.overlapStartSteps || {}).length > 0;
+    };
+    const finish = function (result) {
+        result.forEach(function (section) {
+            delete section.overlapStartSteps;
+            delete section.overlapHighlightSteps;
+            delete section.accompanimentLoops;
+        });
+        return result;
+    };
+    const firstLoopIndex = sourceSections.findIndex(function (section) { return !section.isLeadIn; });
+    const sections = [];
+    sourceSections.forEach(function (section, index) {
+        const repeats = Math.max(1, Math.round(Number(section.repeatCount) || 1));
+        const receivesOverlap = hasOverlap(sourceSections[index - 1]) ||
+            (loop && index === firstLoopIndex && hasOverlap(sourceSections[sourceSections.length - 1]));
+        if (repeats === 1 || (!hasOverlap(section) && !receivesOverlap)) {
+            sections.push(section);
+            return;
+        }
+        // Split only affected repetitions so a handoff cannot leak into later repeats.
+        for (let repeat = 0; repeat < repeats; repeat += 1) {
+            const copy = JSON.parse(JSON.stringify(section));
+            copy.runtimeKey += '::overlap-repeat-' + repeat;
+            copy.repeatCount = 1;
+            if (repeat < repeats - 1) {
+                clearPracticeSectionOutSteps(copy);
+                ['highlightSteps', 'overlapHighlightSteps'].forEach(function (key) {
+                    (copy[key] || []).forEach(function (refs) {
+                        (refs || []).forEach(function (ref) { delete ref.mutedOnFinalRepeat; });
+                    });
+                });
+            }
+            sections.push(copy);
+        }
+    });
+    for (let index = 0; index < sections.length - 1; index += 1) {
+        handOffConfiguredSectionOverlap(sections[index], sections[index + 1]);
+    }
+
+    const lastSection = sections[sections.length - 1];
+    if (loop && hasOverlap(lastSection)) {
+        // Keep the first pass unmodified at its start; later cycles inherit the outgoing note.
+        const firstPass = JSON.parse(JSON.stringify(sections));
+        const firstLoopSection = sections.find(function (section) { return !section.isLeadIn; });
+        const initialLoopNotes = firstLoopSection && JSON.parse(JSON.stringify(firstLoopSection.trackNotes));
+        const initialLoopFlags = firstLoopSection && JSON.parse(JSON.stringify(firstLoopSection.trackTargetFlags || {}));
+        const cutStep = handOffConfiguredSectionOverlap(lastSection, firstLoopSection);
+        if (cutStep > 0) {
+            if (loop === 'practice') {
+                const finalTail = firstPass[firstPass.length - 1];
+                finalTail.runtimeKey += '::final-overlap-tail';
+                finalTail.repeatCount = 1;
+                Object.keys(finalTail.trackNotes).forEach(function (track) {
+                    finalTail.trackNotes[track] = finalTail.trackNotes[track].slice(cutStep);
+                    finalTail.trackTargetFlags[track] = (finalTail.trackTargetFlags[track] || []).slice(cutStep);
+                    if (finalTail.finalRepeatOutSteps[track] !== null) {
+                        finalTail.finalRepeatOutSteps[track] -= cutStep;
+                    }
+                });
+                finalTail.minLength = 0;
+                finalTail.fixedLength = getPracticeSectionLength(finalTail);
+                finalTail.barStartSteps = [0];
+                finish([finalTail]);
+                lastSection.finalOverlapTail = finalTail;
+                firstLoopSection.firstPassTrackNotes = initialLoopNotes;
+                firstLoopSection.firstPassTargetFlags = initialLoopFlags;
+                return finish(sections);
+            }
+            trimConfiguredOverlapSection(firstPass[firstPass.length - 1], cutStep);
+            firstPass.forEach(function (section) {
+                section.runtimeKey += '::overlap-first-pass';
+                section.isLeadIn = true;
+            });
+            return finish(firstPass.concat(sections.filter(function (section) { return !section.isLeadIn; })));
+        }
+    }
+    return finish(sections);
+}
+
 function buildPracticeSectionsFromEntries(entries) {
     const sections = [];
     let loopStartPickupSection = null;
@@ -3061,6 +3237,7 @@ function buildPracticeSectionsFromEntries(entries) {
                 patternNotes = Array(patternNotes.length).fill('f');
             }
             const patternOutStep = getPracticePatternOutStep(pattern);
+            const patternOverlapStep = getPracticePatternControlStep(pattern, 'overlap');
             const rawPatternBarStartSteps = getPracticePatternBarStartSteps(pattern);
             const patternBarStartSteps = shouldUseAccompanimentSegment || shouldLoopAccompaniment
                 ? getPracticeLoopedBarStartSegment(
@@ -3135,6 +3312,17 @@ function buildPracticeSectionsFromEntries(entries) {
                     section.trackNotes[instrumentName],
                     patternNotes
                 );
+                if (entry.isPracticeTarget && !entry.suppressPlayback && patternOverlapStep !== null &&
+                        patternOverlapStep > rawPatternMainStartStep) {
+                    section.overlapStartSteps[instrumentName] = patternOverlapStep - rawPatternMainStartStep;
+                }
+                if (isAccompanimentEntry && !entry.suppressPlayback) {
+                    section.accompanimentLoops[instrumentName] = {
+                        sourceKey: accompanimentOffsetKey,
+                        notes: rawPatternNotes,
+                        offset: accompanimentOffset
+                    };
+                }
                 section.barStartSteps = mergePracticeBarStartSteps(section.barStartSteps, patternBarStartSteps);
                 if (entry.isPracticeTarget && section.practiceTargetInstruments.indexOf(instrumentName) === -1) {
                     section.practiceTargetInstruments.push(instrumentName);
@@ -3178,6 +3366,11 @@ function buildPracticeSectionsFromEntries(entries) {
             loopStartPickupSection = loopPickupSection;
         }
         const sectionLength = getPracticeSectionLength(section);
+        const overlapStart = getConfiguredSectionOverlapStart(section);
+        const blockRepeatCount = normalizePracticeCount(block.repeatCount, 1, 1, 32);
+        const handoffCount = blocks[blockIndex + 1] ? blockRepeatCount : blockRepeatCount - 1;
+        const accompanimentAdvance = sectionLength * blockRepeatCount -
+            (overlapStart > 0 ? (sectionLength - overlapStart) * handoffCount : 0);
         block.entries.forEach(function (entry) {
             const pattern = findPatternById(entry && entry.patternId);
             if (!pattern || pattern.labelType !== 'Begleitung' || entry.isPracticeTarget) {
@@ -3187,7 +3380,7 @@ function buildPracticeSectionsFromEntries(entries) {
             const patternLength = flattenPracticePatternNotes(pattern).length;
             if (patternLength > 0 && sectionLength > 0) {
                 accompanimentOffsets[offsetKey] = ((Number(accompanimentOffsets[offsetKey]) || 0) +
-                    (sectionLength * normalizePracticeCount(block.repeatCount, 1, 1, 32))) % patternLength;
+                    accompanimentAdvance) % patternLength;
             }
         });
         if (practiceBlockHasTargetPause(block)) {
@@ -3210,9 +3403,9 @@ function buildPracticeSectionsFromEntries(entries) {
 
     markPracticeSectionsBeforePausedAccompaniment(sections);
 
-    return sections.filter(function (section) {
+    return applyConfiguredSectionOverlaps(sections.filter(function (section) {
         return sectionHasPracticeNotes(section);
-    });
+    }), hasOuterPracticeLoop ? 'practice' : false);
 }
 
 function notifyPracticeHandModeChanged() {
@@ -3580,6 +3773,7 @@ function flattenPracticeScrollerSections(sections, options) {
     const finalOuterMuteRanges = [];
     const loopSegments = [];
     const playbackSegments = [];
+    const loopNoteOverrides = [];
     let stepOffset = 0;
     let playbackOffset = 0;
     let loopStartStep = null;
@@ -3643,9 +3837,19 @@ function flattenPracticeScrollerSections(sections, options) {
         });
 
         practiceTrackInstrumentNames.forEach(function (instrumentName) {
-            const rawNotes = section && section.trackNotes && Array.isArray(section.trackNotes[instrumentName])
-                ? section.trackNotes[instrumentName]
+            const initialTrackNotes = section.firstPassTrackNotes || section.trackNotes;
+            const rawNotes = initialTrackNotes && Array.isArray(initialTrackNotes[instrumentName])
+                ? initialTrackNotes[instrumentName]
                 : [];
+            if (section.firstPassTrackNotes) {
+                loopNoteOverrides.push({
+                    track: instrumentName,
+                    start: stepOffset,
+                    notes: section.trackNotes[instrumentName].slice(0, sectionLength),
+                    flags: (section.trackTargetFlags[instrumentName] || []).slice(0, sectionLength),
+                    target: section.practiceTargetInstruments.indexOf(instrumentName) !== -1
+                });
+            }
             if (rawNotes.some(function (noteValue) {
                 return isPlayablePracticeNote(noteValue);
             }) && section.trackPatternLabels && Array.isArray(section.trackPatternLabels[instrumentName])) {
@@ -3657,9 +3861,9 @@ function flattenPracticeScrollerSections(sections, options) {
             const isPracticeTarget = section &&
                 Array.isArray(section.practiceTargetInstruments) &&
                 section.practiceTargetInstruments.indexOf(instrumentName) !== -1;
-            const rawStepTargetFlags = section && section.trackTargetFlags &&
-                Array.isArray(section.trackTargetFlags[instrumentName])
-                ? section.trackTargetFlags[instrumentName]
+            const initialTargetFlags = section.firstPassTargetFlags || section.trackTargetFlags;
+            const rawStepTargetFlags = initialTargetFlags && Array.isArray(initialTargetFlags[instrumentName])
+                ? initialTargetFlags[instrumentName]
                 : [];
             const stepTargetFlags = loopPracticeArrayToLength(rawStepTargetFlags, sectionLength, false);
             const outStep = finalRepeatOutSteps[instrumentName];
@@ -3722,6 +3926,13 @@ function flattenPracticeScrollerSections(sections, options) {
         baseTrackNotes[instrumentName] = trackNotes[instrumentName].slice(safeLoopStartStep);
         baseTargetSteps[instrumentName] = targetSteps[instrumentName].slice(safeLoopStartStep);
     });
+    loopNoteOverrides.forEach(function (override) {
+        override.notes.forEach(function (note, index) {
+            const step = override.start - safeLoopStartStep + index;
+            baseTrackNotes[override.track][step] = note;
+            baseTargetSteps[override.track][step] = override.target || Boolean(override.flags[index]);
+        });
+    });
 
     for (let copyIndex = 0; copyIndex < extraVisualLoopCopies; copyIndex += 1) {
         const copyStartStep = visualCycleSteps + copyIndex * visualLoopLength;
@@ -3770,6 +3981,22 @@ function flattenPracticeScrollerSections(sections, options) {
         });
     }
 
+    const tailSection = safeSections.length > 0 ? safeSections[safeSections.length - 1].finalOverlapTail : null;
+    const finalTailLength = tailSection ? getPracticeSectionLength(tailSection) : 0;
+    const finalTailVisualStart = visualCycleSteps + visualLoopLength * extraVisualLoopCopies + visualTailSteps;
+    if (finalTailLength > 0) {
+        barStartSteps.push(finalTailVisualStart);
+        practiceTrackInstrumentNames.forEach(function (track) {
+            const out = tailSection.finalRepeatOutSteps[track];
+            for (let index = 0; index < finalTailLength; index += 1) {
+                const note = out !== null && index > out ? 'f' : tailSection.trackNotes[track][index] || 'f';
+                trackNotes[track].push(note);
+                targetSteps[track].push(isPlayablePracticeNote(note) &&
+                    (tailSection.practiceTargetInstruments.indexOf(track) !== -1 || Boolean(tailSection.trackTargetFlags[track][index])));
+            }
+        });
+    }
+
     return {
         trackNotes: trackNotes,
         targetSteps: targetSteps,
@@ -3789,8 +4016,15 @@ function flattenPracticeScrollerSections(sections, options) {
         visualCycleSteps: visualCycleSteps,
         visualLoopCopies: extraVisualLoopCopies,
         visualTailSteps: visualTailSteps,
+        finalOverlapTail: finalTailLength > 0 ? {
+            playbackStart: hasTimerLoop ? Infinity : playbackOffset + playbackLoopLength * actualOuterLoopCopies,
+            visualStart: finalTailVisualStart,
+            length: finalTailLength,
+            runtimeKey: tailSection.runtimeKey,
+            timed: hasTimerLoop
+        } : null,
         recycleVisualLoop: hasTimerLoop || actualOuterLoopCopies > extraVisualLoopCopies,
-        totalSteps: visualCycleSteps + (visualLoopLength * extraVisualLoopCopies) + visualTailSteps
+        totalSteps: finalTailVisualStart + finalTailLength
     };
 }
 
@@ -4408,6 +4642,7 @@ function renderPracticeScrollerFromPayload(playerPayload) {
     practiceScrollerState.playbackLoopLength = flattened.playbackLoopLength;
     practiceScrollerState.visualCycleSteps = flattened.visualCycleSteps;
     practiceScrollerState.visualTotalSteps = flattened.totalSteps;
+    practiceScrollerState.finalOverlapTail = flattened.finalOverlapTail;
     practiceScrollerState.visualTailSteps = flattened.visualTailSteps;
     practiceScrollerState.recycleVisualLoop = Boolean(flattened.recycleVisualLoop);
     practiceScrollerState.repeatCount = normalizePracticeCount(practiceState.repeatCount, 1, 1, practiceRepeatCountMax);
@@ -4613,6 +4848,17 @@ function normalizePracticeScrollerPlaybackStep(playbackStep) {
 
 function getPracticeScrollerPlaybackSegmentContext(playbackStep) {
     const rawStep = Math.max(0, Number(playbackStep) || 0);
+    const finalTail = practiceScrollerState.finalOverlapTail;
+    if (finalTail && rawStep >= finalTail.playbackStart) {
+        const localStep = Math.min(finalTail.length, rawStep - finalTail.playbackStart);
+        return {
+            isFinalOverlapTail: true,
+            segment: { sectionLength: finalTail.length, repeatCount: 1, visualRepeatCount: 1 },
+            localPlaybackStep: localStep,
+            visualSegmentStart: finalTail.visualStart,
+            visualLocalStep: localStep
+        };
+    }
     const playbackSegments = practiceScrollerState.playbackSegments || [];
     const playbackTotalSteps = practiceScrollerState.playbackTotalSteps || 0;
     const playbackLoopStart = practiceScrollerState.playbackLoopStart || 0;
@@ -4804,7 +5050,9 @@ function updatePracticeScrollerPosition(playbackStep) {
         : rawStep < 0
             ? rawStep
             : normalizePracticeScrollerPlaybackStep(rawStep);
-    const renderedStep = getRenderedPracticeScrollerStep(normalizedStep);
+    const renderedStep = playbackContext && playbackContext.isFinalOverlapTail
+        ? normalizedStep
+        : getRenderedPracticeScrollerStep(normalizedStep);
     if (playbackContext) {
         const carouselInfo = getPracticeScrollerSegmentCarouselInfo(
             playbackContext.segment,
@@ -4930,8 +5178,17 @@ function recyclePracticeScrollerVisualLoop(nextStep) {
     });
 }
 
-function updatePracticeScrollerPlayback(playbackStep, delayMs) {
+function updatePracticeScrollerPlayback(playbackStep, delayMs, sectionInfo) {
     const stepNumber = Math.max(0, Number(playbackStep) || 0);
+    const finalTail = practiceScrollerState.finalOverlapTail;
+    if (finalTail && finalTail.timed) {
+        if (stepNumber === 0) {
+            finalTail.playbackStart = Infinity;
+        }
+        if (sectionInfo && sectionInfo.runtimeKey === finalTail.runtimeKey) {
+            finalTail.playbackStart = stepNumber - Math.max(0, Number(sectionInfo.localStep) || 0);
+        }
+    }
     const now = window.performance.now();
     const eventTime = now + Math.max(0, Number(delayMs) || 0) + practiceState.audioLatencyMs;
 

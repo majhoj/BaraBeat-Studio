@@ -3516,7 +3516,8 @@ function mergeSheetQuickPlayPickupIntoHostSection(hostSection, pickupSection) {
         return;
     }
 
-    const hostLength = getSheetQuickPlaySectionPlaybackLength(hostSection);
+    const hostLength = getConfiguredSectionOverlapStart(hostSection) ||
+        getSheetQuickPlaySectionPlaybackLength(hostSection);
     const pickupLength = getSheetQuickPlaySectionLength(pickupSection);
     const stepsPerBar = getReadRhythmConfig().stepsPerBar;
     const pickupSpan = Math.max(stepsPerBar, pickupLength);
@@ -3601,6 +3602,7 @@ function buildSheetQuickPlayConfiguredSections(preparedPatterns) {
                 patternHighlightRefs = repeatSheetQuickPlayValues(patternHighlightRefs, patternRepeatCount);
             }
             const inStep = getSheetQuickPlayPatternInStep(pattern);
+            const overlapStep = getPracticePatternControlStep(pattern, 'overlap');
             const sourceOutStep = getSheetQuickPlayPatternOutStep(pattern);
             const outStep = sourceOutStep !== null &&
                     sourceOutStep !== undefined &&
@@ -3644,7 +3646,7 @@ function buildSheetQuickPlayConfiguredSections(preparedPatterns) {
                 pickupHighlightRefs = [];
             }
 
-            const shouldIgnoreOutForContinuousLoop = groups.length === 1 &&
+            const shouldIgnoreOutForContinuousLoop = groups.length === 1 && overlapStep === null &&
                 (label === 'Begleitung' || /^Solo(?:\s|$)/i.test(String(label || '')));
             const hasApplicableOut = !shouldIgnoreOutForContinuousLoop &&
                 outStep !== null &&
@@ -3700,6 +3702,16 @@ function buildSheetQuickPlayConfiguredSections(preparedPatterns) {
                     section.highlightSteps,
                     mainHighlightRefs,
                     0
+                );
+            }
+
+            if (overlapStep !== null && overlapStep > sectionStartStep) {
+                section.overlapStartSteps = section.overlapStartSteps || {};
+                targetInstruments.forEach(function (instrumentName) {
+                    section.overlapStartSteps[instrumentName] = overlapStep - sectionStartStep;
+                });
+                section.overlapHighlightSteps = mergeSheetQuickPlayHighlightRefs(
+                    section.overlapHighlightSteps || [], mainHighlightRefs, 0
                 );
             }
 
@@ -3789,7 +3801,7 @@ function buildSheetQuickPlayConfiguredSections(preparedPatterns) {
         }
     });
 
-    return sections;
+    return applyConfiguredSectionOverlaps(sections, true);
 }
 
 function createSheetPatternMoveOverlayButton(range, direction, disabled) {
@@ -9438,7 +9450,7 @@ function handleEmbeddedAudioPlayerMessage(event) {
     }
 
     if (isPracticeFrame && message.type === 'barabeat-audio-step' && typeof updatePracticeScrollerPlayback === 'function') {
-        updatePracticeScrollerPlayback(message.playbackStep, message.delayMs);
+        updatePracticeScrollerPlayback(message.playbackStep, message.delayMs, message);
         return;
     }
 
