@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'barabeat-studio-offline-v81-quick-play-gesture-start';
+const CACHE_NAME = 'barabeat-studio-offline-v83-cyclic-in-out';
 const APP_SHELL = [
   './app-shell.html',
   './manifest.webmanifest',

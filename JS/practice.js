@@ -3228,10 +3228,9 @@ function buildPracticeSectionsFromEntries(entries) {
                 : shouldLoopAccompaniment
                     ? getPracticeLoopedSegment(rawPatternNotes, patternSegmentOffset, blockPracticeLength, 'f')
                     : rawPatternNotes.slice();
-            if (!shouldUseAccompanimentSegment && rawPatternPickupEndStep > 0) {
-                patternNotes = pickupWrapsToPatternStart
-                    ? patternNotes.slice(0, safePatternInStep)
-                    : patternNotes.slice(rawPatternPickupEndStep);
+            // A cyclic IN uses the previous bar for its pickup, then repeats the full pattern.
+            if (!shouldUseAccompanimentSegment && rawPatternPickupEndStep > 0 && !pickupWrapsToPatternStart) {
+                patternNotes = patternNotes.slice(rawPatternPickupEndStep);
             }
             if (entry.suppressPlayback) {
                 patternNotes = Array(patternNotes.length).fill('f');
@@ -3252,9 +3251,7 @@ function buildPracticeSectionsFromEntries(entries) {
                     patternNotes.length
                 );
             let effectivePatternOutStep = patternOutStep !== null && patternOutStep !== undefined
-                ? pickupWrapsToPatternStart && Number(patternOutStep) >= safePatternInStep
-                    ? null
-                    : Math.max(0, Math.round(Number(patternOutStep) || 0) - rawPatternMainStartStep)
+                ? Math.max(0, Math.round(Number(patternOutStep) || 0) - rawPatternMainStartStep)
                 : patternOutStep;
             if (shouldLoopAccompaniment &&
                     effectivePatternOutStep !== null &&

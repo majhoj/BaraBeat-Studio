@@ -424,6 +424,56 @@ assert.equal(notesAt('Djembe_1', 48, 1)[0], 'slap');
 assert.equal(notesAt('Djembe_1', 52, 1)[0], 'tone');
 console.log('Overlap: parallel accompaniment phase, moving notes and following IN checked.');
 
+// Djaa Djembe: Call, Flam auf Eins, then a one-bar Echauffement with IN at step 8.
+const flamOnOne = pattern('flam-on-one', 'Djembe_1', [bar(17, { 0: 'slap_flam' })], 'Flam auf Eins');
+const cyclicWarmupBar = bar(18, {
+  0: 'tone', 2: 'slap', 4: 'slap', 8: 'slap', 10: 'slap', 12: 'tone',
+  14: 'slap', 16: 'slap', 18: 'bass', 20: 'slap', 22: 'slap'
+}, [{ type: 'in', stepIndex: 8 }]);
+const cyclicWarmup = pattern('cyclic-warmup', 'Djembe_1', [cyclicWarmupBar], 'Echauffement');
+const cyclicWarmupBefore = JSON.stringify(cyclicWarmup);
+const flamWithPickup = flamOnOne.bars[0].notes.slice();
+flamWithPickup.splice(8, 16, ...cyclicWarmupBar.notes.slice(8));
+context.findPatternById = id => [following, flamOnOne, cyclicWarmup].find(item => item.id === id);
+for (const repeatCount of [1, 2, 6]) {
+  const sections = context.buildPracticeSectionsFromEntries([
+    practiceEntry(following, 'warmup-call'), practiceEntry(flamOnOne, 'warmup-flam'),
+    practiceEntry(cyclicWarmup, 'warmup-main', repeatCount)
+  ]);
+  loadPlayer(sections);
+  const expected = [...following.bars[0].notes, ...flamWithPickup,
+    ...Array(repeatCount).fill(cyclicWarmupBar.notes).flat()];
+  assert.deepEqual(notesAt('Djembe_1', 0, expected.length), expected,
+    'The Echauffement pickup must not be mixed into a shortened copy of itself');
+  assert.equal(context.oneShotLength, expected.length, 'Every warmup repeat occupies a full bar');
+  const movingNotes = context.flattenPracticeScrollerSections(sections);
+  assert.equal(movingNotes.playbackTotalSteps, expected.length);
+  assert.deepEqual(Array.from(movingNotes.trackNotes.Djembe_1.slice(0, 48)), expected.slice(0, 48));
+  for (let step = 48; step < movingNotes.trackNotes.Djembe_1.length; step += 24) {
+    assert.deepEqual(Array.from(movingNotes.trackNotes.Djembe_1.slice(step, step + 24)), cyclicWarmupBar.notes,
+      'The bounded moving-note buffer must show intact warmup bars');
+  }
+}
+assert.equal(JSON.stringify(cyclicWarmup), cyclicWarmupBefore, 'The source pattern is unchanged');
+for (const outStep of [4, 18]) {
+  const warmupWithOut = pattern('warmup-out', 'Djembe_1', [{
+    ...cyclicWarmupBar,
+    controls: [...cyclicWarmupBar.controls, { type: 'out', stepIndex: outStep }]
+  }], 'Echauffement');
+  context.findPatternById = id => [flamOnOne, warmupWithOut].find(item => item.id === id);
+  const sections = context.buildPracticeSectionsFromEntries([
+    practiceEntry(flamOnOne, 'flam'), practiceEntry(warmupWithOut, 'warmup', 2)
+  ]);
+  loadPlayer(sections);
+  const expected = [...flamWithPickup, ...cyclicWarmupBar.notes,
+    ...cyclicWarmupBar.notes.map((note, step) => step > outStep ? 'f' : note)];
+  assert.deepEqual(notesAt('Djembe_1', 0, expected.length), expected,
+    'A cyclic IN must preserve the final OUT both before and after its position');
+  assert.deepEqual(Array.from(context.flattenPracticeScrollerSections(sections).trackNotes.Djembe_1), expected);
+}
+console.log('Practice Echauffement: cyclic IN, complete repeats, final OUT and matching moving notes checked.');
+context.findPatternById = id => [solo5, nextWithIn].find(item => item.id === id);
+
 context.practiceState.repeatCount = 4;
 context.timelineLoopCount = 3;
 overlapSections = context.buildPracticeSectionsFromEntries([practiceEntry(solo5, 'solo')]);

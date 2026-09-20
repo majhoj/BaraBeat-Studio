@@ -1471,9 +1471,16 @@ function getTimelineEntrySkippedStartStep(entryData) {
   if (entryData.label === 'Begleitung') {
     return 0;
   }
-  return hasTimelineEntryLeadingPickup(entryData)
-    ? getTimelineEntryPickupEndStep(entryData)
-    : 0;
+  if (!hasTimelineEntryLeadingPickup(entryData)) {
+    return 0;
+  }
+  const pickupEndStep = getTimelineEntryPickupEndStep(entryData);
+  // An IN in the final bar leads into another full cycle, as in practice mode.
+  // Consuming that bar would otherwise remove the entire repeated pattern.
+  if (pickupEndStep >= getPatternNotesLength(entryData) && Number(entryData.patternInStep) > 0) {
+    return 0;
+  }
+  return pickupEndStep;
 }
 
 function hasTimelineEntryLeadingPickup(entryData) {
@@ -1488,6 +1495,11 @@ function hasTimelineEntryLeadingPickup(entryData) {
   }
 
   const inStep = Math.max(0, Math.round(Number(entryData.patternInStep) || 0));
+  const sourceLength = getPatternNotesLength(entryData);
+  // A cyclic pickup in the final bar can follow OUT, regardless of the pattern's name.
+  if (inStep > 0 && sourceLength > 0 && getTimelineEntryPickupEndStep(entryData) >= sourceLength) {
+    return true;
+  }
   const earlierBoundarySteps = [entryData.patternOutStep, entryData.patternOverlapStep]
     .filter(function (boundaryStep) {
       return boundaryStep !== null && boundaryStep !== undefined;
