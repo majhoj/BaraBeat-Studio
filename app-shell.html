@@ -2242,6 +2242,7 @@ const sheetQuickPlayState = {
     selectedPatternIds: [],
     patternLibrary: [],
     isPlaying: false,
+    isStarting: false,
     activeHighlightTimers: [],
     highlightSectionsByRuntimeKey: {},
     noteElementsByPosition: {},
@@ -2627,24 +2628,21 @@ function setSheetQuickPlayButtonState(isPlaying) {
 }
 
 function updateSheetQuickPlayButtonAvailability() {
-    const mobileButtonEl = document.getElementById('mobileSheetQuickPlayButton');
-    if (!mobileButtonEl) {
-        positionMobileSheetQuickPlayFrame();
-        return;
-    }
     const hasSelection = sheetQuickPlayState.selectedPatternIds.length > 0;
-    const isLoading = hasSelection && !sheetQuickPlayState.frameReady && !sheetQuickPlayState.isPlaying;
-    mobileButtonEl.disabled = !sheetQuickPlayState.isPlaying && (!hasSelection || !sheetQuickPlayState.frameReady);
-    mobileButtonEl.classList.toggle('is-loading', isLoading);
-    if (isLoading) {
-        mobileButtonEl.textContent = '…';
-        mobileButtonEl.title = uiText('editor.quickPlay.loadingSounds');
-    } else {
-        mobileButtonEl.textContent = sheetQuickPlayState.isPlaying ? '■' : '▶';
-        mobileButtonEl.title = sheetQuickPlayState.isPlaying
-            ? uiText('editor.quickPlay.stop')
-            : uiText('editor.quickPlay.playSelected');
-    }
+    const isLoading = hasSelection && !sheetQuickPlayState.isPlaying &&
+        (!sheetQuickPlayState.frameReady || sheetQuickPlayState.isStarting || sheetQuickPlayRefreshPending);
+    ['sheetQuickPlayButton', 'mobileSheetQuickPlayButton'].forEach(function (buttonId) {
+        const buttonEl = document.getElementById(buttonId);
+        if (!buttonEl) {
+            return;
+        }
+        buttonEl.disabled = !sheetQuickPlayState.isPlaying && (!hasSelection || isLoading);
+        buttonEl.classList.toggle('is-loading', isLoading);
+        buttonEl.textContent = isLoading ? '…' : (sheetQuickPlayState.isPlaying ? '■' : '▶');
+        buttonEl.title = uiText(isLoading
+            ? 'editor.quickPlay.loadingSounds'
+            : (sheetQuickPlayState.isPlaying ? 'editor.quickPlay.stop' : 'editor.quickPlay.playSelected'));
+    });
     positionMobileSheetQuickPlayFrame();
 }
 
@@ -2679,7 +2677,7 @@ function positionMobileSheetQuickPlayFrame() {
     frameEl.style.width = buttonBounds.width + 'px';
     frameEl.style.height = buttonBounds.height + 'px';
     frameEl.classList.add('is-mobile-active');
-    frameEl.classList.toggle('is-mobile-control', sheetQuickPlayState.frameReady);
+    frameEl.classList.toggle('is-mobile-control', sheetQuickPlayState.frameReady && !sheetQuickPlayRefreshPending);
 }
 
 function getSheetQuickPlaySelectedPatterns() {
@@ -2856,12 +2854,10 @@ function selectSheetQuickPlayPattern(patternId) {
     }
     sheetQuickPlayState.selectedPatternIds = selectedIds;
     updateSheetQuickPlaySelectionClasses();
-    if (isMobilePracticeViewport()) {
-        if (sheetQuickPlayState.isPlaying) {
-            stopSheetQuickPlay();
-        }
-        scheduleSheetQuickPlayPreparation();
+    if (sheetQuickPlayState.isPlaying || sheetQuickPlayState.isStarting) {
+        stopSheetQuickPlay();
     }
+    scheduleSheetQuickPlayPreparation();
 }
 
 function buildSheetQuickPlayRepeatRanges(patternBars) {
@@ -3959,6 +3955,7 @@ function renderSheetQuickPlaySelectors(readResult) {
 
     rebuildSheetQuickPlayNoteElementMap();
     updateSheetQuickPlaySelectionClasses();
+    scheduleSheetQuickPlayPreparation();
     window.requestAnimationFrame(positionSheetQuickPlayControls);
 }
 
@@ -4004,6 +4001,7 @@ function sheetQuickPlayMutationAffectsEditor(mutation) {
 
 function scheduleSheetQuickPlaySelectorRefresh(delay) {
     sheetQuickPlayRefreshPending = true;
+    updateSheetQuickPlayButtonAvailability();
     if (sheetQuickPlayEditorPointerActive) {
         return;
     }
@@ -4106,7 +4104,7 @@ function buildSheetQuickPlayPayload() {
         payload[0].TimelineLoop = true;
         payload[0].TimelineLoopCount = 'loop';
         payload[0].SheetQuickPlayMode = true;
-        payload[0].SheetQuickPlayExternalScheduler = isMobilePracticeViewport();
+        payload[0].SheetQuickPlayExternalScheduler = true;
         payload[0].Tempo = getSheetQuickPlayTempo();
         payload[0].PracticeSections = configuredSections.map(function (section) {
             const playerSection = Object.assign({}, section);
@@ -4126,9 +4124,6 @@ function getSheetQuickPlayPreparationSignature() {
 
 function prepareSheetQuickPlayPlayer() {
     sheetQuickPlayState.preparationTimer = null;
-    if (!isMobilePracticeViewport()) {
-        return;
-    }
     const frameEl = document.getElementById('sheetQuickPlayFrame');
     const signature = getSheetQuickPlayPreparationSignature();
     if (!frameEl || sheetQuickPlayState.selectedPatternIds.length === 0) {
@@ -4157,9 +4152,6 @@ function prepareSheetQuickPlayPlayer() {
 }
 
 function scheduleSheetQuickPlayPreparation(delay) {
-    if (!isMobilePracticeViewport()) {
-        return;
-    }
     if (sheetQuickPlayState.preparationTimer !== null) {
         window.clearTimeout(sheetQuickPlayState.preparationTimer);
     }
@@ -4168,31 +4160,8 @@ function scheduleSheetQuickPlayPreparation(delay) {
     updateSheetQuickPlayButtonAvailability();
     sheetQuickPlayState.preparationTimer = window.setTimeout(
         prepareSheetQuickPlayPlayer,
-        Math.max(0, Number(delay) || 120)
+        delay === undefined ? 120 : Math.max(0, Number(delay) || 0)
     );
-}
-
-function requestSheetQuickPlayStart(frameEl) {
-    let attemptsLeft = 80;
-    function tryStart() {
-        if (!sheetQuickPlayState.isPlaying) {
-            return;
-        }
-        const frameWindow = frameEl && frameEl.contentWindow;
-        const frameDocument = frameEl && frameEl.contentDocument;
-        const playButtonEl = frameDocument ? frameDocument.querySelector('[data-playing]') : null;
-        if (playButtonEl && !playButtonEl.disabled) {
-            if (playButtonEl.dataset.playing !== 'true') {
-                playButtonEl.click();
-            }
-            return;
-        }
-        attemptsLeft -= 1;
-        if (frameWindow && attemptsLeft > 0) {
-            window.setTimeout(tryStart, 100);
-        }
-    }
-    tryStart();
 }
 
 function clearSheetQuickPlaySchedulerPump() {
@@ -4204,9 +4173,6 @@ function clearSheetQuickPlaySchedulerPump() {
 
 function startSheetQuickPlaySchedulerPump() {
     clearSheetQuickPlaySchedulerPump();
-    if (!isMobilePracticeViewport()) {
-        return;
-    }
 
     const pumpScheduler = function () {
         const frameEl = document.getElementById('sheetQuickPlayFrame');
@@ -4227,6 +4193,7 @@ function startSheetQuickPlaySchedulerPump() {
 function stopSheetQuickPlay(options) {
     const stopOptions = options && typeof options === 'object' ? options : {};
     const preservePreparedPlayer = Boolean(stopOptions.preservePreparedPlayer);
+    sheetQuickPlayState.isStarting = false;
     clearSheetQuickPlaySchedulerPump();
     const frameEl = document.getElementById('sheetQuickPlayFrame');
     if (frameEl && frameEl.contentDocument) {
@@ -4257,39 +4224,29 @@ function stopSheetQuickPlay(options) {
 }
 
 function startSheetQuickPlay() {
-    if (isMobilePracticeViewport()) {
-        const frameEl = document.getElementById('sheetQuickPlayFrame');
-        const signature = getSheetQuickPlayPreparationSignature();
-        const startFromParent = frameEl && frameEl.contentWindow
-            ? frameEl.contentWindow.startEmbeddedPlaybackFromParent
-            : null;
-        if (sheetQuickPlayState.frameReady &&
-                sheetQuickPlayState.preparedSignature === signature &&
-                typeof startFromParent === 'function' &&
-                startFromParent()) {
-            setSheetQuickPlayButtonState(true);
-            return;
-        }
-        scheduleSheetQuickPlayPreparation(0);
+    if (sheetQuickPlayState.isStarting || sheetQuickPlayRefreshPending) {
         return;
     }
-    renderSheetQuickPlaySelectors();
-    const payload = buildSheetQuickPlayPayload();
     const frameEl = document.getElementById('sheetQuickPlayFrame');
-    if (!payload || !frameEl) {
-        alert(uiText('editor.quickPlay.selectPattern'));
+    const signature = getSheetQuickPlayPreparationSignature();
+    const startFromParent = frameEl && frameEl.contentWindow
+        ? frameEl.contentWindow.startEmbeddedPlaybackFromParent
+        : null;
+    // Keep AudioContext creation/resume in the actual click, including desktop Safari.
+    if (sheetQuickPlayState.frameReady &&
+            sheetQuickPlayState.preparedSignature === signature &&
+            typeof startFromParent === 'function' &&
+            startFromParent()) {
+        sheetQuickPlayState.isStarting = true;
+        updateSheetQuickPlayButtonAvailability();
         return;
     }
-    setSheetQuickPlayButtonState(true);
-    frameEl.onload = function () {
-        requestSheetQuickPlayStart(frameEl);
-    };
-    openAudioTestFrame(payload, frameEl.name || 'sheetQuickPlayFrame');
+    scheduleSheetQuickPlayPreparation(0);
 }
 
 function toggleSheetQuickPlay() {
     if (sheetQuickPlayState.isPlaying) {
-        stopSheetQuickPlay({ preservePreparedPlayer: isMobilePracticeViewport() });
+        stopSheetQuickPlay({ preservePreparedPlayer: true });
         return;
     }
     startSheetQuickPlay();
@@ -9334,16 +9291,29 @@ function handleEmbeddedAudioPlayerMessage(event) {
     }
 
     if (isSheetQuickPlayFrame) {
+        if (!sheetQuickPlayState.preparedSignature) {
+            return;
+        }
         if (message.type === 'barabeat-audio-step') {
             scheduleSheetQuickPlayNoteHighlights(message);
             return;
         }
         if (message.type === 'barabeat-audio-state') {
             if (message.state === 'ready') {
+                if (sheetQuickPlayState.preparationTimer !== null ||
+                        sheetQuickPlayState.preparedSignature !== getSheetQuickPlayPreparationSignature()) {
+                    return;
+                }
                 sheetQuickPlayState.frameReady = true;
                 updateSheetQuickPlayButtonAvailability();
                 return;
             }
+            if (message.state === 'starting') {
+                sheetQuickPlayState.isStarting = true;
+                updateSheetQuickPlayButtonAvailability();
+                return;
+            }
+            sheetQuickPlayState.isStarting = false;
             if (message.state === 'playing') {
                 setSheetQuickPlayButtonState(true);
                 startSheetQuickPlaySchedulerPump();
@@ -9353,6 +9323,9 @@ function handleEmbeddedAudioPlayerMessage(event) {
                 clearSheetQuickPlaySchedulerPump();
                 setSheetQuickPlayButtonState(false);
                 clearSheetQuickPlayHighlights();
+            }
+            if (message.state === 'error') {
+                alert(message.message || uiText('player.error.audioStart'));
             }
             return;
         }
@@ -10321,10 +10294,17 @@ document.addEventListener('DOMContentLoaded', function () {
         startInlineRhythmTitleEdit(this);
     });
     document.querySelector('#sheetQuickPlayTempo').addEventListener('change', function () {
-        getSheetQuickPlayTempo();
-        if (sheetQuickPlayState.isPlaying) {
-            stopSheetQuickPlay();
-            startSheetQuickPlay();
+        const nextTempo = getSheetQuickPlayTempo();
+        const frameEl = document.getElementById('sheetQuickPlayFrame');
+        const bpmControl = frameEl && frameEl.contentDocument
+            ? frameEl.contentDocument.querySelector('#bpm')
+            : null;
+        if (sheetQuickPlayState.frameReady && bpmControl) {
+            bpmControl.value = String(nextTempo);
+            bpmControl.dispatchEvent(new frameEl.contentWindow.Event('input', { bubbles: true }));
+            sheetQuickPlayState.preparedSignature = getSheetQuickPlayPreparationSignature();
+        } else {
+            scheduleSheetQuickPlayPreparation(0);
         }
     });
     window.addEventListener('resize', positionSheetQuickPlayControls);

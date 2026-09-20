@@ -173,6 +173,7 @@ window.loadingEl = loadingEl;
 const playButton = document.querySelector('[data-playing]');
 const exportWavButton = document.querySelector('#exportWavButton');
 let isPlaying = false;
+let playbackStartGeneration = 0;
 let audioIsReady = false;
 let hasWaitedAfterFirstResume = false;
 let hasPrimedAudioOutput = false;
@@ -5778,15 +5779,28 @@ async function startAudioPlayback() {
   configureBarabeatAudioSession();
   configureBarabeatMediaMetadata();
 
-  // Mobile Safari may report a preloaded context as running while its clock
-  // remains at zero. Create the playback context inside the real tap instead.
-  createSheetQuickPlayGestureAudioContext();
-
+  const startGeneration = ++playbackStartGeneration;
   isPlaying = true;
+  if (isSheetQuickPlayMode) {
+    notifyEmbeddedPlaybackState('starting');
+  }
+  let resumeTimeout = null;
   try {
+    // Safari can leave a preloaded context's clock at zero. Create it in the real click/tap.
+    createSheetQuickPlayGestureAudioContext();
     // Keep resume() in the direct call chain of the user's tap. Safari may
     // reject it when playback is started through a synthetic button click.
-    await resumeAndWarmAllInstruments();
+    const resumePromise = resumeAndWarmAllInstruments();
+    if (isSheetQuickPlayMode) {
+      await Promise.race([resumePromise, new Promise(function (_, reject) {
+        resumeTimeout = window.setTimeout(function () {
+          reject(new Error(playerText('player.error.audioStart')));
+        }, 5000);
+      })]);
+      window.clearTimeout(resumeTimeout);
+    } else {
+      await resumePromise;
+    }
     if (!hasWaitedAfterFirstResume) {
       await new Promise(resolve => window.setTimeout(resolve, 260));
       hasWaitedAfterFirstResume = true;
@@ -5796,9 +5810,24 @@ async function startAudioPlayback() {
       hasPrimedAudioOutput = true;
     }
   } catch (err) {
+    if (startGeneration !== playbackStartGeneration) {
+      return false;
+    }
     isPlaying = false;
+    playButton.dataset.playing = 'false';
     console.error('AudioContext resume fehlgeschlagen:', err);
     updateLoadingStatus(playerText('player.error.audioStart'));
+    if (isSheetQuickPlayMode) {
+      hasCreatedSheetQuickPlayGestureContext = false;
+      notifyEmbeddedPlaybackState('error', { message: playerText('player.error.audioStart') });
+    }
+    return false;
+  } finally {
+    if (resumeTimeout !== null) {
+      window.clearTimeout(resumeTimeout);
+    }
+  }
+  if (!isPlaying || startGeneration !== playbackStartGeneration) {
     return false;
   }
 
@@ -5828,6 +5857,7 @@ async function startAudioPlayback() {
 }
 
 function stopAudioPlayback() {
+  playbackStartGeneration += 1;
   if (!isPlaying) {
     return true;
   }

@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'barabeat-studio-offline-v80-practice-quick-play-overlap';
+const CACHE_NAME = 'barabeat-studio-offline-v81-quick-play-gesture-start';
 const APP_SHELL = [
   './app-shell.html',
   './manifest.webmanifest',
