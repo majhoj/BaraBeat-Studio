@@ -2223,13 +2223,7 @@ function getPracticePatternOutStep(pattern) {
 }
 
 function getPracticeStepsPerBar() {
-    if (rhythm === 'tenaer') {
-        return 24;
-    }
-    if (rhythm === 'neunaer') {
-        return 18;
-    }
-    return 32;
+    return BaraBeatTiming.getGrid(rhythm).stepsPerBar;
 }
 
 function buildPracticePickupNotes(notes, inStep, options) {
@@ -3498,23 +3492,11 @@ function buildPracticePlayerPayload() {
 }
 
 function getPracticeScrollerStepsPerBar() {
-    if (rhythm === 'tenaer') {
-        return 24;
-    }
-    if (rhythm === 'neunaer') {
-        return 18;
-    }
-    return 32;
+    return BaraBeatTiming.getGrid(rhythm).stepsPerBar;
 }
 
 function getPracticeScrollerStepsPerBeat() {
-    if (rhythm === 'tenaer') {
-        return 6;
-    }
-    if (rhythm === 'neunaer') {
-        return 6;
-    }
-    return 8;
+    return BaraBeatTiming.getGrid(rhythm).stepsPerBeat;
 }
 
 function getPracticeScrollerBaseStepMs(tempoValue) {
@@ -3526,7 +3508,7 @@ function getPracticeScrollerBaseStepMs(tempoValue) {
         )
         : 100;
     const safeTempo = Math.max(1, Number(tempo) || 100);
-    const stepSeconds = 60 / safeTempo / getPracticeScrollerStepsPerBeat();
+    const stepSeconds = BaraBeatTiming.getBaseStepDuration(rhythm, safeTempo);
     return Math.max(1, stepSeconds * 1000);
 }
 

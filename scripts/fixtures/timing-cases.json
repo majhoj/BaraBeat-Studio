@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "description": "One beat at BPM 80. Swing anchors are percentages of one subdivision; each subdivision has two raster steps.",
+  "cases": [
+    { "rhythm": "binaer", "stepsPerBar": 32, "stepsPerBeat": 8, "swing": [0, 20, -20, 0], "beatIntervals": [0.1125, 0.1125, 0.05625, 0.05625, 0.1125, 0.1125, 0.09375, 0.09375] },
+    { "rhythm": "tenaer", "stepsPerBar": 24, "stepsPerBeat": 6, "swing": [0, 30, 10], "beatIntervals": [0.1625, 0.1625, 0.1, 0.1, 0.1125, 0.1125] },
+    { "rhythm": "neunaer", "stepsPerBar": 18, "stepsPerBeat": 6, "swing": [0, 30, 10], "beatIntervals": [0.1625, 0.1625, 0.1, 0.1, 0.1125, 0.1125] }
+  ]
+}

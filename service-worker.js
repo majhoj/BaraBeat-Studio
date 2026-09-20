@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'barabeat-studio-offline-v83-cyclic-in-out';
+const CACHE_NAME = 'barabeat-studio-offline-v84-shared-timing';
 const APP_SHELL = [
   './app-shell.html',
   './manifest.webmanifest',
@@ -14,6 +14,7 @@ const APP_SHELL = [
   './JS/serverLibrary.js',
   './JS/selection_drag_7.js',
   './JS/functions.js',
+  './JS/timing.js',
   './JS/timeline.js',
   './JS/practice.js',
   './JS/offline.js',

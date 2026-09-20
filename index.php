@@ -21,6 +21,7 @@ $jsLocalLibrary = @filemtime(__DIR__ . '/JS/localLibrary.js') ?: 1;
 $jsServerLibrary = @filemtime(__DIR__ . '/JS/serverLibrary.js') ?: 1;
 $jsSel = @filemtime(__DIR__ . '/JS/selection_drag_7.js') ?: 1;
 $jsFn = @filemtime(__DIR__ . '/JS/functions.js') ?: 1;
+$jsTiming = @filemtime(__DIR__ . '/JS/timing.js') ?: 1;
 $jsTimeline = @filemtime(__DIR__ . '/JS/timeline.js') ?: 1;
 $jsPractice = @filemtime(__DIR__ . '/JS/practice.js') ?: 1;
 $jsOffline = @filemtime(__DIR__ . '/JS/offline.js') ?: 1;
@@ -99,6 +100,7 @@ $offlineFallbackEditionConfigJson = json_encode(
     <script src="JS/serverLibrary.js?v=<?php echo $jsServerLibrary; ?>"></script>
     <script src="JS/selection_drag_7.js?v=<?php echo $jsSel; ?>"></script>
     <script src="JS/functions.js?v=<?php echo $jsFn; ?>"></script>
+    <script src="JS/timing.js?v=<?php echo $jsTiming; ?>"></script>
     <script src="JS/timeline.js?v=<?php echo $jsTimeline; ?>"></script>
     <script src="JS/practice.js?v=<?php echo $jsPractice; ?>"></script>
     <script src="JS/offline.js?v=<?php echo $jsOffline; ?>" defer></script>
@@ -5490,11 +5492,14 @@ const tupletElementIds = ['triplet', 'quartuplet'];
 let notenText = "eee";
 
 function getReadRhythmConfig() {
+    const stepsPerBar = BaraBeatTiming.getGrid(
+        rhythm === 'binaer' || rhythm === 'tenaer' ? rhythm : 'neunaer'
+    ).stepsPerBar;
     if (rhythm == 'binaer') {
         return {
             rhythmLabel: uiText('score.readout.binary'),
-            stepsPerBar: 32,
-            totalStepsPerLine: 64,
+            stepsPerBar: stepsPerBar,
+            totalStepsPerLine: stepsPerBar * 2,
             gapSlotCount: 2,
             getLineSlotIndex: function (centerX) {
                 return Math.round(((centerX - 25) / 12.5) - 7);
@@ -5507,8 +5512,8 @@ function getReadRhythmConfig() {
         const firstNoteX = 100 + gridLineStepX + 1;
         return {
             rhythmLabel: uiText('score.readout.ternary'),
-            stepsPerBar: 24,
-            totalStepsPerLine: 48,
+            stepsPerBar: stepsPerBar,
+            totalStepsPerLine: stepsPerBar * 2,
             gapSlotCount: 2,
             getLineSlotIndex: function (centerX) {
                 return Math.round((centerX - firstNoteX) / noteStepX) + 1;
@@ -5517,8 +5522,8 @@ function getReadRhythmConfig() {
     }
     return {
         rhythmLabel: uiText('score.readout.nineEight'),
-        stepsPerBar: 18,
-        totalStepsPerLine: 36,
+        stepsPerBar: stepsPerBar,
+        totalStepsPerLine: stepsPerBar * 2,
         gapSlotCount: 2,
         getLineSlotIndex: function (centerX) {
             return Math.round((centerX - 121.25) / 21.25);
@@ -6446,13 +6451,9 @@ function getMobileSheetStepsPerBeat() {
 }
 
 function getMobileSheetStepsPerBar() {
-    if (rhythm === 'binaer') {
-        return 32;
-    }
-    if (rhythm === 'neunaer') {
-        return 18;
-    }
-    return 24;
+    return BaraBeatTiming.getGrid(
+        rhythm === 'binaer' || rhythm === 'neunaer' ? rhythm : 'tenaer'
+    ).stepsPerBar;
 }
 
 function getMobileSheetBeatCount() {
