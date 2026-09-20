@@ -8,16 +8,18 @@ export function source(path) {
 
 export function loadFunctions(context, text, names) {
   for (const name of names) {
-    const start = text.indexOf('function ' + name + '(');
-    const end = text.indexOf('\nfunction ', start + 1);
+    let start = text.indexOf('function ' + name + '(');
+    if (text.slice(start - 6, start) === 'async ') start -= 6;
+    // Top-level function closing braces are unindented in these source files.
+    const end = text.indexOf('\n}', start) + 2;
     assert(start >= 0 && end > start, name + ' missing');
-    vm.runInContext(text.slice(start, end).split('\nrecalculateOrderedSectionTiming();')[0], context);
+    vm.runInContext(text.slice(start, end), context);
   }
 }
 
 export function installTiming(context) {
   const path = new URL('../../JS/timing.js', import.meta.url);
-  if (fs.existsSync(path)) vm.runInContext(fs.readFileSync(path, 'utf8'), context);
+  vm.runInContext(fs.readFileSync(path, 'utf8'), context);
 }
 
 export function near(actual, expected, label) {

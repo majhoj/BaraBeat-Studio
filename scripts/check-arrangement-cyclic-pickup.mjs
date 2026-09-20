@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import { installTiming } from './helpers/music-context.mjs';
 
 const player = fs.readFileSync(new URL('../Audio/player.html', import.meta.url), 'utf8');
 const context = vm.createContext({
@@ -13,6 +14,7 @@ const context = vm.createContext({
   steuerung: {},
   instrument: ''
 });
+installTiming(context);
 // Execute the actual pattern/section builders without the browser and audio bootstrap.
 vm.runInContext(player.slice(player.indexOf('function sanitizeRepeatRanges('),
   player.indexOf('const repeatRanges = sanitizeRepeatRanges(')), context);

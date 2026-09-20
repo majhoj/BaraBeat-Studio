@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import { installTiming } from './helpers/music-context.mjs';
 
 const editorSource = fs.readFileSync(new URL('../index.php', import.meta.url), 'utf8');
 const playerSource = fs.readFileSync(new URL('../Audio/player.html', import.meta.url), 'utf8');
@@ -26,6 +27,7 @@ const context = vm.createContext({
   practiceTimerFinalLoopStartStep: null,
   globalPlaybackStep: 0
 });
+installTiming(context);
 vm.runInContext(editorSource.slice(
   editorSource.indexOf('function buildSheetQuickPlayRepeatRanges('),
   editorSource.indexOf('function createSheetPatternMoveOverlayButton(')
