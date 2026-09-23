@@ -4,6 +4,7 @@ import vm from 'node:vm';
 
 const editor = fs.readFileSync(new URL('../index.php', import.meta.url), 'utf8');
 const player = fs.readFileSync(new URL('../Audio/player.html', import.meta.url), 'utf8');
+const practice = fs.readFileSync(new URL('../JS/practice.js', import.meta.url), 'utf8');
 function extract(source, name) {
   const match = new RegExp('(?:async )?function ' + name + '\\(').exec(source);
   assert(match, name + ' missing');
@@ -26,6 +27,7 @@ for (const mobile of [false, true]) {
   const timeouts = new Map();
   const intervals = new Map();
   const errors = [];
+  const volumeMessages = [];
   const bpm = { value: '90', dispatchEvent(event) { assert.equal(event.type, 'input'); } };
   const frame = { name: 'sheetQuickPlayFrame', src: '', dataset: {},
     contentDocument: { querySelector: selector => selector === '#bpm' ? bpm : {
@@ -38,6 +40,7 @@ for (const mobile of [false, true]) {
   const context = vm.createContext({
     sheetQuickPlayState: state, sheetQuickPlayRefreshPending: false,
     timelineState: { tempo: 100 },
+    practiceTrackInstrumentNames: ['Kenkeni', 'Djembe_1'],
     document: { getElementById: id => elements[id] || null },
     window: { location: { origin: 'http://localhost' },
       setTimeout(fn) { const id = ++timerId; timeouts.set(id, fn); return id; },
@@ -52,15 +55,26 @@ for (const mobile of [false, true]) {
     getSheetQuickPlayTempo: () => tempo,
     getSheetQuickPlaySelectedPatterns: () => state.selectedPatternIds.map(id => ({ id, defaultTargets: ['Djembe_1'] })),
     buildSheetQuickPlayPreparedPattern: pattern => pattern,
-    buildTimelinePlayerPayload: () => [{}],
+    buildTimelinePlayerPayload: () => [{
+      PracticeInstrumentVolumes: { Kenkeni: 0 },
+      PracticeInstrumentToneVolumes: { Kenkeni: { open: 0, bell: 0 } }
+    }],
     buildSheetQuickPlayConfiguredSections: () => [{ runtimeKey: 'test', highlightSteps: [] }],
     renderSheetQuickPlaySelectors() { assert.fail('Play must not discard its prepared player'); },
     openAudioTestFrame(payload) {
       loads++;
       assert.equal(payload[0].SheetQuickPlayExternalScheduler, true, 'Both layouts use the parent scheduler');
+      assert.deepEqual(JSON.parse(JSON.stringify(payload[0].PracticeInstrumentVolumes)),
+        context.timelineState.quickPlayInstrumentVolumes || {}, 'Quick play uses only its own mixer');
+      assert.deepEqual(JSON.parse(JSON.stringify(payload[0].PracticeInstrumentToneVolumes)), {},
+        'Muted practice tones must not silence quick play');
       frame.src = 'Audio/player.html?launchReload=' + loads;
       frame.dataset.audioLaunchKey = String(loads);
       frame.contentWindow = {
+        postMessage(message, origin) {
+          assert.equal(origin, 'http://localhost');
+          volumeMessages.push(JSON.parse(JSON.stringify(message)));
+        },
         Event: class { constructor(type) { this.type = type; } },
         startEmbeddedPlaybackFromParent() {
           assert(gesture, 'Start must stay in the real user gesture');
@@ -72,7 +86,11 @@ for (const mobile of [false, true]) {
       };
     }
   });
+  for (const name of ['normalizePracticeInstrumentVolume', 'normalizePracticeInstrumentVolumes']) {
+    vm.runInContext(extract(practice, name), context);
+  }
   for (const name of ['buildSheetQuickPlayPayload', 'getSheetQuickPlayPreparationSignature',
+    'sendSheetQuickPlayInstrumentVolumes',
     'updateSheetQuickPlayButtonAvailability', 'setSheetQuickPlayButtonState', 'selectSheetQuickPlayPattern',
     'prepareSheetQuickPlayPlayer', 'scheduleSheetQuickPlayPreparation', 'clearSheetQuickPlaySchedulerPump',
     'startSheetQuickPlaySchedulerPump', 'stopSheetQuickPlay', 'startSheetQuickPlay', 'toggleSheetQuickPlay',
@@ -101,6 +119,7 @@ for (const mobile of [false, true]) {
   message('ready', 'old-launch');
   assert.equal(state.frameReady, false, 'Ignore readiness from a discarded player');
   message('ready');
+  assert.deepEqual(volumeMessages.at(-1).volumes, {}, 'Missing quick-play settings mean 100%, not practice mute');
   assert.equal(elements.sheetQuickPlayButton.disabled, false);
   click();
   assert.equal(starts, 1);
@@ -116,6 +135,12 @@ for (const mobile of [false, true]) {
   assert.equal(elements.sheetQuickPlayButton.textContent, '■');
   assert.equal(pumps, 1, 'The parent pumps desktop and mobile playback');
   assert.equal(intervals.size, 1);
+  context.timelineState.quickPlayInstrumentVolumes = { Kenkeni: 0.55, Djembe_1: 0 };
+  context.sendSheetQuickPlayInstrumentVolumes();
+  assert.deepEqual(volumeMessages.at(-1).volumes, { Kenkeni: 0.55, Djembe_1: 0 });
+  assert.deepEqual(volumeMessages.at(-1).toneVolumes, {});
+  assert.equal(loads, 1, 'Volume changes do not reload the playing iframe');
+  assert.equal(state.isPlaying, true);
 
   if (!mobile) {
     elements.sheetQuickPlayTempo = { addEventListener(type, listener) { this.listener = listener; } };

@@ -36,6 +36,7 @@ const timelineState = {
     sheetLoopCount: false,
     tempo: 100,
     shekereBeatEnabled: false,
+    quickPlayInstrumentVolumes: {},
     swingProfile: {
         binaer: defaultTimelineSwingProfiles.binaer.slice(),
         tenaer: defaultTimelineSwingProfiles.tenaer.slice(),
@@ -1468,6 +1469,7 @@ function updateTimelineMetadataNode() {
         swingProfile: normalizeAllTimelineSwingProfiles(timelineState.swingProfile),
         feelOffsets: normalizeTimelineFeelOffsets(timelineState.feelOffsets),
         practice: typeof buildPracticeMetadata === 'function' ? buildPracticeMetadata() : null,
+        quickPlayInstrumentVolumes: normalizePracticeInstrumentVolumes(timelineState.quickPlayInstrumentVolumes),
         minimumBarCount: normalizeTimelineMinimumBarCount(timelineState.minimumBarCount),
         playbackStartBar: normalizeTimelinePlaybackStartBar(timelineState.playbackStartBar),
         accompanimentSegments: timelineState.accompanimentSegments.map(serializeTimelineAccompanimentSegment),
@@ -1583,6 +1585,7 @@ function syncTimelineStateFromReadResult(readResult, options) {
     timelineState.shekereBeatEnabled = Boolean(syncOptions.shekereBeatEnabled);
     timelineState.swingProfile = normalizeAllTimelineSwingProfiles(syncOptions.swingProfile);
     timelineState.feelOffsets = normalizeTimelineFeelOffsets(syncOptions.feelOffsets);
+    timelineState.quickPlayInstrumentVolumes = normalizePracticeInstrumentVolumes(syncOptions.quickPlayInstrumentVolumes);
 
     if (typeof applyPracticeMetadata === 'function' && Object.prototype.hasOwnProperty.call(syncOptions, 'persistedPractice')) {
         applyPracticeMetadata(syncOptions.persistedPractice, patternLibrary, newSourceHash);
@@ -1615,6 +1618,7 @@ function buildCurrentTimelineSyncOptions() {
         swingProfile: normalizeAllTimelineSwingProfiles(timelineState.swingProfile),
         feelOffsets: normalizeTimelineFeelOffsets(timelineState.feelOffsets),
         persistedPractice: typeof buildPracticeMetadata === 'function' ? buildPracticeMetadata() : null,
+        quickPlayInstrumentVolumes: normalizePracticeInstrumentVolumes(timelineState.quickPlayInstrumentVolumes),
         persistedMinimumBarCount: normalizeTimelineMinimumBarCount(timelineState.minimumBarCount),
         persistedPlaybackStartBar: normalizeTimelinePlaybackStartBar(timelineState.playbackStartBar),
         persistedAccompanimentSegments: timelineState.accompanimentSegments.map(serializeTimelineAccompanimentSegment),

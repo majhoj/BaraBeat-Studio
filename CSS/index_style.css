@@ -662,8 +662,28 @@ body[data-ui-theme="earth"] .app-menu-panel #temporaryAccessButton.is-open {
 
 .sheet-quick-play-controls > label,
 .sheet-quick-play-controls > input,
+#sheetQuickPlayVolumeButton,
 #sheetQuickPlayButton {
     flex-shrink: 0;
+}
+
+.sheet-quick-play-volume-button img {
+    display: block;
+    margin: auto;
+}
+
+.sheet-quick-play-volume-popover {
+    box-sizing: border-box;
+    font-family: var(--ui-font);
+    max-height: calc(100vh - 16px);
+    max-height: calc(100dvh - 16px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.sheet-quick-play-volume-popover .practice-volume-row {
+    grid-template-columns: 86px minmax(0, 1fr) 44px;
+    min-height: 38px;
 }
 
 .sheet-quick-play-frame {

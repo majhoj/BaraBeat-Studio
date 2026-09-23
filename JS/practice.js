@@ -4104,6 +4104,9 @@ function closePracticeInstrumentVolumePopover() {
     if (popoverEl) {
         popoverEl.remove();
     }
+    document.querySelectorAll('[aria-controls="practiceInstrumentVolumePopover"]').forEach(function (buttonEl) {
+        buttonEl.setAttribute('aria-expanded', 'false');
+    });
 }
 
 function positionPracticeVolumePopover(popoverEl, anchorEl, options) {
@@ -4358,15 +4361,28 @@ function openPracticeInstrumentVolumePopover(instrumentNames, anchorEl, labelTex
 }
 
 function openTimelineInstrumentVolumesPopover(anchorEl) {
+    openInstrumentVolumesPopover(anchorEl);
+}
+
+function openInstrumentVolumesPopover(anchorEl, options) {
     if (!anchorEl) {
         return;
     }
+    const settings = options || {};
+    const mixerState = settings.state || practiceState;
+    const volumeKey = settings.volumeKey || 'instrumentVolumes';
+    const notifyChanged = settings.onChange || notifyPracticeInstrumentVolumesChanged;
+    mixerState[volumeKey] = normalizePracticeInstrumentVolumes(mixerState[volumeKey]);
 
     closePracticeInstrumentVolumePopover();
 
     const popoverEl = document.createElement('div');
     popoverEl.id = 'practiceInstrumentVolumePopover';
-    popoverEl.className = 'practice-volume-popover practice-volume-popover-wide';
+    popoverEl.className = 'practice-volume-popover practice-volume-popover-wide' +
+        (settings.className ? ' ' + settings.className : '');
+    popoverEl.setAttribute('role', 'dialog');
+    popoverEl.setAttribute('aria-label', practiceText('practice.mixer.instrumentVolumes'));
+    anchorEl.setAttribute('aria-expanded', 'true');
 
     const titleEl = document.createElement('div');
     titleEl.className = 'practice-volume-title';
@@ -4382,7 +4398,7 @@ function openTimelineInstrumentVolumesPopover(anchorEl) {
         const nameEl = document.createElement('span');
         nameEl.className = 'practice-volume-row-name';
         nameEl.textContent = labelText;
-        if (toneDefinitions.length > 0) {
+        if (toneDefinitions.length > 0 && settings.showToneVolumes !== false) {
             nameEl.setAttribute('role', 'button');
             nameEl.setAttribute('tabindex', '0');
             nameEl.title = practiceText('practice.mixer.openToneVolumes');
@@ -4391,7 +4407,7 @@ function openTimelineInstrumentVolumesPopover(anchorEl) {
                     event.stopPropagation();
                 }
                 openPracticeInstrumentToneVolumePopover(instrumentName, nameEl, function () {
-                    openTimelineInstrumentVolumesPopover(anchorEl);
+                    openInstrumentVolumesPopover(anchorEl, settings);
                 });
             }
             nameEl.addEventListener('click', openToneVolumes);
@@ -4408,7 +4424,7 @@ function openTimelineInstrumentVolumesPopover(anchorEl) {
         rangeEl.min = '0';
         rangeEl.max = '200';
         rangeEl.step = '5';
-        rangeEl.value = Math.round(getPracticeInstrumentVolume(instrumentName) * 100);
+        rangeEl.value = Math.round(normalizePracticeInstrumentVolume(mixerState[volumeKey][instrumentName]) * 100);
         rangeEl.setAttribute('aria-label', practiceText('practice.mixer.instrumentVolumeAria', {
             instrument: labelText
         }));
@@ -4420,18 +4436,19 @@ function openTimelineInstrumentVolumesPopover(anchorEl) {
 
         rangeEl.addEventListener('input', function (event) {
             const normalizedVolume = normalizePracticeInstrumentVolume(Number(event.target.value) / 100);
-            const previousVolume = getPracticeInstrumentVolume(instrumentName);
-            if (previousVolume !== normalizedVolume && typeof recordArrangementHistorySnapshot === 'function') {
+            const previousVolume = normalizePracticeInstrumentVolume(mixerState[volumeKey][instrumentName]);
+            if (settings.recordHistory !== false && previousVolume !== normalizedVolume &&
+                    typeof recordArrangementHistorySnapshot === 'function') {
                 recordArrangementHistorySnapshot();
             }
             if (normalizedVolume === 1) {
-                delete practiceState.instrumentVolumes[instrumentName];
+                delete mixerState[volumeKey][instrumentName];
             } else {
-                practiceState.instrumentVolumes[instrumentName] = normalizedVolume;
+                mixerState[volumeKey][instrumentName] = normalizedVolume;
             }
             valueEl.value = Math.round(normalizedVolume * 100) + '%';
             valueEl.textContent = valueEl.value;
-            notifyPracticeInstrumentVolumesChanged();
+            notifyChanged();
         });
 
         rowEl.append(nameEl, rangeEl, valueEl);
@@ -4444,14 +4461,15 @@ function openTimelineInstrumentVolumesPopover(anchorEl) {
     const resetButtonEl = document.createElement('button');
     resetButtonEl.type = 'button';
     resetButtonEl.textContent = practiceText('practice.mixer.allOneHundred');
-    resetButtonEl.addEventListener('click', function () {
-        if (Object.keys(normalizePracticeInstrumentVolumes(practiceState.instrumentVolumes)).length > 0 &&
+    resetButtonEl.addEventListener('click', function (event) {
+        event.stopPropagation();
+        if (settings.recordHistory !== false && Object.keys(mixerState[volumeKey]).length > 0 &&
                 typeof recordArrangementHistorySnapshot === 'function') {
             recordArrangementHistorySnapshot();
         }
-        practiceState.instrumentVolumes = {};
-        notifyPracticeInstrumentVolumesChanged();
-        openTimelineInstrumentVolumesPopover(anchorEl);
+        mixerState[volumeKey] = {};
+        notifyChanged();
+        openInstrumentVolumesPopover(anchorEl, settings);
     });
 
     actionsEl.appendChild(resetButtonEl);
@@ -4468,11 +4486,18 @@ document.addEventListener('click', function (event) {
     if (popoverEl.contains(event.target) ||
             (event.target && event.target.closest && (
                 event.target.closest('.practice-scroller-label') ||
-                event.target.closest('#timelineVolumeButton')
+                event.target.closest('#timelineVolumeButton') ||
+                event.target.closest('.sheet-quick-play-volume-button')
             ))) {
         return;
     }
     closePracticeInstrumentVolumePopover();
+});
+
+document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape') {
+        closePracticeInstrumentVolumePopover();
+    }
 });
 
 function cachePracticeScrollerDom(scrollerEl) {

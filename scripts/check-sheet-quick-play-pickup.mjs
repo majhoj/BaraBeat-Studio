@@ -279,6 +279,36 @@ assert.deepEqual(notesAt('Djembe_1', 19, 5), new Array(5).fill('f'), 'OUT still 
 assert.equal(notesAt('Djembe_1', 24, 1)[0], 'Open', 'The next call starts on the next full bar');
 verifyHighlights(soloBeforeCall, 0, 24, 'Djembe_1', soloOne);
 
+// Djia Billy Konate 02: Echauffement 1 (bar 18), two slaps after OUT, no written repeat.
+const echauffementOne = pattern('echauffement-1', 'Djembe_1', [
+  bar(18, { 0: 'tone', 2: 'slap', 4: 'slap', 8: 'slap', 10: 'slap',
+    12: 'tone', 14: 'slap', 16: 'slap', 18: 'bass', 20: 'slap', 22: 'slap' },
+  [{ type: 'out', stepIndex: 18 }])
+], 'Echauffement 1');
+const originalEchauffement = JSON.stringify(echauffementOne);
+const parallelDjembe = { ...djembe, defaultTargets: ['Djembe_2'] };
+for (const selection of [[echauffementOne], [echauffementOne, parallelDjembe],
+  [parallelDjembe, echauffementOne]]) {
+  const sections = prepare(selection);
+  loadPlayer(sections);
+  assert.deepEqual(notesAt('Djembe_1', 0, 96),
+    Array.from({ length: 4 }, () => echauffementOne.bars[0].notes).flat(),
+    'Echauffement 1 must retain both slaps after OUT in every continuous loop');
+  verifyHighlights(sections, 0, 96, 'Djembe_1', echauffementOne);
+  if (selection.length > 1) {
+    assert.deepEqual(notesAt('Djembe_2', 0, 96),
+      Array.from({ length: 4 }, () => djembe.bars[0].notes).flat());
+  }
+}
+const echauffementBeforeCall = prepare([echauffementOne, djembeCall]);
+loadPlayer(echauffementBeforeCall);
+assert.equal(notesAt('Djembe_1', 18, 1)[0], 'bass', 'The OUT note itself remains audible');
+assert.deepEqual(notesAt('Djembe_1', 19, 5), new Array(5).fill('f'),
+  'Echauffement still uses OUT when handing over to a call');
+assert.equal(notesAt('Djembe_1', 24, 1)[0], 'Open');
+verifyHighlights(echauffementBeforeCall, 0, 24, 'Djembe_1', echauffementOne);
+assert.equal(JSON.stringify(echauffementOne), originalEchauffement, 'Source OUT must remain unchanged');
+
 const echauffement = pattern('echauffement', 'Djembe_1', [
   bar(8, { 0: 'bass', 18: 'tone', 20: 'slap' }, [{ type: 'out', stepIndex: 18 }], { start: [1], end: [1] })
 ], 'Echauffement');
@@ -287,6 +317,19 @@ loadPlayer(echauffementSections);
 assert.equal(notesAt('Djembe_1', 20, 1)[0], 'slap');
 assert.equal(notesAt('Djembe_1', 24 + 20, 1)[0], 'f', 'Echauffement keeps its OUT in the final written repeat');
 verifyHighlights(echauffementSections, 0, 48, 'Djembe_1', echauffement);
+
+const internallyRepeatedEchauffement = pattern('echauffement-internal-repeat', 'Djembe_1', [
+  bar(18, { 0: 'tone', 20: 'slap' }, [], { start: [1], end: [1] }),
+  bar(19, { 0: 'tone', 18: 'bass', 20: 'slap' }, [{ type: 'out', stepIndex: 18 }])
+], 'Echauffement');
+const internalEchauffementSections = prepare([internallyRepeatedEchauffement]);
+loadPlayer(internalEchauffementSections);
+assert.equal(internalEchauffementSections[0].repeatCount, 1, 'Internal repeats are expanded into notes');
+assert.equal(internalEchauffementSections[0].fixedLength, 72);
+assert.equal(notesAt('Djembe_1', 20, 1)[0], 'slap');
+assert.equal(notesAt('Djembe_1', 24 + 20, 1)[0], 'slap');
+assert.equal(notesAt('Djembe_1', 48 + 20, 1)[0], 'f', 'Written internal repeats keep their final OUT');
+verifyHighlights(internalEchauffementSections, 0, 144, 'Djembe_1', internallyRepeatedEchauffement);
 
 for (const name of ['getStepsPerBeatForRhythm', 'getBaseStepDuration', 'getPlaybackRhythmStep', 'scheduleShekereBeatIfNeeded', 'getStepInterval']) {
   vm.runInContext(extractFunction(playerSource, name), context);

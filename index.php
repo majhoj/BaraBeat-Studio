@@ -323,6 +323,7 @@ $offlineFallbackEditionConfigJson = json_encode(
         <button type="button" id="sheetQuickPlayTitle" class="sheet-quick-play-title" aria-label="<?php echo htmlspecialchars(barabeat_t('editor.rhythmName'), ENT_QUOTES, 'UTF-8'); ?>" data-i18n-aria-label="editor.rhythmName"></button>
         <label for="sheetQuickPlayTempo" data-i18n="editor.quickPlay.tempo"><?php echo htmlspecialchars(barabeat_t('editor.quickPlay.tempo'), ENT_QUOTES, 'UTF-8'); ?></label>
         <input type="number" id="sheetQuickPlayTempo" min="30" max="180" step="1" value="100" />
+        <button type="button" id="sheetQuickPlayVolumeButton" class="sheet-quick-play-volume-button" aria-haspopup="dialog" aria-controls="practiceInstrumentVolumePopover" aria-expanded="false" title="<?php echo htmlspecialchars(barabeat_t('practice.mixer.instrumentVolumes'), ENT_QUOTES, 'UTF-8'); ?>" aria-label="<?php echo htmlspecialchars(barabeat_t('practice.mixer.instrumentVolumes'), ENT_QUOTES, 'UTF-8'); ?>" data-i18n-title="practice.mixer.instrumentVolumes" data-i18n-aria-label="practice.mixer.instrumentVolumes"><img src="Assets/volume-2.svg" width="18" height="18" alt="" /></button>
         <button type="button" id="sheetQuickPlayButton" aria-pressed="false" title="<?php echo htmlspecialchars(barabeat_t('editor.quickPlay.playSelected'), ENT_QUOTES, 'UTF-8'); ?>" data-i18n-title="editor.quickPlay.playSelected">▶</button>
     </div>
     <iframe id="sheetQuickPlayFrame" name="sheetQuickPlayFrame" class="sheet-quick-play-frame" title="<?php echo htmlspecialchars(barabeat_t('editor.quickPlay.frameTitle'), ENT_QUOTES, 'UTF-8'); ?>" data-i18n-title="editor.quickPlay.frameTitle" allow="autoplay"></iframe>
@@ -2184,6 +2185,8 @@ function clear_all() {
     timelineState.shekereBeatEnabled = false;
     timelineState.swingProfile = normalizeAllTimelineSwingProfiles();
     timelineState.feelOffsets = normalizeTimelineFeelOffsets();
+    timelineState.quickPlayInstrumentVolumes = {};
+    closePracticeInstrumentVolumePopover();
     if (typeof resetPracticeForSource === 'function') {
         resetPracticeForSource('');
     }
@@ -3120,6 +3123,7 @@ function buildSheetQuickPlayPreparedPattern(pattern, patternIndex) {
             preparedBarCount: preparedBars.length
         },
         quickPlaySectionRepeatCount: sectionRepeatCount,
+        quickPlayHasWrittenRepeats: repeatRanges.length > 0,
         quickPlayHasCyclicPickup: hasSheetQuickPlayCyclicPickup(pattern),
         bars: preparedBars
     });
@@ -3644,8 +3648,10 @@ function buildSheetQuickPlayConfiguredSections(preparedPatterns) {
                 pickupHighlightRefs = [];
             }
 
+            // Written Echauffement repeats keep their final OUT, unlike an uninterrupted loop.
             const shouldIgnoreOutForContinuousLoop = groups.length === 1 && overlapStep === null &&
-                (label === 'Begleitung' || /^Solo(?:\s|$)/i.test(String(label || '')));
+                (label === 'Begleitung' || /^Solo(?:\s|$)/i.test(String(label || '')) ||
+                    (label === 'Echauffement' && !pattern.quickPlayHasWrittenRepeats));
             const hasApplicableOut = !shouldIgnoreOutForContinuousLoop &&
                 outStep !== null &&
                 outStep !== undefined &&
@@ -4148,6 +4154,37 @@ function initializeSheetQuickPlayLiveRefresh() {
     window.addEventListener('touchcancel', finishEditorPointerInteraction, true);
 }
 
+function sendSheetQuickPlayInstrumentVolumes() {
+    const frameEl = document.getElementById('sheetQuickPlayFrame');
+    if (frameEl && frameEl.contentWindow) {
+        frameEl.contentWindow.postMessage({
+            type: 'barabeat-practice-instrument-volumes',
+            volumes: normalizePracticeInstrumentVolumes(timelineState.quickPlayInstrumentVolumes),
+            toneVolumes: {}
+        }, window.location.origin);
+    }
+}
+
+function openSheetQuickPlayInstrumentVolumes(anchorEl) {
+    const currentPopover = document.getElementById('practiceInstrumentVolumePopover');
+    if (currentPopover && currentPopover.classList.contains('sheet-quick-play-volume-popover')) {
+        closePracticeInstrumentVolumePopover();
+        return;
+    }
+    openInstrumentVolumesPopover(anchorEl, {
+        state: timelineState,
+        volumeKey: 'quickPlayInstrumentVolumes',
+        showToneVolumes: false,
+        // Sheet snapshots temporarily rewrite chooser text and would restart the live player.
+        recordHistory: false,
+        className: 'sheet-quick-play-volume-popover',
+        onChange: function () {
+            updateTimelineMetadataNode();
+            sendSheetQuickPlayInstrumentVolumes();
+        }
+    });
+}
+
 function buildSheetQuickPlayPayload() {
     const selectedPatterns = getSheetQuickPlaySelectedPatterns();
     if (selectedPatterns.length === 0) {
@@ -4185,6 +4222,8 @@ function buildSheetQuickPlayPayload() {
         payload[0].TimelineLoopCount = 'loop';
         payload[0].SheetQuickPlayMode = true;
         payload[0].SheetQuickPlayExternalScheduler = true;
+        payload[0].PracticeInstrumentVolumes = normalizePracticeInstrumentVolumes(timelineState.quickPlayInstrumentVolumes);
+        payload[0].PracticeInstrumentToneVolumes = {};
         payload[0].Tempo = getSheetQuickPlayTempo();
         payload[0].PracticeSections = configuredSections.map(function (section) {
             const playerSection = Object.assign({}, section);
@@ -8860,8 +8899,28 @@ function renderMobileSheetView(readResult) {
     playButtonEl.id = 'mobileSheetQuickPlayButton';
     playButtonEl.setAttribute('aria-pressed', 'false');
     playButtonEl.addEventListener('click', toggleSheetQuickPlay);
+    const volumeButtonEl = document.createElement('button');
+    volumeButtonEl.type = 'button';
+    volumeButtonEl.id = 'mobileSheetQuickPlayVolumeButton';
+    volumeButtonEl.className = 'sheet-quick-play-volume-button';
+    volumeButtonEl.title = uiText('practice.mixer.instrumentVolumes');
+    volumeButtonEl.setAttribute('aria-label', volumeButtonEl.title);
+    volumeButtonEl.setAttribute('aria-haspopup', 'dialog');
+    volumeButtonEl.setAttribute('aria-controls', 'practiceInstrumentVolumePopover');
+    volumeButtonEl.setAttribute('aria-expanded', 'false');
+    const volumeIconEl = document.createElement('img');
+    volumeIconEl.src = 'Assets/volume-2.svg';
+    volumeIconEl.width = 18;
+    volumeIconEl.height = 18;
+    volumeIconEl.alt = '';
+    volumeButtonEl.appendChild(volumeIconEl);
+    volumeButtonEl.addEventListener('click', function (event) {
+        event.stopPropagation();
+        openSheetQuickPlayInstrumentVolumes(volumeButtonEl);
+    });
     controlsEl.appendChild(tempoLabelEl);
     controlsEl.appendChild(tempoInputEl);
+    controlsEl.appendChild(volumeButtonEl);
     controlsEl.appendChild(playButtonEl);
     headerEl.appendChild(controlsEl);
     const subtitleEntry = getMobileSheetHeaderSubtitleEntry();
@@ -9384,6 +9443,7 @@ function handleEmbeddedAudioPlayerMessage(event) {
                     return;
                 }
                 sheetQuickPlayState.frameReady = true;
+                sendSheetQuickPlayInstrumentVolumes();
                 updateSheetQuickPlayButtonAvailability();
                 return;
             }
@@ -10368,6 +10428,10 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     document.querySelector('#sheetQuickPlayButton').addEventListener('click', function () {
         toggleSheetQuickPlay();
+    });
+    document.querySelector('#sheetQuickPlayVolumeButton').addEventListener('click', function (event) {
+        event.stopPropagation();
+        openSheetQuickPlayInstrumentVolumes(this);
     });
     document.querySelector('#sheetQuickPlayTitle').addEventListener('click', function () {
         startInlineRhythmTitleEdit(this);
@@ -11507,6 +11571,7 @@ function onSVGLoaded(data) {
             shekereBeatEnabled: timelineState.shekereBeatEnabled,
             swingProfile: timelineState.swingProfile,
             feelOffsets: timelineState.feelOffsets,
+            quickPlayInstrumentVolumes: persistedTimelineMetadata ? persistedTimelineMetadata.quickPlayInstrumentVolumes : null,
             persistedPractice: persistedTimelineMetadata ? persistedTimelineMetadata.practice : null,
             persistedMinimumBarCount: persistedMinimumBarCount,
             persistedPlaybackStartBar: persistedPlaybackStartBar,

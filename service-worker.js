@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'barabeat-studio-offline-v84-shared-timing';
+const CACHE_NAME = 'barabeat-studio-offline-v86-quick-play-volume';
 const APP_SHELL = [
   './app-shell.html',
   './manifest.webmanifest',
@@ -22,6 +22,7 @@ const APP_SHELL = [
   './Audio/js/instrument_2.js',
   './Audio/player.html',
   './Assets/favicon.svg',
+  './Assets/volume-2.svg',
   './Assets/favicon-32.png',
   './apple-touch-icon.png',
   './Assets/pwa-icon-192.png',

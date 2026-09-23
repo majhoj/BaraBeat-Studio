@@ -48,6 +48,7 @@ Der Handbuchtest benoetigt PHP CLI. Keine Tests aendern Notenblaetter.
 | Ballet Dununs | `musical-audio`: hoechstens zwei klingende Schlaege pro Position, alle sechs Eingabereihenfolgen der drei offenen Trommeln und gedaempfte Kombination |
 | WAV-Zeitpunkte und Dauer | `musical-audio`: echter Export-Schleifenaufruf, alle drei Raster mit/ohne Quick-Play-Auftakt; bestehender 3,5-s-Ausklang |
 | Safari-/PWA-Start | Bestehende `sheet-quick-play-start`, `standalone-audio-scheduling`, `audio-gain-node-pooling` bleiben erhalten |
+| Sofort-Spielen-Lautstaerke | `sheet-quick-play-volumes`, `sheet-quick-play-start`: eigener Mixer, 100%-Vorgaben trotz stummer Uebungsspur, Live-Aenderungen ohne Player-Neustart, Reset und unveraenderter Arrangement-Mixer |
 | Offline | `offline-cold-start`, `timing-offline`, `offline-cache`: Shell, Timing-Modul, Player, HTTP-Assets und Cache-Ausschluesse |
 
 ## Bewusste Regel: Ballet Dununs
