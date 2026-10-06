@@ -138,6 +138,7 @@
       "renameFolder": "Nuevo nombre de la carpeta:"
     },
     "confirm": {
+      "discardUnsaved": "Hay cambios sin guardar en la partitura, los ajustes de práctica o el arreglo.\n¿Continuar sin guardar? Elige Cancelar para mantener abierta la partitura actual.",
       "deleteLocal": "¿Eliminar \"{title}\" localmente?\nLa versión del servidor no cambiará.",
       "replaceLocalChanges": "\"{title}\" tiene cambios locales.\n¿Cargar de todos modos la versión del servidor y sustituir la copia local?",
       "deleteEmptyFolder": "¿Eliminar la carpeta local vacía \"{name}\"?",

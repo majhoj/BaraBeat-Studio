@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'barabeat-studio-offline-v86-quick-play-volume';
+const CACHE_NAME = 'barabeat-studio-offline-v90-quick-play-highlights';
 const APP_SHELL = [
   './app-shell.html',
   './manifest.webmanifest',
@@ -15,6 +15,7 @@ const APP_SHELL = [
   './JS/selection_drag_7.js',
   './JS/functions.js',
   './JS/timing.js',
+  './JS/repeat-pickup.js',
   './JS/timeline.js',
   './JS/practice.js',
   './JS/offline.js',

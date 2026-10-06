@@ -69,6 +69,7 @@ for (const path of ['', 'index.php']) {
   assert(!html.includes('PRIVATE_SESSION_CSRF_RESPONSE'));
   assert(!/"csrfToken"\s*:\s*"[^"]+"/.test(html));
   assert(html.indexOf('src="JS/timing.js') < html.indexOf('src="JS/practice.js'));
+  assert(html.indexOf('src="JS/repeat-pickup.js') < html.indexOf('src="JS/practice.js'));
   assert(html.includes('const stepsPerBar = BaraBeatTiming.getGrid('), 'Generated shell must contain the current reader');
 }
 for (const path of ['JS/timing.js?v=changed', 'Audio/player.html?launchReload=offline#launch=test']) {
@@ -77,6 +78,8 @@ for (const path of ['JS/timing.js?v=changed', 'Audio/player.html?launchReload=of
   const text = await response.text();
   assert(text.includes(path.startsWith('JS/') ? 'var BaraBeatTiming' : 'src="../JS/timing.js"'));
 }
+assert((await (await request('JS/repeat-pickup.js?v=changed')).text()).includes('var BaraBeatRepeatPickup'),
+  'Internal pickups must also work with the offline player');
 for (const path of ['Audio/audioplayer.php', 'PHP/dateiladen.php', 'impressum.php', 'offline-assets.php', 'Noten/example.bbs']) {
   assert.equal(await request(path), undefined, path + ' must remain network-only');
 }

@@ -138,6 +138,7 @@
       "renameFolder": "Nouveau nom du dossier :"
     },
     "confirm": {
+      "discardUnsaved": "Des modifications de la partition, des réglages d'entraînement ou de l'arrangement n'ont pas été enregistrées.\nContinuer sans enregistrer ? Choisissez Annuler pour conserver la partition actuelle ouverte.",
       "deleteLocal": "Supprimer \"{title}\" localement ?\nLa version du serveur restera inchangée.",
       "replaceLocalChanges": "\"{title}\" contient des modifications locales.\nCharger quand même la version du serveur et remplacer la copie locale ?",
       "deleteEmptyFolder": "Supprimer le dossier local vide \"{name}\" ?",

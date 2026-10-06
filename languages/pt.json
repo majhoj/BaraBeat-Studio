@@ -138,6 +138,7 @@
       "renameFolder": "Novo nome da pasta:"
     },
     "confirm": {
+      "discardUnsaved": "Há alterações não salvas na partitura, nas configurações de prática ou no arranjo.\nContinuar sem salvar? Escolha Cancelar para manter a partitura atual aberta.",
       "deleteLocal": "Excluir \"{title}\" localmente?\nA versão do servidor permanecerá inalterada.",
       "replaceLocalChanges": "\"{title}\" tem alterações locais.\nCarregar mesmo assim a versão do servidor e substituir a cópia local?",
       "deleteEmptyFolder": "Excluir a pasta local vazia \"{name}\"?",

@@ -35,6 +35,10 @@ Der Handbuchtest benoetigt PHP CLI. Keine Tests aendern Notenblaetter.
 | IN, Auftakt nach Call/Intro | `musical-structure`: IN zwei Schritte vor dem neuen Takt; kein zusaetzlicher Auftakttakt |
 | OUT / nur letzter Durchlauf | `arrangement-out-trim`, `arrangement-cyclic-pickup`, `sheet-quick-play-pickup`: Noten und Laengen vor/nach OUT, Schlussdurchlauf |
 | Zyklisches IN hinter OUT | `arrangement-cyclic-pickup`, `sheet-quick-play-pickup`: vollstaendige Pattern, letzter OUT, Variation 2, Echauffement |
+| IN in internem Wiederholungsabschnitt | `internal-repeat-pickup`: Soli nach Okas, sechs notierte / zehn gespielte Sangban-Takte; IN von Takt 6 am Ende von Takt 5, gleiche Audionoten in allen Modi, passende rote Markierung und laufende Noten, unveraenderte Quelldaten |
+| Internes IN ohne Wiederholung | `internal-repeat-pickup`: aktualisierte Okas-Variation 2 nur mit IN; Uebernahme in den Vortakt auch ohne Wiederholungszeichen, nur letzter Durchlauf des Vortakts veraendert, passende rote Markierung, vier aeussere Loops; erstes Pattern-IN und Auftakte ganzer Wiederholungsgruppen bleiben unveraendert |
+| Sofort-Spielen: rote Noten synchron | `quick-play-highlight-timing`: absolute Audiozeit und Geraete-Ausgabezeit statt reinem Browser-Timer; wartende Ausgabe, verspaetete Meldungen, Desktop/Mobil, IN-Quellnote, Stopp, alte Player und begrenzte Timerliste |
+| OUT am Ende einer Begleitsequenz | `internal-repeat-pickup`: Sofort-Spielen beachtet OUT im letzten Durchlauf eines separat wiederholten Schlussabschnitts; Taktende, aeusserer Loop, laengere Parallelbegleitung und expliziter Leertakt bleiben erhalten; normale Begleitloops bleiben unveraendert |
 | Verkuerzte Takte | `musical-structure`: genau ein Beat, Note auf der Verkuerzungsgrenze entfaellt |
 | Ueberlappungen | `overlap-control`, `sheet-quick-play-pickup`, `timeline-horizontal-tracks`: Uebergaben, Taktzahl, Schlussnote, begrenzte Sichtkopien |
 | Flam, Triolen | `musical-audio`: zwei Schlaege mit Abstand 5/BPM; drei gleichmaessige Schlaege pro Beat, Live und Export |
@@ -50,6 +54,9 @@ Der Handbuchtest benoetigt PHP CLI. Keine Tests aendern Notenblaetter.
 | Safari-/PWA-Start | Bestehende `sheet-quick-play-start`, `standalone-audio-scheduling`, `audio-gain-node-pooling` bleiben erhalten |
 | Sofort-Spielen-Lautstaerke | `sheet-quick-play-volumes`, `sheet-quick-play-start`: eigener Mixer, 100%-Vorgaben trotz stummer Uebungsspur, Live-Aenderungen ohne Player-Neustart, Reset und unveraenderter Arrangement-Mixer |
 | Offline | `offline-cold-start`, `timing-offline`, `offline-cache`: Shell, Timing-Modul, Player, HTTP-Assets und Cache-Ausschluesse |
+| Ungespeicherte Aenderungen | `unsaved-score-changes`: Notenblatt, Uebungseinstellungen und Arrangement; Laden/Neu abbrechen, Browserwarnung, erfolgreiche/fehlgeschlagene Speicherung, Aenderungen waehrend Speichern, Dokumentwechsel, Offline-Shell und fuenf Sprachen |
+| Datei-Tastenkuerzel | `file-keyboard-shortcuts`: Cmd+S/O verwenden bestehende Menuebefehle; Texteingaben, offene Dialoge, gehaltene Tasten, parallele Speicherversuche, Player-Fokus und Offline-Shell |
+| Laufende Noten | `practice-scroller-highlights`: helle Begleitung bleibt an der roten Linie unveraendert; Uebungsteil bleibt hervorgehoben, auch bei Rollenwechsel derselben Spur; direkte Verschiebung und Mobilverhalten |
 
 ## Bewusste Regel: Ballet Dununs
 

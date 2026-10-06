@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
-import { source, loadFunctions, installTiming } from './helpers/music-context.mjs';
+import { source, loadFunctions, installTiming, installRepeatPickup } from './helpers/music-context.mjs';
 
 const editor = source('index.php');
 const noOp = () => {};
@@ -18,6 +18,7 @@ const context = vm.createContext({
   s: { rect: () => ({ attr(value) { overlays.push(value); return this; }, click: noOp }) }
 });
 installTiming(context);
+installRepeatPickup(context);
 loadFunctions(context, editor, ['renderSheetQuickPlaySelectors', 'isSheetQuickPlayPlayableNote',
   'normalizeSheetQuickPlayTargetInstrument', 'mapLabelForPlayer', 'getPlayerLabelInfo', 'getReadRhythmConfig']);
 const notes = new Array(24).fill('f');

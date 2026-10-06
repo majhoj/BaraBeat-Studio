@@ -2248,10 +2248,6 @@ body[data-ui-theme="earth"] .app-menu-panel #temporaryAccessButton.is-open {
     background: rgba(210, 36, 36, 0.4);
 }
 
-.practice-scroller-cell.is-practice-target .practice-note-symbol {
-    filter: drop-shadow(0 0 3px rgba(210, 36, 36, 0.18));
-}
-
 .practice-note-symbol {
     display: inline-flex;
     align-items: center;
@@ -2491,7 +2487,6 @@ body[data-ui-theme="earth"] .app-menu-panel #temporaryAccessButton.is-open {
 
 .practice-scroller-cell.is-current .practice-note-symbol {
     transform: scale(1.7);
-    filter: drop-shadow(0 0 4px rgba(210, 36, 36, 0.28));
 }
 
 .practice-scroller-cell.is-current .practice-note-symbol.is-tuplet {

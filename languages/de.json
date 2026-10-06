@@ -138,6 +138,7 @@
       "renameFolder": "Neuer Ordnername:"
     },
     "confirm": {
+      "discardUnsaved": "Es gibt ungespeicherte Änderungen am Notenblatt, im Übungsmodus oder im Arrangement.\nWirklich ohne Speichern fortfahren? Mit Abbrechen bleibst du beim aktuellen Notenblatt.",
       "deleteLocal": "\"{title}\" lokal löschen?\nDer Server bleibt unverändert.",
       "replaceLocalChanges": "\"{title}\" wurde lokal geändert.\nTrotzdem die Serverversion laden und die lokale Kopie ersetzen?",
       "deleteEmptyFolder": "Den leeren Ordner \"{name}\" lokal löschen?",

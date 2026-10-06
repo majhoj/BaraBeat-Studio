@@ -22,6 +22,7 @@ $jsServerLibrary = @filemtime(__DIR__ . '/JS/serverLibrary.js') ?: 1;
 $jsSel = @filemtime(__DIR__ . '/JS/selection_drag_7.js') ?: 1;
 $jsFn = @filemtime(__DIR__ . '/JS/functions.js') ?: 1;
 $jsTiming = @filemtime(__DIR__ . '/JS/timing.js') ?: 1;
+$jsRepeatPickup = @filemtime(__DIR__ . '/JS/repeat-pickup.js') ?: 1;
 $jsTimeline = @filemtime(__DIR__ . '/JS/timeline.js') ?: 1;
 $jsPractice = @filemtime(__DIR__ . '/JS/practice.js') ?: 1;
 $jsOffline = @filemtime(__DIR__ . '/JS/offline.js') ?: 1;
@@ -101,6 +102,7 @@ $offlineFallbackEditionConfigJson = json_encode(
     <script src="JS/selection_drag_7.js?v=<?php echo $jsSel; ?>"></script>
     <script src="JS/functions.js?v=<?php echo $jsFn; ?>"></script>
     <script src="JS/timing.js?v=<?php echo $jsTiming; ?>"></script>
+    <script src="JS/repeat-pickup.js?v=<?php echo $jsRepeatPickup; ?>"></script>
     <script src="JS/timeline.js?v=<?php echo $jsTimeline; ?>"></script>
     <script src="JS/practice.js?v=<?php echo $jsPractice; ?>"></script>
     <script src="JS/offline.js?v=<?php echo $jsOffline; ?>" defer></script>
@@ -725,6 +727,9 @@ const checkTextFileEndpoint = "dateivorhanden.php";
 const isOfflineColdStart = window.BARABEAT_OFFLINE_BOOT === true;
 const historyLimit = 80;
 let currentScoreId = null;
+let savedScoreSnapshot = null;
+let scoreDocumentGeneration = 0;
+let fileShortcutInProgress = false;
 let currentFileSource = "local";
 let undoHistory = [];
 let redoHistory = [];
@@ -1603,6 +1608,54 @@ function closeFileDialog() {
     }
 }
 
+async function handleFileKeyboardShortcut(event) {
+    if (event.defaultPrevented || event.isComposing || !event.metaKey ||
+            event.ctrlKey || event.altKey || event.shiftKey) {
+        return;
+    }
+    const key = String(event.key || '').toLowerCase();
+    if (key !== 's' && key !== 'o') return;
+    event.preventDefault();
+    event.stopPropagation();
+    const dialogEl = document.getElementById('fileDialog');
+    if (event.repeat || fileShortcutInProgress || (dialogEl && !dialogEl.hidden)) return;
+    const buttonEl = document.getElementById(key === 's' ? 'saveFileDialogButton' : 'openFileDialogButton');
+    if (!buttonEl || buttonEl.disabled) return;
+
+    // Commit inline edits just as a click on the menu command would.
+    const activeEl = (event.target && event.target.ownerDocument || document).activeElement;
+    if (activeEl && typeof activeEl.blur === 'function') activeEl.blur();
+    if (key === 'o') {
+        openFileDialog('open');
+        return;
+    }
+    fileShortcutInProgress = true;
+    try {
+        await saveCurrentScoreFromMenu();
+    } finally {
+        fileShortcutInProgress = false;
+    }
+}
+
+function bindFileKeyboardShortcuts() {
+    document.addEventListener('keydown', handleFileKeyboardShortcut, true);
+    document.querySelectorAll('#sheetQuickPlayFrame, #practiceAudioFrame, #timelineAudioFrame, #mobileArrangementAudioFrame')
+        .forEach(function (frameEl) {
+            function bindFrameShortcuts() {
+                try {
+                    // Keyboard events inside a player do not bubble to the editor.
+                    if (frameEl.contentDocument) {
+                        frameEl.contentDocument.addEventListener('keydown', handleFileKeyboardShortcut, true);
+                    }
+                } catch (error) {
+                    // Only same-origin players can use the editor shortcuts.
+                }
+            }
+            frameEl.addEventListener('load', bindFrameShortcuts);
+            bindFrameShortcuts();
+        });
+}
+
 function getSelectedFileDialogEntry() {
     return fileDialogState.entries.find(function (entry) {
         return getFileDialogEntryId(entry) === fileDialogState.selectedId;
@@ -1638,9 +1691,13 @@ function saveContentWithCheck(config) {
 
 function loadRhythmContent(title, content, scoreId, options) {
     if (!content) {
-        return;
+        return false;
     }
     const loadOptions = options || {};
+    if (!confirmDiscardScoreChanges(loadOptions.approvedSnapshot)) {
+        return false;
+    }
+    scoreDocumentGeneration += 1;
     loadedTitle = title || uiText('editor.untitled');
     currentScoreId = scoreId || null;
     if (loadOptions.remember !== false) {
@@ -1648,16 +1705,117 @@ function loadRhythmContent(title, content, scoreId, options) {
     }
     setIoFieldValue(content);
     Snap.loadStr(content, onSVGLoaded);
+    return true;
 }
 
 function loadRhythmFile(fileName) {
-    loadedTitle = String(fileName || '').replace(/\.(bbs|txt)$/i, '');
     postPhp(loadFileEndpoint, { b: fileName }, function (data) {
-        setIoFieldValue(data);
-        const loadedSvgMarkup = getIoFieldValue();
-        Snap.loadStr(loadedSvgMarkup, onSVGLoaded);
+        loadRhythmContent(String(fileName || '').replace(/\.(bbs|txt)$/i, ''), data, null);
     });
 }
+
+function getScoreElementSnapshot(element) {
+    // Selection groups and responsive SVG sizing are not document changes.
+    let matrix = s.node.createSVGMatrix();
+    for (let node = element.node; node && node !== s.node; node = node.parentNode) {
+        const transforms = node.transform && node.transform.baseVal;
+        let localMatrix = s.node.createSVGMatrix();
+        for (let index = 0; transforms && index < transforms.numberOfItems; index++) {
+            localMatrix = localMatrix.multiply(transforms.getItem(index).matrix);
+        }
+        matrix = localMatrix.multiply(matrix);
+    }
+    const position = ['a', 'b', 'c', 'd', 'e', 'f'].map(function (key) {
+        return Math.round(matrix[key] * 1000000) / 1000000;
+    });
+    const chooserType = getChooserType(element);
+    if (chooserType) {
+        return { chooser: chooserType, value: getChooserInternalValue(element, chooserType), position: position };
+    }
+    const clone = element.node.cloneNode(true);
+    clone.removeAttribute('transform');
+    const elementId = element.attr('id');
+    if (elementId === 'triplet' || elementId === 'quartuplet') {
+        clone.querySelectorAll('text').forEach(function (textNode) {
+            textNode.textContent = elementId === 'quartuplet' ? 'Quartole' : 'Triole';
+        });
+    }
+    [clone].concat(Array.from(clone.querySelectorAll('*'))).forEach(function (node) {
+        node.removeAttribute('xmlns');
+        node.removeAttribute('cursor');
+        node.removeAttribute('pointer-events');
+        if (node.classList) {
+            node.classList.remove('shp', 'sheet-quick-play-note-active', 'is-mobile-editor-selected');
+            if (!node.getAttribute('class')) node.removeAttribute('class');
+        }
+    });
+    function snapshotNode(node) {
+        if (node.nodeType === 3) return node.textContent;
+        if (node.nodeType !== 1) return null;
+        return {
+            tag: node.localName,
+            attributes: Array.from(node.attributes).map(function (attribute) {
+                return [attribute.name, attribute.value];
+            }).sort(function (left, right) { return left[0].localeCompare(right[0]); }),
+            children: Array.from(node.childNodes).map(snapshotNode).filter(function (child) { return child !== null; })
+        };
+    }
+    return { element: snapshotNode(clone), position: position };
+}
+
+function getCurrentScoreSnapshot() {
+    const elements = [];
+    s.selectAll(canvasElementSelector + ', ' + chooserSelector).forEach(function (element) {
+        elements.push(JSON.stringify(getScoreElementSnapshot(element)));
+    });
+    const titleEditor = document.getElementById('rhythmTitleEditor');
+    const title = titleEditor ? titleEditor.value.trim() : getCurrentRhythmTitle();
+    const settings = buildCurrentTimelineSyncOptions();
+    settings.sheetLoop = Boolean(timelineState.sheetLoop);
+    settings.sheetLoopCount = getResolvedTimelineLoopCount();
+    return {
+        title: isDefaultRhythmTitle(title) ? '' : title,
+        rhythm: rhythm,
+        lineCount: normalizeSheetLineCount(zeilenAnzahl),
+        elements: elements.sort(),
+        settings: settings
+    };
+}
+
+function scoreSnapshotSignature(snapshot) {
+    return JSON.stringify(snapshot, function (key, value) {
+        // Source hashes are rebuilt on readout; the underlying notes are compared above.
+        if (key === 'sourceHash' || key === 'persistedSourceHash') return undefined;
+        if (value && typeof value === 'object' && !Array.isArray(value)) {
+            const sorted = {};
+            Object.keys(value).sort().forEach(function (name) { sorted[name] = value[name]; });
+            return sorted;
+        }
+        return value;
+    });
+}
+
+function rememberSavedScoreSnapshot(snapshot) {
+    savedScoreSnapshot = scoreSnapshotSignature(snapshot || getCurrentScoreSnapshot());
+}
+
+function hasUnsavedScoreChanges() {
+    return savedScoreSnapshot !== null && savedScoreSnapshot !== scoreSnapshotSignature(getCurrentScoreSnapshot());
+}
+
+function confirmDiscardScoreChanges(approvedSnapshot) {
+    if (savedScoreSnapshot === null) return true;
+    const signature = scoreSnapshotSignature(getCurrentScoreSnapshot());
+    return signature === savedScoreSnapshot || signature === approvedSnapshot ||
+        window.confirm(uiText('file.confirm.discardUnsaved'));
+}
+
+window.addEventListener('beforeunload', function (event) {
+    if (hasUnsavedScoreChanges()) {
+        event.preventDefault();
+        event.returnValue = '';
+    }
+});
 
 function removeCanvasElements(selector) {
     s.selectAll(selector).forEach(function (el) {
@@ -2848,6 +3006,23 @@ function rebuildMobileSheetQuickPlayNoteElementMap() {
     sheetQuickPlayState.mobileNoteElementsByPosition = elementMap;
 }
 
+function cancelSheetQuickPlayHighlightTimer(timerId) {
+    window.clearTimeout(timerId);
+    const index = sheetQuickPlayState.activeHighlightTimers.indexOf(timerId);
+    if (index !== -1) {
+        sheetQuickPlayState.activeHighlightTimers.splice(index, 1);
+    }
+}
+
+function scheduleSheetQuickPlayHighlightTimer(callback, delayMs) {
+    const timerId = window.setTimeout(function () {
+        cancelSheetQuickPlayHighlightTimer(timerId);
+        callback();
+    }, Math.max(0, Number(delayMs) || 0));
+    sheetQuickPlayState.activeHighlightTimers.push(timerId);
+    return timerId;
+}
+
 function scheduleSheetQuickPlayNoteHighlights(message) {
     const runtimeKey = String(message && message.runtimeKey || '');
     const section = runtimeKey
@@ -2865,7 +3040,31 @@ function scheduleSheetQuickPlayNoteHighlights(message) {
         return;
     }
 
-    const startTimerId = window.setTimeout(function () {
+    const frameEl = document.getElementById('sheetQuickPlayFrame');
+    const playerWindow = frameEl && frameEl.contentWindow;
+    const scheduledTime = message && message.audioScheduledTime;
+    const readOutputTime = Number.isFinite(scheduledTime) && playerWindow &&
+        typeof playerWindow.getEmbeddedQuickPlayPlaybackTime === 'function'
+        ? playerWindow.getEmbeddedQuickPlayPlaybackTime.bind(playerWindow) : null;
+
+    const showHighlights = function () {
+        if (readOutputTime) {
+            let outputTime;
+            try {
+                outputTime = readOutputTime();
+            } catch (error) {
+                return;
+            }
+            const remainingMs = Number.isFinite(outputTime) ? (scheduledTime - outputTime) * 1000 : 20;
+            // Standalone playback schedules far ahead; a wall-clock timer alone can outrun audio.
+            if (remainingMs > 1) {
+                scheduleSheetQuickPlayHighlightTimer(showHighlights, Math.max(10, Math.min(100, remainingMs)));
+                return;
+            }
+            if (remainingMs < -150) {
+                return;
+            }
+        }
         refs.forEach(function (ref) {
             const key = getSheetQuickPlayPositionKey(ref.sourceBarIndex, ref.sourceStepIndex);
             const noteElements = sheetQuickPlayState.noteElementsByPosition[key] || [];
@@ -2874,32 +3073,30 @@ function scheduleSheetQuickPlayNoteHighlights(message) {
                     return;
                 }
                 if (noteEl.node.__sheetQuickPlayHighlightTimer) {
-                    window.clearTimeout(noteEl.node.__sheetQuickPlayHighlightTimer);
+                    cancelSheetQuickPlayHighlightTimer(noteEl.node.__sheetQuickPlayHighlightTimer);
                 }
                 noteEl.addClass('sheet-quick-play-note-active');
-                const clearTimerId = window.setTimeout(function () {
+                const clearTimerId = scheduleSheetQuickPlayHighlightTimer(function () {
                     noteEl.removeClass('sheet-quick-play-note-active');
                     noteEl.node.__sheetQuickPlayHighlightTimer = null;
                 }, 150);
                 noteEl.node.__sheetQuickPlayHighlightTimer = clearTimerId;
-                sheetQuickPlayState.activeHighlightTimers.push(clearTimerId);
             });
             const mobileNoteElements = sheetQuickPlayState.mobileNoteElementsByPosition[key] || [];
             mobileNoteElements.forEach(function (noteEl) {
                 if (noteEl.__sheetQuickPlayHighlightTimer) {
-                    window.clearTimeout(noteEl.__sheetQuickPlayHighlightTimer);
+                    cancelSheetQuickPlayHighlightTimer(noteEl.__sheetQuickPlayHighlightTimer);
                 }
                 noteEl.classList.add('sheet-quick-play-note-active');
-                const clearTimerId = window.setTimeout(function () {
+                const clearTimerId = scheduleSheetQuickPlayHighlightTimer(function () {
                     noteEl.classList.remove('sheet-quick-play-note-active');
                     noteEl.__sheetQuickPlayHighlightTimer = null;
                 }, 150);
                 noteEl.__sheetQuickPlayHighlightTimer = clearTimerId;
-                sheetQuickPlayState.activeHighlightTimers.push(clearTimerId);
             });
         });
-    }, Math.max(0, Number(message && message.delayMs) || 0));
-    sheetQuickPlayState.activeHighlightTimers.push(startTimerId);
+    };
+    scheduleSheetQuickPlayHighlightTimer(showHighlights, readOutputTime ? 0 : message && message.delayMs);
 }
 
 function updateSheetQuickPlaySelectionClasses() {
@@ -2997,7 +3194,30 @@ function buildSheetQuickPlayRepeatRanges(patternBars) {
     return ranges;
 }
 
-function expandSheetQuickPlayBars(patternBars, repeatRangesToApply, startBarIndex, endBarIndex) {
+function getSheetQuickPlayClosingRepeatOutStep(patternBars, repeatRange) {
+    if (!repeatRange || repeatRange.startBar <= 1) {
+        return null;
+    }
+    const endBar = patternBars[repeatRange.endBar - 1];
+    const notes = Array.isArray(endBar && endBar.notes) ? endBar.notes : [];
+    const endMarkers = endBar && endBar.repeat ? endBar.repeat.end : [];
+    const hasFiniteRepeat = (Array.isArray(endMarkers) ? endMarkers : [endMarkers]).some(function (marker) {
+        return Number.isFinite(Number(marker)) && Number(marker) > 0;
+    });
+    if (notes.length === 0 || !hasFiniteRepeat || patternBars.slice(repeatRange.endBar).some(function (bar) {
+        return (Array.isArray(bar && bar.notes) ? bar.notes : []).some(isSheetQuickPlayPlayableNote);
+    })) {
+        return null;
+    }
+    const outControl = (Array.isArray(endBar.controls) ? endBar.controls : [])
+        .filter(function (control) { return control && control.type === 'out'; })
+        .sort(function (left, right) { return Number(left.stepIndex) - Number(right.stepIndex); })[0];
+    return outControl
+        ? Math.max(0, Math.min(notes.length - 1, Math.round(Number(outControl.stepIndex) || 0)))
+        : null;
+}
+
+function expandSheetQuickPlayBars(patternBars, repeatRangesToApply, startBarIndex, endBarIndex, respectClosingOut) {
     const bars = Array.isArray(patternBars) ? patternBars : [];
     const ranges = Array.isArray(repeatRangesToApply) ? repeatRangesToApply : [];
     const expandedBars = [];
@@ -3015,6 +3235,11 @@ function expandSheetQuickPlayBars(patternBars, repeatRangesToApply, startBarInde
             })[0];
 
         if (!matchingRange) {
+            if (expandedBars.length > 0) {
+                expandedBars[expandedBars.length - 1] = BaraBeatRepeatPickup.withInternalPickup(
+                    expandedBars[expandedBars.length - 1], bars, startBarIndex - 1, currentBarIndex - 1
+                );
+            }
             expandedBars.push(bars[currentBarIndex - 1]);
             currentBarIndex += 1;
             continue;
@@ -3029,11 +3254,29 @@ function expandSheetQuickPlayBars(patternBars, repeatRangesToApply, startBarInde
             bars,
             nestedRanges,
             matchingRange.startBar,
-            matchingRange.endBar
+            matchingRange.endBar,
+            respectClosingOut
         );
+        if (expandedBars.length > 0) {
+            expandedBars[expandedBars.length - 1] = BaraBeatRepeatPickup.withPickup(
+                expandedBars[expandedBars.length - 1], repeatedSegment
+            );
+        }
         expandedBars.push.apply(expandedBars, repeatedSegment);
         for (let repeatIndex = 0; repeatIndex < Math.max(0, Number(matchingRange.count) || 0); repeatIndex++) {
             expandedBars.push.apply(expandedBars, repeatedSegment);
+        }
+        const closingOutStep = respectClosingOut
+            ? getSheetQuickPlayClosingRepeatOutStep(bars, matchingRange)
+            : null;
+        if (closingOutStep !== null && expandedBars.length > 0) {
+            // Close only the last written pass; the outer loop and parallel tracks keep their length.
+            const lastBar = expandedBars[expandedBars.length - 1];
+            expandedBars[expandedBars.length - 1] = Object.assign({}, lastBar, {
+                notes: lastBar.notes.map(function (note, step) {
+                    return step > closingOutStep ? 'f' : note;
+                })
+            });
         }
         currentBarIndex = matchingRange.endBar + 1;
     }
@@ -3058,7 +3301,8 @@ function buildSheetQuickPlayPreparedPattern(pattern, patternIndex) {
             return fullPatternRepeatRanges.indexOf(repeatRange) === -1;
         }),
         1,
-        sourceBars.length
+        sourceBars.length,
+        (pattern.labelType || pattern.label) === 'Begleitung'
     );
     const sectionRepeatCount = fullPatternRepeatRanges.reduce(function (repeatCount, repeatRange) {
         return repeatCount * (Math.max(0, Math.round(Number(repeatRange.count) || 0)) + 1);
@@ -3107,6 +3351,7 @@ function buildSheetQuickPlayPreparedPattern(pattern, patternIndex) {
                 end: []
             },
             controls: preparedControls,
+            playbackNoteSources: bar.playbackNoteSources,
             notes: barNotes
         };
     });
@@ -3208,10 +3453,10 @@ function getSheetQuickPlayPatternHighlightRefs(pattern) {
         const barNotes = Array.isArray(bar && bar.notes) ? bar.notes : [];
         return allRefs.concat(barNotes.map(function (noteValue, sourceStepIndex) {
             return isSheetQuickPlayPlayableNote(noteValue)
-                ? {
+                ? (bar.playbackNoteSources && bar.playbackNoteSources[sourceStepIndex] || {
                     sourceBarIndex: sourceBarIndex,
                     sourceStepIndex: sourceStepIndex
-                }
+                })
                 : null;
         }));
     }, []);
@@ -4516,7 +4761,10 @@ function drawSheetPageFrames() {
 }
 
 // Notenlinien anlegen für binären Rhythmus
-function viererNoten() {
+function viererNoten(approvedSnapshot) {
+    if (!confirmDiscardScoreChanges(approvedSnapshot)) return false;
+    if (savedScoreSnapshot !== null) recordHistorySnapshot();
+    scoreDocumentGeneration += 1;
     drawRhythmSheet({
         rhythmName: 'binaer',
         subdivisionCount: 34,
@@ -4533,9 +4781,14 @@ function viererNoten() {
         gridSizeXValue: 29,
         repeatMarkerOffsetXValue: 24
     });
+    rememberSavedScoreSnapshot();
+    return true;
 }
 
 function dreierNoten() {
+    if (!confirmDiscardScoreChanges()) return false;
+    if (savedScoreSnapshot !== null) recordHistorySnapshot();
+    scoreDocumentGeneration += 1;
     drawRhythmSheet({
         rhythmName: 'tenaer',
         subdivisionCount: 26,
@@ -4552,9 +4805,14 @@ function dreierNoten() {
         gridSizeXValue: 34,
         repeatMarkerOffsetXValue: 26
     });
+    rememberSavedScoreSnapshot();
+    return true;
 }
 
 function neunerNoten() {
+    if (!confirmDiscardScoreChanges()) return false;
+    if (savedScoreSnapshot !== null) recordHistorySnapshot();
+    scoreDocumentGeneration += 1;
     drawRhythmSheet({
         rhythmName: 'neunaer',
         subdivisionCount: 20,
@@ -4571,6 +4829,8 @@ function neunerNoten() {
         gridSizeXValue: 45.5,
         repeatMarkerOffsetXValue: 35
     });
+    rememberSavedScoreSnapshot();
+    return true;
 }
 
 function viererNotenOhneStartChooser() {
@@ -9543,6 +9803,11 @@ async function saveCurrentScoreLocal(nameOverride, folderIdOverride, options) {
     const saveOptions = options || {};
     const serializedRhythm = buildSerializedRhythm();
     const name = (nameOverride || titel.attr('text') || uiText('editor.untitled')).trim();
+    const generation = scoreDocumentGeneration;
+    const titleAtStart = getCurrentRhythmTitle();
+    const savedSnapshot = getCurrentScoreSnapshot();
+    savedSnapshot.title = isDefaultRhythmTitle(name) ? '' : name;
+    const savedSignature = scoreSnapshotSignature(savedSnapshot);
     const scoreId = saveOptions.asCopy ? null : currentScoreId;
     const existingScore = scoreId ? await localLibrary.getScore(scoreId) : null;
     const folderId = folderIdOverride ||
@@ -9557,9 +9822,13 @@ async function saveCurrentScoreLocal(nameOverride, folderIdOverride, options) {
         content: serializedRhythm
     });
 
-    currentScoreId = savedScore.id;
-    setRhythmTitle(savedScore.title);
-    setSelectedFileSource('local');
+    // Edits made while IndexedDB is writing must remain unsaved.
+    if (generation === scoreDocumentGeneration) {
+        currentScoreId = savedScore.id;
+        if (getCurrentRhythmTitle() === titleAtStart) setRhythmTitle(savedScore.title);
+        savedScoreSnapshot = savedSignature;
+        setSelectedFileSource('local');
+    }
     await refreshFileList();
     return savedScore;
 }
@@ -9644,9 +9913,9 @@ async function renameLocalScore() {
     }
 }
 
-async function deleteLocalScore() {
+async function deleteLocalScore(scoreIdOverride) {
     try {
-        const scoreId = getSelectedLocalScoreId();
+        const scoreId = scoreIdOverride || getSelectedLocalScoreId();
         if (!scoreId) {
             alert(uiText('file.error.selectLocal'));
             return;
@@ -9658,6 +9927,9 @@ async function deleteLocalScore() {
             return;
         }
 
+        const deletesCurrentScore = score.id === currentScoreId;
+        if (deletesCurrentScore && !confirmDiscardScoreChanges()) return;
+        const approvedSnapshot = scoreSnapshotSignature(getCurrentScoreSnapshot());
         const shouldDelete = confirm(uiText('file.confirm.deleteLocal', { title: score.title }));
         if (!shouldDelete) {
             return;
@@ -9669,7 +9941,7 @@ async function deleteLocalScore() {
         if (score.id === getRememberedLastLoadedScoreId()) {
             rememberLastLoadedScore('');
         }
-        viererNoten();
+        if (deletesCurrentScore) viererNoten(approvedSnapshot);
         await refreshFileList();
         alert(uiText('file.message.deletedLocal', { title: score.title }));
     } catch (error) {
@@ -9745,11 +10017,12 @@ async function openLocalScore(scoreId) {
     if (!score) {
         throw new Error(uiText('file.error.localNotFound'));
     }
-    loadRhythmContent(score.title, score.content || score.data, score.id);
-    return score;
+    return loadRhythmContent(score.title, score.content || score.data, score.id) ? score : null;
 }
 
 async function importServerScore(serverPath, serverInfo) {
+    if (!confirmDiscardScoreChanges()) return null;
+    const approvedSnapshot = scoreSnapshotSignature(getCurrentScoreSnapshot());
     const resolvedServerInfo = serverInfo || await findServerScoreInfo(serverPath);
     const serverScore = await serverLibrary.importScore(serverPath);
     const serverDownloadedAt = new Date().toISOString();
@@ -9815,7 +10088,9 @@ async function importServerScore(serverPath, serverInfo) {
         });
     });
 
-    loadRhythmContent(savedScore.title, savedScore.content, savedScore.id);
+    if (!loadRhythmContent(savedScore.title, savedScore.content, savedScore.id, { approvedSnapshot: approvedSnapshot })) {
+        return null;
+    }
     setSelectedFileSource('local');
     await refreshFileList();
     return savedScore;
@@ -9829,6 +10104,7 @@ async function loadFileDialogServerNoticeVersion() {
     try {
         const serverInfo = await findServerScoreInfo(serverPath);
         const savedScore = await importServerScore(serverPath, serverInfo);
+        if (!savedScore) return;
         closeFileDialog();
         showAutoDismissMessage(uiText('file.message.loadedFromServer', { title: savedScore.title }));
     } catch (error) {
@@ -9852,9 +10128,9 @@ async function confirmFileDialog() {
                 return;
             }
             if (fileDialogState.source === 'server') {
-                await importServerScore(entry.serverPath || entry.fileName, entry);
+                if (!await importServerScore(entry.serverPath || entry.fileName, entry)) return;
             } else {
-                await openLocalScore(entry.id);
+                if (!await openLocalScore(entry.id)) return;
             }
             closeFileDialog();
             return;
@@ -9993,8 +10269,7 @@ async function deleteSelectedFileDialogScore() {
     }
 
     if (entry.entryType === 'score') {
-        currentScoreId = entry.id;
-        await deleteLocalScore();
+        await deleteLocalScore(entry.id);
         fileDialogState.selectedId = null;
         await refreshFileDialogEntries();
     }
@@ -10310,6 +10585,7 @@ document.addEventListener('DOMContentLoaded', function () {
     document.querySelector('#saveFileDialogButton').addEventListener('click', function () {
         saveCurrentScoreFromMenu();
     });
+    bindFileKeyboardShortcuts();
     document.querySelector('#saveAsFileDialogButton').addEventListener('click', function () {
         openFileDialog('saveAs');
     });
@@ -10371,22 +10647,19 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     document.querySelector('#button3').addEventListener('click', runReadRhythm);
     document.querySelector('#button4').addEventListener('click', function () {
-        recordHistorySnapshot();
-        viererNoten();
+        if (!viererNoten()) return;
         if (isMobileLandscapeViewport()) {
             refreshMobileSheetEditorView();
         }
     });
     document.querySelector('#button5').addEventListener('click', function () {
-        recordHistorySnapshot();
-        dreierNoten();
+        if (!dreierNoten()) return;
         if (isMobileLandscapeViewport()) {
             refreshMobileSheetEditorView();
         }
     });
     document.querySelector('#button8').addEventListener('click', function () {
-        recordHistorySnapshot();
-        neunerNoten();
+        if (!neunerNoten()) return;
         if (isMobileLandscapeViewport()) {
             refreshMobileSheetEditorView();
         }
@@ -11594,10 +11867,10 @@ function onSVGLoaded(data) {
         console.warn('Timeline-Zustand konnte nach dem Laden nicht rekonstruiert werden', error);
     }
     clearHistorySnapshots();
+    rememberSavedScoreSnapshot();
 }
 
 function get_value(e) {
-    removeCanvasElements(removableCanvasElementSelector);
     closeAppMenus();
 
     let selectedFileName;

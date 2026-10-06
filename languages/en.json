@@ -138,6 +138,7 @@
       "renameFolder": "New folder name:"
     },
     "confirm": {
+      "discardUnsaved": "There are unsaved changes to the score, practice settings or arrangement.\nContinue without saving? Choose Cancel to stay with the current score.",
       "deleteLocal": "Delete \"{title}\" locally?\nThe server version will remain unchanged.",
       "replaceLocalChanges": "\"{title}\" has local changes.\nLoad the server version anyway and replace the local copy?",
       "deleteEmptyFolder": "Delete the empty local folder \"{name}\"?",

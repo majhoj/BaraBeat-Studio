@@ -53,6 +53,7 @@ const requiredMatches = [
   'JS/edition.js',
   'JS/app-bootstrap.js',
   'JS/timing.js',
+  'JS/repeat-pickup.js',
   'Assets/pwa-icon-192.png',
   'Assets/pwa-icon-512.png',
   'manual/offline/de.html',

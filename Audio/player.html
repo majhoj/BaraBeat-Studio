@@ -98,6 +98,7 @@
 </script>
 <script src="../JS/i18n.js"></script>
 <script src="../JS/timing.js"></script>
+<script src="../JS/repeat-pickup.js"></script>
 <script>
   function playerText(key, values) {
       return window.BaraBeatI18n && typeof window.BaraBeatI18n.t === 'function'
@@ -185,6 +186,32 @@ window.getEmbeddedTimelinePlaybackTime = function () {
   return instr && instr._audioCtx ? instr._audioCtx.currentTime : null;
 };
 
+function getQuickPlayOutputTime() {
+  const audioContext = instr && instr._audioCtx;
+  if (!audioContext || audioContext.state !== 'running') {
+    return null;
+  }
+  const currentTime = audioContext.currentTime;
+  if (typeof audioContext.getOutputTimestamp === 'function') {
+    try {
+      const timestamp = audioContext.getOutputTimestamp();
+      if (timestamp && Number.isFinite(timestamp.contextTime) && timestamp.contextTime > 0 &&
+          Number.isFinite(timestamp.performanceTime) && timestamp.performanceTime > 0) {
+        // Output timestamps already include device latency; do not subtract it again.
+        return Math.min(currentTime, timestamp.contextTime +
+          Math.max(0, performance.now() - timestamp.performanceTime) / 1000);
+      }
+    } catch (error) {
+      // Older engines may expose the method before output timestamps are available.
+    }
+  }
+  const baseLatency = Number.isFinite(audioContext.baseLatency) ? Math.max(0, audioContext.baseLatency) : 0;
+  const outputLatency = Number.isFinite(audioContext.outputLatency) ? Math.max(0, audioContext.outputLatency) : 0;
+  return Math.max(0, currentTime - baseLatency - outputLatency);
+}
+
+window.getEmbeddedQuickPlayPlaybackTime = getQuickPlayOutputTime;
+
 function applyAudioTheme(themeName) {
   document.body.classList.toggle('audio-theme-playful', themeName === 'playful');
   document.body.classList.toggle('audio-theme-earth', themeName === 'earth');
@@ -250,6 +277,7 @@ function notifyEmbeddedPlaybackStep(playbackStep, scheduledTime) {
       : '',
     localStep: sectionContext ? Math.max(0, Number(sectionContext.localStep) || 0) : 0,
     isFinalSectionRepeat: isFinalSectionRepeat,
+    audioScheduledTime: isSheetQuickPlayMode ? scheduledTime : null,
     delayMs: Math.max(0, (scheduledTime - instr._audioCtx.currentTime) * 1000)
   }, window.location.origin);
 }
@@ -711,9 +739,6 @@ function expandPatternBars(pattern) {
         return !(repeatRange.startBar === 1 && repeatRange.endBar === patternBars.length);
       })
     : patternRepeatRanges;
-  if (repeatRangesForPattern.length === 0) {
-    return patternBars;
-  }
   return expandBarsWithRepeats(patternBars, repeatRangesForPattern, 1, patternBars.length);
 }
 
@@ -3368,6 +3393,11 @@ function expandBarsWithRepeats(flatBars, repeatRangesToApply, startBarIndex, end
 
     const matchingRange = matchingRanges[0];
     if (!matchingRange) {
+      if (expandedBars.length > 0) {
+        expandedBars[expandedBars.length - 1] = BaraBeatRepeatPickup.withInternalPickup(
+          expandedBars[expandedBars.length - 1], flatBars, startBarIndex - 1, currentBarIndex - 1
+        );
+      }
       expandedBars.push(flatBars[currentBarIndex - 1]);
       currentBarIndex += 1;
       continue;
@@ -3384,6 +3414,11 @@ function expandBarsWithRepeats(flatBars, repeatRangesToApply, startBarIndex, end
       matchingRange.endBar
     );
 
+    if (expandedBars.length > 0) {
+      expandedBars[expandedBars.length - 1] = BaraBeatRepeatPickup.withPickup(
+        expandedBars[expandedBars.length - 1], repeatedSegment
+      );
+    }
     expandedBars.push.apply(expandedBars, repeatedSegment);
     if (matchingRange.count === 'loop') {
       expandedBars.push.apply(expandedBars, repeatedSegment);

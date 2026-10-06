@@ -2138,6 +2138,11 @@ function expandPracticeBarsWithRepeats(bars, repeatRangesToApply, startBarIndex,
             })[0];
 
         if (!matchingRange) {
+            if (expandedBars.length > 0) {
+                expandedBars[expandedBars.length - 1] = BaraBeatRepeatPickup.withInternalPickup(
+                    expandedBars[expandedBars.length - 1], bars, startBarIndex - 1, currentBarIndex - 1
+                );
+            }
             expandedBars.push(bars[currentBarIndex - 1]);
             currentBarIndex += 1;
             continue;
@@ -2153,6 +2158,11 @@ function expandPracticeBarsWithRepeats(bars, repeatRangesToApply, startBarIndex,
             matchingRange.startBar,
             matchingRange.endBar
         );
+        if (expandedBars.length > 0) {
+            expandedBars[expandedBars.length - 1] = BaraBeatRepeatPickup.withPickup(
+                expandedBars[expandedBars.length - 1], repeatedSegment
+            );
+        }
         expandedBars.push.apply(expandedBars, repeatedSegment);
         const repeatCount = Number(matchingRange.count) || 0;
         for (let repeatIndex = 0; repeatIndex < repeatCount; repeatIndex += 1) {
@@ -2169,9 +2179,6 @@ function expandPracticePatternBars(pattern) {
         return [];
     }
     const repeatRanges = buildPracticeRepeatRangesFromBars(bars);
-    if (repeatRanges.length === 0) {
-        return bars;
-    }
     return expandPracticeBarsWithRepeats(bars, repeatRanges, 1, bars.length);
 }
 
@@ -5080,7 +5087,10 @@ function updatePracticeScrollerPosition(playbackStep) {
 
     const now = window.performance.now();
     practiceScrollerState.currentStep = rawStep;
-    scrollerEl.style.setProperty('--practice-scroller-offset', laneOffset + 'px');
+    const laneTransform = 'translate3d(' + laneOffset + 'px, 0, 0)';
+    (scrollerDom ? scrollerDom.laneEls : []).forEach(function (laneEl) {
+        laneEl.style.transform = laneTransform;
+    });
     const activeStepChanged = practiceScrollerState.activeStep !== activeStep;
     if (scrollerDom && scrollerDom.statusEl &&
             (activeStepChanged || now - practiceScrollerState.lastStatusUpdateAt >= 250)) {
@@ -5107,8 +5117,10 @@ function updatePracticeScrollerPosition(playbackStep) {
                 const activeChildIndex = activeStep + getPracticeScrollerPreRollLineSteps();
                 if (laneEl.children[activeChildIndex]) {
                     const activeCellEl = laneEl.children[activeChildIndex];
-                    activeCellEl.classList.add('is-current');
-                    practiceScrollerState.activeCells.push(activeCellEl);
+                    if (activeCellEl.classList.contains('is-practice-target')) {
+                        activeCellEl.classList.add('is-current');
+                        practiceScrollerState.activeCells.push(activeCellEl);
+                    }
                 }
             });
         }

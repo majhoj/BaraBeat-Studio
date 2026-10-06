@@ -22,6 +22,10 @@ export function installTiming(context) {
   vm.runInContext(fs.readFileSync(path, 'utf8'), context);
 }
 
+export function installRepeatPickup(context) {
+  vm.runInContext(source('JS/repeat-pickup.js'), context);
+}
+
 export function near(actual, expected, label) {
   assert(Math.abs(actual - expected) < 1e-9, `${label}: expected ${expected}, received ${actual}`);
 }

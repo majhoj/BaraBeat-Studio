@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
-import { source, loadFunctions, installTiming } from './helpers/music-context.mjs';
+import { source, loadFunctions, installTiming, installRepeatPickup } from './helpers/music-context.mjs';
 
 const player = source('Audio/player.html');
 const editor = source('index.php');
@@ -14,6 +14,7 @@ const context = vm.createContext({
   practiceState: { repeatCount: 1, timerMinutes: 0, accompanimentStart: 'immediate' }
 });
 installTiming(context);
+installRepeatPickup(context);
 vm.runInContext(player.slice(player.indexOf('function sanitizeRepeatRanges('),
   player.indexOf('const repeatRanges = sanitizeRepeatRanges(')), context);
 vm.runInContext(player.slice(player.indexOf('function getFeelOffsetSeconds('),
