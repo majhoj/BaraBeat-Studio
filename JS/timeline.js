@@ -1,7 +1,7 @@
 // Abschnittstimeline: Zustand, Bibliothek, Rendering, Drag/Drop und Metadaten
 const timelineDjembeTargets = ['Djembe_1', 'Djembe_2', 'Djembe_3'];
 const timelineBassTargets = ['Kenkeni', 'Sangban', 'Doundoun'];
-const timelineTrackTargets = timelineDjembeTargets.concat(timelineBassTargets);
+const timelineTrackTargets = timelineDjembeTargets.concat(timelineBassTargets, ['Dreierbass']);
 const timelineMetadataVersion = 10;
 const minimumCompatibleTimelineMetadataVersion = 7;
 const defaultTimelineSwingProfiles = {

@@ -43,6 +43,7 @@ Der Handbuchtest benoetigt PHP CLI. Keine Tests aendern Notenblaetter.
 | Ueberlappungen | `overlap-control`, `sheet-quick-play-pickup`, `timeline-horizontal-tracks`: Uebergaben, Taktzahl, Schlussnote, begrenzte Sichtkopien |
 | Flam, Triolen | `musical-audio`: zwei Schlaege mit Abstand 5/BPM; drei gleichmaessige Schlaege pro Beat, Live und Export |
 | Parallele Instrumente | `musical-structure`, `timeline-accompaniment-lanes`: ein- und zweitaktige Begleitung zusammen, kurze Spur wiederholt sich |
+| Ballet Dununs in der Timeline | `timeline-three-bass`: eigene sichtbare Dreierbass-Spur, Einsetzen per Taktleiste, Begleitsegment verschieben/verlaengern, Speichern/Neuladen und Player-Uebergabe; separate Bassspuren bleiben unveraendert |
 | Einzelne/unfertige Takte | `quick-play-drafts`: Instrument + Note ohne Funktion spielbar; nur Instrument oder Note ohne Instrument nicht spielbar |
 | Start im Arrangement | `musical-structure`, `timeline-accompaniment-lanes`: Starttakt inklusive Auftakt, Start-/Endgrenzen |
 | Leere Auswahl | `musical-structure`: Quick Play liefert null, Ueben verlangt Auswahl |
