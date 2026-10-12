@@ -2494,9 +2494,13 @@ function registerTimelinePickupLeadAtStep(sections, sectionOffsets, targetStep, 
 }
 
 function applyExplicitTimelineAccompanimentSegments(sections, config, patternById) {
-  const segments = Array.isArray(config && config.AccompanimentSegments)
+  const accompanimentSegments = Array.isArray(config && config.AccompanimentSegments)
     ? config.AccompanimentSegments
     : [];
+  const positionedCalls = Array.isArray(config && config.TimelinePositionedCalls)
+    ? config.TimelinePositionedCalls.map(function (call) { return Object.assign({}, call, { positionedCall: true }); })
+    : [];
+  const segments = accompanimentSegments.concat(positionedCalls);
   if (!Array.isArray(sections) || sections.length === 0 || segments.length === 0) {
     return;
   }
@@ -2542,12 +2546,15 @@ function applyExplicitTimelineAccompanimentSegments(sections, config, patternByI
   segments
     .slice()
     .sort(function (leftSegment, rightSegment) {
-      return Number(leftSegment && leftSegment.startBar) - Number(rightSegment && rightSegment.startBar);
+      // Calls replace only their own instrument after the continuous accompaniments are written.
+      return Number(Boolean(leftSegment && leftSegment.positionedCall)) - Number(Boolean(rightSegment && rightSegment.positionedCall)) ||
+        Number(leftSegment && leftSegment.startBar) - Number(rightSegment && rightSegment.startBar);
     })
     .forEach(function (segment) {
       const pattern = patternById[segment && segment.patternId] || null;
       const targetInstrument = normalizeTimelineTargetInstrument(segment && segment.targetInstrument);
-      if (!pattern || pattern.label !== 'Begleitung' || trackInstrumentNames.indexOf(targetInstrument) === -1) {
+      const isPositionedCall = Boolean(segment && segment.positionedCall);
+      if (!pattern || pattern.label !== (isPositionedCall ? 'Call' : 'Begleitung') || trackInstrumentNames.indexOf(targetInstrument) === -1) {
         return;
       }
 
@@ -2575,8 +2582,11 @@ function applyExplicitTimelineAccompanimentSegments(sections, config, patternByI
         patternOutBarEndStep: getPatternOutBarEndStep(pattern),
         patternOverlapStep: getPatternOverlapStep(pattern)
       };
-      const segmentNotes = getTimelineEntryEffectiveNotes(entryData, true, segmentLength);
-      const pickupNotes = buildTimelinePickupNotes(entryData.patternNotes, entryData.patternInStep);
+      const effectiveNotes = getTimelineEntryEffectiveNotes(entryData, true, isPositionedCall ? 0 : segmentLength);
+      const segmentNotes = isPositionedCall ? padNotesToLength(effectiveNotes, segmentLength).slice(0, segmentLength) : effectiveNotes;
+      const pickupNotes = !isPositionedCall || hasTimelineEntryLeadingPickup(entryData)
+        ? buildTimelinePickupNotes(entryData.patternNotes, entryData.patternInStep)
+        : [];
       if (pickupNotes.length > 0 && segmentStartStep > 0) {
         const availablePickupLength = Math.min(pickupNotes.length, segmentStartStep);
         const availablePickupNotes = pickupNotes.slice(pickupNotes.length - availablePickupLength);
@@ -2608,6 +2618,13 @@ function applyExplicitTimelineAccompanimentSegments(sections, config, patternByI
         segmentNotes,
         true
       );
+      if (isPositionedCall && targetInstrument.indexOf('Djembe_') === 0) {
+        sections.forEach(function (section, index) {
+          if (sectionOffsets[index] < segmentEndStep && sectionOffsets[index] + section.length > segmentStartStep) {
+            section.trackHandModes[targetInstrument] = String(segment.handMode || 'auto');
+          }
+        });
+      }
     });
 }
 
@@ -2789,6 +2806,11 @@ function buildTimelineSections(config) {
   timelineEntries.forEach(function (entry) {
     const pattern = patternById[entry.patternId];
     if (!pattern) {
+      return;
+    }
+
+    // Bar-positioned Calls are overlaid after the base timeline, without changing bass repeats.
+    if (pattern.label === 'Call' && entry.overlayBarOffset !== null && entry.overlayBarOffset !== undefined) {
       return;
     }
 
