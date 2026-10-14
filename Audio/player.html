@@ -1253,19 +1253,24 @@ function mergeTimelineEntriesIntoPreviousSectionAtStart(sections, entryDataList)
       return;
     }
     const safeInStep = Math.max(0, Math.min(sourceNotes.length - 1, Number(entryData.patternInStep) || 0));
-    const overlapLength = Math.min(hostLength, sourceNotes.length);
+    const stepsPerBar = getTimelineStepsPerBar();
+    const sharesOpeningBar = !isPracticeMode && !isSheetQuickPlayMode &&
+      getTimelineEntrySkippedStartStep(entryData) === stepsPerBar;
+    const hostOffset = sharesOpeningBar ? Math.max(0, hostLength - stepsPerBar) : 0;
+    const overlapLength = Math.min(hostLength - hostOffset,
+      sharesOpeningBar ? stepsPerBar : sourceNotes.length);
     const overlapNotes = silenceNotesBeforeStep(sourceNotes.slice(0, overlapLength), safeInStep);
 
     entryData.targetInstruments.forEach(function (instrumentName) {
       hostSection.trackNotes[instrumentName] = silenceTrackRange(
         hostSection.trackNotes[instrumentName],
-        safeInStep,
+        hostOffset + safeInStep,
         Math.max(0, overlapLength - safeInStep)
       );
       hostSection.trackNotes[instrumentName] = mergeNotesIntoTrack(
         hostSection.trackNotes[instrumentName],
         overlapNotes,
-        0
+        hostOffset
       );
       consumedByInstrument[instrumentName] = Math.max(
         consumedByInstrument[instrumentName] || 0,
@@ -2986,6 +2991,18 @@ function buildTimelineSections(config) {
 
       matchingLane.entries.push(entryData);
     });
+
+    if (!isPracticeMode && !isSheetQuickPlayMode) {
+      blockLanes.forEach(function (lane) {
+        lane.entries.forEach(function (entryData, index) {
+          if (index > 0 && entryData.entrySignature === lane.entries[index - 1].entrySignature &&
+              getTimelineEntrySkippedStartStep(entryData) > 0) {
+            // A separate opening IN bar is shared once, not removed from every repetition.
+            entryData.patternInStep = null;
+          }
+        });
+      });
+    }
 
     const shouldMergeBlockAsParallel = Boolean(
       parallelGroupId ||

@@ -4061,7 +4061,7 @@ function getTimelinePatternBarCountWithOverlapHandoff(pattern, bars, barCount, s
         Array.isArray(bars) ? bars.length : 0,
         Math.round(Number(barCount) || 1)
     ));
-    if (!shouldHandOffOverlap || !pattern || pattern.labelType === 'Begleitung' || normalizedBarCount <= 1) {
+    if (!shouldHandOffOverlap || !pattern || pattern.labelType === 'Begleitung') {
         return normalizedBarCount;
     }
 
@@ -4115,9 +4115,10 @@ function getTimelineRowBarCount(rowGroups, shouldHandOffFinalOverlap) {
     const baseGroups = (Array.isArray(rowGroups) ? rowGroups : []).filter(function (group) {
         return group && !isTimelineOverlayGroup(group);
     });
+    // A fully shared one-bar pattern advances no bars; its clip remains one bar wide.
     return Math.max.apply(null, baseGroups.map(function (group) {
         return getTimelineGroupBarCount(group, shouldHandOffFinalOverlap);
-    }).concat(1));
+    }).concat(baseGroups.length ? 0 : 1));
 }
 
 function getTimelineRowGapBeforeBars(rowGroups) {
@@ -4157,6 +4158,25 @@ function setTimelineRowGapBeforeBars(rowGroups, nextGapBeforeBars) {
     renderTimelinePanel();
 }
 
+function getTimelineRowSharedPickupBars(rowGroups, previousRow) {
+    if (!previousRow || previousRow.barCount <= 0 || getTimelineRowGapBeforeBars(rowGroups) > 0) {
+        return 0;
+    }
+    const baseGroups = rowGroups.filter(function (group) { return !isTimelineOverlayGroup(group); });
+    if (baseGroups.length !== 1) return 0;
+    const pattern = findPatternById(baseGroups[0].patternId);
+    const bars = getTimelineExpandedPatternBars(pattern);
+    if (!pattern || pattern.labelType === 'Begleitung' || bars.length <= 1) return 0;
+    const controls = Array.isArray(bars[0].controls) ? bars[0].controls : [];
+    const inControl = controls.filter(function (control) { return control && control.type === 'in'; })
+        .sort(function (left, right) { return Number(left.stepIndex) - Number(right.stepIndex); })[0];
+    if (!inControl || controls.some(function (control) {
+        return control && (control.type === 'out' || control.type === 'overlap') &&
+            Number(control.stepIndex) < Number(inControl.stepIndex);
+    })) return 0;
+    return 1;
+}
+
 function buildTimelineHorizontalLayout(visualRows) {
     const rows = [];
     let nextStartBar = 1;
@@ -4166,12 +4186,14 @@ function buildTimelineHorizontalLayout(visualRows) {
         const gapBeforeBars = getTimelineRowGapBeforeBars(rowGroups);
         const shouldHandOffFinalOverlap = rowIndex < timelineRows.length - 1;
         const barCount = getTimelineRowBarCount(rowGroups, shouldHandOffFinalOverlap);
-        nextStartBar += gapBeforeBars;
+        const sharedPickupBars = getTimelineRowSharedPickupBars(rowGroups, rows[rows.length - 1]);
+        nextStartBar += gapBeforeBars - sharedPickupBars;
         rows.push({
             rowIndex: rowIndex,
             rowGroups: rowGroups,
             startBar: nextStartBar,
             gapBeforeBars: gapBeforeBars,
+            sharedPickupBars: sharedPickupBars,
             barCount: barCount,
             shouldHandOffFinalOverlap: shouldHandOffFinalOverlap,
             endBar: nextStartBar + barCount
@@ -4231,6 +4253,7 @@ function buildTimelineHorizontalLayout(visualRows) {
                     rowIndex: rowLayout.rowIndex,
                     pattern: pattern,
                     shouldHandOffFinalOverlap: rowLayout.shouldHandOffFinalOverlap,
+                    sharedPickupBars: isTimelineOverlayGroup(group) ? 0 : rowLayout.sharedPickupBars,
                     isOverlay: isTimelineOverlayGroup(group)
                 });
             });
@@ -4290,7 +4313,7 @@ function buildTimelinePositionedCalls(layout) {
                 index < clip.group.entries.length - 1 || clip.shouldHandOffFinalOverlap);
             const followingClip = layout.clips.find(function (candidate) {
                 return candidate !== clip && candidate.targetInstrument === clip.targetInstrument &&
-                    candidate.startBar === startBar + barCount;
+                    candidate.startBar + (candidate.sharedPickupBars || 0) === startBar + barCount;
             });
             const followingEntry = clip.group.entries[index + 1] ||
                 (followingClip && followingClip.group && followingClip.group.entries[0]);

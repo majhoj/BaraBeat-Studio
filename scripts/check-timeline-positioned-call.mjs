@@ -172,7 +172,7 @@ solo.bars[0].notes[22] = 'slap_flam';
 played = audio();
 assert.equal(played.Djembe_1[142], 'slap_flam', 'Separate pickup bar also leads into the following Solo');
 assert.equal(played.Djembe_1[144], 'bass', 'The separate pickup bar is consumed, not played again');
-for (let i = 0; i < 4; i++) assert.equal(played.Djembe_1[144 + i * 24], 'bass', 'Solo repetitions remain consecutive');
+for (let i = 0; i < 4; i++) assert.equal(played.Djembe_1[144 + i * 48], 'bass', 'Only the first pickup bar is shared; later Solo repetitions stay complete');
 assertBassUnchanged(sequential, played);
 
 console.log('Positioned Calls: bar 6, add/move, continuous bass repeats, single passes, multiple Calls, undo snapshot, persistence, IN/OUT, following Solo pickup and moving out checked.');

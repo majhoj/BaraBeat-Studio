@@ -112,6 +112,32 @@ const pickupSections = build([flam, separatePickup], [entry(flam.id), entry(sepa
 assert.equal(pickupSections[0].trackNotes.Djembe_1[22], 'slap');
 assert.deepEqual(notes(pickupSections[1]), separatePickup.bars[1].notes);
 
+// Djaa alternative: only the first of three two-bar Solo cycles starts inside the Flam bar.
+const twoBarSolo = pattern('Solo 2', 'Solo 2', [
+  bar({ 8: 'slap_flam', 12: 'tone', 14: 'tone', 18: 'slap_flam' }, [{ type: 'in', stepIndex: 8 }]),
+  bar({})
+]);
+const repeatedPickupSections = build([flam, twoBarSolo], [entry(flam.id),
+  ...Array.from({ length: 3 }, () => entry(twoBarSolo.id))]);
+assert.deepEqual(Array.from(repeatedPickupSections, s => s.length), [24, 24, 48, 48],
+  'Only the first IN bar is shared; later repetitions must retain both bars');
+assert.deepEqual(notes(repeatedPickupSections[0]), twoBarSolo.bars[0].notes.map((note, step) =>
+  step === 0 ? 'slap_flam' : note));
+assert.deepEqual(notes(repeatedPickupSections[1]), twoBarSolo.bars[1].notes);
+for (const section of repeatedPickupSections.slice(2)) {
+  assert.deepEqual(notes(section), twoBarSolo.bars.flatMap(b => b.notes));
+}
+assert.equal(repeatedPickupSections.reduce((sum, section) => sum + section.length, 0), 6 * 24);
+const soloWithoutHost = build([twoBarSolo], Array.from({ length: 3 }, () => entry(twoBarSolo.id)));
+assert(soloWithoutHost.every(section => section.length === 48), 'Without a preceding pattern all three Solo cycles stay complete');
+const longerHost = pattern('Two-bar host', 'Solo', [bar({0:'bass'}), bar({0:'tone'})]);
+const afterLongerHost = build([longerHost, twoBarSolo], [entry(longerHost.id),
+  ...Array.from({length:3}, () => entry(twoBarSolo.id))]);
+assert.deepEqual(notes(afterLongerHost[0]).slice(0,24), longerHost.bars[0].notes,
+  'The IN must not enter a longer host one bar early');
+assert.equal(notes(afterLongerHost[0])[32], 'slap_flam');
+assert.equal(afterLongerHost.reduce((sum,s)=>sum+s.length,0),7*24);
+
 const noIn = pattern('Ohne IN', 'Echauffement', [{ ...warmupBar, controls: [] }]);
 const noInSections = build([flam, noIn], [entry(flam.id), entry(noIn.id)]);
 assert.deepEqual(notes(noInSections[0]), flam.bars[0].notes);

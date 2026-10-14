@@ -33,6 +33,7 @@ Der Handbuchtest benoetigt PHP CLI. Keine Tests aendern Notenblaetter.
 | Binaer, tenaer, neunaer | `musical-structure`, `musical-timing`: 32/8, 24/6, 18/6 Schritte; bei BPM 80 Taktlaenge 3 s, 3 s, 2,25 s |
 | Normale Wiederholungen | `musical-structure`: zwei zusaetzliche Wiederholungen ergeben drei Durchlaeufe in Player, Ueben und Quick Play |
 | IN, Auftakt nach Call/Intro | `musical-structure`: IN zwei Schritte vor dem neuen Takt; kein zusaetzlicher Auftakttakt |
+| Mehrtaktiges Solo mit IN | `arrangement-cyclic-pickup`, `timeline-horizontal-tracks`: erster Solo-Takt wird mit dem vorherigen Flam geteilt, zwei weitere Durchlaeufe bleiben vollstaendig; drei zweitaktige Durchlaeufe belegen gemeinsam sechs Takte, auch mit stummen zweiten Takten; ohne Vorgaenger kein Abzug |
 | OUT / nur letzter Durchlauf | `arrangement-out-trim`, `arrangement-cyclic-pickup`, `sheet-quick-play-pickup`: Noten und Laengen vor/nach OUT, Schlussdurchlauf |
 | Zyklisches IN hinter OUT | `arrangement-cyclic-pickup`, `sheet-quick-play-pickup`: vollstaendige Pattern, letzter OUT, Variation 2, Echauffement |
 | IN in internem Wiederholungsabschnitt | `internal-repeat-pickup`: Soli nach Okas, sechs notierte / zehn gespielte Sangban-Takte; IN von Takt 6 am Ende von Takt 5, gleiche Audionoten in allen Modi, passende rote Markierung und laufende Noten, unveraenderte Quelldaten |
@@ -40,7 +41,7 @@ Der Handbuchtest benoetigt PHP CLI. Keine Tests aendern Notenblaetter.
 | Sofort-Spielen: rote Noten synchron | `quick-play-highlight-timing`: absolute Audiozeit und Geraete-Ausgabezeit statt reinem Browser-Timer; wartende Ausgabe, verspaetete Meldungen, Desktop/Mobil, IN-Quellnote, Stopp, alte Player und begrenzte Timerliste |
 | OUT am Ende einer Begleitsequenz | `internal-repeat-pickup`: Sofort-Spielen beachtet OUT im letzten Durchlauf eines separat wiederholten Schlussabschnitts; Taktende, aeusserer Loop, laengere Parallelbegleitung und expliziter Leertakt bleiben erhalten; normale Begleitloops bleiben unveraendert |
 | Verkuerzte Takte | `musical-structure`: genau ein Beat, Note auf der Verkuerzungsgrenze entfaellt |
-| Ueberlappungen | `overlap-control`, `sheet-quick-play-pickup`, `timeline-horizontal-tracks`: Uebergaben, Taktzahl, Schlussnote, begrenzte Sichtkopien |
+| Ueberlappungen | `overlap-control`, `sheet-quick-play-pickup`, `timeline-horizontal-tracks`: Uebergaben, Taktzahl, Schlussnote, begrenzte Sichtkopien; eintaktiger Flam teilt Takt 12 mit Solo 2 (dreimal zwei Takte bis Takt 17), beide Bloecke bleiben sichtbar; letzter Flam ohne Nachfolger behaelt seinen Takt |
 | Flam, Triolen | `musical-audio`: zwei Schlaege mit Abstand 5/BPM; drei gleichmaessige Schlaege pro Beat, Live und Export |
 | Parallele Instrumente | `musical-structure`, `timeline-accompaniment-lanes`: ein- und zweitaktige Begleitung zusammen, kurze Spur wiederholt sich |
 | Ballet Dununs in der Timeline | `timeline-three-bass`: eigene sichtbare Dreierbass-Spur, Einsetzen per Taktleiste, Begleitsegment verschieben/verlaengern, Speichern/Neuladen und Player-Uebergabe; separate Bassspuren bleiben unveraendert |

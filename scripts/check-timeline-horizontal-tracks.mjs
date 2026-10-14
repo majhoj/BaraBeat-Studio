@@ -50,6 +50,8 @@ const patterns = {
     })
   },
   solo2a: { id: 'solo2a', labelType: 'Solo', bars: [{}, {}] },
+  flam: { id: 'flam', labelType: 'Solo', bars: [{ controls: [{ type: 'overlap', stepIndex: 0 }] }] },
+  soloWithIn: { id: 'soloWithIn', labelType: 'Solo', bars: [{ controls: [{ type: 'in', stepIndex: 8 }] }, {}] },
   solo4: {
     id: 'solo4',
     labelType: 'Solo',
@@ -122,7 +124,9 @@ vm.runInContext(extractFunction(timelineSource, 'getTimelinePatternBarCountAtFin
 vm.runInContext(extractFunction(timelineSource, 'getTimelineGroupBarCount'), context);
 vm.runInContext(extractFunction(timelineSource, 'getTimelineRowBarCount'), context);
 vm.runInContext(extractFunction(timelineSource, 'getTimelineRowGapBeforeBars'), context);
+vm.runInContext(extractFunction(timelineSource, 'getTimelineRowSharedPickupBars'), context);
 vm.runInContext(extractFunction(timelineSource, 'buildTimelineHorizontalLayout'), context);
+vm.runInContext(extractFunction(timelineSource, 'assignTimelineTrackClipLayers'), context);
 vm.runInContext(extractFunction(timelineSource, 'getTimelineTargetSignature'), context);
 vm.runInContext(extractFunction(timelineSource, 'getTimelineEntryCloneSignature'), context);
 vm.runInContext(extractFunction(timelineSource, 'buildPatternLibraryBlocks'), context);
@@ -239,6 +243,56 @@ context.solo4HandoffRows = [[context.solo4Group], [callGroup]];
 const solo4HandoffLayout = vm.runInContext('buildTimelineHorizontalLayout(solo4HandoffRows);', context);
 assert(solo4HandoffLayout.rows[0].barCount === 10 && solo4HandoffLayout.rows[1].startBar === 11,
   'Solo 4 und das folgende Pattern teilen ihren Uebergangstakt nicht korrekt.');
+
+// Djaa: the one-bar Flam and the following two-bar Solo share their first bar.
+context.flamGroup = {
+  patternId: 'flam',
+  entries: [{ patternId: 'flam', targetInstruments: ['Djembe_1'] }]
+};
+context.flamHandoffRows = [[{
+  patternId: 'call',
+  entries: Array.from({ length: 11 }, () => ({ patternId: 'call', targetInstruments: ['Djembe_1'] }))
+}], [context.flamGroup], [{
+  patternId: 'solo2a',
+  entries: Array.from({ length: 3 }, () => ({ patternId: 'solo2a', targetInstruments: ['Djembe_1'] }))
+}], [callGroup]];
+const flamHandoffLayout = vm.runInContext('buildTimelineHorizontalLayout(flamHandoffRows);', context);
+assert(flamHandoffLayout.rows[1].startBar === 12 && flamHandoffLayout.rows[1].barCount === 0,
+  'Ein vollstaendig ueberlappender Flam darf keinen zusaetzlichen Takt verbrauchen.');
+assert(flamHandoffLayout.rows[2].startBar === 12 && flamHandoffLayout.rows[2].endBar === 18,
+  'Solo 2 muss seine drei zweitaktigen Durchlaeufe in Takt 12 bis 17 belegen.');
+assert(flamHandoffLayout.rows[3].startBar === 18,
+  'Das folgende Pattern muss nach sechs gemeinsamen Takten in Takt 18 beginnen.');
+const flamClip = flamHandoffLayout.clips.find(clip => clip.pattern.id === 'flam');
+assert(flamClip.startBar === 12 && flamClip.barCount === 1,
+  'Der ueberlappende Flam muss als ein Takt breiter, bedienbarer Block sichtbar bleiben.');
+const handoffLayers = context.assignTimelineTrackClipLayers(flamHandoffLayout.clips.filter(clip => clip.targetInstrument === 'Djembe_1'));
+assert(handoffLayers.find(clip => clip.pattern.id === 'flam').layerIndex !==
+  handoffLayers.find(clip => clip.pattern.id === 'solo2a').layerIndex,
+  'Flam und Solo duerfen sich im gemeinsamen Takt nicht gegenseitig verdecken.');
+const finalFlamLayout = vm.runInContext('buildTimelineHorizontalLayout([[flamGroup]]);', context);
+assert(finalFlamLayout.rows[0].barCount === 1,
+  'Ohne folgendes Pattern muss der Flam seinen Takt behalten.');
+context.repeatedFlamGroup = {
+  patternId: 'flam',
+  entries: Array.from({ length: 3 }, () => ({ patternId: 'flam', targetInstruments: ['Djembe_1'] }))
+};
+assert(vm.runInContext('getTimelineGroupBarCount(repeatedFlamGroup, true);', context) === 0 &&
+  vm.runInContext('getTimelineGroupBarCount(repeatedFlamGroup, false);', context) === 1,
+  'Wiederholte eintaktige Ueberlappungen muessen mit und ohne Nachfolger korrekt gezaehlt werden.');
+
+context.inHandoffRows = [[{
+  patternId: 'call', entries: Array.from({ length: 11 }, () => ({patternId:'call', targetInstruments:['Djembe_1']}))
+}], [callGroup], [{
+  patternId: 'soloWithIn', entries: Array.from({ length: 3 }, () => ({patternId:'soloWithIn', targetInstruments:['Djembe_1']}))
+}], [callGroup]];
+const inHandoffLayout = vm.runInContext('buildTimelineHorizontalLayout(inHandoffRows);', context);
+assert(inHandoffLayout.rows[1].startBar === 12 && inHandoffLayout.rows[2].startBar === 12 &&
+  inHandoffLayout.rows[2].barCount === 6 && inHandoffLayout.rows[3].startBar === 18,
+  'IN im ersten Solo-Takt muss den Takt des Vorgaengerpatterns nur einmal teilen.');
+const inWithoutHost = context.buildTimelineHorizontalLayout([context.inHandoffRows[2]]);
+assert(inWithoutHost.rows[0].startBar === 1 && inWithoutHost.rows[0].barCount === 6,
+  'Ohne Vorgaenger darf das erste Solo nicht verkuerzt werden.');
 
 djembeGroup.gapBeforeBars = 1;
 sangbanGroup.gapBeforeBars = 1;
