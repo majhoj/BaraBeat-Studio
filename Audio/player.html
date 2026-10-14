@@ -1332,11 +1332,32 @@ function mergeTimelinePickupIntoHostSection(hostSection, pickupSection) {
 }
 
 function mergeTimelineEntryPickupsIntoPreviousSection(sections, entryDataList, options) {
-  const entries = Array.isArray(entryDataList) ? entryDataList : [];
   const settings = options && typeof options === 'object' ? options : {};
+  const deferredConsumed = {};
+  const entries = (Array.isArray(entryDataList) ? entryDataList : []).map(function (entryData) {
+    const deferredTargets = entryData.deferredPickupTargets || [];
+    if (!deferredTargets.length || !hasTimelineEntryLeadingPickup(entryData)) {
+      return entryData;
+    }
+    // The preceding bar-positioned Call receives this pickup after it has been written.
+    if (settings.alignFullPatternToPreviousSectionStart) {
+      deferredTargets.forEach(function (target) {
+        deferredConsumed[target] = Math.max(deferredConsumed[target] || 0, getTimelineEntrySkippedStartStep(entryData));
+      });
+    }
+    return Object.assign({}, entryData, {
+      targetInstruments: entryData.targetInstruments.filter(function (target) {
+        return deferredTargets.indexOf(target) === -1;
+      })
+    });
+  });
   const allowStandalonePickup = settings.allowStandalonePickup !== false;
   if (settings.alignFullPatternToPreviousSectionStart) {
-    return mergeTimelineEntriesIntoPreviousSectionAtStart(sections, entries);
+    const consumed = mergeTimelineEntriesIntoPreviousSectionAtStart(sections, entries);
+    Object.keys(deferredConsumed).forEach(function (target) {
+      consumed[target] = Math.max(consumed[target] || 0, deferredConsumed[target]);
+    });
+    return consumed;
   }
   const pickupSection = createOrderedSection('Auftakt');
   const pickupLabelNames = [];
@@ -2626,6 +2647,32 @@ function applyExplicitTimelineAccompanimentSegments(sections, config, patternByI
         });
       }
     });
+
+  // Incoming IN notes take precedence over the preceding Call, just as for sequential Calls.
+  positionedCalls.forEach(function (call) {
+    const followingPattern = patternById[call.followingPatternId];
+    const targetInstrument = normalizeTimelineTargetInstrument(call.targetInstrument);
+    const callPattern = patternById[call.patternId];
+    if (!callPattern || callPattern.label !== 'Call' || !followingPattern ||
+        trackInstrumentNames.indexOf(targetInstrument) === -1) return;
+    const entryData = {
+      label: followingPattern.label,
+      patternNotes: flattenPatternNotes(followingPattern),
+      patternInStep: getPatternInStep(followingPattern),
+      patternOutStep: getPatternOutStep(followingPattern),
+      patternOverlapStep: getPatternOverlapStep(followingPattern)
+    };
+    if (!hasTimelineEntryLeadingPickup(entryData)) return;
+    const targetStep = timelineBarStartSteps[Number(call.startBar) - 1 + Number(call.barCount)];
+    if (targetStep === undefined) return;
+    const pickupNotes = buildTimelinePickupNotes(entryData.patternNotes, entryData.patternInStep)
+      .slice(Math.max(0, Number(entryData.patternInStep) || 0) % stepsPerBar);
+    const availableLength = Math.min(pickupNotes.length, targetStep);
+    const availableNotes = pickupNotes.slice(pickupNotes.length - availableLength);
+    writeTimelineTrackRange(sections, sectionOffsets, targetInstrument, targetStep - availableLength, availableNotes, true);
+    const firstNote = availableNotes.findIndex(function (note) { return note && note !== 'f'; });
+    if (firstNote !== -1) registerTimelinePickupLeadAtStep(sections, sectionOffsets, targetStep, availableLength - firstNote);
+  });
 }
 
 function ensureTimelinePlaybackBarCapacity(sections, config) {
@@ -2842,6 +2889,9 @@ function buildTimelineSections(config) {
         ? null
         : Math.max(0, Math.round(Number(entry.overlayRepeatIndex) || 0)),
       patternFingerprint: pattern.sourceKey || pattern.id || '',
+      deferredPickupTargets: (Array.isArray(config.TimelinePositionedCalls) ? config.TimelinePositionedCalls : [])
+        .filter(function (call) { return call.followingEntryId === entry.id && Boolean(entry.id); })
+        .map(function (call) { return normalizeTimelineTargetInstrument(call.targetInstrument); }),
       entrySignature: entrySignature,
       handMode: String(entry.handMode || ''),
       targetInstruments: targetInstruments,

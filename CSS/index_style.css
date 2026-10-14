@@ -3519,10 +3519,6 @@ body.is-timeline-dragging .timeline-track-ruler-bar.is-drop-target {
     z-index: 80;
 }
 
-.timeline-track-entry-clip.is-overlay {
-    background: var(--ui-active-bg);
-}
-
 .timeline-track-entry-clip .timeline-chip-head {
     position: relative;
     display: block;

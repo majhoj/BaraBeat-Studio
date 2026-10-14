@@ -132,4 +132,47 @@ assert.equal(played.Djembe_1[118], 'slap', 'Call IN is placed just before its st
 assert.equal(played.Djembe_1[128], 'bass');
 assert.equal(played.Djembe_1[132], 'f', 'Call OUT is respected without shortening other instruments');
 assertBassUnchanged(baseline, played);
-console.log('Positioned Calls: bar 6, add/move, continuous bass repeats, single passes, multiple Calls, undo snapshot, persistence, IN/OUT and moving out checked.');
+
+// Djaa: Solo 1 follows a Call in the last bar of a two-bar bass repetition.
+call.bars = [bar('slap')];
+call.bars[0].notes[22] = 'tone';
+call.bars[0].notes[23] = 'tone';
+const solo = pattern('solo', 'Solo 1', 'Djembe_1', [bar('tone', [{ type: 'in', stepIndex: 22 }])]);
+solo.bars[0].notes[22] = 'bass';
+patterns.push(solo);
+setup();
+const originalCallGroup = ui.buildTimelineDisplayGroups(state.entries, patterns).at(-1);
+for (let i = 0; i < 4; i++) state.entries.push(ui.cloneTimelineEntryFromPattern(solo, { blockId: 'solo-block' }));
+const sequential = audio();
+const moveBeforeSolo = { type: 'timeline-entry-group', startIndex: originalCallGroup.startIndex, count: originalCallGroup.count };
+ui.executeTimelineRulerBarDrop(moveBeforeSolo, ui.getTimelineRulerBarDropAction(moveBeforeSolo, layout(), 6));
+assert.equal(payload().TimelinePositionedCalls[0].followingPatternId, '', 'A gap is not an immediate successor');
+state.entries.find(entry => entry.patternId === solo.id).gapBeforeBars = 0;
+assert.equal(payload().TimelinePositionedCalls[0].followingPatternId, solo.id);
+played = audio();
+assert.equal(played.Djembe_1[142], 'bass', 'Solo IN belongs at the end of the Call in bar 6');
+assert.equal(played.Djembe_1[143], 'f', 'Rests after IN replace remaining Call notes too');
+assert.deepEqual(played.Djembe_1.slice(120, 144), sequential.Djembe_1.slice(144, 168),
+  'Positioned and sequential Calls must have the same incoming pickup');
+assert.deepEqual(played.Djembe_1.slice(144), sequential.Djembe_1.slice(168),
+  'All four Solo repetitions must remain unchanged');
+assertBassUnchanged(sequential, played);
+state.entries = ui.syncTimelineEntriesWithPatternLibrary(patterns,
+  JSON.parse(JSON.stringify(ui.buildCurrentTimelineSyncOptions().persistedEntries)), { appendMissingPatterns: false });
+assert.deepEqual(audio(), played, 'Incoming pickup also survives save/reload');
+
+state.accompanimentSegments = [];
+played = audio();
+assert.equal(played.Djembe_1[118], 'f', 'No stray Solo IN one bar early inside the bass section');
+assert.equal(played.Djembe_1[142], 'bass');
+solo.bars[0].controls = [];
+assert.equal(audio().Djembe_1[142], 'tone', 'Without a following IN the Call must not be modified');
+solo.bars = [bar('f', [{ type: 'in', stepIndex: 22 }]), bar('bass')];
+solo.bars[0].notes[22] = 'slap_flam';
+played = audio();
+assert.equal(played.Djembe_1[142], 'slap_flam', 'Separate pickup bar also leads into the following Solo');
+assert.equal(played.Djembe_1[144], 'bass', 'The separate pickup bar is consumed, not played again');
+for (let i = 0; i < 4; i++) assert.equal(played.Djembe_1[144 + i * 24], 'bass', 'Solo repetitions remain consecutive');
+assertBassUnchanged(sequential, played);
+
+console.log('Positioned Calls: bar 6, add/move, continuous bass repeats, single passes, multiple Calls, undo snapshot, persistence, IN/OUT, following Solo pickup and moving out checked.');

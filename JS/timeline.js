@@ -4288,12 +4288,21 @@ function buildTimelinePositionedCalls(layout) {
         clip.group.entries.forEach(function (entry, index) {
             const barCount = getTimelineGroupBarCount({ entries: [entry] },
                 index < clip.group.entries.length - 1 || clip.shouldHandOffFinalOverlap);
+            const followingClip = layout.clips.find(function (candidate) {
+                return candidate !== clip && candidate.targetInstrument === clip.targetInstrument &&
+                    candidate.startBar === startBar + barCount;
+            });
+            const followingEntry = clip.group.entries[index + 1] ||
+                (followingClip && followingClip.group && followingClip.group.entries[0]);
             calls.push({
                 patternId: entry.patternId,
                 targetInstrument: clip.targetInstrument,
                 startBar: startBar,
                 barCount: barCount,
-                handMode: entry.handMode || 'auto'
+                handMode: entry.handMode || 'auto',
+                followingPatternId: followingEntry ? followingEntry.patternId :
+                    (followingClip ? followingClip.pattern.id : ''),
+                followingEntryId: followingEntry ? followingEntry.id : ''
             });
             startBar += barCount;
         });
