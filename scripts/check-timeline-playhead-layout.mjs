@@ -143,6 +143,7 @@ const groups = patterns.map(pattern => ({
   patterns: [pattern], entries: [{ patternId: pattern.id, handMode: 'auto', targetInstruments: [pattern.sourceInstrument || pattern.instrument] }]
 }));
 context.timelineState = { sourcePatterns: patterns, sourceLibraryGroups: groups, entries: [] };
+context.hasPositionedTimeline = () => false;
 context.document = { getElementById: () => patternList, createElement: tag => new Element(tag) };
 context.buildPatternDisplayLabelMap = () => ({ groups });
 context.buildTimelineGroupSummary = () => ({ totalBars: 1 });

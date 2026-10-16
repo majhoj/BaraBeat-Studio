@@ -4,7 +4,8 @@ Die Tests verwenden die aktuellen Funktionen aus Editor, Ueben, Timeline und
 Player. Browser-DOM, Audiogeraet und Download werden bei den Node-Tests ersetzt;
 musikalische Berechnungen werden nicht als Test-Doubles nachgebaut.
 `fixtures/timing-cases.json` (Version 1) enthaelt kleine, von den Formeln
-unabhaengige Sollwerte. Das `.bbs`-Format bleibt unveraendert.
+unabhaengige Sollwerte. Der `.bbs`-Container bleibt unveraendert; Timeline-Metadaten
+ab Version 11 speichern Starttakte und explizite Dauern unabhaengiger Spurbloecke.
 
 ## Ausfuehren
 
@@ -46,6 +47,7 @@ Der Handbuchtest benoetigt PHP CLI. Keine Tests aendern Notenblaetter.
 | Parallele Instrumente | `musical-structure`, `timeline-accompaniment-lanes`: ein- und zweitaktige Begleitung zusammen, kurze Spur wiederholt sich |
 | Ballet Dununs in der Timeline | `timeline-three-bass`: eigene sichtbare Dreierbass-Spur, Einsetzen per Taktleiste, Begleitsegment verschieben/verlaengern, Speichern/Neuladen und Player-Uebergabe; separate Bassspuren bleiben unveraendert |
 | Taktgenaue Calls | `timeline-positioned-call`: Call in Takt 6 innerhalb zweitaktiger Basswiederholungen; Hinzufuegen/Verschieben, unveraenderte Begleitung, einzelne Durchlaeufe, mehrere Calls, Undo-Snapshot, Speichern/Neuladen und IN/OUT; IN des direkt folgenden Solos im Call-Takt, einschliesslich Pausen und separatem Auftakttakt, ohne verfruehten Auftakt in der Bassspur |
+| Unabhaengige Spurbloecke | `timeline-independent-tracks`: Migration, Speichern/Neuladen, Begleitung verlaengern ohne andere Bloecke zu verschieben, Solo mit allen Wiederholungen verschieben, Kollisionen, Undo, IN/OUT, verkuerzte Takte und Ueberlappungen; Solo 5 dreimal belegt sechs eigene Takte auch bei einem spaeter platzierten Solo 6, Schlussnote bleibt im Uebergang erhalten; ohne Nachfolger bleibt der klingende Schlusstakt erhalten |
 | Einzelne/unfertige Takte | `quick-play-drafts`: Instrument + Note ohne Funktion spielbar; nur Instrument oder Note ohne Instrument nicht spielbar |
 | Start im Arrangement | `musical-structure`, `timeline-accompaniment-lanes`: Starttakt inklusive Auftakt, Start-/Endgrenzen |
 | Leere Auswahl | `musical-structure`: Quick Play liefert null, Ueben verlangt Auswahl |

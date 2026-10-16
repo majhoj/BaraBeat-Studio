@@ -3515,6 +3515,11 @@ body.is-timeline-dragging .timeline-track-ruler-bar.is-drop-target {
     overflow: visible;
 }
 
+.timeline-track-clip.is-placement-invalid {
+    outline: 2px solid #b3261e;
+    cursor: not-allowed;
+}
+
 .timeline-track-entry-clip.has-open-details {
     z-index: 80;
 }

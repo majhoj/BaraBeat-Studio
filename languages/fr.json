@@ -527,6 +527,7 @@
     "untitledRhythm": "Rythme sans titre",
     "error": {
       "noPlayableArrangement": "Cette partition ne contient pas encore d'arrangement lisible.",
+      "trackOccupied": "Un autre pattern occupe déjà cette position sur la même piste instrumentale. La modification n'a pas été appliquée.",
       "start": "Impossible de lancer l'arrangement : {message}",
       "build": "Impossible d'ouvrir la timeline : {message}",
       "refresh": "Impossible d'actualiser la timeline : {message}"

@@ -2,7 +2,7 @@
 const timelineDjembeTargets = ['Djembe_1', 'Djembe_2', 'Djembe_3'];
 const timelineBassTargets = ['Kenkeni', 'Sangban', 'Doundoun'];
 const timelineTrackTargets = timelineDjembeTargets.concat(timelineBassTargets, ['Dreierbass']);
-const timelineMetadataVersion = 10;
+const timelineMetadataVersion = 11;
 const minimumCompatibleTimelineMetadataVersion = 7;
 const defaultTimelineSwingProfiles = {
     binaer: [0, 0, 0, 0],
@@ -993,6 +993,8 @@ function cloneTimelineEntryFromPattern(pattern, overrides) {
     return {
         id: overrideConfig.id || ('timeline-entry-' + nextId),
         blockId: overrideConfig.blockId || '',
+        startBar: normalizeTimelineEntryStartBar(overrideConfig.startBar),
+        durationBars: normalizeTimelineGapBeforeBars(overrideConfig.durationBars),
         parallelGroupId: overrideConfig.parallelGroupId || '',
         gapBeforeBars: normalizeTimelineGapBeforeBars(overrideConfig.gapBeforeBars),
         overlayRepeatIndex: overrideConfig.overlayRepeatIndex === null || overrideConfig.overlayRepeatIndex === undefined
@@ -1025,6 +1027,8 @@ function cloneTimelineEntry(entry) {
 
     return cloneTimelineEntryFromPattern(sourcePattern, {
         blockId: entry.blockId || '',
+        startBar: normalizeTimelineEntryStartBar(entry.startBar),
+        durationBars: normalizeTimelineGapBeforeBars(entry.durationBars),
         parallelGroupId: entry.parallelGroupId || '',
         gapBeforeBars: normalizeTimelineGapBeforeBars(entry.gapBeforeBars),
         overlayRepeatIndex: entry.overlayRepeatIndex === null || entry.overlayRepeatIndex === undefined
@@ -1272,6 +1276,8 @@ function syncTimelineEntriesWithPatternLibrary(patternLibrary, existingEntries, 
         return {
             id: entry.id || ('timeline-entry-' + timelineState.nextEntryId++),
             blockId: entry.blockId || '',
+            startBar: normalizeTimelineEntryStartBar(entry.startBar),
+            durationBars: normalizeTimelineGapBeforeBars(entry.durationBars),
             parallelGroupId: entry.parallelGroupId || '',
             gapBeforeBars: normalizeTimelineGapBeforeBars(entry.gapBeforeBars),
             overlayRepeatIndex: entry.overlayRepeatIndex === null || entry.overlayRepeatIndex === undefined
@@ -1444,6 +1450,7 @@ function buildTimelinePlayerPayload(patternLibrary, timelineEntries) {
         TimelineTotalBars: Math.max(0, Math.round(Number(timelineLayout.playbackTotalBars) || 0)),
         TimelineTrailingBars: Math.max(0, timelineLayout.totalBars - timelineLayout.naturalTotalBars),
         TimelinePositionedCalls: buildTimelinePositionedCalls(timelineLayout),
+        TimelineClips: timelineLayout.positioned ? buildTimelinePositionedClips(timelineLayout) : undefined,
         AccompanimentSegments: timelineState.accompanimentSegments.map(serializeTimelineAccompanimentSegment)
     }];
 }
@@ -1482,6 +1489,8 @@ function updateTimelineMetadataNode() {
             return {
                 id: entry.id,
                 blockId: entry.blockId || '',
+                startBar: normalizeTimelineEntryStartBar(entry.startBar),
+                durationBars: normalizeTimelineGapBeforeBars(entry.durationBars),
                 parallelGroupId: entry.parallelGroupId || '',
                 gapBeforeBars: normalizeTimelineGapBeforeBars(entry.gapBeforeBars),
                 overlayRepeatIndex: entry.overlayRepeatIndex === null || entry.overlayRepeatIndex === undefined
@@ -1587,6 +1596,7 @@ function syncTimelineStateFromReadResult(readResult, options) {
     timelineState.sheetLoop = sheetLoopCount === 'loop';
     syncTimelineBlockIdSequence(timelineState.entries);
     syncTimelineAccompanimentSegmentIdSequence(timelineState.accompanimentSegments);
+    migrateTimelinePositions();
     timelineState.tempo = normalizeTimelineTempo(syncOptions.tempo ?? timelineState.tempo);
     timelineState.shekereBeatEnabled = Boolean(syncOptions.shekereBeatEnabled);
     timelineState.swingProfile = normalizeAllTimelineSwingProfiles(syncOptions.swingProfile);
@@ -1632,6 +1642,8 @@ function buildCurrentTimelineSyncOptions() {
             return {
                 id: entry.id,
                 blockId: entry.blockId || '',
+                startBar: normalizeTimelineEntryStartBar(entry.startBar),
+                durationBars: normalizeTimelineGapBeforeBars(entry.durationBars),
                 parallelGroupId: entry.parallelGroupId || '',
                 gapBeforeBars: normalizeTimelineGapBeforeBars(entry.gapBeforeBars),
                 patternId: entry.patternId,
@@ -1843,6 +1855,7 @@ function buildTimelineDisplayGroups(entries, patternLibrary) {
             : String(normalizeTimelineTempo(entry.sectionTempo));
 
         if (previousGroup && gapBeforeBars === 0 &&
+            normalizeTimelineEntryStartBar(previousGroup.entries[0].startBar) === normalizeTimelineEntryStartBar(entry.startBar) &&
             previousGroup.labelName === labelName &&
             previousGroup.targetSignature === targetSignature &&
             previousGroup.handSignature === handSignature &&
@@ -1951,6 +1964,7 @@ function setTimelineGroupRepeatCount(group, repeatInfo, nextRepeatCount) {
             const clonedEntry = cloneTimelineEntry(sourceEntry);
             if (clonedEntry) {
                 clonedEntry.gapBeforeBars = 0;
+                clonedEntry.durationBars = 0;
                 replacementEntries.push(clonedEntry);
             }
         });
@@ -1960,6 +1974,13 @@ function setTimelineGroupRepeatCount(group, repeatInfo, nextRepeatCount) {
         return;
     }
     replacementEntries[0].gapBeforeBars = gapBeforeBars;
+
+    if (normalizeTimelineEntryStartBar(group.entries[0].startBar) !== null &&
+        !canPlaceTimelineEntries(replacementEntries, group.entries[0].startBar, group.entries)) {
+        renderTimelinePanel();
+        reportTimelinePlacementConflict();
+        return false;
+    }
 
     if (typeof recordArrangementHistorySnapshot === 'function') {
         recordArrangementHistorySnapshot();
@@ -2292,6 +2313,9 @@ function doTimelineTargetsOverlap(targetsA, targetsB) {
 }
 
 function buildTimelineVisualRows(entryGroups, patternLibrary) {
+    if (entryGroups.length && entryGroups.every(function (group) {
+        return normalizeTimelineEntryStartBar(group.entries[0].startBar) !== null;
+    })) return entryGroups.map(function (group) { return [group]; });
     const rows = [];
     let rowIndex = 0;
 
@@ -2549,6 +2573,13 @@ function buildPatternDisplayLabelMap(patternLibrary) {
 }
 
 function insertTimelineEntryAtIndex(payload, targetIndex) {
+    if (hasPositionedTimeline()) {
+        const layout = getCurrentTimelineLayout();
+        const target = layout.clips.find(function (clip) {
+            return clip.group && clip.group.startIndex === targetIndex;
+        });
+        return placeTimelinePayload(payload, target ? target.startBar : getTimelineAppendBar(payload, layout));
+    }
     const insertIndex = Math.max(0, Math.min(targetIndex, timelineState.entries.length));
 
     if (!payload) {
@@ -2686,6 +2717,12 @@ function getTimelinePayloadCandidateEntries(payload) {
 }
 
 function canInsertTimelinePayloadParallelToRow(payload, rowGroups) {
+    if (hasPositionedTimeline() && rowGroups.length) {
+        const entries = getTimelinePayloadCandidateEntries(payload);
+        const excluded = payload.type === 'timeline-entry-group'
+            ? timelineState.entries.slice(Number(payload.startIndex), Number(payload.startIndex) + Number(payload.count)) : [];
+        return entries.length > 0 && canPlaceTimelineEntries(entries, rowGroups[0].entries[0].startBar, excluded);
+    }
     const groups = Array.isArray(rowGroups) ? rowGroups.filter(Boolean) : [];
     const candidateEntries = getTimelinePayloadCandidateEntries(payload);
     if (!payload || groups.length === 0 || candidateEntries.length === 0) {
@@ -2709,6 +2746,7 @@ function canInsertTimelinePayloadParallelToRow(payload, rowGroups) {
 }
 
 function insertTimelineEntryParallelToRow(payload, rowGroups) {
+    if (hasPositionedTimeline() && rowGroups.length) return placeTimelinePayload(payload, rowGroups[0].entries[0].startBar);
     const groups = Array.isArray(rowGroups) ? rowGroups.filter(Boolean) : [];
     if (groups.length === 0 || !canInsertTimelinePayloadParallelToRow(payload, rowGroups)) {
         return;
@@ -3032,6 +3070,11 @@ function renderTimelinePatternLibrary() {
         addButton.textContent = '+';
         addButton.setAttribute('aria-label', timelineText('arrangement.addPatternAtEnd'));
         addButton.addEventListener('click', function () {
+            if (hasPositionedTimeline()) {
+                const payload = { type: 'pattern-group', entries: patternGroup.entries || [] };
+                placeTimelinePayload(payload, getTimelineAppendBar(payload, getCurrentTimelineLayout()));
+                return;
+            }
             const newBlockId = nextTimelineBlockId();
             const newEntries = (patternGroup.entries || []).map(function (entry) {
                 const sourcePattern = findPatternById(entry.patternId);
@@ -3361,6 +3404,16 @@ function createTimelineEntryChip(group, rowGroups, patternDisplayInfo) {
             checkboxEl.type = 'checkbox';
             checkboxEl.checked = entry.targetInstruments.indexOf(targetName) !== -1;
             checkboxEl.addEventListener('change', function () {
+                if (hasPositionedTimeline()) {
+                    const targets = checkboxEl.checked ? entry.targetInstruments.concat(targetName)
+                        : entry.targetInstruments.filter(function (name) { return name !== targetName; });
+                    const changed = group.entries.map(function (item) { return Object.assign({}, item, { targetInstruments: targets }); });
+                    if (!targets.length || !canPlaceTimelineEntries(changed, entry.startBar, group.entries)) {
+                        checkboxEl.checked = !checkboxEl.checked;
+                        if (targets.length) reportTimelinePlacementConflict();
+                        return;
+                    }
+                }
                 if (typeof recordArrangementHistorySnapshot === 'function') {
                     recordArrangementHistorySnapshot();
                 }
@@ -3380,6 +3433,7 @@ function createTimelineEntryChip(group, rowGroups, patternDisplayInfo) {
                     }
                 });
                 updateTimelineMetadataNode();
+                if (hasPositionedTimeline()) renderTimelinePanel();
             });
             labelEl.appendChild(checkboxEl);
             labelEl.appendChild(document.createTextNode(getTimelineInstrumentLabel(targetName)));
@@ -3585,6 +3639,10 @@ function addTimelineAccompanimentSegment(payload, targetInstrument, requestedSta
         }, 1)
         : normalizeTimelineAccompanimentStartBar(requestedStartBar);
 
+    const barCount = Math.max(1, Array.isArray(pattern.bars) ? pattern.bars.length : 1);
+    if (hasPositionedTimeline() && getCurrentTimelineLayout().clips.some(function (clip) {
+        return timelineClipsConflict({ pattern: pattern, targetInstrument: targetInstrument, startBar: startBar, barCount: barCount }, clip);
+    })) return false;
     if (typeof recordArrangementHistorySnapshot === 'function') {
         recordArrangementHistorySnapshot();
     }
@@ -3596,7 +3654,7 @@ function addTimelineAccompanimentSegment(payload, targetInstrument, requestedSta
         startBar: startBar,
         barCount: Math.max(1, Array.isArray(pattern.bars) ? pattern.bars.length : 1)
     }));
-    resolveTimelineAccompanimentLaneCollisions(targetInstrument);
+    if (!hasPositionedTimeline()) resolveTimelineAccompanimentLaneCollisions(targetInstrument);
     updateTimelineMetadataNode();
     renderTimelinePanel();
 }
@@ -3604,6 +3662,20 @@ function addTimelineAccompanimentSegment(payload, targetInstrument, requestedSta
 function updateTimelineAccompanimentSegment(segment, changes) {
     if (!segment) {
         return;
+    }
+    if (hasPositionedTimeline()) {
+        const candidate = Object.assign({}, segment, changes, {
+            startBar: normalizeTimelineAccompanimentStartBar(changes.startBar ?? segment.startBar),
+            barCount: normalizeTimelineAccompanimentBarCount(changes.barCount ?? segment.barCount),
+            pattern: findPatternById(segment.patternId)
+        });
+        if (getCurrentTimelineLayout().clips.some(function (clip) {
+            return clip.segment !== segment && timelineClipsConflict(candidate, clip);
+        })) {
+            renderTimelinePanel();
+            reportTimelinePlacementConflict();
+            return false;
+        }
     }
     if (typeof recordArrangementHistorySnapshot === 'function') {
         recordArrangementHistorySnapshot();
@@ -3614,7 +3686,7 @@ function updateTimelineAccompanimentSegment(segment, changes) {
     if (Object.prototype.hasOwnProperty.call(changes, 'barCount')) {
         segment.barCount = normalizeTimelineAccompanimentBarCount(changes.barCount);
     }
-    resolveTimelineAccompanimentLaneCollisions(segment.targetInstrument);
+    if (!hasPositionedTimeline()) resolveTimelineAccompanimentLaneCollisions(segment.targetInstrument);
     updateTimelineMetadataNode();
     renderTimelinePanel();
 }
@@ -4177,7 +4249,175 @@ function getTimelineRowSharedPickupBars(rowGroups, previousRow) {
     return 1;
 }
 
+function normalizeTimelineEntryStartBar(value) {
+    return value === null || value === undefined || value === ''
+        ? null : normalizeTimelineAccompanimentStartBar(value);
+}
+
+function reportTimelinePlacementConflict() {
+    if (typeof window.alert === 'function') window.alert(timelineText('arrangement.error.trackOccupied'));
+}
+
+function hasPositionedTimeline() {
+    return timelineState.entries.every(function (entry) {
+        return normalizeTimelineEntryStartBar(entry.startBar) !== null;
+    });
+}
+
+function getCurrentTimelineLayout() {
+    return buildTimelineHorizontalLayout(buildTimelineVisualRows(
+        buildTimelineDisplayGroups(timelineState.entries, timelineState.sourcePatterns), timelineState.sourcePatterns
+    ));
+}
+
+function migrateTimelinePositions() {
+    if (hasPositionedTimeline()) return;
+    const layout = getCurrentTimelineLayout();
+    const seen = new Set();
+    // Capture the old layout before removing any of its section/overlay relationships.
+    layout.clips.forEach(function (clip) {
+        if (!clip.group || seen.has(clip.group)) return;
+        seen.add(clip.group);
+        const blockId = nextTimelineBlockId();
+        clip.group.entries.forEach(function (entry) {
+            entry.startBar = clip.startBar;
+            entry.durationBars = doesTimelinePatternContinue(clip.pattern) ? clip.barCount : 0;
+            entry.blockId = blockId;
+            entry.parallelGroupId = '';
+            entry.gapBeforeBars = 0;
+            entry.overlayRepeatIndex = null;
+            entry.overlayBarOffset = null;
+        });
+    });
+}
+
+function hasTimelineOpeningInBar(pattern) {
+    return getTimelineRowSharedPickupBars([{ patternId: pattern.id, entries: [], gapBeforeBars: 0 }], { barCount: 1 }) > 0;
+}
+
+function buildPositionedTimelineLayout(groups) {
+    const clips = [];
+    groups.forEach(function (group) {
+        const pattern = findPatternById(group.patternId);
+        if (!pattern) return;
+        const startBar = normalizeTimelineEntryStartBar(group.entries[0].startBar);
+        const sharedLength = getTimelineGroupBarCount(group, true);
+        const fullLength = getTimelineGroupBarCount(group, false);
+        const targets = getTimelineGroupTargets(group);
+        // The outgoing bar belongs to the transition even if a successor was placed later.
+        // Do not make the source block's duration depend on an exactly aligned successor.
+        const handsOff = sharedLength < fullLength && groups.some(function (next) {
+            return next !== group && normalizeTimelineEntryStartBar(next.entries[0].startBar) >= startBar + sharedLength &&
+                doTimelineTargetsOverlap(targets, getTimelineGroupTargets(next));
+        });
+        const barCount = group.entries[0].durationBars || Math.max(1, handsOff ? sharedLength : fullLength);
+        targets.forEach(function (targetInstrument) {
+            clips.push({ kind: 'entry', targetInstrument: targetInstrument, startBar: startBar,
+                barCount: barCount, group: group, rowGroups: [group], pattern: pattern,
+                shouldHandOffFinalOverlap: handsOff, isOverlay: false });
+        });
+    });
+    timelineState.accompanimentSegments.forEach(function (segment) {
+        const pattern = findPatternById(segment.patternId);
+        if (pattern) clips.push({ kind: 'segment', targetInstrument: segment.targetInstrument,
+            startBar: segment.startBar, barCount: segment.barCount, pattern: pattern, segment: segment, isOverlay: false });
+    });
+    const contentBars = Math.max(0, ...clips.map(function (clip) { return clip.startBar + clip.barCount - 1; }));
+    const naturalTotalBars = Math.max(8, contentBars);
+    return { positioned: true, rows: [], clips: clips, naturalTotalBars: naturalTotalBars,
+        totalBars: Math.max(naturalTotalBars, timelineState.minimumBarCount || 0),
+        playbackTotalBars: Math.max(contentBars, timelineState.minimumBarCount || 0),
+        usedTargets: timelineTrackTargets.filter(function (target) {
+            return clips.some(function (clip) { return clip.targetInstrument === target; });
+        }) };
+}
+
+function buildTimelinePositionedClips(layout) {
+    return layout.clips.map(function (clip) {
+        return { startBar: clip.startBar, barCount: clip.barCount, targetInstrument: clip.targetInstrument,
+            patternId: clip.pattern.id, loopToBars: clip.segment ? clip.barCount : clip.group.entries[0].durationBars,
+            entries: clip.group ? clip.group.entries.map(function (entry) { return Object.assign({}, entry); }) : [],
+            handoff: Boolean(clip.shouldHandOffFinalOverlap) };
+    });
+}
+
+function timelineClipsConflict(left, right) {
+    if (left.targetInstrument !== right.targetInstrument) return false;
+    const overlap = Math.min(left.startBar + left.barCount, right.startBar + right.barCount) -
+        Math.max(left.startBar, right.startBar);
+    if (overlap <= 0) return false;
+    // A notated pickup or outgoing overlap may share one boundary bar on the same instrument.
+    const allowedBoundary = overlap === 1 && [left, right].some(function (first) {
+        const next = first === left ? right : left;
+        if (next.startBar !== first.startBar + first.barCount - 1) return false;
+        const outgoingOverlap = first.group
+            ? getTimelineGroupBarCount(first.group, true) < getTimelineGroupBarCount(first.group, false)
+            : getTimelinePatternBarCountAtFinalOut(first.pattern, true) < getTimelinePatternBarCountAtFinalOut(first.pattern, false);
+        return hasTimelineOpeningInBar(next.pattern) || outgoingOverlap;
+    });
+    return !allowedBoundary;
+}
+
+function canPlaceTimelineEntries(entries, startBar, excludedEntries) {
+    const excluded = excludedEntries || [];
+    const original = timelineState.entries;
+    try {
+        timelineState.entries = original.filter(function (entry) { return excluded.indexOf(entry) === -1; })
+            .concat(entries.map(function (entry) { return Object.assign({}, entry, { startBar: normalizeTimelineAccompanimentStartBar(startBar) }); }));
+        const groups = buildTimelineDisplayGroups(timelineState.entries, timelineState.sourcePatterns);
+        const layout = buildPositionedTimelineLayout(groups);
+        const firstNewIndex = original.length - excluded.length;
+        return !layout.clips.some(function (candidate) {
+            return candidate.group && candidate.group.startIndex >= firstNewIndex && layout.clips.some(function (other) {
+                return other !== candidate && other.group !== candidate.group && timelineClipsConflict(candidate, other);
+            });
+        });
+    } finally { timelineState.entries = original; }
+}
+
+function getTimelineAppendBar(payload, layout) {
+    const entries = getTimelinePayloadCandidateEntries(payload);
+    const targets = entries.flatMap(function (entry) { return entry.targetInstruments; });
+    const clips = layout.clips.filter(function (clip) { return targets.indexOf(clip.targetInstrument) !== -1; });
+    const endBar = Math.max(1, ...clips.map(function (clip) { return clip.startBar + clip.barCount; }));
+    const last = clips.find(function (clip) { return clip.startBar + clip.barCount === endBar; });
+    const pattern = entries[0] && findPatternById(entries[0].patternId);
+    if (last && (pattern && hasTimelineOpeningInBar(pattern) || last.group &&
+        getTimelineGroupBarCount(last.group, true) < getTimelineGroupBarCount(last.group, false))) return Math.max(1, endBar - 1);
+    return endBar;
+}
+
+function placeTimelinePayload(payload, startBar) {
+    if (!payload) return false;
+    const isMove = payload.type === 'timeline-entry-group';
+    const source = isMove ? timelineState.entries.slice(Number(payload.startIndex), Number(payload.startIndex) + Number(payload.count))
+        : payload.type === 'pattern-group' ? payload.entries : getTimelinePayloadCandidateEntries(payload);
+    if (!source || !source.length) return false;
+    const blockId = isMove ? source[0].blockId : nextTimelineBlockId();
+    const entries = source.map(function (entry) {
+        const pattern = findPatternById(entry.patternId);
+        return pattern ? Object.assign({}, isMove ? entry : cloneTimelineEntryFromPattern(pattern, entry), {
+            startBar: normalizeTimelineAccompanimentStartBar(startBar), blockId: blockId,
+            parallelGroupId: '', overlayRepeatIndex: null, overlayBarOffset: null, gapBeforeBars: 0
+        }) : null;
+    }).filter(Boolean);
+    if (!canPlaceTimelineEntries(entries, startBar, isMove ? source : [])) {
+        reportTimelinePlacementConflict();
+        return false;
+    }
+    if (typeof recordArrangementHistorySnapshot === 'function') recordArrangementHistorySnapshot();
+    if (isMove) timelineState.entries.splice(Number(payload.startIndex), Number(payload.count), ...entries);
+    else timelineState.entries.push(...entries);
+    updateTimelineMetadataNode();
+    renderTimelinePanel();
+    return true;
+}
+
 function buildTimelineHorizontalLayout(visualRows) {
+    const groups = (visualRows || []).flat();
+    if (groups.every(function (group) { return normalizeTimelineEntryStartBar(group.entries[0].startBar) !== null; })) {
+        return buildPositionedTimelineLayout(groups);
+    }
     const rows = [];
     let nextStartBar = 1;
     const timelineRows = Array.isArray(visualRows) ? visualRows : [];
@@ -4561,6 +4801,7 @@ function bindTimelineTrackPointerMove(surfaceEl, clipEl, payload, layout) {
             pendingAction = targetBar === null
                 ? null
                 : getTimelineRulerBarDropAction(payload, layout, targetBar);
+            clipEl.classList.toggle('is-placement-invalid', targetBar !== null && !pendingAction);
             clearRulerTarget();
             if (pendingAction && targetBar !== null) {
                 const targetEl = clipEl.closest('.timeline-track-scroll')
@@ -4577,6 +4818,7 @@ function bindTimelineTrackPointerMove(surfaceEl, clipEl, payload, layout) {
             window.removeEventListener('pointercancel', cancelPointerMove);
             clearRulerTarget();
             clipEl.classList.remove('is-pointer-moving');
+            clipEl.classList.remove('is-placement-invalid');
             clipEl.style.removeProperty('transform');
             if (pointerMoveStarted) {
                 setTimelineDragDropTargetsVisible(false);
@@ -4657,6 +4899,22 @@ function createTimelineTrackEntryClip(clip, patternDisplayInfo, layout) {
         entryCard.appendChild(endLabelEl);
     }
     const repeatControl = appendTimelineTrackRepeatControl(entryCard, clip.group);
+    if (layout.positioned) {
+        const label = document.createElement('label');
+        label.appendChild(document.createTextNode(timelineText('arrangement.accompanimentStartBar')));
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.min = '1';
+        input.max = '999';
+        input.value = String(clip.startBar);
+        input.addEventListener('change', function () {
+            if (!placeTimelinePayload({ type: 'timeline-entry-group', startIndex: clip.group.startIndex, count: clip.group.count }, input.value)) {
+                input.value = String(clip.startBar);
+            }
+        });
+        label.appendChild(input);
+        entryCard.querySelector('.timeline-entry-detail-body').appendChild(label);
+    }
     if (repeatControl) {
         const resizeHandleEl = document.createElement('button');
         resizeHandleEl.type = 'button';
@@ -4716,6 +4974,22 @@ function getTimelineRulerBarDropAction(payload, layout, barNumber) {
     }
 
     const normalizedBarNumber = Math.max(1, Math.round(Number(barNumber) || 1));
+    if (layout.positioned) {
+        if (payload.type === 'timeline-accompaniment-segment') {
+            const segment = timelineState.accompanimentSegments.find(function (item) { return item.id === payload.segmentId; });
+            if (!segment) return null;
+            const candidate = Object.assign({}, segment, { startBar: normalizedBarNumber, pattern: findPatternById(segment.patternId) });
+            if (layout.clips.some(function (clip) { return clip.segment !== segment && timelineClipsConflict(candidate, clip); })) return null;
+            return { type: 'move-accompaniment-segment', segment: segment, startBar: normalizedBarNumber };
+        }
+        const isMove = payload.type === 'timeline-entry-group';
+        const entries = isMove ? timelineState.entries.slice(Number(payload.startIndex), Number(payload.startIndex) + Number(payload.count))
+            : getTimelinePayloadCandidateEntries(payload).map(function (entry) {
+                return Object.assign({}, entry, { blockId: 'candidate-placement' });
+            });
+        if (!entries.length || !canPlaceTimelineEntries(entries, normalizedBarNumber, isMove ? entries : [])) return null;
+        return { type: 'positioned', startBar: normalizedBarNumber };
+    }
     if (payload.type === 'timeline-accompaniment-segment') {
         const segment = timelineState.accompanimentSegments.find(function (candidateSegment) {
             return candidateSegment.id === payload.segmentId;
@@ -4837,6 +5111,10 @@ function executeTimelineRulerBarDrop(payload, action) {
     if (!payload || !action) {
         return;
     }
+    if (action.type === 'positioned') {
+        placeTimelinePayload(payload, action.startBar);
+        return;
+    }
     if (action.type === 'positioned-call') {
         insertTimelineCallAtBar(payload, action.rowGroups, action.barOffset);
         return;
@@ -4942,7 +5220,7 @@ function bindTimelineTrackLaneDrop(dropEl, targetInstrument, totalBars, layout) 
         const entries = getTimelinePayloadCandidateEntries(payload);
         return Boolean(layout && entries.length && entries.every(function (entry) {
             const pattern = findPatternById(entry.patternId);
-            return pattern && pattern.labelType === 'Call' && entry.targetInstruments.indexOf(targetInstrument) !== -1;
+            return pattern && (layout.positioned || pattern.labelType === 'Call') && entry.targetInstruments.indexOf(targetInstrument) !== -1;
         }));
     }
     dropEl.addEventListener('dragover', function (event) {

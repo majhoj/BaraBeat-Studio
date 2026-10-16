@@ -2842,7 +2842,140 @@ function buildFlatBarsFromTimeline(config) {
   return flatBars;
 }
 
+function buildPositionedTimelineSections(config) {
+  const stepsPerBar = getTimelineStepsPerBar();
+  const totalSteps = Math.max(0, Math.round(Number(config.TimelineTotalBars) || 0)) * stepsPerBar;
+  const patternById = Object.fromEntries((config.PatternLibrary || []).map(function (pattern) { return [pattern.id, pattern]; }));
+  const clips = config.TimelineClips.slice().sort(function (left, right) { return left.startBar - right.startBar; });
+  const tracks = createEmptyTrackNoteMap();
+  trackInstrumentNames.forEach(function (target) { tracks[target] = new Array(totalSteps).fill('f'); });
+  const boundaries = new Set([0, totalSteps]);
+  const pickups = [];
+  const tails = [];
+  const spans = [];
+  const barLengths = [];
+
+  function write(target, notes, offset, replaceSilence) {
+    notes.forEach(function (note, index) {
+      const step = offset + index;
+      if (step >= 0 && step < totalSteps && (replaceSilence || note && note !== 'f')) tracks[target][step] = note || 'f';
+    });
+  }
+
+  clips.forEach(function (clip) {
+    const target = normalizeTimelineTargetInstrument(clip.targetInstrument);
+    if (trackInstrumentNames.indexOf(target) === -1) return;
+    const start = (Math.max(1, Number(clip.startBar) || 1) - 1) * stepsPerBar;
+    const end = Math.min(totalSteps, start + Math.max(1, Number(clip.barCount) || 1) * stepsPerBar);
+    boundaries.add(start);
+    boundaries.add(end);
+    const sourceEntries = clip.entries && clip.entries.length ? clip.entries : [{ patternId: clip.patternId }];
+    const entries = clip.loopToBars ? sourceEntries.slice(0, 1) : sourceEntries;
+    let cursor = start;
+    entries.forEach(function (entry, index) {
+      const sourcePattern = patternById[entry.patternId];
+      if (!sourcePattern) return;
+      const sourceBars = expandPatternBars(sourcePattern);
+      // Place in bar coordinates first; shorten the shared time axis only after all tracks are present.
+      const pattern = Object.assign({}, sourcePattern, { bars: sourcePattern.bars.map(function (bar) {
+        return Object.assign({}, bar, { controls: (bar.controls || []).filter(function (control) { return control.type !== 'shortbar'; }) });
+      }) });
+      const data = { label: pattern.label, patternNotes: clip.loopToBars && patternStartsContinuingAccompaniment(pattern)
+          ? flattenContinuingAccompanimentNotes(pattern) : flattenPatternNotes(pattern),
+        patternInStep: getPatternInStep(pattern), patternOutStep: getPatternOutStep(pattern),
+        patternOutBarEndStep: getPatternOutBarEndStep(pattern), patternOverlapStep: getPatternOverlapStep(pattern) };
+      const leadingIn = index === 0 && hasTimelineEntryLeadingPickup(data);
+      const skipped = leadingIn ? getTimelineEntrySkippedStartStep(data) : 0;
+      const last = index === entries.length - 1;
+      const nextAccompaniment = clips.some(function (next) {
+        return next !== clip && next.targetInstrument === target && next.startBar === clip.startBar + clip.barCount &&
+          patternById[next.patternId] && patternById[next.patternId].label === 'Begleitung';
+      });
+      // Absolute clips include their opening pickup bar. Only the first pass starts at IN.
+      const playbackData = Object.assign({}, data, { patternInStep: null });
+      const applyOut = last && (data.label !== 'Begleitung' || !nextAccompaniment);
+      let notes = getTimelineEntryEffectiveNotes(playbackData, applyOut, clip.loopToBars ? end - start : 0);
+      let writeFrom = 0;
+      if (leadingIn) {
+        const inStep = Math.max(0, Number(data.patternInStep) || 0);
+        const pickup = buildTimelinePickupNotes(data.patternNotes, inStep);
+        const lead = getTimelineEntryPickupLeadSteps(data);
+        const targetStep = skipped > 0 ? start + skipped : start;
+        if (skipped > 0) {
+          notes = silenceNotesBeforeStep(notes, inStep);
+          writeFrom = inStep;
+        }
+        pickups.push({ target: target, notes: pickup.slice(inStep % stepsPerBar),
+          start: targetStep - lead, targetStep: targetStep, lead: lead });
+      }
+      const tailLength = (!last || clip.handoff) ? getTimelineEntryOverlapTailLength(playbackData, notes.length) : 0;
+      const bodyLength = notes.length - tailLength;
+      for (let localStep = 0; localStep < notes.length; localStep += stepsPerBar) {
+        const barIndex = Math.floor((cursor + localStep) / stepsPerBar);
+        const sourceBar = sourceBars[Math.floor(localStep / stepsPerBar) % sourceBars.length];
+        const length = sourceBar ? getBarShortLength(sourceBar) : stepsPerBar;
+        barLengths[barIndex] = Math.max(barLengths[barIndex] || 0, length);
+      }
+      write(target, notes.slice(writeFrom, bodyLength), cursor + writeFrom, true);
+      if (tailLength) tails.push({ target: target, notes: notes.slice(bodyLength), start: cursor + bodyLength });
+      spans.push({ target: target, start: cursor, end: Math.min(end, cursor + notes.length),
+        handMode: entry.handMode || 'auto', label: pattern.label, labelName: pattern.labelName || pattern.label,
+        tempo: index === 0 ? normalizeSectionTempo(entry.sectionTempo) : null });
+      cursor += bodyLength;
+      if (clip.loopToBars) return;
+    });
+  });
+  tails.forEach(function (tail) { write(tail.target, tail.notes, tail.start, false); });
+  pickups.forEach(function (pickup) { write(pickup.target, pickup.notes, pickup.start, true); });
+
+  const barOffsets = [0];
+  for (let barIndex = 0; barIndex < totalSteps / stepsPerBar; barIndex++) {
+    const length = barLengths[barIndex] === undefined ? stepsPerBar : barLengths[barIndex];
+    barOffsets.push(barOffsets[barIndex] + length);
+    if (length < stepsPerBar) {
+      boundaries.add(barIndex * stepsPerBar);
+      boundaries.add((barIndex + 1) * stepsPerBar);
+    }
+  }
+  function actualStep(virtualStep) {
+    const step = Math.max(0, Math.min(totalSteps, virtualStep));
+    const barIndex = Math.floor(step / stepsPerBar);
+    return barOffsets[barIndex] + Math.min(step % stepsPerBar, barLengths[barIndex] ?? stepsPerBar);
+  }
+
+  const offsets = Array.from(boundaries).filter(function (step) { return step >= 0 && step <= totalSteps; }).sort(function (a, b) { return a - b; });
+  const sections = offsets.slice(0, -1).map(function (start, index) {
+    const end = offsets[index + 1];
+    const section = createOrderedSection('Timeline');
+    section.runtimeKey = 'positioned::' + start;
+    section.fixedLength = actualStep(end) - actualStep(start);
+    section.sectionTargets = [];
+    const names = [];
+    spans.forEach(function (span) {
+      if (span.start < end && span.end > start) {
+        if (section.sectionTargets.indexOf(span.target) === -1) section.sectionTargets.push(span.target);
+        section.trackHandModes[span.target] = span.handMode;
+        if (names.indexOf(span.labelName) === -1) names.push(span.labelName);
+        if (section.label === 'Timeline' || section.label === 'Begleitung') section.label = span.label;
+      }
+      if (span.start === start && span.tempo !== null) section.sectionTempo = span.tempo;
+    });
+    section.labelName = names.join(' + ');
+    trackInstrumentNames.forEach(function (target) { section.trackNotes[target] = tracks[target].slice(start, start + section.fixedLength); });
+    return section;
+  });
+  finalizeSectionLengths(sections);
+  const actualOffsets = offsets.map(actualStep);
+  pickups.forEach(function (pickup) {
+    registerTimelinePickupLeadAtStep(sections, actualOffsets, actualStep(pickup.targetStep), actualStep(pickup.targetStep) - actualStep(pickup.start));
+  });
+  return sections;
+}
+
 function buildTimelineSections(config) {
+  if (!isPracticeMode && !isSheetQuickPlayMode && Array.isArray(config.TimelineClips)) {
+    return buildPositionedTimelineSections(config);
+  }
   const patternLibrary = Array.isArray(config.PatternLibrary) ? config.PatternLibrary : [];
   const timelineEntries = Array.isArray(config.TimelineEntries) ? config.TimelineEntries : [];
   const patternById = {};

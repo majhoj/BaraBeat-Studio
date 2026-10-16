@@ -527,6 +527,7 @@
     "untitledRhythm": "Untitled rhythm",
     "error": {
       "noPlayableArrangement": "This score does not yet contain a playable arrangement.",
+      "trackOccupied": "Another pattern already occupies this position on the same instrument track. The change was not applied.",
       "start": "Could not start the arrangement: {message}",
       "build": "Could not open the timeline: {message}",
       "refresh": "Could not refresh the timeline: {message}"

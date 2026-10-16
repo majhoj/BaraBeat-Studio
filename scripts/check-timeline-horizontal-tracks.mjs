@@ -125,6 +125,7 @@ vm.runInContext(extractFunction(timelineSource, 'getTimelineGroupBarCount'), con
 vm.runInContext(extractFunction(timelineSource, 'getTimelineRowBarCount'), context);
 vm.runInContext(extractFunction(timelineSource, 'getTimelineRowGapBeforeBars'), context);
 vm.runInContext(extractFunction(timelineSource, 'getTimelineRowSharedPickupBars'), context);
+vm.runInContext(extractFunction(timelineSource, 'normalizeTimelineEntryStartBar'), context);
 vm.runInContext(extractFunction(timelineSource, 'buildTimelineHorizontalLayout'), context);
 vm.runInContext(extractFunction(timelineSource, 'assignTimelineTrackClipLayers'), context);
 vm.runInContext(extractFunction(timelineSource, 'getTimelineTargetSignature'), context);

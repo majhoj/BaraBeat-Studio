@@ -527,6 +527,7 @@
     "untitledRhythm": "Ritmo sem título",
     "error": {
       "noPlayableArrangement": "Esta partitura ainda não contém um arranjo reproduzível.",
+      "trackOccupied": "Outro pattern já ocupa esta posição na mesma pista instrumental. A alteração não foi aplicada.",
       "start": "Não foi possível iniciar o arranjo: {message}",
       "build": "Não foi possível abrir a linha do tempo: {message}",
       "refresh": "Não foi possível atualizar a linha do tempo: {message}"

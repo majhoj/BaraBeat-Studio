@@ -527,6 +527,7 @@
     "untitledRhythm": "Unbenannter Rhythmus",
     "error": {
       "noPlayableArrangement": "Für dieses Notenblatt ist noch kein spielbares Arrangement vorhanden.",
+      "trackOccupied": "An dieser Stelle liegt bereits ein Pattern auf derselben Instrumentenspur. Die Änderung wurde nicht übernommen.",
       "start": "Fehler beim Starten des Arrangements: {message}",
       "build": "Fehler beim Aufbau der Timeline: {message}",
       "refresh": "Fehler beim Aktualisieren der Timeline: {message}"
