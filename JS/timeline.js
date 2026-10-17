@@ -1975,11 +1975,10 @@ function setTimelineGroupRepeatCount(group, repeatInfo, nextRepeatCount) {
     }
     replacementEntries[0].gapBeforeBars = gapBeforeBars;
 
-    if (normalizeTimelineEntryStartBar(group.entries[0].startBar) !== null &&
-        !canPlaceTimelineEntries(replacementEntries, group.entries[0].startBar, group.entries)) {
-        renderTimelinePanel();
-        reportTimelinePlacementConflict();
-        return false;
+    if (normalizeTimelineEntryStartBar(group.entries[0].startBar) !== null) {
+        return commitTimelineTrackEditPlan(buildTimelineTrackEditPlan({
+            sourceEntries: group.entries, nextEntries: replacementEntries
+        }));
     }
 
     if (typeof recordArrangementHistorySnapshot === 'function') {
@@ -3664,18 +3663,7 @@ function updateTimelineAccompanimentSegment(segment, changes) {
         return;
     }
     if (hasPositionedTimeline()) {
-        const candidate = Object.assign({}, segment, changes, {
-            startBar: normalizeTimelineAccompanimentStartBar(changes.startBar ?? segment.startBar),
-            barCount: normalizeTimelineAccompanimentBarCount(changes.barCount ?? segment.barCount),
-            pattern: findPatternById(segment.patternId)
-        });
-        if (getCurrentTimelineLayout().clips.some(function (clip) {
-            return clip.segment !== segment && timelineClipsConflict(candidate, clip);
-        })) {
-            renderTimelinePanel();
-            reportTimelinePlacementConflict();
-            return false;
-        }
+        return commitTimelineTrackEditPlan(buildTimelineTrackEditPlan({ segment: segment, changes: changes }));
     }
     if (typeof recordArrangementHistorySnapshot === 'function') {
         recordArrangementHistorySnapshot();
@@ -4375,6 +4363,118 @@ function canPlaceTimelineEntries(entries, startBar, excludedEntries) {
     } finally { timelineState.entries = original; }
 }
 
+function isTimelineTrackFollower(clip, source) {
+    if (clip.targetInstrument !== source.targetInstrument ||
+        (source.group ? clip.group === source.group : clip.segment === source.segment)) return false;
+    if (clip.startBar !== source.startBar) return clip.startBar > source.startBar;
+    // A one-bar Flam can precede an IN/Solo at the same start bar, not vice versa.
+    if (source.barCount !== 1 || timelineClipsConflict(source, clip)) return false;
+    if (clip.barCount > 1) return true;
+    if (source.shouldHandOffFinalOverlap !== clip.shouldHandOffFinalOverlap) {
+        return Boolean(source.shouldHandOffFinalOverlap);
+    }
+    return Boolean(source.group && clip.group && source.group.startIndex < clip.group.startIndex);
+}
+
+function buildTimelineTrackEditPlan(edit) {
+    const originalEntries = timelineState.entries;
+    const originalSegments = timelineState.accompanimentSegments;
+    const layout = getCurrentTimelineLayout();
+    const sourceClips = layout.clips.filter(function (clip) {
+        return edit.segment ? clip.segment === edit.segment
+            : clip.group && clip.group.entries[0] === edit.sourceEntries[0];
+    });
+    if (!sourceClips.length) return null;
+    const source = sourceClips[0];
+    const nextSegment = edit.segment ? Object.assign({}, edit.segment, {
+        startBar: normalizeTimelineAccompanimentStartBar(edit.changes.startBar ?? edit.segment.startBar),
+        barCount: normalizeTimelineAccompanimentBarCount(edit.changes.barCount ?? edit.segment.barCount)
+    }) : null;
+    const nextStart = nextSegment ? nextSegment.startBar : edit.nextEntries[0].startBar;
+    const nextLength = nextSegment ? nextSegment.barCount : edit.nextEntries[0].durationBars ||
+        Math.max(1, getTimelineGroupBarCount({ entries: edit.nextEntries }, source.shouldHandOffFinalOverlap));
+    const delta = nextStart + nextLength - source.startBar - source.barCount;
+    const movedTargets = new Map();
+    const movedSegments = new Set();
+    if (delta) layout.clips.forEach(function (clip) {
+        if (!sourceClips.some(function (sourceClip) { return isTimelineTrackFollower(clip, sourceClip); })) return;
+        if (clip.group) {
+            if (!movedTargets.has(clip.group)) movedTargets.set(clip.group, new Set());
+            movedTargets.get(clip.group).add(clip.targetInstrument);
+        } else movedSegments.add(clip.segment);
+    });
+
+    const affectedEntries = new Set(edit.nextEntries || []);
+    const splitGroups = [];
+    const groups = Array.from(new Set(layout.clips.filter(function (clip) { return clip.group; })
+        .map(function (clip) { return clip.group; }))).sort(function (left, right) { return left.startIndex - right.startIndex; });
+    const entries = groups.flatMap(function (group) {
+        if (!edit.segment && group === source.group) return edit.nextEntries;
+        const targets = movedTargets.get(group);
+        if (!targets) return group.entries;
+        const fixedTargets = getTimelineGroupTargets(group).filter(function (target) { return !targets.has(target); });
+        const shifted = group.entries.map(function (entry) {
+            const next = Object.assign({}, entry, { startBar: entry.startBar + delta,
+                targetInstruments: entry.targetInstruments.filter(function (target) { return targets.has(target); }) });
+            affectedEntries.add(next);
+            return next;
+        });
+        if (!fixedTargets.length) return shifted;
+        // Split a shared assignment only when one of its instrument tracks moves.
+        splitGroups.push(shifted);
+        return group.entries.map(function (entry) {
+            return Object.assign({}, entry, { targetInstruments: entry.targetInstruments.filter(function (target) { return !targets.has(target); }) });
+        }).concat(shifted);
+    });
+    const segmentUpdates = new Map();
+    const segments = originalSegments.map(function (segment) {
+        const next = segment === edit.segment ? nextSegment : movedSegments.has(segment)
+            ? Object.assign({}, segment, { startBar: segment.startBar + delta }) : segment;
+        if (next !== segment) segmentUpdates.set(segment, next);
+        return next;
+    });
+    if (entries.concat(segments).some(function (item) { return item.startBar < 1 || item.startBar > 999; })) return null;
+
+    try {
+        timelineState.entries = entries;
+        timelineState.accompanimentSegments = segments;
+        const candidate = getCurrentTimelineLayout();
+        const affectedSegments = new Set(segmentUpdates.values());
+        const collision = candidate.clips.some(function (clip) {
+            const affected = clip.group ? clip.group.entries.some(function (entry) { return affectedEntries.has(entry); })
+                : affectedSegments.has(clip.segment);
+            return affected && candidate.clips.some(function (other) {
+                return other !== clip && !(clip.group && other.group === clip.group) && timelineClipsConflict(clip, other);
+            });
+        });
+        return collision ? null : { entries: entries, segmentUpdates: segmentUpdates, splitGroups: splitGroups };
+    } finally {
+        timelineState.entries = originalEntries;
+        timelineState.accompanimentSegments = originalSegments;
+    }
+}
+
+function commitTimelineTrackEditPlan(plan) {
+    if (!plan) {
+        renderTimelinePanel();
+        reportTimelinePlacementConflict();
+        return false;
+    }
+    if (typeof recordArrangementHistorySnapshot === 'function') recordArrangementHistorySnapshot();
+    plan.splitGroups.forEach(function (entries) {
+        const blockId = nextTimelineBlockId();
+        entries.forEach(function (entry) {
+            entry.blockId = blockId;
+            entry.id = 'timeline-entry-' + timelineState.nextEntryId++;
+        });
+    });
+    timelineState.entries = plan.entries;
+    plan.segmentUpdates.forEach(function (next, segment) { Object.assign(segment, next); });
+    updateTimelineMetadataNode();
+    renderTimelinePanel();
+    return true;
+}
+
 function getTimelineAppendBar(payload, layout) {
     const entries = getTimelinePayloadCandidateEntries(payload);
     const targets = entries.flatMap(function (entry) { return entry.targetInstruments; });
@@ -4401,13 +4501,15 @@ function placeTimelinePayload(payload, startBar) {
             parallelGroupId: '', overlayRepeatIndex: null, overlayBarOffset: null, gapBeforeBars: 0
         }) : null;
     }).filter(Boolean);
-    if (!canPlaceTimelineEntries(entries, startBar, isMove ? source : [])) {
+    if (isMove) {
+        return commitTimelineTrackEditPlan(buildTimelineTrackEditPlan({ sourceEntries: source, nextEntries: entries }));
+    }
+    if (!canPlaceTimelineEntries(entries, startBar, [])) {
         reportTimelinePlacementConflict();
         return false;
     }
     if (typeof recordArrangementHistorySnapshot === 'function') recordArrangementHistorySnapshot();
-    if (isMove) timelineState.entries.splice(Number(payload.startIndex), Number(payload.count), ...entries);
-    else timelineState.entries.push(...entries);
+    timelineState.entries.push(...entries);
     updateTimelineMetadataNode();
     renderTimelinePanel();
     return true;
@@ -4667,20 +4769,33 @@ function bindTimelineEntryResizeHandle(handleEl, entryCard, group, repeatControl
         const startRepeatCount = normalizeTimelineGroupRepeatCount(
             repeatControl.repeatInfo.repeatCount || 1
         );
-        const totalBarCount = Math.max(1, getTimelineGroupBarCount(group, shouldHandOffFinalOverlap));
-        const unitBarCount = Math.max(1, totalBarCount / startRepeatCount);
+        const totalBarCount = group.entries[0].durationBars || Math.max(1, getTimelineGroupBarCount(group, shouldHandOffFinalOverlap));
+        const unitEntries = group.entries.slice(0, repeatControl.repeatInfo.unitLength);
+        const firstRepeatBars = getTimelineGroupBarCount({ entries: unitEntries }, shouldHandOffFinalOverlap);
+        const additionalRepeatBars = getTimelineGroupBarCount({ entries: unitEntries.concat(unitEntries) }, shouldHandOffFinalOverlap) - firstRepeatBars;
+        function barCountAtRepeatCount(count) {
+            return Math.max(1, firstRepeatBars + (count - 1) * additionalRepeatBars);
+        }
         let previewRepeatCount = startRepeatCount;
         entryCard.draggable = false;
         handleEl.setPointerCapture(event.pointerId);
 
         function updatePreview(pointerEvent) {
             const deltaBars = Math.round((pointerEvent.clientX - startClientX) / barWidth);
-            const deltaRepeats = Math.round(deltaBars / unitBarCount);
-            previewRepeatCount = normalizeTimelineGroupRepeatCount(startRepeatCount + deltaRepeats);
+            const desiredBars = totalBarCount + deltaBars;
+            previewRepeatCount = startRepeatCount;
+            let distance = Math.abs(barCountAtRepeatCount(startRepeatCount) - desiredBars);
+            for (let count = 1; count <= 100; count++) {
+                const nextDistance = Math.abs(barCountAtRepeatCount(count) - desiredBars);
+                if (nextDistance < distance) {
+                    previewRepeatCount = count;
+                    distance = nextDistance;
+                }
+            }
             repeatControl.inputEl.value = String(previewRepeatCount);
             entryCard.style.setProperty(
                 '--timeline-track-bar-count',
-                String(unitBarCount * previewRepeatCount)
+                String(barCountAtRepeatCount(previewRepeatCount))
             );
         }
 
@@ -4978,8 +5093,7 @@ function getTimelineRulerBarDropAction(payload, layout, barNumber) {
         if (payload.type === 'timeline-accompaniment-segment') {
             const segment = timelineState.accompanimentSegments.find(function (item) { return item.id === payload.segmentId; });
             if (!segment) return null;
-            const candidate = Object.assign({}, segment, { startBar: normalizedBarNumber, pattern: findPatternById(segment.patternId) });
-            if (layout.clips.some(function (clip) { return clip.segment !== segment && timelineClipsConflict(candidate, clip); })) return null;
+            if (!buildTimelineTrackEditPlan({ segment: segment, changes: { startBar: normalizedBarNumber } })) return null;
             return { type: 'move-accompaniment-segment', segment: segment, startBar: normalizedBarNumber };
         }
         const isMove = payload.type === 'timeline-entry-group';
@@ -4987,7 +5101,11 @@ function getTimelineRulerBarDropAction(payload, layout, barNumber) {
             : getTimelinePayloadCandidateEntries(payload).map(function (entry) {
                 return Object.assign({}, entry, { blockId: 'candidate-placement' });
             });
-        if (!entries.length || !canPlaceTimelineEntries(entries, normalizedBarNumber, isMove ? entries : [])) return null;
+        if (!entries.length) return null;
+        const canPlace = isMove ? buildTimelineTrackEditPlan({ sourceEntries: entries,
+            nextEntries: entries.map(function (entry) { return Object.assign({}, entry, { startBar: normalizedBarNumber }); }) })
+            : canPlaceTimelineEntries(entries, normalizedBarNumber, []);
+        if (!canPlace) return null;
         return { type: 'positioned', startBar: normalizedBarNumber };
     }
     if (payload.type === 'timeline-accompaniment-segment') {

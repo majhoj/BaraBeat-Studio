@@ -73,9 +73,9 @@ assert.equal(clip('solo').group.count, 4);
 assert.equal(clip('solo').isOverlay, false);
 assert.equal(ui.getTimelineRulerBarDropAction({ type: 'timeline-entry-group', startIndex: moving.startIndex, count: moving.count }, layout(), 6), null,
   'A Call already occupies bar 6 on the same instrument');
-const preConflict = JSON.stringify(state.entries);
-assert.equal(ui.setTimelineGroupRepeatCount(clip('solo').group, ui.getTimelineGroupRepeatInfo(clip('solo').group), 5), false);
-assert.equal(JSON.stringify(state.entries), preConflict, 'Rejected resize does not modify entries');
+assert.equal(ui.setTimelineGroupRepeatCount(clip('solo').group, ui.getTimelineGroupRepeatInfo(clip('solo').group), 5), true);
+assert.equal(layout().clips.filter(c => c.pattern.id === 'call').at(-1).startBar, 12, 'Following Call moves on the same track');
+ui.setTimelineGroupRepeatCount(clip('solo').group, ui.getTimelineGroupRepeatInfo(clip('solo').group), 4);
 ui.setTimelineGroupRepeatCount(clip('solo').group, ui.getTimelineGroupRepeatInfo(clip('solo').group), 2);
 assert.equal(clip('solo').barCount, 2);
 state.entries = JSON.parse(undo);
@@ -139,7 +139,7 @@ assert.equal(ui.placeTimelinePayload({ type: 'timeline-entry-group', startIndex:
 assert.equal(clip('solo-5').barCount, 6);
 assert.equal(clip('solo-6').group.count, 3);
 assert.equal(clip('solo-6').barCount, 6);
-assert.equal(clip('call').startBar, 37);
+assert.equal(clip('call').startBar, 36, 'Following Call moves left together with Solo 6');
 assert.equal(clip('sangban').startBar, 24);
 assert.equal(audio().Djembe_1[29 * 24], 'slap', 'Final overlap sounds in Solo 6 first bar');
 assert.equal(audio().Djembe_1[30 * 24], 'bass');
@@ -147,7 +147,7 @@ state.entries = state.entries.filter(entry => entry.patternId === solo5.id || en
 assert.equal(clip('solo-5').barCount, 7, 'Without a successor on its own track the final sounding bar remains part of Solo 5');
 assert.equal(audio().Djembe_1.at(-24), 'slap');
 
-// Explicit accompaniment segments reject collisions without moving neighbours.
+// Explicit accompaniment segments also move followers on their own track.
 state.entries = []; state.accompanimentSegments = [];
 add(call, 1, { startBar: 5 });
 const accompaniment = pattern('djembe-loop', 'Begleitung', 'Djembe_1', [bar('bass')]);
@@ -156,10 +156,10 @@ ui.addTimelineAccompanimentSegment({ type: 'pattern', patternId: accompaniment.i
 const segment = state.accompanimentSegments[0];
 ui.updateTimelineAccompanimentSegment(segment, { barCount: '3' });
 assert.equal(segment.barCount, 3);
-assert.equal(ui.updateTimelineAccompanimentSegment(segment, { barCount: '4' }), false);
-assert.equal(segment.barCount, 3);
-assert.equal(clip('call').startBar, 5);
-assert.equal(ui.getTimelineAppendBar({ type: 'pattern', patternId: call.id }, layout()), 6);
+assert.equal(ui.updateTimelineAccompanimentSegment(segment, { barCount: '4' }), true);
+assert.equal(segment.barCount, 4);
+assert.equal(clip('call').startBar, 8, 'Original two-bar gap remains when the segment grows');
+assert.equal(ui.getTimelineAppendBar({ type: 'pattern', patternId: call.id }, layout()), 9);
 
 // Starting on a Solo retains the IN immediately preceding it.
 state.entries = []; state.accompanimentSegments = [];
