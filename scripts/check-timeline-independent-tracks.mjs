@@ -190,4 +190,48 @@ assert.equal(clip('call').startBar, 3);
 assert.equal(audio().Djembe_1.length, 36, 'Two shortened bars precede the full Call without extra silence');
 assert.equal(audio().Djembe_1[6], 'tone');
 assert.equal(audio().Djembe_1[12], 'slap');
-console.log('Independent tracks: legacy migration/audio, persistence, Sangban resize, Solo move/repeats, collisions, undo and shared IN checked.');
+// Djaa Dununba: six written bars, an opening four-bar repeat, IN in bar four.
+state.entries = [];
+const warmup = pattern('djaa-warmup', 'Echauffement', 'Doundoun',
+  Array.from({ length: 6 }, (_, i) => bar(i % 2 ? 'Bell' : 'Open')));
+warmup.bars[0].repeat.start = ['continue'];
+warmup.bars[3].repeat.end = [2];
+warmup.bars[3].controls = [{ type: 'in', stepIndex: 22 }];
+warmup.bars[3].notes[22] = 'Bell_Open';
+state.sourcePatterns.push(warmup);
+add(warmup, 1, { startBar: 45 });
+const warmupAudio = audio().Doundoun;
+assert.deepEqual(warmupAudio.slice(44 * 24, 58 * 24),
+  [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 4, 5].flatMap(i => warmup.bars[i].notes),
+  'All four opening bars and both repetitions must sound before the final two bars');
+assert.equal(warmupAudio[44 * 24 - 2], 'Bell_Open', 'Opening repeat keeps its cyclic pickup');
+
+// Trimming removes only explicitly added trailing bars, including when a companion lane ends last.
+state.accompanimentSegments = [{ id: 'late-bass', patternId: bass.id, targetInstrument: 'Doundoun',
+  startBar: 60, barCount: 4 }];
+state.minimumBarCount = 70;
+state.playbackStartBar = 69;
+const contentBeforeTrim = JSON.stringify([state.entries, state.accompanimentSegments]);
+let trimUndo;
+let metadataWrites = 0;
+ui.recordArrangementHistorySnapshot = () => { trimUndo = JSON.stringify(ui.buildCurrentTimelineSyncOptions()); };
+ui.updateTimelineMetadataNode = () => { metadataWrites++; };
+ui.removeTimelineTrailingBars();
+assert.equal(layout().totalBars, 63);
+assert.equal(layout().playbackTotalBars, 63);
+assert.equal(state.playbackStartBar, 63, 'A start in removed bars moves to the final remaining bar');
+assert.equal(JSON.parse(trimUndo).persistedMinimumBarCount, 70, 'Undo records the original extent');
+assert.equal(JSON.stringify([state.entries, state.accompanimentSegments]), contentBeforeTrim,
+  'Patterns, accompaniment clips and internal gaps remain untouched');
+assert.equal(ui.buildCurrentTimelineSyncOptions().persistedMinimumBarCount, 0, 'Trimmed length is persisted');
+ui.removeTimelineTrailingBars();
+assert.equal(metadataWrites, 1, 'No-op trimming does not write metadata or create another undo step');
+state.entries = [];
+state.accompanimentSegments = [];
+state.minimumBarCount = 7;
+state.playbackStartBar = 7;
+ui.removeTimelineTrailingBars();
+assert.equal(layout().totalBars, 8, 'An empty timeline keeps its editing area');
+assert.equal(layout().playbackTotalBars, 0, 'The minimum editing area adds no playback silence');
+assert.equal(state.playbackStartBar, 1);
+console.log('Independent tracks: migration, editing, shared IN and Djaa opening repeat playback checked.');

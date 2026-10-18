@@ -1117,6 +1117,20 @@ function getPatternInStep(pattern) {
   return getPatternControlStep(pattern, 'in');
 }
 
+function hasPatternOpeningRepeatPickup(pattern) {
+  const bars = pattern.bars || [];
+  const inBarIndex = bars.findIndex(function (bar) {
+    return (bar.controls || []).some(function (control) { return control.type === 'in'; });
+  });
+  return inBarIndex >= 0 && buildRepeatRangesFromPatternBars(bars).some(function (range) {
+    return range.startBar === 1 && range.endBar === inBarIndex + 1 &&
+      !isTimelineContinuationMarker(range.count) &&
+      bars[inBarIndex].controls.some(function (control) {
+        return control.type === 'in' && Number(control.stepIndex) > 0;
+      });
+  });
+}
+
 function getPatternOverlapStep(pattern) {
   return getPatternControlStep(pattern, 'overlap');
 }
@@ -2885,7 +2899,10 @@ function buildPositionedTimelineSections(config) {
         patternInStep: getPatternInStep(pattern), patternOutStep: getPatternOutStep(pattern),
         patternOutBarEndStep: getPatternOutBarEndStep(pattern), patternOverlapStep: getPatternOverlapStep(pattern) };
       const leadingIn = index === 0 && hasTimelineEntryLeadingPickup(data);
-      const skipped = leadingIn ? getTimelineEntrySkippedStartStep(data) : 0;
+      // IN at the end of the opening repeat leads into its next cycle.
+      // Expanding that repeat must not turn the first cycle into silent lead-in bars.
+      const skipped = leadingIn && !hasPatternOpeningRepeatPickup(pattern)
+        ? getTimelineEntrySkippedStartStep(data) : 0;
       const last = index === entries.length - 1;
       const nextAccompaniment = clips.some(function (next) {
         return next !== clip && next.targetInstrument === target && next.startBar === clip.startBar + clip.barCount &&

@@ -4313,6 +4313,7 @@ function buildPositionedTimelineLayout(groups) {
     const contentBars = Math.max(0, ...clips.map(function (clip) { return clip.startBar + clip.barCount - 1; }));
     const naturalTotalBars = Math.max(8, contentBars);
     return { positioned: true, rows: [], clips: clips, naturalTotalBars: naturalTotalBars,
+        contentTotalBars: contentBars,
         totalBars: Math.max(naturalTotalBars, timelineState.minimumBarCount || 0),
         playbackTotalBars: Math.max(contentBars, timelineState.minimumBarCount || 0),
         usedTargets: timelineTrackTargets.filter(function (target) {
@@ -4638,6 +4639,7 @@ function buildTimelineHorizontalLayout(visualRows) {
         rows: rows,
         clips: clips,
         naturalTotalBars: naturalTotalBars,
+        contentTotalBars: contentTotalBars,
         playbackTotalBars: playbackTotalBars,
         totalBars: totalBars,
         usedTargets: usedTargets.length > 0 ? usedTargets : timelineTrackTargets.slice(0, 1)
@@ -4673,6 +4675,23 @@ function buildTimelinePositionedCalls(layout) {
         });
     });
     return calls;
+}
+
+function removeTimelineTrailingBars() {
+    const layout = getCurrentTimelineLayout();
+    if (layout.playbackTotalBars <= layout.contentTotalBars) {
+        return;
+    }
+    if (typeof recordArrangementHistorySnapshot === 'function') {
+        recordArrangementHistorySnapshot();
+    }
+    timelineState.minimumBarCount = 0;
+    timelineState.playbackStartBar = Math.min(
+        normalizeTimelinePlaybackStartBar(timelineState.playbackStartBar),
+        Math.max(1, layout.contentTotalBars)
+    );
+    updateTimelineMetadataNode();
+    renderTimelinePanel();
 }
 
 function addTimelineBar(layout) {
@@ -5496,7 +5515,18 @@ function renderTimelineSequence() {
     addBarButtonEl.addEventListener('click', function () {
         addTimelineBar(layout);
     });
-    rulerCanvasEl.appendChild(addBarButtonEl);
+    const barActionsEl = document.createElement('div');
+    barActionsEl.className = 'timeline-track-bar-actions';
+    const removeBarsButtonEl = document.createElement('button');
+    removeBarsButtonEl.type = 'button';
+    removeBarsButtonEl.className = 'timeline-track-remove-bars';
+    removeBarsButtonEl.textContent = '−';
+    removeBarsButtonEl.title = timelineText('arrangement.removeTrailingBars');
+    removeBarsButtonEl.setAttribute('aria-label', timelineText('arrangement.removeTrailingBars'));
+    removeBarsButtonEl.disabled = layout.playbackTotalBars <= layout.contentTotalBars;
+    removeBarsButtonEl.addEventListener('click', removeTimelineTrailingBars);
+    barActionsEl.append(addBarButtonEl, removeBarsButtonEl);
+    rulerCanvasEl.appendChild(barActionsEl);
     rulerRowEl.append(rulerLabelEl, rulerCanvasEl);
     contentEl.appendChild(rulerRowEl);
 

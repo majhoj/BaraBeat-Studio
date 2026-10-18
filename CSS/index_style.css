@@ -3229,7 +3229,7 @@ body.is-timeline-dragging .timeline-overlay-cell {
 .timeline-track-editor {
     --timeline-track-bar-width: 108px;
     --timeline-track-label-width: 112px;
-    --timeline-track-add-bar-width: 42px;
+    --timeline-track-add-bar-width: 84px;
     --timeline-track-lead-width: 0px;
     display: flex;
     flex-direction: column;
@@ -3351,7 +3351,13 @@ body.is-timeline-dragging .timeline-overlay-cell {
     min-height: 30px;
 }
 
-.timeline-track-add-bar {
+.timeline-track-bar-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+}
+
+.timeline-track-add-bar,
+.timeline-track-remove-bars {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -3370,13 +3376,16 @@ body.is-timeline-dragging .timeline-overlay-cell {
 }
 
 .timeline-track-add-bar:hover,
-.timeline-track-add-bar:focus-visible {
+.timeline-track-add-bar:focus-visible,
+.timeline-track-remove-bars:hover,
+.timeline-track-remove-bars:focus-visible {
     background: var(--ui-soft-bg);
     box-shadow: inset 0 0 0 2px var(--ui-border-strong);
     outline: 0;
 }
 
-.timeline-track-add-bar:disabled {
+.timeline-track-add-bar:disabled,
+.timeline-track-remove-bars:disabled {
     cursor: default;
     opacity: 0.45;
 }

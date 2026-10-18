@@ -54,8 +54,10 @@ const context = vm.createContext({
   buildTimelineDisplayGroups: () => [],
   buildTimelineVisualRows: () => [],
   buildTimelineHorizontalLayout: () => ({
-    totalBars: 120, usedTargets: ['Djembe_1', 'Sangban'], clips: [], rows: []
+    totalBars: 120, playbackTotalBars: 120, contentTotalBars: 110,
+    usedTargets: ['Djembe_1', 'Sangban'], clips: [], rows: []
   }),
+  removeTimelineTrailingBars() {},
   normalizeTimelinePlaybackStartBar: value => value,
   timelineText: key => key,
   getTimelineInstrumentLabel: value => value,
@@ -70,6 +72,10 @@ const viewport = sequence.querySelector('.timeline-track-viewport');
 const scroll = sequence.querySelector('.timeline-track-scroll');
 const content = sequence.querySelector('.timeline-track-content');
 const playhead = sequence.querySelector('.timeline-track-playhead');
+const removeBars = sequence.querySelector('.timeline-track-remove-bars');
+assert.equal(removeBars.disabled, false);
+assert.equal(removeBars.attributes['aria-label'], 'arrangement.removeTrailingBars');
+assert.equal(removeBars.listeners.click, context.removeTimelineTrailingBars);
 assert.equal(scroll.parentElement, viewport);
 assert.equal(playhead.parentElement, viewport, 'Playhead must not be inside the scrolling content');
 assert.equal(content.parentElement, scroll);
