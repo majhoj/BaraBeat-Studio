@@ -4429,13 +4429,13 @@ function schedulePracticeCountIn(firstPlaybackTime) {
   }
 }
 
-function scheduleShekereHit(scheduledTime, gainValue) {
-  if (!practiceCountInBuffer || !instr || !instr._audioCtx) {
+function scheduleShekereHit(scheduledTime, gainValue, exportContext) {
+  const audioCtx = exportContext || (instr && instr._audioCtx);
+  if (!practiceCountInBuffer || !audioCtx) {
     return;
   }
 
-  const audioCtx = instr._audioCtx;
-  if (scheduledTime < audioCtx.currentTime + 0.02) {
+  if (!exportContext && scheduledTime < audioCtx.currentTime + 0.02) {
     return;
   }
 
@@ -4445,9 +4445,11 @@ function scheduleShekereHit(scheduledTime, gainValue) {
   gainNode.gain.value = Math.max(0, Number(gainValue) || 0) * getPracticeInstrumentVolume('Shekere');
   sampleSource.connect(gainNode).connect(audioCtx.destination);
   sampleSource.onended = function () {
-    activePracticeCountInSources = activePracticeCountInSources.filter(function (source) {
-      return source !== sampleSource;
-    });
+    if (!exportContext) {
+      activePracticeCountInSources = activePracticeCountInSources.filter(function (source) {
+        return source !== sampleSource;
+      });
+    }
     try {
       sampleSource.disconnect();
       gainNode.disconnect();
@@ -4455,8 +4457,10 @@ function scheduleShekereHit(scheduledTime, gainValue) {
       // The short-lived count-in graph may already be disconnected.
     }
   };
-  activePracticeCountInSources.push(sampleSource);
-  sampleSource.start(scheduledTime);
+  if (!exportContext) {
+    activePracticeCountInSources.push(sampleSource);
+  }
+  sampleSource.start(exportContext ? Math.max(0, scheduledTime) : scheduledTime);
 }
 
 function getPlaybackRhythmStep(playbackStep) {
@@ -4467,7 +4471,7 @@ function getPlaybackRhythmStep(playbackStep) {
     : playbackStep;
 }
 
-function scheduleShekereBeatIfNeeded(playbackStep, scheduledTime) {
+function scheduleShekereBeatIfNeeded(playbackStep, scheduledTime, exportContext) {
   if (!shekereBeatEnabled || !practiceCountInBuffer) {
     return;
   }
@@ -4477,7 +4481,7 @@ function scheduleShekereBeatIfNeeded(playbackStep, scheduledTime) {
     return;
   }
 
-  scheduleShekereHit(scheduledTime - shekereBeatAnticipationSeconds, 0.55);
+  scheduleShekereHit(scheduledTime - shekereBeatAnticipationSeconds, 0.55, exportContext);
 }
 
 function parseTupletNoteValue(noteValue) {
@@ -5860,6 +5864,7 @@ async function exportCurrentArrangementAsWav() {
       const djembe3Playback = maybeTrackBeatForExport('Djembe_3', trackStates.Djembe_3);
       const accentMultiplier = getAccentMultiplier(stepIndex);
       const exportStepTempo = getEffectiveTempoForStep(stepIndex);
+      scheduleShekereBeatIfNeeded(stepIndex, currentTime, offlineContext);
 
       advanceSilentH2HStep(djembe1Playback, exportHandStates.Djembe_1, {
         instrumentInstance: djembe_1,

@@ -68,7 +68,11 @@ for (const [symbols, expected] of [
 // Execute the real WAV export loop; only WebAudio rendering/download are test doubles.
 let renderedFrames = 0;
 let downloaded = '';
+const shekereHits = [];
 Object.assign(context, {
+  shekereBeatEnabled: false, practiceCountInBuffer: { sample: 'Shekere' },
+  shekereBeatAnticipationSeconds: 0.018, activePracticeCountInSources: [],
+  getPracticeInstrumentVolume: track => track === 'Shekere' ? 0.4 : 1,
   audioIsReady: true, exportWavButton: { disabled: false, textContent: 'WAV' },
   playerText: key => key, obj: [{ Name: 'Timing fixture' }],
   soloTrackName: '', trackStates: { Djembe_1: 'djembe' },
@@ -82,32 +86,63 @@ Object.assign(context, {
       renderedFrames = frames; this.destination = {};
     }
     async startRendering() { return {}; }
+    createGain() {
+      return { gain: { value: 1 }, connect: destination => {
+        assert.equal(destination, this.destination);
+      }, disconnect() {} };
+    }
+    createBufferSource() {
+      let gain;
+      return {
+        buffer: null,
+        connect(node) { gain = node; return node; },
+        start(time) { shekereHits.push({ time, buffer: this.buffer, gain: gain.gain.value }); },
+        disconnect() {}
+      };
+    }
   },
   encodeWavFromAudioBuffer: () => ({}), downloadBlob: (blob, name) => { downloaded = name; }
 });
 loadFunctions(context, player, ['buildSwingStepOffsets', 'getBinaerSwingStepOffsets',
   'getTenaerSwingStepOffsets', 'getNeunaerSwingStepOffsets', 'getPlaybackRhythmStep',
-  'getStepInterval', 'exportCurrentArrangementAsWav']);
+  'getStepInterval', 'scheduleShekereHit', 'scheduleShekereBeatIfNeeded', 'exportCurrentArrangementAsWav']);
 const fixtures = JSON.parse(source('scripts/fixtures/timing-cases.json'));
 for (const fixture of fixtures.cases) {
   for (const quick of [false, true]) {
+   for (const enabled of [false, true]) {
+    context.shekereBeatEnabled = enabled;
     context.rhythmType = fixture.rhythm;
     context.swingProfile = { [fixture.rhythm]: fixture.swing };
     context.isSheetQuickPlayMode = quick;
     context.orderedSections = [{ isLeadIn: true, playbackLength: 2 }];
     context.getExportStepCount = () => fixture.stepsPerBeat + 2;
     hits.length = 0;
+    shekereHits.length = 0;
     await context.exportCurrentArrangementAsWav();
     let time = 0;
+    const expectedShekereTimes = [];
     assert.equal(hits.length, fixture.stepsPerBeat + 2);
     hits.forEach((hit, step) => {
       near(hit.time, time, 'WAV event position');
       const phase = (step - (quick ? 2 : 0) + fixture.stepsPerBeat) % fixture.stepsPerBeat;
+      if (enabled && phase === 0) expectedShekereTimes.push(Math.max(0, time - 0.018));
       time += fixture.beatIntervals[phase];
     });
     assert(Math.abs(renderedFrames - Math.ceil((time + 3.5) * 48000)) <= 1, 'WAV duration includes the existing tail');
     assert.equal(downloaded, 'Timing fixture.wav');
     assert.equal(context.exportWavButton.disabled, false);
+    assert.equal(shekereHits.length, expectedShekereTimes.length, 'Export includes only enabled Shekere beats');
+    shekereHits.forEach((hit, index) => {
+      near(hit.time, expectedShekereTimes[index], 'Shekere WAV beat, pickup phase and anticipation');
+      near(hit.gain, 0.55 * 0.4, 'Shekere WAV respects the instrument volume');
+      assert.equal(hit.buffer, context.practiceCountInBuffer);
+    });
+    assert.equal(context.activePracticeCountInSources.length, 0, 'Export sources stay separate from live playback');
+   }
   }
 }
+context.practiceCountInBuffer = null;
+shekereHits.length = 0;
+await context.exportCurrentArrangementAsWav();
+assert.equal(shekereHits.length, 0, 'Missing Shekere sample does not break export');
 console.log('Audio: Flam/tuplets, intentional two-stroke Ballet-Dunun limit and actual WAV scheduling/duration checked.');
