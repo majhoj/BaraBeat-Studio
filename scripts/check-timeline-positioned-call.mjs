@@ -5,6 +5,7 @@ import { source, loadFunctions, installTiming, installRepeatPickup } from './hel
 const ui = vm.createContext({ console, window: { addEventListener() {} }, rhythm: 'tenaer',
   titel: { attr: () => 'Djaa Call test' }, getResolvedTimelineLoopCount: () => false,
   normalizePracticeInstrumentVolumes: value => value || {}, practiceState: {} });
+installRepeatPickup(ui);
 vm.runInContext(source('JS/timeline.js'), ui);
 loadFunctions(ui, source('index.php'), ['mapInstrumentNameForPlayer']);
 ui.updateTimelineMetadataNode = () => {};

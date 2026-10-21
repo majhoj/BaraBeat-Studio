@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-import { source } from './helpers/music-context.mjs';
+import { source, loadFunctions } from './helpers/music-context.mjs';
 
 const origin = 'https://barabeat.test/';
 const handlers = {};
@@ -49,6 +49,37 @@ handlers.install({ waitUntil: promise => { installPromise = promise; } });
 await installPromise;
 assert.equal(stores.size, 1);
 
+const currentCacheName = [...stores.keys()][0];
+const previousCacheName = 'barabeat-studio-offline-v90-quick-play-highlights';
+assert.notEqual(currentCacheName, previousCacheName, 'The new range API requires a new offline cache');
+stores.set(previousCacheName, new Map([
+  [origin + 'JS/repeat-pickup.js', new Response('var BaraBeatRepeatPickup = {};')]
+]));
+const previousPlayerCacheName = 'barabeat-studio-offline-v93-quick-play-opening-repeat';
+assert.notEqual(currentCacheName, previousPlayerCacheName, 'WAV headroom requires a new player cache');
+stores.set(previousPlayerCacheName, new Map([
+  [origin + 'Audio/player.html', new Response('old player without WAV headroom')]
+]));
+const previousPairingCacheName = 'barabeat-studio-offline-v94-wav-headroom';
+assert.notEqual(currentCacheName, previousPairingCacheName, 'Shared pairing requires a new module cache');
+stores.set(previousPairingCacheName, new Map([
+  [origin + 'JS/repeat-pickup.js', new Response('var BaraBeatRepeatPickup = { buildRepeatRanges: function () { return []; } };')]
+]));
+const staleShellCacheName = 'barabeat-studio-offline-v95-repeat-pairing';
+assert.notEqual(currentCacheName, staleShellCacheName, 'Replacing the deployed stale shell requires a new cache');
+stores.set(staleShellCacheName, new Map([
+  [origin + 'app-shell.html', new Response('old shell that discards the opening repeat at IN')]
+]));
+let activationPromise;
+handlers.activate({ waitUntil: promise => { activationPromise = promise; } });
+await activationPromise;
+assert.equal(stores.size, 1);
+assert(stores.has(currentCacheName), 'Activation keeps the fully installed new cache');
+assert(!stores.has(previousCacheName), 'Activation removes the old module cache');
+assert(!stores.has(previousPlayerCacheName), 'Activation removes the old player cache');
+assert(!stores.has(previousPairingCacheName), 'Activation removes the module without collectRepeatRanges');
+assert(!stores.has(staleShellCacheName), 'Activation removes the stale deployed offline shell');
+
 async function request(path, mode = 'navigate', method = 'GET') {
   let response;
   const url = new URL(path, origin);
@@ -80,6 +111,48 @@ for (const path of ['JS/timing.js?v=changed', 'Audio/player.html?launchReload=of
 }
 assert((await (await request('JS/repeat-pickup.js?v=changed')).text()).includes('var BaraBeatRepeatPickup'),
   'Internal pickups must also work with the offline player');
+
+const offlineModule = await (await request('JS/repeat-pickup.js?v=changed')).text();
+const offlineTimeline = await (await request('JS/timeline.js?v=changed')).text();
+const offlinePlayer = await (await request('Audio/player.html?launchReload=offline')).text();
+const offlinePractice = await (await request('JS/practice.js?v=changed')).text();
+const offlineShell = await (await request('index.php')).text();
+function quickPlayCode(text) {
+  const start = text.indexOf('function buildSheetQuickPlayRepeatRanges(');
+  const end = text.indexOf('function createSheetPatternMoveOverlayButton(', start);
+  assert(start >= 0 && end > start, 'Quick Play preparation code must be present');
+  return text.slice(start, end);
+}
+assert.equal(quickPlayCode(offlineShell), quickPlayCode(source('index.php')),
+  'Offline Quick Play must match the current editor; regenerate app-shell.html before deployment');
+assert.equal(offlinePlayer, source('Audio/player.html'), 'Offline player must be the updated file');
+assert.equal(offlineModule, source('JS/repeat-pickup.js'), 'Offline module must expose the new pairing API');
+assert.equal(offlinePractice, source('JS/practice.js'), 'Offline practice must match its shared module');
+const music = vm.createContext({ Blob });
+vm.runInContext(offlineModule, music);
+loadFunctions(music, offlineTimeline, ['getTimelineRepeatMarkerList', 'buildTimelinePatternRepeatRanges']);
+loadFunctions(music, offlinePlayer, ['sanitizeRepeatRanges', 'normalizeRepeatMarkerList', 'buildRepeatRangesFromPatternBars']);
+loadFunctions(music, offlinePractice, ['getPracticeRepeatMarkerList', 'buildPracticeRepeatRangesFromBars']);
+loadFunctions(music, offlineShell, ['buildSheetQuickPlayRepeatRanges']);
+assert.equal(typeof music.BaraBeatRepeatPickup.collectRepeatRanges, 'function');
+const bars = [{ repeat: { start: true } }, { repeat: { end: 2 } }];
+for (const ranges of [music.buildTimelinePatternRepeatRanges({ bars }), music.buildRepeatRangesFromPatternBars(bars),
+  music.buildPracticeRepeatRangesFromBars(bars), music.buildSheetQuickPlayRepeatRanges(bars)]) {
+  assert.deepEqual(JSON.parse(JSON.stringify(ranges)), [{ startBar: 1, endBar: 2, count: 2 }],
+    'Cached consumers must run with the cached range module, not an old API');
+}
+const duplicates = [{ repeat: { start: [true, true], end: [2, 2] } }];
+assert.equal(music.BaraBeatRepeatPickup.collectRepeatRanges(duplicates).length, 2);
+assert.equal(music.buildPracticeRepeatRangesFromBars(duplicates).length, 2);
+assert.equal(music.buildSheetQuickPlayRepeatRanges(duplicates).length, 2);
+assert.equal(music.buildRepeatRangesFromPatternBars(duplicates).length, 1);
+loadFunctions(music, offlinePlayer, ['encodeWavFromAudioBuffer']);
+const offlineWav = new DataView(await music.encodeWavFromAudioBuffer({
+  numberOfChannels: 1, sampleRate: 48000, length: 2,
+  getChannelData: () => Float32Array.of(2, -2)
+}).arrayBuffer());
+assert.equal(offlineWav.getInt16(44, true), 32111, 'Offline export applies the 0.98 target peak');
+assert.equal(offlineWav.getInt16(46, true), -32112, 'Offline export preserves the negative half-wave');
 for (const path of ['Audio/audioplayer.php', 'PHP/dateiladen.php', 'impressum.php', 'offline-assets.php', 'Noten/example.bbs']) {
   assert.equal(await request(path), undefined, path + ' must remain network-only');
 }

@@ -4,6 +4,7 @@ import { source, loadFunctions, installTiming, installRepeatPickup } from './hel
 
 const ui = vm.createContext({ console, window: { addEventListener() {} }, rhythm: 'tenaer',
   titel: { attr: () => 'Independent tracks' }, normalizePracticeInstrumentVolumes: () => ({}), practiceState: {} });
+installRepeatPickup(ui);
 vm.runInContext(source('JS/timeline.js'), ui);
 ui.updateTimelineMetadataNode = () => {};
 ui.renderTimelinePanel = () => {};
@@ -199,6 +200,13 @@ warmup.bars[3].repeat.end = [2];
 warmup.bars[3].controls = [{ type: 'in', stepIndex: 22 }];
 warmup.bars[3].notes[22] = 'Bell_Open';
 state.sourcePatterns.push(warmup);
+warmup.bars[3].repeat.end = [1];
+add(warmup, 1, { startBar: 45 });
+assert.deepEqual(audio().Doundoun.slice(44 * 24, 54 * 24),
+  [0, 1, 2, 3, 0, 1, 2, 3, 4, 5].flatMap(i => warmup.bars[i].notes),
+  'A written 1 means two complete opening passes, followed by the final two bars');
+state.entries = [];
+warmup.bars[3].repeat.end = [2];
 add(warmup, 1, { startBar: 45 });
 const warmupAudio = audio().Doundoun;
 assert.deepEqual(warmupAudio.slice(44 * 24, 58 * 24),

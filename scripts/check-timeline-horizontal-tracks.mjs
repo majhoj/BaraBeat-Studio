@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
+import { installRepeatPickup } from './helpers/music-context.mjs';
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(scriptDirectory, '..');
@@ -102,6 +103,7 @@ const context = vm.createContext({
   },
   timelineTrackTargets: ['Djembe_1', 'Djembe_2', 'Djembe_3', 'Kenkeni', 'Sangban', 'Doundoun']
 });
+installRepeatPickup(context);
 context.findPatternById = patternId => patterns[patternId] || null;
 context.isTimelineOverlayGroup = () => false;
 context.getTimelineRowRepeatInfo = () => ({ repeatCount: 1 });

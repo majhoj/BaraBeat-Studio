@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
-import { source, loadFunctions } from './helpers/music-context.mjs';
+import { source, loadFunctions, installRepeatPickup } from './helpers/music-context.mjs';
 
 const context = vm.createContext({
   console,
@@ -9,6 +9,7 @@ const context = vm.createContext({
   titel: { attr: () => 'Ballet Dununs test' },
   getResolvedTimelineLoopCount: () => false
 });
+installRepeatPickup(context);
 vm.runInContext(source('JS/timeline.js'), context);
 loadFunctions(context, source('index.php'), ['mapInstrumentNameForPlayer']);
 context.updateTimelineMetadataNode = () => {};

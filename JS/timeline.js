@@ -1721,15 +1721,7 @@ function getTimelineTargetSignature(targetInstruments) {
 }
 
 function getTimelineRepeatMarkerList(markerValue) {
-    if (Array.isArray(markerValue)) {
-        return markerValue.filter(function (marker) {
-            return marker !== false && marker !== null && marker !== undefined && marker !== '';
-        });
-    }
-    if (markerValue === false || markerValue === null || markerValue === undefined || markerValue === '') {
-        return [];
-    }
-    return [markerValue];
+    return BaraBeatRepeatPickup.normalizeMarkerList(markerValue);
 }
 
 function buildTimelinePatternBarSummary(pattern) {
@@ -4030,79 +4022,7 @@ function renderLegacyTimelineSequence() {
 
 function buildTimelinePatternRepeatRanges(pattern) {
     const bars = pattern && Array.isArray(pattern.bars) ? pattern.bars : [];
-    if (bars.length === 0) {
-        return [];
-    }
-
-    const repeatBoundaries = new Array(bars.length + 1).fill(null).map(function (_, boundaryIndex) {
-        return {
-            index: boundaryIndex,
-            startMarkers: [],
-            endMarkers: []
-        };
-    });
-
-    bars.forEach(function (bar, barIndex) {
-        const repeatInfo = bar && bar.repeat ? bar.repeat : {};
-        getTimelineRepeatMarkerList(repeatInfo.start).forEach(function (marker) {
-            repeatBoundaries[barIndex].startMarkers.push({
-                boundaryIndex: barIndex,
-                count: marker
-            });
-        });
-        getTimelineRepeatMarkerList(repeatInfo.end).forEach(function (marker) {
-            repeatBoundaries[barIndex + 1].endMarkers.push({
-                boundaryIndex: barIndex + 1,
-                count: marker
-            });
-        });
-    });
-
-    const repeatRanges = [];
-    const repeatStartStack = [];
-    repeatBoundaries.forEach(function (boundary) {
-        boundary.endMarkers.forEach(function (endMarker) {
-            const matchingStartMarker = repeatStartStack.pop();
-            if (!matchingStartMarker) {
-                return;
-            }
-            repeatRanges.push({
-                startBar: matchingStartMarker.boundaryIndex + 1,
-                endBar: endMarker.boundaryIndex,
-                count: endMarker.count
-            });
-        });
-        boundary.startMarkers.forEach(function (startMarker) {
-            repeatStartStack.push(startMarker);
-        });
-    });
-
-    const seenRanges = {};
-    return repeatRanges.filter(function (repeatRange) {
-        const startBar = Number(repeatRange.startBar);
-        const endBar = Number(repeatRange.endBar);
-        const count = repeatRange.count === 'loop' ? 'loop' : Number(repeatRange.count);
-        if (!Number.isFinite(startBar) || !Number.isFinite(endBar) || startBar < 1 || endBar < startBar) {
-            return false;
-        }
-        if (count !== 'loop' && (!Number.isFinite(count) || count < 1)) {
-            return false;
-        }
-        const rangeKey = startBar + ':' + endBar + ':' + count;
-        if (seenRanges[rangeKey]) {
-            return false;
-        }
-        seenRanges[rangeKey] = true;
-        repeatRange.startBar = startBar;
-        repeatRange.endBar = endBar;
-        repeatRange.count = count;
-        return true;
-    }).sort(function (rangeA, rangeB) {
-        if (rangeA.startBar !== rangeB.startBar) {
-            return rangeA.startBar - rangeB.startBar;
-        }
-        return rangeB.endBar - rangeA.endBar;
-    });
+    return BaraBeatRepeatPickup.buildRepeatRanges(bars);
 }
 
 function getTimelineExpandedPatternBars(pattern) {

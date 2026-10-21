@@ -3,7 +3,8 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import { installTiming, installRepeatPickup } from './helpers/music-context.mjs';
 
-const editorSource = fs.readFileSync(new URL('../index.php', import.meta.url), 'utf8');
+const editorFile = process.argv.includes('--offline-shell') ? 'app-shell.html' : 'index.php';
+const editorSource = fs.readFileSync(new URL('../' + editorFile, import.meta.url), 'utf8');
 const playerSource = fs.readFileSync(new URL('../Audio/player.html', import.meta.url), 'utf8');
 const practiceSource = fs.readFileSync(new URL('../JS/practice.js', import.meta.url), 'utf8');
 function extractFunction(source, name) {
@@ -332,7 +333,70 @@ assert.equal(notesAt('Djembe_1', 24 + 20, 1)[0], 'slap');
 assert.equal(notesAt('Djembe_1', 48 + 20, 1)[0], 'f', 'Written internal repeats keep their final OUT');
 verifyHighlights(internalEchauffementSections, 0, 144, 'Djembe_1', internallyRepeatedEchauffement);
 
-for (const name of ['getStepsPerBeatForRhythm', 'getBaseStepDuration', 'getPlaybackRhythmStep', 'scheduleShekereBeatIfNeeded', 'getStepInterval']) {
+// Djaa Djembe, Sangban, Dundunba: Dununba Echauffement, IN ends the opening repeat.
+const dununbaWarmup = pattern('djaa-dununba-warmup', 'Doundoun', [
+  bar(51, { 0: 'Bell_Open', 4: 'Bell_Open', 8: 'Bell_Open', 10: 'Bell_Open',
+    14: 'Bell_Open', 18: 'Bell_Open', 22: 'Bell_Open' }, [], { start: ['continue'], end: [] }),
+  bar(52, { 0: 'Bell_Open', 4: 'Bell_Open', 8: 'Bell_Open', 10: 'Bell_Open',
+    14: 'Bell_Open', 18: 'Bell_Open', 22: 'Bell_Open' }),
+  bar(53, { 0: 'Bell_Open', 4: 'Bell_Open', 6: 'Bell_Open', 10: 'Bell_Open',
+    14: 'Bell_Open', 18: 'Bell_Open', 22: 'Bell_Open' }),
+  bar(54, { 0: 'Bell_Open', 4: 'Bell_Open', 8: 'Bell_Open', 10: 'Bell_Open',
+    14: 'Bell_Open', 18: 'Bell_Open', 22: 'Bell_Open' }, [{ type: 'in', stepIndex: 22 }],
+    { start: [], end: [2] }),
+  bar(55, { 0: 'Bell_Open', 4: 'Bell_Open', 8: 'Bell_Open', 10: 'Bell_Open',
+    14: 'Bell_Open', 18: 'Bell_Open', 22: 'Bell_Open' }),
+  bar(56, { 0: 'Bell_Open' })
+], 'Echauffement');
+const dununbaCall = { ...call, defaultTargets: ['Doundoun'] };
+for (const repeatCount of [1, 2, 8]) {
+  const warmup = JSON.parse(JSON.stringify(dununbaWarmup));
+  warmup.bars[3].repeat.end = [repeatCount];
+  const sourceBefore = JSON.stringify(warmup);
+  const expectedBars = Array.from({ length: repeatCount + 1 }, () => warmup.bars.slice(0, 4))
+    .flat().concat(warmup.bars.slice(4));
+  const expectedNotes = expectedBars.flatMap(item => item.notes);
+  for (const selection of [[warmup], [warmup, djembe], [djembe, warmup], [dununbaCall, warmup]]) {
+    const sections = prepare(selection);
+    const main = sections.at(-1);
+    assert.equal(main.fixedLength, expectedNotes.length,
+      'IN must not discard the first four-bar pass (written repeat count ' + repeatCount + ')');
+    assert.equal(main.repeatCount, 1, 'Written repeats are expanded exactly once');
+    assert.deepEqual(Array.from(main.trackNotes.Doundoun), expectedNotes);
+    loadPlayer(sections);
+    const mainStart = selection[0] === dununbaCall ? 24 : 2;
+    assert.equal(notesAt('Doundoun', mainStart - 2, 1)[0], 'Bell_Open',
+      'The cyclic IN still leads into the first full pass');
+    assert.deepEqual(notesAt('Doundoun', mainStart, expectedNotes.length), expectedNotes);
+    assert.deepEqual(Array.from(main.highlightSteps.filter((refs, step) => step % 24 === 0),
+      refs => refs.find(ref => ref.sourceBarIndex >= 51).sourceBarIndex),
+    expectedBars.map(item => item.sourceBarIndex), 'Every written pass keeps its source-bar highlights');
+    verifyHighlights(sections, mainStart, expectedNotes.length, 'Doundoun', warmup);
+    if (selection[0] !== dununbaCall) {
+      assert.deepEqual(notesAt('Doundoun', mainStart + expectedNotes.length, expectedNotes.length), expectedNotes,
+        'The next outer loop retains the same complete sequence');
+    }
+  }
+  assert.equal(JSON.stringify(warmup), sourceBefore, 'Repeat and IN source data remain unchanged');
+}
+for (const variant of ['pickup-only', 'later-repeat', 'in-outside-repeat']) {
+  const warmup = JSON.parse(JSON.stringify(dununbaWarmup));
+  if (variant === 'pickup-only') {
+    warmup.bars.slice(0, 4).forEach((item, i) => {
+      item.notes = item.notes.map((note, step) => i === 3 && step >= 22 ? note : 'f');
+    });
+  } else if (variant === 'later-repeat') {
+    warmup.bars[0].repeat.start = [];
+    warmup.bars[1].repeat.start = ['continue'];
+  } else {
+    warmup.bars[3].repeat.end = [];
+    warmup.bars[2].repeat.end = [2];
+  }
+  assert.equal(context.hasSheetQuickPlayCyclicPickup(warmup), false,
+    'Do not reinterpret other leading IN cases: ' + variant);
+}
+
+for (const name of ['getStepsPerBeatForRhythm', 'getBaseStepDuration', 'getPlaybackRhythmStep', 'scheduleShekereBeatIfNeeded', 'getStepInterval', 'nextNote']) {
   vm.runInContext(extractFunction(playerSource, name), context);
 }
 context.getEffectiveTempoForStep = () => 80;
@@ -363,6 +427,49 @@ for (const rhythmType of ['binaer', 'neunaer']) {
     rhythmType + ' pickup uses the correct swing phase');
   assert(Math.abs(context.getStepInterval(2) - offsets[1] * 0.75) < 1e-9);
 }
+// Djaa Djembe, Sangban, Dundunba: Solo 2 starts at IN step 8, source bars 6-7.
+const solo2WithIn = pattern('djaa-solo-2-in', 'Djembe_1', [
+  bar(6, { 8: 'slap_flam', 12: 'tone', 14: 'tone', 18: 'slap_flam' }, [{ type: 'in', stepIndex: 8 }]),
+  bar(7, {})
+], 'Solo 2');
+const solo2Original = JSON.stringify(solo2WithIn);
+const solo2Sections = prepare([solo2WithIn]);
+loadPlayer(solo2Sections);
+context.rhythmType = 'tenaer';
+context.nextNoteTime = 0;
+context.globalPlaybackStep = 0;
+context.updateDisplayedTempo = () => {};
+const solo2BeatSteps = [];
+context.scheduleShekereHit = step => solo2BeatSteps.push(step);
+const swingIntervals = [0.05, 0.1, 0.15, 0.2, 0.2, 0.3].map(fraction => fraction * 0.75);
+for (let step = 0; step < 192; step++) {
+  const phase = (step + 8) % 6;
+  assert.equal(context.getPlaybackRhythmStep(step) % 6, phase, 'Trimmed IN keeps its original beat position in every loop');
+  context.scheduleShekereBeatIfNeeded(step, step);
+  assert(Math.abs(context.getStepInterval(step) - swingIntervals[phase]) < 1e-9, 'IN uses the original swing subdivision');
+  const before = context.nextNoteTime;
+  context.nextNote();
+  assert(Math.abs(context.nextNoteTime - before - swingIntervals[phase]) < 1e-9, 'Live scheduling uses the same IN phase');
+}
+assert.deepEqual(solo2BeatSteps, Array.from({ length: 32 }, (_, index) => 4 + index * 6),
+  'Shekere aligns with source beats 12 and 18, not with the offbeat IN');
+assert.equal(notesAt('Djembe_1', 4, 1)[0], 'tone');
+assert.equal(notesAt('Djembe_1', 10, 1)[0], 'slap_flam');
+assert.equal(solo2Sections.length, 1);
+assert.equal(solo2Sections[0].fixedLength, 48, 'The fix must not change loop length');
+assert.equal(solo2Sections[0].trackNotes.Djembe_1[0], 'slap_flam', 'Playback still begins at IN');
+verifyHighlights(solo2Sections, 0, 192, 'Djembe_1', solo2WithIn);
+assert.equal(JSON.stringify(solo2WithIn), solo2Original, 'The source pattern stays unchanged');
+
+loadPlayer(prepare([solo2WithIn, djembeCall]));
+assert.equal(context.getPlaybackRhythmStep(0) % 6, 2);
+assert.equal(context.getPlaybackRhythmStep(48) % 6, 0, 'The following Call keeps its own downbeat');
+assert.equal(context.getPlaybackRhythmStep(72) % 6, 2, 'The next outer loop restores the Solo IN phase');
+loadPlayer(prepare([djembeCall, solo2WithIn]));
+assert.equal(context.getPlaybackRhythmStep(0), 0, 'A pickup merged into a Call does not shift its beat');
+loadPlayer(prepare([solo2WithIn, { ...djembe, defaultTargets: ['Djembe_2'] }]));
+assert.equal(context.getPlaybackRhythmStep(0), 0, 'Parallel playback retains its untrimmed grid');
+loadPlayer(solo2Sections);
 context.isSheetQuickPlayMode = false;
 assert.equal(context.getPlaybackRhythmStep(0), 0, 'Practice and arrangement rhythm grids remain unchanged');
 console.log('Quick play: freely named cyclic pickups, accompaniment/solo loops, pattern changes, repeats, highlights and beat/swing alignment checked.');

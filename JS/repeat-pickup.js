@@ -1,6 +1,117 @@
 var BaraBeatRepeatPickup = (function () {
   'use strict';
 
+  function normalizeRanges(repeatRangesInput) {
+    if (!Array.isArray(repeatRangesInput)) {
+      return [];
+    }
+
+    const seenRanges = new Set();
+    return repeatRangesInput
+      .filter(function (repeatRange) {
+        if (!repeatRange) {
+          return false;
+        }
+        const startBar = Number(repeatRange.startBar);
+        const endBar = Number(repeatRange.endBar);
+        if (!Number.isFinite(startBar) || !Number.isFinite(endBar) || startBar < 1 || endBar < startBar) {
+          return false;
+        }
+
+        const countValue = repeatRange.count === 'loop' ? 'loop' : Number(repeatRange.count);
+        if (countValue !== 'loop' && (!Number.isFinite(countValue) || countValue < 1)) {
+          return false;
+        }
+
+        const dedupeKey = startBar + ':' + endBar + ':' + countValue;
+        if (seenRanges.has(dedupeKey)) {
+          return false;
+        }
+        seenRanges.add(dedupeKey);
+        return true;
+      })
+      .map(function (repeatRange) {
+        return {
+          startBar: Number(repeatRange.startBar),
+          endBar: Number(repeatRange.endBar),
+          count: repeatRange.count === 'loop' ? 'loop' : Number(repeatRange.count)
+        };
+      })
+      .sort(function (rangeA, rangeB) {
+        if (rangeA.startBar !== rangeB.startBar) {
+          return rangeA.startBar - rangeB.startBar;
+        }
+        return rangeB.endBar - rangeA.endBar;
+      });
+  }
+
+  function normalizeMarkerList(markerValue) {
+    if (Array.isArray(markerValue)) {
+      return markerValue.filter(function (marker) {
+        return marker !== false && marker !== null && marker !== undefined && marker !== '';
+      });
+    }
+    if (markerValue === false || markerValue === null || markerValue === undefined || markerValue === '') {
+      return [];
+    }
+    return [markerValue];
+  }
+
+  function collectRepeatRanges(patternBars) {
+    if (!Array.isArray(patternBars) || patternBars.length === 0) {
+      return [];
+    }
+
+    const repeatBoundaries = new Array(patternBars.length + 1).fill(null).map(function (_, boundaryIndex) {
+      return {
+        index: boundaryIndex,
+        startMarkers: [],
+        endMarkers: []
+      };
+    });
+
+    patternBars.forEach(function (bar, barIndex) {
+      const repeatInfo = bar && bar.repeat ? bar.repeat : {};
+      normalizeMarkerList(repeatInfo.start).forEach(function (marker) {
+        repeatBoundaries[barIndex].startMarkers.push({
+          boundaryIndex: barIndex,
+          count: marker
+        });
+      });
+      normalizeMarkerList(repeatInfo.end).forEach(function (marker) {
+        repeatBoundaries[barIndex + 1].endMarkers.push({
+          boundaryIndex: barIndex + 1,
+          count: marker
+        });
+      });
+    });
+
+    const repeatRanges = [];
+    const repeatStartStack = [];
+    repeatBoundaries.forEach(function (boundary) {
+      boundary.endMarkers.forEach(function (endMarker) {
+        const matchingStartMarker = repeatStartStack.pop();
+        if (!matchingStartMarker) {
+          return;
+        }
+        repeatRanges.push({
+          startBar: matchingStartMarker.boundaryIndex + 1,
+          endBar: endMarker.boundaryIndex,
+          count: endMarker.count
+        });
+      });
+      boundary.startMarkers.forEach(function (startMarker) {
+        repeatStartStack.push(startMarker);
+      });
+    });
+
+    return repeatRanges;
+  }
+
+  function buildRepeatRanges(patternBars) {
+    return normalizeRanges(collectRepeatRanges(patternBars));
+  }
+
   function playableLength(bar) {
     const length = Array.isArray(bar && bar.notes) ? bar.notes.length : 0;
     return (Array.isArray(bar && bar.controls) ? bar.controls : []).reduce(function (end, control) {
@@ -71,5 +182,12 @@ var BaraBeatRepeatPickup = (function () {
     return hasEarlierIn ? withPickup(previousBar, [nextBar]) : previousBar;
   }
 
-  return Object.freeze({ withPickup: withPickup, withInternalPickup: withInternalPickup });
+  return Object.freeze({
+    normalizeRanges: normalizeRanges,
+    normalizeMarkerList: normalizeMarkerList,
+    collectRepeatRanges: collectRepeatRanges,
+    buildRepeatRanges: buildRepeatRanges,
+    withPickup: withPickup,
+    withInternalPickup: withInternalPickup
+  });
 }());

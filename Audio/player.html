@@ -594,59 +594,11 @@ const MAX_EXPANDED_BARS = 2000;
 const trackInstrumentNames = ['Kenkeni', 'Sangban', 'Doundoun', 'Dreierbass', 'Djembe_1', 'Djembe_2', 'Djembe_3'];
 
 function sanitizeRepeatRanges(repeatRangesInput) {
-  if (!Array.isArray(repeatRangesInput)) {
-    return [];
-  }
-
-  const seenRanges = new Set();
-  return repeatRangesInput
-    .filter(function (repeatRange) {
-      if (!repeatRange) {
-        return false;
-      }
-      const startBar = Number(repeatRange.startBar);
-      const endBar = Number(repeatRange.endBar);
-      if (!Number.isFinite(startBar) || !Number.isFinite(endBar) || startBar < 1 || endBar < startBar) {
-        return false;
-      }
-
-      const countValue = repeatRange.count === 'loop' ? 'loop' : Number(repeatRange.count);
-      if (countValue !== 'loop' && (!Number.isFinite(countValue) || countValue < 1)) {
-        return false;
-      }
-
-      const dedupeKey = startBar + ':' + endBar + ':' + countValue;
-      if (seenRanges.has(dedupeKey)) {
-        return false;
-      }
-      seenRanges.add(dedupeKey);
-      return true;
-    })
-    .map(function (repeatRange) {
-      return {
-        startBar: Number(repeatRange.startBar),
-        endBar: Number(repeatRange.endBar),
-        count: repeatRange.count === 'loop' ? 'loop' : Number(repeatRange.count)
-      };
-    })
-    .sort(function (rangeA, rangeB) {
-      if (rangeA.startBar !== rangeB.startBar) {
-        return rangeA.startBar - rangeB.startBar;
-      }
-      return rangeB.endBar - rangeA.endBar;
-    });
+  return BaraBeatRepeatPickup.normalizeRanges(repeatRangesInput);
 }
 
 function normalizeRepeatMarkerList(markerValue) {
-  if (Array.isArray(markerValue)) {
-    return markerValue.filter(function (marker) {
-      return marker !== false && marker !== null && marker !== undefined && marker !== '';
-    });
-  }
-  if (markerValue === false || markerValue === null || markerValue === undefined || markerValue === '') {
-    return [];
-  }
-  return [markerValue];
+  return BaraBeatRepeatPickup.normalizeMarkerList(markerValue);
 }
 
 function normalizeTimelineLoopCountValue(rawValue) {
@@ -663,54 +615,7 @@ function normalizeTimelineLoopCountValue(rawValue) {
 }
 
 function buildRepeatRangesFromPatternBars(patternBars) {
-  if (!Array.isArray(patternBars) || patternBars.length === 0) {
-    return [];
-  }
-
-  const repeatBoundaries = new Array(patternBars.length + 1).fill(null).map(function (_, boundaryIndex) {
-    return {
-      index: boundaryIndex,
-      startMarkers: [],
-      endMarkers: []
-    };
-  });
-
-  patternBars.forEach(function (bar, barIndex) {
-    const repeatInfo = bar && bar.repeat ? bar.repeat : {};
-    normalizeRepeatMarkerList(repeatInfo.start).forEach(function (marker) {
-      repeatBoundaries[barIndex].startMarkers.push({
-        boundaryIndex: barIndex,
-        count: marker
-      });
-    });
-    normalizeRepeatMarkerList(repeatInfo.end).forEach(function (marker) {
-      repeatBoundaries[barIndex + 1].endMarkers.push({
-        boundaryIndex: barIndex + 1,
-        count: marker
-      });
-    });
-  });
-
-  const repeatRanges = [];
-  const repeatStartStack = [];
-  repeatBoundaries.forEach(function (boundary) {
-    boundary.endMarkers.forEach(function (endMarker) {
-      const matchingStartMarker = repeatStartStack.pop();
-      if (!matchingStartMarker) {
-        return;
-      }
-      repeatRanges.push({
-        startBar: matchingStartMarker.boundaryIndex + 1,
-        endBar: endMarker.boundaryIndex,
-        count: endMarker.count
-      });
-    });
-    boundary.startMarkers.forEach(function (startMarker) {
-      repeatStartStack.push(startMarker);
-    });
-  });
-
-  return sanitizeRepeatRanges(repeatRanges);
+  return BaraBeatRepeatPickup.buildRepeatRanges(patternBars);
 }
 
 function patternHasRawControl(pattern, controlType) {
@@ -3558,6 +3463,7 @@ function buildConfiguredPracticeSections(config) {
     const section = createOrderedSection(configuredSection && configuredSection.label ? configuredSection.label : 'Begleitung');
     section.repeatCount = normalizeSectionRepeatCount(configuredSection && configuredSection.repeatCount);
     section.isLeadIn = Boolean(configuredSection && configuredSection.isLeadIn);
+    section.rhythmStepOffset = Math.max(0, Math.round(Number(configuredSection && configuredSection.rhythmStepOffset) || 0));
     section.overlapsPracticeCountIn = Boolean(configuredSection && configuredSection.overlapsPracticeCountIn);
     section.fixedLength = Math.max(0, Math.round(Number(configuredSection && configuredSection.fixedLength) || 0));
     section.labelName = configuredSection && configuredSection.labelName ? configuredSection.labelName : section.label;
@@ -4464,6 +4370,13 @@ function scheduleShekereHit(scheduledTime, gainValue, exportContext) {
 }
 
 function getPlaybackRhythmStep(playbackStep) {
+  if (isSheetQuickPlayMode) {
+    const sectionContext = getPlaybackSectionContext(playbackStep);
+    if (sectionContext && sectionContext.section.rhythmStepOffset > 0) {
+      // A solo trimmed to IN still starts at that subdivision, not at a new beat one.
+      return sectionContext.localStep + sectionContext.section.rhythmStepOffset;
+    }
+  }
   const firstSection = orderedSections[0];
   // A separate quick-play pickup precedes beat one; it must not move the beat/swing grid.
   return isSheetQuickPlayMode && firstSection && firstSection.isLeadIn
@@ -5787,13 +5700,24 @@ function encodeWavFromAudioBuffer(audioBuffer) {
   writeUint32(dataSize);
 
   const channels = [];
+  let peak = 0;
   for (let channelIndex = 0; channelIndex < channelCount; channelIndex++) {
-    channels.push(audioBuffer.getChannelData(channelIndex));
+    const channelData = audioBuffer.getChannelData(channelIndex);
+    channels.push(channelData);
+    for (let sampleIndex = 0; sampleIndex < frameCount; sampleIndex++) {
+      const magnitude = Math.abs(channelData[sampleIndex]);
+      if (magnitude > peak) {
+        peak = magnitude;
+      }
+    }
   }
+  // One export-only gain preserves stereo balance and leaves the rendered buffer untouched.
+  const targetPeak = 0.98;
+  const exportGain = peak > targetPeak ? targetPeak / peak : 1;
 
   for (let sampleIndex = 0; sampleIndex < frameCount; sampleIndex++) {
     for (let channelIndex = 0; channelIndex < channelCount; channelIndex++) {
-      const sampleValue = Math.max(-1, Math.min(1, channels[channelIndex][sampleIndex] || 0));
+      const sampleValue = Math.max(-1, Math.min(1, (channels[channelIndex][sampleIndex] || 0) * exportGain));
       view.setInt16(offset, sampleValue < 0 ? sampleValue * 0x8000 : sampleValue * 0x7FFF, true);
       offset += 2;
     }

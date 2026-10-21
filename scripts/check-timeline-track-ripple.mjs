@@ -4,6 +4,7 @@ import { source, loadFunctions, installTiming, installRepeatPickup } from './hel
 
 const ui = vm.createContext({ console, window: { addEventListener() {} }, rhythm: 'tenaer',
   titel: { attr: () => 'Track ripple' }, normalizePracticeInstrumentVolumes: () => ({}), practiceState: {} });
+installRepeatPickup(ui);
 vm.runInContext(source('JS/timeline.js'), ui);
 ui.updateTimelineMetadataNode = () => {};
 ui.renderTimelinePanel = () => {};

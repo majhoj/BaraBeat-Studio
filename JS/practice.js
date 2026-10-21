@@ -2047,15 +2047,7 @@ function isPlayablePracticeNote(noteValue) {
 }
 
 function getPracticeRepeatMarkerList(markerValue) {
-    if (Array.isArray(markerValue)) {
-        return markerValue.filter(function (marker) {
-            return marker !== false && marker !== null && marker !== undefined && marker !== '';
-        });
-    }
-    if (markerValue === false || markerValue === null || markerValue === undefined || markerValue === '') {
-        return [];
-    }
-    return [markerValue];
+    return BaraBeatRepeatPickup.normalizeMarkerList(markerValue);
 }
 
 function isPracticeContinuationMarker(markerValue) {
@@ -2063,50 +2055,7 @@ function isPracticeContinuationMarker(markerValue) {
 }
 
 function buildPracticeRepeatRangesFromBars(bars) {
-    const safeBars = Array.isArray(bars) ? bars : [];
-    const repeatBoundaries = new Array(safeBars.length + 1).fill(null).map(function (_, boundaryIndex) {
-        return {
-            startMarkers: [],
-            endMarkers: [],
-            index: boundaryIndex
-        };
-    });
-
-    safeBars.forEach(function (bar, barIndex) {
-        const repeatInfo = bar && bar.repeat ? bar.repeat : {};
-        getPracticeRepeatMarkerList(repeatInfo.start).forEach(function (marker) {
-            repeatBoundaries[barIndex].startMarkers.push({
-                boundaryIndex: barIndex,
-                count: marker
-            });
-        });
-        getPracticeRepeatMarkerList(repeatInfo.end).forEach(function (marker) {
-            repeatBoundaries[barIndex + 1].endMarkers.push({
-                boundaryIndex: barIndex + 1,
-                count: marker
-            });
-        });
-    });
-
-    const repeatRanges = [];
-    const repeatStartStack = [];
-    repeatBoundaries.forEach(function (boundary) {
-        boundary.endMarkers.forEach(function (endMarker) {
-            const matchingStartMarker = repeatStartStack.pop();
-            if (!matchingStartMarker) {
-                return;
-            }
-            repeatRanges.push({
-                startBar: matchingStartMarker.boundaryIndex + 1,
-                endBar: endMarker.boundaryIndex,
-                count: endMarker.count
-            });
-        });
-        boundary.startMarkers.forEach(function (startMarker) {
-            repeatStartStack.push(startMarker);
-        });
-    });
-
+    const repeatRanges = BaraBeatRepeatPickup.collectRepeatRanges(bars);
     return repeatRanges.filter(function (repeatRange) {
         const startBar = Number(repeatRange.startBar);
         const endBar = Number(repeatRange.endBar);

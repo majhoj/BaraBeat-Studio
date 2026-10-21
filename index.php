@@ -3154,17 +3154,14 @@ function buildSheetQuickPlayRepeatRanges(patternBars) {
 
     bars.forEach(function (bar, barIndex) {
         const repeatInfo = bar && bar.repeat ? bar.repeat : {};
-        const startMarkers = Array.isArray(repeatInfo.start) ? repeatInfo.start : (repeatInfo.start ? [repeatInfo.start] : []);
-        const endMarkers = Array.isArray(repeatInfo.end) ? repeatInfo.end : (repeatInfo.end ? [repeatInfo.end] : []);
+        // Keep falsy scalar markers absent, while preserving zero/NaN inside arrays.
+        const startMarkers = BaraBeatRepeatPickup.normalizeMarkerList(repeatInfo.start || []);
+        const endMarkers = BaraBeatRepeatPickup.normalizeMarkerList(repeatInfo.end || []);
         startMarkers.forEach(function (marker) {
-            if (marker !== false && marker !== null && marker !== undefined && marker !== '') {
-                boundaries[barIndex].startMarkers.push(marker);
-            }
+            boundaries[barIndex].startMarkers.push(marker);
         });
         endMarkers.forEach(function (marker) {
-            if (marker !== false && marker !== null && marker !== undefined && marker !== '') {
-                boundaries[barIndex + 1].endMarkers.push(marker);
-            }
+            boundaries[barIndex + 1].endMarkers.push(marker);
         });
     });
 
@@ -3748,14 +3745,31 @@ function hasSheetQuickPlayCyclicPickup(pattern) {
         return pattern.quickPlayHasCyclicPickup;
     }
     const notes = getSheetQuickPlayPatternNotes(pattern);
+    const inStep = getSheetQuickPlayPatternInStep(pattern);
     const pickupEndStep = getSheetQuickPlayPickupEndStep(
         notes,
-        getSheetQuickPlayPatternInStep(pattern),
+        inStep,
         getReadRhythmConfig().stepsPerBar
     );
+    if (pickupEndStep <= 0) {
+        return false;
+    }
     // At the end of a pattern, IN leads back into its cycle instead of discarding it.
-    return pickupEndStep > 0 &&
-        ((pattern.labelType || pattern.label) === 'Begleitung' || pickupEndStep === notes.length);
+    if ((pattern.labelType || pattern.label) === 'Begleitung' || pickupEndStep === notes.length) {
+        return true;
+    }
+    // The same applies to IN at the end of an opening repeat with notes before IN.
+    // A genuine leading pickup without preceding notes keeps its existing behavior.
+    const bars = Array.isArray(pattern.bars) ? pattern.bars : [];
+    const inBarIndex = bars.findIndex(function (bar) {
+        return (Array.isArray(bar && bar.controls) ? bar.controls : []).some(function (control) {
+            return control && control.type === 'in';
+        });
+    });
+    return notes.slice(0, inStep).some(isSheetQuickPlayPlayableNote) &&
+        buildSheetQuickPlayRepeatRanges(bars).some(function (range) {
+            return range.startBar === 1 && range.endBar === inBarIndex + 1;
+        });
 }
 
 function mergeSheetQuickPlayPickupIntoHostSection(hostSection, pickupSection) {
@@ -3885,6 +3899,7 @@ function buildSheetQuickPlayConfiguredSections(preparedPatterns) {
                 pickupHighlightRefs = [];
                 mainHighlightRefs = patternHighlightRefs.slice(safeInStep);
                 sectionStartStep = safeInStep;
+                section.rhythmStepOffset = safeInStep;
             } else if (pickupEndStep > 0 && !hasHostSection && !hasCyclicPickup) {
                 sectionStartStep = Math.max(0, pickupEndStep - stepsPerBar);
                 mainNotes = pickupNotes.concat(mainNotes);

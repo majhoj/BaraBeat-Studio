@@ -80,6 +80,7 @@ Object.assign(context, {
   getAccentMultiplier: () => 1, advanceSilentH2HStep: () => {}, getH2HRestMuteSampleName: () => '',
   h2hRestMuteGainMultipliers: { Djembe_1: 1, Djembe_2: 1, Djembe_3: 1 },
   getEffectiveTempoForStep: () => 80,
+  getPlaybackSectionContext: () => null,
   OfflineAudioContext: class {
     constructor(channels, frames, sampleRate) {
       assert.equal(channels, 2); assert.equal(sampleRate, 48000);
@@ -140,6 +141,34 @@ for (const fixture of fixtures.cases) {
     assert.equal(context.activePracticeCountInSources.length, 0, 'Export sources stay separate from live playback');
    }
   }
+}
+// A standalone solo trimmed to an internal IN must export the same shifted beat/swing phase.
+for (const fixture of fixtures.cases) {
+  const offset = fixture.stepsPerBeat + 2;
+  context.shekereBeatEnabled = true;
+  context.isSheetQuickPlayMode = true;
+  context.rhythmType = fixture.rhythm;
+  context.swingProfile = { [fixture.rhythm]: fixture.swing };
+  context.orderedSections = [{ rhythmStepOffset: offset, length: fixture.stepsPerBar * 2 }];
+  context.getPlaybackSectionContext = step => ({
+    section: context.orderedSections[0], localStep: step % context.orderedSections[0].length
+  });
+  context.getExportStepCount = () => fixture.stepsPerBar * 4;
+  hits.length = 0;
+  shekereHits.length = 0;
+  await context.exportCurrentArrangementAsWav();
+  let expectedTime = 0;
+  const expectedBeats = [];
+  hits.forEach((hit, step) => {
+    near(hit.time, expectedTime, 'Trimmed solo WAV note time');
+    const phase = (step + offset) % fixture.stepsPerBeat;
+    if (phase === 0) expectedBeats.push(expectedTime - 0.018);
+    expectedTime += fixture.beatIntervals[phase];
+  });
+  assert.equal(hits.length, fixture.stepsPerBar * 4);
+  assert.equal(shekereHits.length, expectedBeats.length);
+  shekereHits.forEach((hit, index) => near(hit.time, expectedBeats[index], 'Trimmed solo WAV Shekere beat'));
+  assert(Math.abs(renderedFrames - Math.ceil((expectedTime + 3.5) * 48000)) <= 1);
 }
 context.practiceCountInBuffer = null;
 shekereHits.length = 0;
