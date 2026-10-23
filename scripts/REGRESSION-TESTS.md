@@ -51,6 +51,7 @@ Der Handbuchtest benoetigt PHP CLI. Keine Tests aendern Notenblaetter.
 | Ballet Dununs in der Timeline | `timeline-three-bass`: eigene sichtbare Dreierbass-Spur, Einsetzen per Taktleiste, Begleitsegment verschieben/verlaengern, Speichern/Neuladen und Player-Uebergabe; separate Bassspuren bleiben unveraendert |
 | Taktgenaue Calls | `timeline-positioned-call`: Call in Takt 6 innerhalb zweitaktiger Basswiederholungen; Hinzufuegen/Verschieben, unveraenderte Begleitung, einzelne Durchlaeufe, mehrere Calls, Undo-Snapshot, Speichern/Neuladen und IN/OUT; IN des direkt folgenden Solos im Call-Takt, einschliesslich Pausen und separatem Auftakttakt, ohne verfruehten Auftakt in der Bassspur |
 | Unabhaengige Instrumentenspuren | `timeline-independent-tracks`: Migration, Speichern/Neuladen, Begleitung verlaengern ohne andere Instrumentenspuren zu verschieben, Solo mit allen Wiederholungen verschieben, Kollisionen, Undo, IN/OUT, verkuerzte Takte und Ueberlappungen; Solo 5 dreimal belegt sechs eigene Takte auch bei einem spaeter platzierten Solo 6, Schlussnote bleibt im Uebergang erhalten; ohne Nachfolger bleibt der klingende Schlusstakt erhalten |
+| Freie Djembe-Spuren beim Einfuegen | `timeline-free-djembe-targets`: generisches Djembe-Pattern trotz belegter Standardspur einfuegen; gleiche Entscheidung in Vorschau und Drop, alle freien Stimmen, eigener Block, unveraenderte Originale/Quelldaten, vollstaendige Dauer inklusive Wiederholungen/Spursegmenten, Undo, Speichern/Neuladen und Player-Noten; keine Umbelegung expliziter oder verschobener Pattern |
 | Nachruecken innerhalb einer Spur | `timeline-track-ripple`: Verlaengern, Verkuerzen und Verschieben bewegen die nachfolgenden Bloecke nur auf derselben Instrumentenspur; Abstaende, gemeinsam genutzte IN-/Ueberlappungstakte, Schluss-OUT, Wiederholungen und explizite Begleitsegmente bleiben erhalten; Mehrfachzuordnungen werden bei Bedarf spurweise getrennt; atomisches Undo, Speichern/Neuladen, unveraenderte Vorschau und Ablehnung unzulaessiger Kollisionen/Taktgrenzen |
 | Einzelne/unfertige Takte | `quick-play-drafts`: Instrument + Note ohne Funktion spielbar; nur Instrument oder Note ohne Instrument nicht spielbar |
 | Start im Arrangement | `musical-structure`, `timeline-accompaniment-lanes`: Starttakt inklusive Auftakt, Start-/Endgrenzen |
@@ -358,3 +359,26 @@ hochladen. Nur die neue Cacheversion zusammen mit der alten Shell wuerde den
 Fehler erneut cachen. Anschliessend BaraBeat online laden, Offline-Vorbereitung
 abschliessen lassen, App vollstaendig schliessen und offline erneut starten.
 Die oeffentlichen Dateien wurden bei dieser Diagnose nur gelesen, nicht geaendert.
+
+## Arrangement: freie Djembe-Spuren beim Einfuegen
+
+`resolveTimelineNewEntryTargets` belaesst kollisionsfreie Bibliothekszuordnungen
+unveraendert. Ist die Standardspur belegt, darf ein einzelnes generisches
+`Djembe`-Pattern auf alle ueber seine gesamte Dauer freien Djembe-Spuren
+ausweichen. Wiederholte Eintraege desselben Patterns bleiben ein eigener Block.
+Explizite Djembe-Nummern, gemischte Pattern-Gruppen, Bassinstrumente und das
+Verschieben vorhandener Bloecke behalten ihre bisherigen Kollisionsregeln.
+Vorschau, Taktleisten-Drop und paralleles Einfuegen nutzen dieselbe Pruefung.
+
+Alle 37 `check-*.mjs`-Tests einschliesslich HTTP-Pruefung bestehen. Zusaetzlich
+wurde die aktualisierte `Kuku Solo.bbs` vom 23.10.2026 im Browser getestet:
+nativer Drag von Begleitpattern 3 auf Takt 41 selektiert Djembe 1 und 2, waehrend
+alle 111 vorhandenen Eintraege unveraendert bleiben. Djembe 2 kann abgewaehlt,
+der neue Block bis Takt 51 verlaengert werden. Die anderen Instrumentenspuren
+behalten Position und Dauer; das bisherige Nachruecken auf der bearbeiteten
+Spur bleibt erhalten. Derselbe Drag funktioniert nach echtem Offline-Kaltstart.
+Die BBS-Datei selbst wurde nicht veraendert.
+
+Offline-Cache: `barabeat-studio-offline-v97-free-djembe-targets`. Beim Deployment
+`JS/timeline.js` und die neu erzeugte `app-shell.html` gemeinsam hochladen,
+danach `service-worker.js`. Cache-Strategie und Ausschluesse bleiben unveraendert.

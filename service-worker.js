@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'barabeat-studio-offline-v96-quick-play-shell';
+const CACHE_NAME = 'barabeat-studio-offline-v97-free-djembe-targets';
 const APP_SHELL = [
   './app-shell.html',
   './manifest.webmanifest',

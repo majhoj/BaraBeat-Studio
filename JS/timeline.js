@@ -2710,9 +2710,14 @@ function getTimelinePayloadCandidateEntries(payload) {
 function canInsertTimelinePayloadParallelToRow(payload, rowGroups) {
     if (hasPositionedTimeline() && rowGroups.length) {
         const entries = getTimelinePayloadCandidateEntries(payload);
-        const excluded = payload.type === 'timeline-entry-group'
-            ? timelineState.entries.slice(Number(payload.startIndex), Number(payload.startIndex) + Number(payload.count)) : [];
-        return entries.length > 0 && canPlaceTimelineEntries(entries, rowGroups[0].entries[0].startBar, excluded);
+        const startBar = rowGroups[0].entries[0].startBar;
+        if (payload.type === 'timeline-entry-group') {
+            const excluded = timelineState.entries.slice(Number(payload.startIndex), Number(payload.startIndex) + Number(payload.count));
+            return entries.length > 0 && canPlaceTimelineEntries(entries, startBar, excluded);
+        }
+        return resolveTimelineNewEntryTargets(entries.map(function (entry) {
+            return Object.assign({}, entry, { blockId: 'candidate-placement' });
+        }), startBar).length > 0;
     }
     const groups = Array.isArray(rowGroups) ? rowGroups.filter(Boolean) : [];
     const candidateEntries = getTimelinePayloadCandidateEntries(payload);
@@ -4284,6 +4289,23 @@ function canPlaceTimelineEntries(entries, startBar, excludedEntries) {
     } finally { timelineState.entries = original; }
 }
 
+function resolveTimelineNewEntryTargets(entries, startBar) {
+    if (!entries.length) return [];
+    if (canPlaceTimelineEntries(entries, startBar, [])) return entries;
+    const pattern = findPatternById(entries[0].patternId);
+    // Only an unnumbered Djembe pattern may choose other voices when its default is occupied.
+    if (!pattern || pattern.instrument !== 'Djembe' || pattern.sourceInstrument !== 'Djembe' ||
+        entries.some(function (entry) { return entry.patternId !== pattern.id; })) return [];
+    const freeTargets = timelineDjembeTargets.filter(function (target) {
+        return canPlaceTimelineEntries(entries.map(function (entry) {
+            return Object.assign({}, entry, { targetInstruments: [target] });
+        }), startBar, []);
+    });
+    return freeTargets.length ? entries.map(function (entry) {
+        return Object.assign({}, entry, { targetInstruments: freeTargets.slice() });
+    }) : [];
+}
+
 function isTimelineTrackFollower(clip, source) {
     if (clip.targetInstrument !== source.targetInstrument ||
         (source.group ? clip.group === source.group : clip.segment === source.segment)) return false;
@@ -4415,7 +4437,7 @@ function placeTimelinePayload(payload, startBar) {
         : payload.type === 'pattern-group' ? payload.entries : getTimelinePayloadCandidateEntries(payload);
     if (!source || !source.length) return false;
     const blockId = isMove ? source[0].blockId : nextTimelineBlockId();
-    const entries = source.map(function (entry) {
+    let entries = source.map(function (entry) {
         const pattern = findPatternById(entry.patternId);
         return pattern ? Object.assign({}, isMove ? entry : cloneTimelineEntryFromPattern(pattern, entry), {
             startBar: normalizeTimelineAccompanimentStartBar(startBar), blockId: blockId,
@@ -4425,7 +4447,8 @@ function placeTimelinePayload(payload, startBar) {
     if (isMove) {
         return commitTimelineTrackEditPlan(buildTimelineTrackEditPlan({ sourceEntries: source, nextEntries: entries }));
     }
-    if (!canPlaceTimelineEntries(entries, startBar, [])) {
+    entries = resolveTimelineNewEntryTargets(entries, startBar);
+    if (!entries.length) {
         reportTimelinePlacementConflict();
         return false;
     }
@@ -5043,7 +5066,7 @@ function getTimelineRulerBarDropAction(payload, layout, barNumber) {
         if (!entries.length) return null;
         const canPlace = isMove ? buildTimelineTrackEditPlan({ sourceEntries: entries,
             nextEntries: entries.map(function (entry) { return Object.assign({}, entry, { startBar: normalizedBarNumber }); }) })
-            : canPlaceTimelineEntries(entries, normalizedBarNumber, []);
+            : resolveTimelineNewEntryTargets(entries, normalizedBarNumber).length > 0;
         if (!canPlace) return null;
         return { type: 'positioned', startBar: normalizedBarNumber };
     }

@@ -70,6 +70,11 @@ assert.notEqual(currentCacheName, staleShellCacheName, 'Replacing the deployed s
 stores.set(staleShellCacheName, new Map([
   [origin + 'app-shell.html', new Response('old shell that discards the opening repeat at IN')]
 ]));
+const previousTimelineCacheName = 'barabeat-studio-offline-v96-quick-play-shell';
+assert.notEqual(currentCacheName, previousTimelineCacheName, 'Free Djembe assignment requires an updated timeline cache');
+stores.set(previousTimelineCacheName, new Map([
+  [origin + 'JS/timeline.js', new Response('old timeline without free Djembe assignment')]
+]));
 let activationPromise;
 handlers.activate({ waitUntil: promise => { activationPromise = promise; } });
 await activationPromise;
@@ -79,6 +84,7 @@ assert(!stores.has(previousCacheName), 'Activation removes the old module cache'
 assert(!stores.has(previousPlayerCacheName), 'Activation removes the old player cache');
 assert(!stores.has(previousPairingCacheName), 'Activation removes the module without collectRepeatRanges');
 assert(!stores.has(staleShellCacheName), 'Activation removes the stale deployed offline shell');
+assert(!stores.has(previousTimelineCacheName), 'Activation removes the old placement logic');
 
 async function request(path, mode = 'navigate', method = 'GET') {
   let response;
@@ -117,6 +123,7 @@ const offlineTimeline = await (await request('JS/timeline.js?v=changed')).text()
 const offlinePlayer = await (await request('Audio/player.html?launchReload=offline')).text();
 const offlinePractice = await (await request('JS/practice.js?v=changed')).text();
 const offlineShell = await (await request('index.php')).text();
+assert.equal(offlineTimeline, source('JS/timeline.js'), 'Offline insertion must use the updated target assignment');
 function quickPlayCode(text) {
   const start = text.indexOf('function buildSheetQuickPlayRepeatRanges(');
   const end = text.indexOf('function createSheetPatternMoveOverlayButton(', start);
