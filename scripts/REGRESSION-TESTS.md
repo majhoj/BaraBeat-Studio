@@ -29,6 +29,32 @@ Der Handbuchtest benoetigt PHP CLI. Keine Tests aendern Notenblaetter.
 
 ## Abdeckung
 
+PDF-Export: `node scripts/check-pdf-export.mjs` prueft echte PDF-Objekte,
+Seitenzahl/-reihenfolge, A4-Format, binaere Streamlaengen und Xref-Offsets,
+Blattgrenzen ohne Zwischenraeume, 93,3% der vorherigen 120%-Darstellung mit
+gemeinsamem Massstab, 19 mm Rand links, 20 mm oben auf dem ersten Blatt und
+hoehenidentischen Notenzeilen auf allen Folgeblaettern, Rhythmusnamen vor
+den Seitenzahlen in deren Schrift/Formatierung (auch Sonderzeichen und lange
+Namen), Schutz randnaher Notizen/Seitenzahlen vor Beschnitt, einen
+wiederverwendeten Canvas, Fehlerbereinigung und Paritaet der Offline-Shell.
+Mit `--browser` werden zusaetzlich Tiriba (1 Blatt), Kuku Solo (2 Blaetter)
+und Djaa Djembe, Sangban, Dundunba (4 Blaetter) wirklich exportiert, auch mit
+leerem Schlussblatt und ohne Netzwerk. Benoetigt Playwright, Chromium und
+den lokalen Testserver; `BARABEAT_PLAYWRIGHT_MODULE` kann einen lokalen
+Modulpfad angeben, `BARABEAT_TEST_BROWSER=webkit` aktiviert WebKit.
+Optional speichert `BARABEAT_PDF_TEST_DIR` die PDFs fuer die Sichtpruefung.
+
+Lokales Speichern: `node scripts/check-local-save-conflicts.mjs` prueft
+Rueckfrage/Abbruch beim Ersetzen, Speichern als, mehrdeutige Alt-Dubletten,
+Verknuepfung mit Veroeffentlichungen, Speicherfehler, gemerkte Datei-ID,
+fuenf Sprachen und Offline-Paritaet. Mit `--browser` prueft der Test in einem
+isolierten Chromium-Profil echte IndexedDB-Transaktionen, gleiche Namen in
+verschiedenen Ordnern, Gross-/Kleinschreibung und Unicode, Umbenennen/Verschieben,
+gleichzeitiges Speichern aus zwei Fenstern, vorhandene Dubletten ohne Migration,
+den echten Dateidialog, Serverimport mit Namenskonflikt, Neuladen und Offline.
+Die Datenbank der installierten App wird dabei nicht verwendet. Testserver und
+`BARABEAT_PLAYWRIGHT_MODULE` wie beim PDF-Test.
+
 | Musikalischer Fall | Test (`check-*.mjs`) / konkretes Soll |
 | --- | --- |
 | Binaer, tenaer, neunaer | `musical-structure`, `musical-timing`: 32/8, 24/6, 18/6 Schritte; bei BPM 80 Taktlaenge 3 s, 3 s, 2,25 s |

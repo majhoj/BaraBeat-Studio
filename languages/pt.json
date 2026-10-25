@@ -138,6 +138,7 @@
       "renameFolder": "Novo nome da pasta:"
     },
     "confirm": {
+      "replaceSameName": "Esta pasta já contém uma partitura chamada \"{title}\".\nSubstituir o arquivo local existente? O conteúdo anterior será sobrescrito.",
       "discardUnsaved": "Há alterações não salvas na partitura, nas configurações de prática ou no arranjo.\nContinuar sem salvar? Escolha Cancelar para manter a partitura atual aberta.",
       "deleteLocal": "Excluir \"{title}\" localmente?\nA versão do servidor permanecerá inalterada.",
       "replaceLocalChanges": "\"{title}\" tem alterações locais.\nCarregar mesmo assim a versão do servidor e substituir a cópia local?",
@@ -145,6 +146,8 @@
       "deleteFromServer": "Excluir \"{title}\" do servidor?\nO arquivo local continuará disponível."
     },
     "error": {
+      "localNameExists": "Esta pasta já contém uma partitura chamada \"{title}\". Abre o arquivo existente ou escolhe outro nome.",
+      "localNameAmbiguous": "Esta pasta contém várias partituras chamadas \"{title}\". Abre o arquivo existente desejado ou salva com outro nome. Nada foi sobrescrito.",
       "listLoad": "Não foi possível carregar a lista de arquivos: {message}",
       "localSave": "Não foi possível salvar localmente: {message}",
       "selectLocalToRename": "Primeiro selecione ou salve um arquivo local.",

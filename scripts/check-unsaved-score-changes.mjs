@@ -50,7 +50,7 @@ const context = vm.createContext({
 });
 loadFunctions(context, text, [
   'scoreSnapshotSignature', 'rememberSavedScoreSnapshot', 'hasUnsavedScoreChanges',
-  'confirmDiscardScoreChanges', 'loadRhythmContent', 'saveCurrentScoreLocal',
+  'confirmDiscardScoreChanges', 'loadRhythmContent', 'saveLocalScoreWithNameCheck', 'saveCurrentScoreLocal',
   'viererNoten', 'dreierNoten', 'neunerNoten', 'openLocalScore', 'importServerScore'
 ]);
 const unloadStart = text.indexOf("window.addEventListener('beforeunload'");

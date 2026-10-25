@@ -138,6 +138,7 @@
       "renameFolder": "Nuevo nombre de la carpeta:"
     },
     "confirm": {
+      "replaceSameName": "Esta carpeta ya contiene una partitura llamada \"{title}\".\n¿Sustituir el archivo local existente? Se sobrescribirá su contenido anterior.",
       "discardUnsaved": "Hay cambios sin guardar en la partitura, los ajustes de práctica o el arreglo.\n¿Continuar sin guardar? Elige Cancelar para mantener abierta la partitura actual.",
       "deleteLocal": "¿Eliminar \"{title}\" localmente?\nLa versión del servidor no cambiará.",
       "replaceLocalChanges": "\"{title}\" tiene cambios locales.\n¿Cargar de todos modos la versión del servidor y sustituir la copia local?",
@@ -145,6 +146,8 @@
       "deleteFromServer": "¿Eliminar \"{title}\" del servidor?\nEl archivo local seguirá disponible."
     },
     "error": {
+      "localNameExists": "Esta carpeta ya contiene una partitura llamada \"{title}\". Abre el archivo existente o elige otro nombre.",
+      "localNameAmbiguous": "Esta carpeta contiene varias partituras llamadas \"{title}\". Abre el archivo existente que deseas o guarda con otro nombre. No se ha sobrescrito nada.",
       "listLoad": "No se pudo cargar la lista de archivos: {message}",
       "localSave": "No se pudo guardar localmente: {message}",
       "selectLocalToRename": "Primero selecciona o guarda un archivo local.",

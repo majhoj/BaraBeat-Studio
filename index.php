@@ -5660,19 +5660,24 @@ function base64ToUint8Array(base64Value) {
     return bytes;
 }
 
-function createSingleImagePdf(jpegBytes, imageWidth, imageHeight) {
+function createImagePagesPdf(imagePages) {
     const encoder = new TextEncoder();
     const pageWidth = 595.28;
     const pageHeight = 841.89;
     const margin = 22;
     const usableWidth = pageWidth - margin * 2;
     const usableHeight = pageHeight - margin * 2;
-    const imageRatio = imageWidth / imageHeight;
-    const pageRatio = usableWidth / usableHeight;
-    const drawWidth = imageRatio > pageRatio ? usableWidth : usableHeight * imageRatio;
-    const drawHeight = imageRatio > pageRatio ? usableWidth / imageRatio : usableHeight;
-    const drawX = (pageWidth - drawWidth) / 2;
-    const drawY = pageHeight - margin - drawHeight;
+    const leftMargin = 19 * 72 / 25.4;
+    const topMargin = 20 * 72 / 25.4;
+    const contentMargin = 10;
+    // Keep one scale across all sheets; protect annotations placed near an edge.
+    const enlargement = imagePages.reduce(function (factor, imagePage) {
+        const bounds = imagePage.contentBounds || { x: 0, y: 0, width: imagePage.width, height: imagePage.height };
+        const baseScale = Math.min(usableWidth / imagePage.width, usableHeight / imagePage.height);
+        return Math.min(factor,
+            (pageWidth - leftMargin - contentMargin) / (bounds.width * baseScale),
+            (pageHeight - topMargin - contentMargin) / (bounds.height * baseScale));
+    }, 1.2 * 0.933);
     const chunks = [];
     const offsets = [0];
     let byteLength = 0;
@@ -5701,35 +5706,52 @@ function createSingleImagePdf(jpegBytes, imageWidth, imageHeight) {
 
     appendText('%PDF-1.4\n');
     addObject(1, '<< /Type /Catalog /Pages 2 0 R >>');
-    addObject(2, '<< /Type /Pages /Kids [3 0 R] /Count 1 >>');
-    addObject(
-        3,
-        '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + pageWidth + ' ' + pageHeight +
-        '] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>'
-    );
-    offsets[4] = byteLength;
-    appendText(
-        '4 0 obj\n' +
-        '<< /Type /XObject /Subtype /Image /Width ' + imageWidth +
-        ' /Height ' + imageHeight +
-        ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' +
-        jpegBytes.length + ' >>\nstream\n'
-    );
-    appendBytes(jpegBytes);
-    appendText('\nendstream\nendobj\n');
+    const pageReferences = imagePages.map(function (_, index) {
+        return (3 + index * 3) + ' 0 R';
+    });
+    addObject(2, '<< /Type /Pages /Kids [' + pageReferences.join(' ') + '] /Count ' + imagePages.length + ' >>');
+    imagePages.forEach(function (imagePage, index) {
+        const pageObject = 3 + index * 3;
+        const imageObject = pageObject + 1;
+        const contentObject = pageObject + 2;
+        const imageRatio = imagePage.width / imagePage.height;
+        const pageRatio = usableWidth / usableHeight;
+        const drawWidth = (imageRatio > pageRatio ? usableWidth : usableHeight * imageRatio) * enlargement;
+        const drawHeight = (imageRatio > pageRatio ? usableWidth / imageRatio : usableHeight) * enlargement;
+        const bounds = imagePage.contentBounds || { x: 0, y: 0, width: imagePage.width, height: imagePage.height };
+        const scale = drawWidth / imagePage.width;
+        const drawX = leftMargin - bounds.x * scale;
+        const drawY = pageHeight - topMargin - (imagePage.height - bounds.y) * scale;
+        addObject(
+            pageObject,
+            '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + pageWidth + ' ' + pageHeight +
+            '] /Resources << /XObject << /Im0 ' + imageObject + ' 0 R >> >> /Contents ' + contentObject + ' 0 R >>'
+        );
+        offsets[imageObject] = byteLength;
+        appendText(
+            imageObject + ' 0 obj\n' +
+            '<< /Type /XObject /Subtype /Image /Width ' + imagePage.width +
+            ' /Height ' + imagePage.height +
+            ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' +
+            imagePage.jpegBytes.length + ' >>\nstream\n'
+        );
+        appendBytes(imagePage.jpegBytes);
+        appendText('\nendstream\nendobj\n');
 
-    const contentStream = 'q\n' +
-        drawWidth.toFixed(2) + ' 0 0 ' + drawHeight.toFixed(2) + ' ' +
-        drawX.toFixed(2) + ' ' + drawY.toFixed(2) + ' cm\n' +
-        '/Im0 Do\nQ';
-    addObject(5, '<< /Length ' + encoder.encode(contentStream).length + ' >>\nstream\n' + contentStream + '\nendstream');
+        const contentStream = 'q\n' +
+            drawWidth.toFixed(2) + ' 0 0 ' + drawHeight.toFixed(2) + ' ' +
+            drawX.toFixed(2) + ' ' + drawY.toFixed(2) + ' cm\n' +
+            '/Im0 Do\nQ';
+        addObject(contentObject, '<< /Length ' + encoder.encode(contentStream).length + ' >>\nstream\n' + contentStream + '\nendstream');
+    });
 
     const xrefOffset = byteLength;
-    appendText('xref\n0 6\n0000000000 65535 f \n');
-    for (let objectNumber = 1; objectNumber <= 5; objectNumber += 1) {
+    const objectCount = 3 + imagePages.length * 3;
+    appendText('xref\n0 ' + objectCount + '\n0000000000 65535 f \n');
+    for (let objectNumber = 1; objectNumber < objectCount; objectNumber += 1) {
         appendText(String(offsets[objectNumber]).padStart(10, '0') + ' 00000 n \n');
     }
-    appendText('trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n' + xrefOffset + '\n%%EOF');
+    appendText('trailer\n<< /Size ' + objectCount + ' /Root 1 0 R >>\nstartxref\n' + xrefOffset + '\n%%EOF');
     return new Blob(chunks, { type: 'application/pdf' });
 }
 
@@ -5746,36 +5768,111 @@ function loadImageFromObjectUrl(url) {
     });
 }
 
-async function exportCurrentSheetAsPdf() {
-    const svgContent = buildExportSvgContent();
-    const documentTitle = titel.attr('text') || uiText('editor.defaultExportName');
-    const svgBlob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8' });
-    const svgUrl = URL.createObjectURL(svgBlob);
+function getPdfScorePageBounds(pageCount) {
+    const pageBounds = Array(pageCount).fill(null);
+    s.selectAll(exportableElementSelector).forEach(function (element) {
+        if (element.attr('id') === 'timeline_metadata' || element.hasClass('sheet-page-background')) return;
+        const box = element.getBBox();
+        if (!box || ![box.x, box.y, box.width, box.height].every(Number.isFinite)) return;
+        for (let index = 0; index < pageCount; index += 1) {
+            const offsetY = getSheetPageOffsetY(index);
+            const left = Math.max(0, box.x);
+            const right = Math.min(sheetWidth, box.x + box.width);
+            const top = Math.max(0, box.y - offsetY);
+            const bottom = Math.min(sheetPageHeight, box.y + box.height - offsetY);
+            if (right <= left || bottom <= top) continue;
+            const bounds = pageBounds[index];
+            pageBounds[index] = bounds ? {
+                left: Math.min(bounds.left, left), top: Math.min(bounds.top, top),
+                right: Math.max(bounds.right, right), bottom: Math.max(bounds.bottom, bottom)
+            } : { left: left, top: top, right: right, bottom: bottom };
+        }
+    });
+    // Share the vertical origin so sheets without a title keep their staff rows aligned.
+    const sharedTop = pageBounds.reduce(function (top, bounds) {
+        return Math.min(top, bounds ? bounds.top - 2 : 0);
+    }, sheetPageHeight);
+    // Leave room for strokes extending beyond the geometric bounding box.
+    return pageBounds.map(function (bounds) {
+        return bounds ? { x: bounds.left - 2, y: sharedTop,
+            width: bounds.right - bounds.left + 4, height: bounds.bottom + 2 - sharedTop }
+            : { x: 0, y: sharedTop, width: sheetWidth, height: sheetPageHeight - sharedTop };
+    });
+}
 
+async function exportCurrentSheetAsPdf() {
+    const documentTitle = titel.attr('text') || uiText('editor.defaultExportName');
     try {
-        const image = await loadImageFromObjectUrl(svgUrl);
+        const svgDocument = new DOMParser().parseFromString(buildExportSvgContent(), 'image/svg+xml');
+        const svgRoot = svgDocument.documentElement;
+        const pageCount = getSheetPageCount(zeilenAnzahl);
+        const pageBounds = getPdfScorePageBounds(pageCount);
+        svgRoot.querySelectorAll('.sheet-page-background').forEach(function (frame) { frame.remove(); });
+        svgRoot.querySelectorAll('.sheet-page-number').forEach(function (pageNumber) {
+            pageNumber.textContent = documentTitle + ' - ' + pageNumber.textContent;
+        });
+        const imagePages = [];
+        // Reuse one page-sized canvas, even for long scores.
         const canvas = document.createElement('canvas');
         canvas.width = 2480;
         canvas.height = 3508;
         const context = canvas.getContext('2d');
-        context.fillStyle = 'white';
-        context.fillRect(0, 0, canvas.width, canvas.height);
-
-        const padding = 94;
-        const usableWidth = canvas.width - padding * 2;
-        const usableHeight = canvas.height - padding * 2;
-        const imageRatio = image.naturalWidth / image.naturalHeight;
-        const canvasRatio = usableWidth / usableHeight;
-        const drawWidth = imageRatio > canvasRatio ? usableWidth : usableHeight * imageRatio;
-        const drawHeight = imageRatio > canvasRatio ? usableWidth / imageRatio : usableHeight;
-        const drawX = (canvas.width - drawWidth) / 2;
-        const drawY = padding;
-
-        context.drawImage(image, drawX, drawY, drawWidth, drawHeight);
-
-        const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.94);
-        const jpegBytes = base64ToUint8Array(jpegDataUrl.split(',')[1]);
-        const pdfBlob = createSingleImagePdf(jpegBytes, canvas.width, canvas.height);
+        // Measure the longer footer in the same font, without changing the editor.
+        svgRoot.querySelectorAll('.sheet-page-number').forEach(function (pageNumber, index) {
+            const bounds = pageBounds[index];
+            if (!bounds) return;
+            const fontSize = parseFloat(pageNumber.style.fontSize || pageNumber.getAttribute('font-size')) || 11;
+            const fontFamily = pageNumber.style.fontFamily || pageNumber.getAttribute('font-family') || 'sans-serif';
+            context.font = fontSize + 'px ' + fontFamily;
+            const right = Number(pageNumber.getAttribute('x'));
+            const availableWidth = right - Math.max(0, bounds.x);
+            const textWidth = context.measureText(pageNumber.textContent).width;
+            if (textWidth > availableWidth && availableWidth > 0) {
+                pageNumber.setAttribute('textLength', availableWidth);
+                pageNumber.setAttribute('lengthAdjust', 'spacingAndGlyphs');
+            }
+        });
+        for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
+            const contentBounds = pageBounds[pageIndex];
+            if (pageCount > 1) {
+                // Crop at the editor's sheet boundaries, excluding the gaps between sheets.
+                svgRoot.setAttribute('width', sheetWidth);
+                svgRoot.setAttribute('height', sheetPageHeight);
+                svgRoot.setAttribute('viewBox', [0, getSheetPageOffsetY(pageIndex), sheetWidth, sheetPageHeight].join(' '));
+            }
+            const svgBlob = new Blob([new XMLSerializer().serializeToString(svgRoot)], { type: 'image/svg+xml;charset=utf-8' });
+            const svgUrl = URL.createObjectURL(svgBlob);
+            try {
+                const image = await loadImageFromObjectUrl(svgUrl);
+                context.fillStyle = 'white';
+                context.fillRect(0, 0, canvas.width, canvas.height);
+                const padding = 94;
+                const usableWidth = canvas.width - padding * 2;
+                const usableHeight = canvas.height - padding * 2;
+                const imageRatio = image.naturalWidth / image.naturalHeight;
+                const canvasRatio = usableWidth / usableHeight;
+                const drawWidth = imageRatio > canvasRatio ? usableWidth : usableHeight * imageRatio;
+                const drawHeight = imageRatio > canvasRatio ? usableWidth / imageRatio : usableHeight;
+                const drawX = (canvas.width - drawWidth) / 2;
+                const viewBox = svgRoot.getAttribute('viewBox').trim().split(/\s+/).map(Number);
+                context.drawImage(image, drawX, padding, drawWidth, drawHeight);
+                const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.94);
+                imagePages.push({
+                    jpegBytes: base64ToUint8Array(jpegDataUrl.split(',')[1]),
+                    width: canvas.width,
+                    height: canvas.height,
+                    contentBounds: {
+                        x: drawX + (contentBounds.x - viewBox[0]) * drawWidth / viewBox[2],
+                        y: padding + (contentBounds.y + (pageCount > 1 ? getSheetPageOffsetY(pageIndex) : 0) - viewBox[1]) * drawHeight / viewBox[3],
+                        width: contentBounds.width * drawWidth / viewBox[2],
+                        height: contentBounds.height * drawHeight / viewBox[3]
+                    }
+                });
+            } finally {
+                URL.revokeObjectURL(svgUrl);
+            }
+        }
+        const pdfBlob = createImagePagesPdf(imagePages);
         const baseName = sanitizeDownloadFileName(documentTitle, uiText('editor.defaultExportName'));
         const pdfUrl = URL.createObjectURL(pdfBlob);
         const link = document.createElement('a');
@@ -5790,8 +5887,6 @@ async function exportCurrentSheetAsPdf() {
     } catch (error) {
         console.error('PDF-Export fehlgeschlagen', error);
         alert(uiText('error.pdfExportFailed', { message: error.message || '' }));
-    } finally {
-        URL.revokeObjectURL(svgUrl);
     }
 }
 
@@ -9814,6 +9909,27 @@ function showAutoDismissMessage(message, durationMs) {
 
 // Speichern
 
+async function saveLocalScoreWithNameCheck(score) {
+    try {
+        return await localLibrary.saveScore(score);
+    } catch (error) {
+        if (!error || error.code !== 'LOCAL_SCORE_NAME_EXISTS') throw error;
+        if (error.conflictingScoreIds.length !== 1) {
+            throw new Error(uiText('file.error.localNameAmbiguous', { title: score.title }));
+        }
+        const existingScore = await localLibrary.getScore(error.conflictingScoreIds[0]);
+        if (!existingScore || (score.serverPath && existingScore.serverPath && score.serverPath !== existingScore.serverPath)) {
+            throw error;
+        }
+        if (!confirm(uiText('file.confirm.replaceSameName', { title: existingScore.title }))) {
+            const cancelError = new Error('Local save cancelled');
+            cancelError.isUserCancel = true;
+            throw cancelError;
+        }
+        return localLibrary.saveScore(Object.assign({}, score, { id: existingScore.id }));
+    }
+}
+
 async function saveCurrentScoreLocal(nameOverride, folderIdOverride, options) {
     const saveOptions = options || {};
     const serializedRhythm = buildSerializedRhythm();
@@ -9829,7 +9945,7 @@ async function saveCurrentScoreLocal(nameOverride, folderIdOverride, options) {
         (existingScore && existingScore.folderId) ||
         localLibrary.rootFolderId;
 
-    const savedScore = await localLibrary.saveScore({
+    const savedScore = await saveLocalScoreWithNameCheck({
         id: scoreId,
         title: name,
         folderId: folderId,
@@ -9840,6 +9956,7 @@ async function saveCurrentScoreLocal(nameOverride, folderIdOverride, options) {
     // Edits made while IndexedDB is writing must remain unsaved.
     if (generation === scoreDocumentGeneration) {
         currentScoreId = savedScore.id;
+        rememberLastLoadedScore(savedScore.id);
         if (getCurrentRhythmTitle() === titleAtStart) setRhythmTitle(savedScore.title);
         savedScoreSnapshot = savedSignature;
         setSelectedFileSource('local');
@@ -9879,6 +9996,7 @@ async function saveCurrentScoreFromMenu() {
         showAutoDismissMessage(uiText('file.message.savedLocal', { title: savedScore.title }));
         closeAppMenus();
     } catch (error) {
+        if (error && error.isUserCancel) return;
         console.error('Lokales Speichern fehlgeschlagen', error);
         alert(uiText('file.error.localSave', { message: error.message || '' }));
     }
@@ -10014,6 +10132,7 @@ async function publishCurrentScore() {
         const publishedScore = await publishCurrentScoreToServer();
         alert(uiText('file.message.published', { title: publishedScore.title }));
     } catch (error) {
+        if (error && error.isUserCancel) return;
         console.error('Veröffentlichen fehlgeschlagen', error);
         alert(uiText('file.error.publish', { message: error.message || '' }));
     }
@@ -10087,7 +10206,7 @@ async function importServerScore(serverPath, serverInfo) {
             }));
         }
 
-        return localLibrary.saveScore({
+        return saveLocalScoreWithNameCheck({
             title: serverScore.title,
             folderId: localLibrary.rootFolderId,
             format: serverScore.format,
@@ -11905,6 +12024,7 @@ function get_value(e) {
 
     if (getSelectedFileSource() === 'server' || selectedFromUrl) {
         importServerScore(selectedFileName).catch(function (error) {
+            if (error && error.isUserCancel) return;
             console.error('Serverdatei konnte nicht importiert werden', error);
             alert(uiText('file.error.serverLoad', { message: error.message || '' }));
         });

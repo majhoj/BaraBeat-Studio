@@ -233,30 +233,40 @@
       throw new Error(t("error.scoreObjectExpected"));
     }
 
-    const existingScore = score.id ? await getByKey("scores", score.id) : null;
-    const timestamp = nowIso();
-    const title = normalizeName(score.title || score.name || (existingScore && existingScore.title), "Unbenannt");
-    const isPublished = Boolean(
-      typeof score.isPublished !== "undefined"
-        ? score.isPublished
-        : existingScore && existingScore.isPublished
-    );
-    const syncState = score.syncState ||
-      (existingScore && existingScore.isPublished ? "modified-local" : DEFAULT_SYNC_STATE);
-
-    const savedScore = Object.assign({}, existingScore || {}, score, {
-      id: score.id || createId("score"),
-      folderId: normalizeParentId(score.folderId || (existingScore && existingScore.folderId)),
-      title: title,
-      sortName: normalizeSortName(title),
-      isPublished: isPublished,
-      syncState: syncState,
-      createdAt: existingScore && existingScore.createdAt ? existingScore.createdAt : timestamp,
-      updatedAt: timestamp,
-      localUpdatedAt: timestamp
-    });
-
     return withStore("scores", "readwrite", async function (stores) {
+      const existingScore = score.id ? await promisifyRequest(stores.scores.get(score.id)) : null;
+      const timestamp = nowIso();
+      const title = normalizeName(score.title || score.name || (existingScore && existingScore.title), "Unbenannt");
+      const folderId = normalizeParentId(score.folderId || (existingScore && existingScore.folderId));
+      const nameKey = normalizeSortName(title.normalize("NFC"));
+      const keepsIdentity = existingScore && normalizeParentId(existingScore.folderId) === folderId &&
+        normalizeSortName(String(existingScore.title || "").normalize("NFC")) === nameKey;
+
+      // Check and write in one transaction, including competing windows. Existing duplicates stay editable by ID.
+      if (!keepsIdentity) {
+        const siblings = await getAllFromIndex(stores.scores, "folderId", folderId);
+        const conflicts = siblings.filter(function (other) {
+          return other.id !== score.id && normalizeSortName(String(other.title || "").normalize("NFC")) === nameKey;
+        });
+        if (conflicts.length) {
+          const error = new Error(t("file.error.localNameExists", { title: title }));
+          error.code = "LOCAL_SCORE_NAME_EXISTS";
+          error.conflictingScoreIds = conflicts.map(function (other) { return other.id; });
+          throw error;
+        }
+      }
+
+      const savedScore = Object.assign({}, existingScore || {}, score, {
+        id: score.id || createId("score"),
+        folderId: folderId,
+        title: title,
+        sortName: normalizeSortName(title),
+        isPublished: Boolean(typeof score.isPublished !== "undefined" ? score.isPublished : existingScore && existingScore.isPublished),
+        syncState: score.syncState || (existingScore && existingScore.isPublished ? "modified-local" : DEFAULT_SYNC_STATE),
+        createdAt: existingScore && existingScore.createdAt ? existingScore.createdAt : timestamp,
+        updatedAt: timestamp,
+        localUpdatedAt: timestamp
+      });
       await promisifyRequest(stores.scores.put(savedScore));
       return savedScore;
     });

@@ -138,6 +138,7 @@
       "renameFolder": "Nouveau nom du dossier :"
     },
     "confirm": {
+      "replaceSameName": "Ce dossier contient déjà une partition nommée \"{title}\".\nRemplacer le fichier local existant ? Son contenu précédent sera écrasé.",
       "discardUnsaved": "Des modifications de la partition, des réglages d'entraînement ou de l'arrangement n'ont pas été enregistrées.\nContinuer sans enregistrer ? Choisissez Annuler pour conserver la partition actuelle ouverte.",
       "deleteLocal": "Supprimer \"{title}\" localement ?\nLa version du serveur restera inchangée.",
       "replaceLocalChanges": "\"{title}\" contient des modifications locales.\nCharger quand même la version du serveur et remplacer la copie locale ?",
@@ -145,6 +146,8 @@
       "deleteFromServer": "Supprimer \"{title}\" du serveur ?\nLe fichier local restera disponible."
     },
     "error": {
+      "localNameExists": "Ce dossier contient déjà une partition nommée \"{title}\". Ouvre le fichier existant ou choisis un autre nom.",
+      "localNameAmbiguous": "Ce dossier contient plusieurs partitions nommées \"{title}\". Ouvre le fichier existant souhaité ou enregistre sous un autre nom. Rien n’a été écrasé.",
       "listLoad": "Impossible de charger la liste des fichiers : {message}",
       "localSave": "Impossible d'enregistrer localement : {message}",
       "selectLocalToRename": "Sélectionnez ou enregistrez d'abord un fichier local.",

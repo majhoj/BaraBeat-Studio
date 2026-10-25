@@ -138,6 +138,7 @@
       "renameFolder": "Neuer Ordnername:"
     },
     "confirm": {
+      "replaceSameName": "In diesem Ordner gibt es bereits ein Notenblatt namens \"{title}\".\nDie vorhandene lokale Datei ersetzen? Der bisherige Inhalt wird überschrieben.",
       "discardUnsaved": "Es gibt ungespeicherte Änderungen am Notenblatt, im Übungsmodus oder im Arrangement.\nWirklich ohne Speichern fortfahren? Mit Abbrechen bleibst du beim aktuellen Notenblatt.",
       "deleteLocal": "\"{title}\" lokal löschen?\nDer Server bleibt unverändert.",
       "replaceLocalChanges": "\"{title}\" wurde lokal geändert.\nTrotzdem die Serverversion laden und die lokale Kopie ersetzen?",
@@ -145,6 +146,8 @@
       "deleteFromServer": "\"{title}\" vom Server löschen?\nDie lokale Datei bleibt erhalten."
     },
     "error": {
+      "localNameExists": "In diesem Ordner gibt es bereits ein Notenblatt namens \"{title}\". Bitte öffne die vorhandene Datei oder wähle einen anderen Namen.",
+      "localNameAmbiguous": "In diesem Ordner gibt es mehrere Notenblätter namens \"{title}\". Bitte öffne die gewünschte vorhandene Datei oder speichere unter einem anderen Namen. Es wurde nichts überschrieben.",
       "listLoad": "Fehler beim Laden der Dateiliste: {message}",
       "localSave": "Fehler beim lokalen Speichern: {message}",
       "selectLocalToRename": "Bitte zuerst eine lokale Datei auswählen oder speichern.",

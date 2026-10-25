@@ -75,7 +75,33 @@ assert.notEqual(currentCacheName, previousTimelineCacheName, 'Free Djembe assign
 stores.set(previousTimelineCacheName, new Map([
   [origin + 'JS/timeline.js', new Response('old timeline without free Djembe assignment')]
 ]));
+const previousPdfCacheName = 'barabeat-studio-offline-v97-free-djembe-targets';
+assert.notEqual(currentCacheName, previousPdfCacheName, 'Multipage PDF export requires a new offline shell');
+stores.set(previousPdfCacheName, new Map([
+  [origin + 'app-shell.html', new Response('old shell with single-page PDF export')]
+]));
+const previousPdfScaleCacheName = 'barabeat-studio-offline-v98-multipage-pdf';
+assert.notEqual(currentCacheName, previousPdfScaleCacheName, 'Larger PDF sheets require an updated shell');
+stores.set(previousPdfScaleCacheName, new Map([
+  [origin + 'app-shell.html', new Response('old shell with smaller PDF sheets')]
+]));
+const previousPdfMarginCacheName = 'barabeat-studio-offline-v99-pdf-scale';
+assert.notEqual(currentCacheName, previousPdfMarginCacheName, 'PDF margins and named footers require a new shell');
+stores.set(previousPdfMarginCacheName, new Map([
+  [origin + 'app-shell.html', new Response('old shell with centered PDF sheets')]
+]));
 let activationPromise;
+const previousLocalSaveCacheName = 'barabeat-studio-offline-v101-pdf-row-alignment';
+assert.notEqual(currentCacheName, previousLocalSaveCacheName, 'Local save guards require updated shell, module and translations');
+stores.set(previousLocalSaveCacheName, new Map([
+  [origin + 'app-shell.html', new Response('old shell without save conflict handling')],
+  [origin + 'JS/localLibrary.js', new Response('old library without atomic name checks')]
+]));
+const previousPdfAlignmentCacheName = 'barabeat-studio-offline-v100-pdf-margins-footer';
+assert.notEqual(currentCacheName, previousPdfAlignmentCacheName, 'Aligned PDF rows require an updated shell');
+stores.set(previousPdfAlignmentCacheName, new Map([
+  [origin + 'app-shell.html', new Response('old shell with individually aligned PDF pages')]
+]));
 handlers.activate({ waitUntil: promise => { activationPromise = promise; } });
 await activationPromise;
 assert.equal(stores.size, 1);
@@ -85,6 +111,11 @@ assert(!stores.has(previousPlayerCacheName), 'Activation removes the old player 
 assert(!stores.has(previousPairingCacheName), 'Activation removes the module without collectRepeatRanges');
 assert(!stores.has(staleShellCacheName), 'Activation removes the stale deployed offline shell');
 assert(!stores.has(previousTimelineCacheName), 'Activation removes the old placement logic');
+assert(!stores.has(previousPdfCacheName), 'Activation removes the single-page PDF exporter');
+assert(!stores.has(previousPdfScaleCacheName), 'Activation removes the smaller PDF layout');
+assert(!stores.has(previousPdfMarginCacheName), 'Activation removes the centered PDF layout');
+assert(!stores.has(previousPdfAlignmentCacheName), 'Activation removes the individually aligned PDF layout');
+assert(!stores.has(previousLocalSaveCacheName), 'Activation removes the unguarded local save implementation');
 
 async function request(path, mode = 'navigate', method = 'GET') {
   let response;
