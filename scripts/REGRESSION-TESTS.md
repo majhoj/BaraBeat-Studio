@@ -55,6 +55,23 @@ den echten Dateidialog, Serverimport mit Namenskonflikt, Neuladen und Offline.
 Die Datenbank der installierten App wird dabei nicht verwendet. Testserver und
 `BARABEAT_PLAYWRIGHT_MODULE` wie beim PDF-Test.
 
+Uebungsauftakt im aeusseren Loop: `node scripts/check-practice-loop-pickup.mjs`
+prueft den kurzen ersten IN und die volle Taktausrichtung beim Wiedereinstieg,
+mit/ohne Ballet-Dununs-Begleitung, Timer/endliche Wiederholungen, drei Raster,
+unveraenderte Quelldaten und die Uebereinstimmung von Player und Laufenden Noten.
+Mit `--browser` wird die aktuelle `Noten/Balakulania SMF.bbs` im echten Editor
+eingelesen und Solo 1 mit/ohne Begleitpattern 1 auch ohne Netzwerk geprueft.
+Testserver und `BARABEAT_PLAYWRIGHT_MODULE` wie beim PDF-Test.
+
+OUT bei paralleler Begleitung: `node scripts/check-practice-target-out.mjs`
+prueft, dass mit Pausen aufgefuellte Uebungsspuren ihre OUT-Position behalten,
+echte Begleitloops ihr OUT weiterhin verschieben und nach dem Schluss-OUT keine
+veraltete Mindestlaenge den naechsten Auftakt verschiebt. Balakulania Solo 2:
+zwei volle Wiederholungen, dritte bis zum OUT; Audio und Laufende Noten identisch,
+auch mit Abschnittswiederholungen, Timer und Ruecksprung zum Komischen Ruf.
+Mit `--browser` wird die aktuelle BBS-Datei im eingebetteten Player geprueft,
+mit/ohne Ballet Dununs; Offline-Vorbereitung und Quelldatenschutz eingeschlossen.
+
 | Musikalischer Fall | Test (`check-*.mjs`) / konkretes Soll |
 | --- | --- |
 | Binaer, tenaer, neunaer | `musical-structure`, `musical-timing`: 32/8, 24/6, 18/6 Schritte; bei BPM 80 Taktlaenge 3 s, 3 s, 2,25 s |

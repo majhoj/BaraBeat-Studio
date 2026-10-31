@@ -102,6 +102,16 @@ assert.notEqual(currentCacheName, previousPdfAlignmentCacheName, 'Aligned PDF ro
 stores.set(previousPdfAlignmentCacheName, new Map([
   [origin + 'app-shell.html', new Response('old shell with individually aligned PDF pages')]
 ]));
+const previousPracticePickupCacheName = 'barabeat-studio-offline-v102-local-save-conflicts';
+assert.notEqual(currentCacheName, previousPracticePickupCacheName, 'Loop pickups require the corrected practice module');
+stores.set(previousPracticePickupCacheName, new Map([
+  [origin + 'JS/practice.js', new Response('old practice module reusing the shortened count-in pickup')]
+]));
+const previousPracticeOutCacheName = 'barabeat-studio-offline-v103-practice-loop-pickup';
+assert.notEqual(currentCacheName, previousPracticeOutCacheName, 'Target OUT positions require the corrected practice module');
+stores.set(previousPracticeOutCacheName, new Map([
+  [origin + 'JS/practice.js', new Response('old practice module shifting OUT on padded target tracks')]
+]));
 handlers.activate({ waitUntil: promise => { activationPromise = promise; } });
 await activationPromise;
 assert.equal(stores.size, 1);
@@ -116,6 +126,8 @@ assert(!stores.has(previousPdfScaleCacheName), 'Activation removes the smaller P
 assert(!stores.has(previousPdfMarginCacheName), 'Activation removes the centered PDF layout');
 assert(!stores.has(previousPdfAlignmentCacheName), 'Activation removes the individually aligned PDF layout');
 assert(!stores.has(previousLocalSaveCacheName), 'Activation removes the unguarded local save implementation');
+assert(!stores.has(previousPracticePickupCacheName), 'Activation removes the shortened loop pickup implementation');
+assert(!stores.has(previousPracticeOutCacheName), 'Activation removes the shifted target OUT implementation');
 
 async function request(path, mode = 'navigate', method = 'GET') {
   let response;

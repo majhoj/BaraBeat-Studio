@@ -2586,6 +2586,8 @@ function trimPracticeSectionToFinalOut(section) {
         return;
     }
 
+    // Later pickups must use the trimmed length, not the previous accompaniment minimum.
+    section.minLength = Math.min(Number(section.minLength) || 0, endStep);
     practiceTrackInstrumentNames.forEach(function (instrumentName) {
         if (Array.isArray(section.trackNotes[instrumentName])) {
             section.trackNotes[instrumentName] = section.trackNotes[instrumentName].slice(0, endStep);
@@ -2644,7 +2646,8 @@ function normalizePracticeSectionTrackLoops(section) {
             section.trackNotes[instrumentName] = loopedNotes;
         }
 
-        if (section.finalRepeatOutSteps && section.finalRepeatOutSteps[instrumentName] !== null &&
+        // Only looped tracks move their OUT; target tracks were merely padded with rests.
+        if (!isPracticeTargetTrack && section.finalRepeatOutSteps && section.finalRepeatOutSteps[instrumentName] !== null &&
                 section.finalRepeatOutSteps[instrumentName] !== undefined) {
             const rawOutStep = Number(section.finalRepeatOutSteps[instrumentName]);
             if (Number.isFinite(rawOutStep) && rawOutStep >= 0 && sourceLength > 0) {
@@ -2732,9 +2735,11 @@ function appendPracticeSectionWithPickup(sections, section, pickupSection, hasPi
     }
 
     if (hostIndex === -1) {
-        trimStandalonePracticePickup(pickupSection);
-        pickupSection.overlapsPracticeCountIn = Boolean(overlapsCountIn);
-        sections.push(pickupSection);
+        // Only shorten the first count-in pickup; later loops need the full bar alignment.
+        const standalonePickup = clonePracticeSection(pickupSection, '');
+        trimStandalonePracticePickup(standalonePickup);
+        standalonePickup.overlapsPracticeCountIn = Boolean(overlapsCountIn);
+        sections.push(standalonePickup);
         appendPracticeSectionWithFinalOut(sections, section);
         return pickupSection;
     }
