@@ -529,7 +529,14 @@
       "basses": "Tambores graves"
     },
     "untitledRhythm": "Ritmo sin título",
+    "confirm": {
+      "rebuild": "¿Sustituir el arreglo existente por una nueva secuencia predeterminada de la partitura? Se sustituirán las posiciones y repeticiones personalizadas."
+    },
     "error": {
+      "savedDataUnreadable": "Los datos del arreglo guardado están incompletos o no se pueden leer.",
+      "savedVersionUnsupported": "Esta versión de BaraBeat no admite el formato de arreglo {version}. Abre el archivo con una versión compatible.",
+      "savedPatternsMissing": "No se pueden asociar con seguridad todos los patrones del arreglo guardado con la partitura.",
+      "loadCancelled": "No se ha abierto el archivo para proteger el arreglo guardado. Se ha conservado la partitura actual.\n\n{message}",
       "noPlayableArrangement": "Esta partitura aún no contiene un arreglo reproducible.",
       "trackOccupied": "Otro patrón ya ocupa esta posición en la misma pista instrumental. No se ha aplicado el cambio.",
       "start": "No se pudo iniciar el arreglo: {message}",

@@ -529,7 +529,14 @@
       "basses": "Bass drums"
     },
     "untitledRhythm": "Untitled rhythm",
+    "confirm": {
+      "rebuild": "Replace the existing arrangement with a new default sequence from the score? Custom positions and repetitions will be replaced."
+    },
     "error": {
+      "savedDataUnreadable": "The saved arrangement data is incomplete or unreadable.",
+      "savedVersionUnsupported": "Arrangement format {version} is not supported by this version of BaraBeat. Please open the file with a compatible version.",
+      "savedPatternsMissing": "Not all saved arrangement patterns can be reliably matched to the score.",
+      "loadCancelled": "The file was not opened to protect the saved arrangement. Your current score has been kept.\n\n{message}",
       "noPlayableArrangement": "This score does not yet contain a playable arrangement.",
       "trackOccupied": "Another pattern already occupies this position on the same instrument track. The change was not applied.",
       "start": "Could not start the arrangement: {message}",

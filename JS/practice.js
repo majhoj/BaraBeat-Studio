@@ -3571,6 +3571,8 @@ function getPracticeScrollerSymbolParts(noteValue) {
         slap_muffled: [{ type: 'cross', muted: true }],
         Klick: [{ type: 'cross', muted: true, lane: 'bottom' }],
         kenkeni_muffled: [{ type: 'cross', muted: true, lane: 'top' }],
+        sangban_flam: [{ type: 'circle', ghost: true, lane: 'middle' }, { type: 'circle', lane: 'middle' }],
+        kenkeni_flam: [{ type: 'cross', lane: 'top' }, { type: 'cross', lane: 'top' }],
         tone_flam: [{ type: 'circle', ghost: true }, { type: 'circle' }],
         Flam: [{ type: 'circle', ghost: true }, { type: 'circle' }],
         'T-Flam': [{ type: 'circle', ghost: true }, { type: 'circle' }],
@@ -3627,6 +3629,9 @@ function createPracticeScrollerSingleNoteSymbol(noteValue) {
     symbolEl.className = parts.length > 1
         ? 'practice-note-symbol is-combo'
         : 'practice-note-symbol';
+    if (noteValue === 'sangban_flam' || noteValue === 'kenkeni_flam') {
+        symbolEl.classList.add('is-flam');
+    }
     if (usesVerticalLanes) {
         const usesMiddleLane = parts.some(function (partConfig) {
             return partConfig.lane === 'middle';
@@ -3672,6 +3677,8 @@ function createPracticeScrollerNoteSymbol(noteValue) {
 
     const symbolEl = document.createElement('span');
     const isFlamSymbol = noteValue === 'tone_flam' ||
+        noteValue === 'sangban_flam' ||
+        noteValue === 'kenkeni_flam' ||
         noteValue === 'Flam' ||
         noteValue === 'T-Flam' ||
         noteValue === 'slap_flam' ||

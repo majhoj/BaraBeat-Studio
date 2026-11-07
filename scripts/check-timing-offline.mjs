@@ -112,6 +112,18 @@ assert.notEqual(currentCacheName, previousPracticeOutCacheName, 'Target OUT posi
 stores.set(previousPracticeOutCacheName, new Map([
   [origin + 'JS/practice.js', new Response('old practice module shifting OUT on padded target tracks')]
 ]));
+const previousArrangementLoadCacheName = 'barabeat-studio-offline-v104-practice-target-out';
+assert.notEqual(currentCacheName, previousArrangementLoadCacheName, 'Arrangement protection needs the new loader and timeline module');
+stores.set(previousArrangementLoadCacheName, new Map([
+  [origin + 'app-shell.html', new Response('old shell without protected loading')],
+  [origin + 'JS/timeline.js', new Response('old timeline with silent fallback and doubled internal repeats')]
+]));
+const previousBalletFlamCacheName = 'barabeat-studio-offline-v105-arrangement-load-guards';
+assert.notEqual(currentCacheName, previousBalletFlamCacheName, 'Ballet Dununs Flams need the updated reader and player together');
+stores.set(previousBalletFlamCacheName, new Map([
+  [origin + 'app-shell.html', new Response('old shell ignoring Ballet Dununs Flams')],
+  [origin + 'Audio/player.html', new Response('old player without Ballet Dununs Flams')]
+]));
 handlers.activate({ waitUntil: promise => { activationPromise = promise; } });
 await activationPromise;
 assert.equal(stores.size, 1);
@@ -128,6 +140,8 @@ assert(!stores.has(previousPdfAlignmentCacheName), 'Activation removes the indiv
 assert(!stores.has(previousLocalSaveCacheName), 'Activation removes the unguarded local save implementation');
 assert(!stores.has(previousPracticePickupCacheName), 'Activation removes the shortened loop pickup implementation');
 assert(!stores.has(previousPracticeOutCacheName), 'Activation removes the shifted target OUT implementation');
+assert(!stores.has(previousArrangementLoadCacheName), 'Activation removes the unprotected arrangement loader');
+assert(!stores.has(previousBalletFlamCacheName), 'Activation removes the reader and player without Ballet Dununs Flams');
 
 async function request(path, mode = 'navigate', method = 'GET') {
   let response;
@@ -178,7 +192,13 @@ assert.equal(quickPlayCode(offlineShell), quickPlayCode(source('index.php')),
 assert.equal(offlinePlayer, source('Audio/player.html'), 'Offline player must be the updated file');
 assert.equal(offlineModule, source('JS/repeat-pickup.js'), 'Offline module must expose the new pairing API');
 assert.equal(offlinePractice, source('JS/practice.js'), 'Offline practice must match its shared module');
+assert(offlineShell.includes('metadata = readTimelineMetadata(data);'), 'The offline loader validates saved data before replacing the score');
+assert.throws(() => vm.runInNewContext(offlineTimeline + '\nvalidateTimelineMetadata({version: 99, entries: []});',
+  { window: { addEventListener() {} } }), /savedVersionUnsupported/, 'The cached timeline rejects unsupported metadata');
 const music = vm.createContext({ Blob });
+loadFunctions(music, offlineShell, ['mergePercussionNote']);
+assert.equal(music.mergePercussionNote('f', 'tone_flam', 'Dreierbass'), 'sangban_flam');
+assert.equal(music.mergePercussionNote('f', 'slap_flam', 'Dreierbass'), 'kenkeni_flam');
 vm.runInContext(offlineModule, music);
 loadFunctions(music, offlineTimeline, ['getTimelineRepeatMarkerList', 'buildTimelinePatternRepeatRanges']);
 loadFunctions(music, offlinePlayer, ['sanitizeRepeatRanges', 'normalizeRepeatMarkerList', 'buildRepeatRangesFromPatternBars']);

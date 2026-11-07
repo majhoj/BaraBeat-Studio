@@ -4687,6 +4687,14 @@ function scheduleNote(kenkeniNote, sangbanNote, doundounNote, dreierbassNote, dj
       case "kenkeni":
         dreierbass.play('Kenkeni_Open', dreierbassTime, applyToneGain('Dreierbass', 'kenkeni', dreierbassGain));
         break;
+      case "sangban_flam":
+        dreierbass.play('Sangban_Open', dreierbassTime, applyToneGain('Dreierbass', 'sangban', dreierbassGain));
+        dreierbass.play('Sangban_Open', dreierbassTime + 5 / strokeTempo, applyToneGain('Dreierbass', 'sangban', dreierbassGain));
+        break;
+      case "kenkeni_flam":
+        dreierbass.play('Kenkeni_Open', dreierbassTime, applyToneGain('Dreierbass', 'kenkeni', dreierbassGain));
+        dreierbass.play('Kenkeni_Open', dreierbassTime + 5 / strokeTempo, applyToneGain('Dreierbass', 'kenkeni', dreierbassGain));
+        break;
       case "kenkeni_muffled":
         dreierbass.play('Kenkeni_Muffled', dreierbassTime, applyToneGain('Dreierbass', 'kenkeni_muffled', dreierbassGain));
         break;
@@ -5585,6 +5593,14 @@ function scheduleNoteToDestination(kenkeniNote, sangbanNote, doundounNote, dreie
       break;
     case "kenkeni":
       playSampleToDestination(dreierbass, 'Kenkeni_Open', dreierbassTime, applyExportToneGain('Dreierbass', 'kenkeni', noteGain), audioContext, destinationNode);
+      break;
+    case "sangban_flam":
+      playSampleToDestination(dreierbass, 'Sangban_Open', dreierbassTime, applyExportToneGain('Dreierbass', 'sangban', noteGain), audioContext, destinationNode);
+      playSampleToDestination(dreierbass, 'Sangban_Open', dreierbassTime + 5 / exportTempo, applyExportToneGain('Dreierbass', 'sangban', noteGain), audioContext, destinationNode);
+      break;
+    case "kenkeni_flam":
+      playSampleToDestination(dreierbass, 'Kenkeni_Open', dreierbassTime, applyExportToneGain('Dreierbass', 'kenkeni', noteGain), audioContext, destinationNode);
+      playSampleToDestination(dreierbass, 'Kenkeni_Open', dreierbassTime + 5 / exportTempo, applyExportToneGain('Dreierbass', 'kenkeni', noteGain), audioContext, destinationNode);
       break;
     case "kenkeni_muffled":
       playSampleToDestination(dreierbass, 'Kenkeni_Muffled', dreierbassTime, applyExportToneGain('Dreierbass', 'kenkeni_muffled', noteGain), audioContext, destinationNode);

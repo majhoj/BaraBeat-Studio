@@ -529,7 +529,14 @@
       "basses": "Bässe"
     },
     "untitledRhythm": "Unbenannter Rhythmus",
+    "confirm": {
+      "rebuild": "Das vorhandene Arrangement durch eine neue Standardfolge aus dem Notenblatt ersetzen? Eigene Positionen und Wiederholungen werden dabei ersetzt."
+    },
     "error": {
+      "savedDataUnreadable": "Die gespeicherten Arrangementdaten sind unvollständig oder nicht lesbar.",
+      "savedVersionUnsupported": "Arrangementformat {version} wird von dieser BaraBeat-Version nicht unterstützt. Bitte öffne die Datei mit einer passenden Version.",
+      "savedPatternsMissing": "Nicht alle gespeicherten Arrangement-Pattern lassen sich dem Notenblatt sicher zuordnen.",
+      "loadCancelled": "Die Datei wurde zum Schutz des gespeicherten Arrangements nicht geöffnet. Das bisherige Notenblatt bleibt erhalten.\n\n{message}",
       "noPlayableArrangement": "Für dieses Notenblatt ist noch kein spielbares Arrangement vorhanden.",
       "trackOccupied": "An dieser Stelle liegt bereits ein Pattern auf derselben Instrumentenspur. Die Änderung wurde nicht übernommen.",
       "start": "Fehler beim Starten des Arrangements: {message}",

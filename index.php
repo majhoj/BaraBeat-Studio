@@ -1697,14 +1697,39 @@ function loadRhythmContent(title, content, scoreId, options) {
     if (!confirmDiscardScoreChanges(loadOptions.approvedSnapshot)) {
         return false;
     }
-    scoreDocumentGeneration += 1;
+    let data;
+    let metadata;
+    try {
+        data = Snap.parseStr(content);
+        metadata = readTimelineMetadata(data);
+    } catch (error) {
+        alert(uiText('arrangement.error.loadCancelled', { message: error.message || '' }));
+        return false;
+    }
+    const previousSnapshot = getCurrentHistorySnapshot();
+    const previousPracticeState = JSON.parse(JSON.stringify(practiceState));
+    const previousTitle = loadedTitle;
     loadedTitle = title || uiText('editor.untitled');
+    try {
+        onSVGLoaded(data, metadata);
+    } catch (error) {
+        loadedTitle = previousTitle;
+        restoreHistorySnapshot(previousSnapshot);
+        // Restoring a saved scenario must not replace unsaved changes to its current settings.
+        Object.assign(practiceState, previousPracticeState);
+        updateTimelineMetadataNode();
+        renderPracticePanel();
+        alert(uiText('arrangement.error.loadCancelled', { message: error.message || '' }));
+        return false;
+    }
+    scoreDocumentGeneration += 1;
     currentScoreId = scoreId || null;
     if (loadOptions.remember !== false) {
         rememberLastLoadedScore(currentScoreId);
     }
     setIoFieldValue(content);
-    Snap.loadStr(content, onSVGLoaded);
+    clearHistorySnapshots();
+    rememberSavedScoreSnapshot();
     return true;
 }
 
@@ -6289,6 +6314,12 @@ function mergePercussionNote(currentSymbol, noteId, instrumentName) {
             return 'Bell_Open';
         }
     } else if (instrumentName == 'Dreierbass') {
+        if (noteId == 'slap_flam' && currentSymbol == 'f') {
+            return 'kenkeni_flam';
+        }
+        if (noteId == 'tone_flam' && currentSymbol == 'f') {
+            return 'sangban_flam';
+        }
         if (noteId == 'slap' && currentSymbol == 'f') {
             return 'kenkeni';
         }
@@ -6948,6 +6979,8 @@ function getMobileSheetNoteParts(noteValue) {
         slap_muffled: [{ type: 'cross', muted: true }],
         Klick: [{ type: 'cross', muted: true }],
         kenkeni_muffled: [{ type: 'cross', muted: true, lane: 'top' }],
+        sangban_flam: [{ type: 'circle', lane: 'middle', offset: -3 }, { type: 'circle', ghost: true, lane: 'middle', offset: 3 }],
+        kenkeni_flam: [{ type: 'cross', lane: 'top' }, { type: 'cross', lane: 'top' }],
         tone_flam: [{ type: 'circle', offset: -3 }, { type: 'circle', ghost: true, offset: 3 }],
         Flam: [{ type: 'circle', offset: -3 }, { type: 'circle', ghost: true, offset: 3 }],
         'T-Flam': [{ type: 'circle', offset: -3 }, { type: 'circle', ghost: true, offset: 3 }],
@@ -11165,7 +11198,12 @@ document.addEventListener('DOMContentLoaded', function () {
         notifyPracticeSelectionChanged();
     });
     document.querySelector('#timelineRefreshButton').addEventListener('click', function () {
+        if ((timelineState.entries.length > 0 || timelineState.accompanimentSegments.length > 0) &&
+                !window.confirm(uiText('arrangement.confirm.rebuild'))) {
+            return;
+        }
         try {
+            recordArrangementHistorySnapshot();
             const readResult = callPHPScript_lesen(zeilenAnzahl, { showAlert: false });
             syncTimelineStateFromReadResult(readResult);
             scheduleTimelineAudioRefresh(0);
@@ -11917,9 +11955,8 @@ function getLoadedSheetLineCount(data) {
     return zeilenProBlatt;
 }
 
-function onSVGLoaded(data) {
+function onSVGLoaded(data, persistedTimelineMetadata) {
     document.body.classList.add('has-loaded-score');
-    const persistedTimelineMetadata = readTimelineMetadata(data);
     zeilenAnzahl = getLoadedSheetLineCount(data);
 
     if (data.select("#rhythmus") == '<binaer id="rhythmus"/>') {
@@ -11983,7 +12020,8 @@ function onSVGLoaded(data) {
             persistedMinimumBarCount: persistedMinimumBarCount,
             persistedPlaybackStartBar: persistedPlaybackStartBar,
             persistedAccompanimentSegments: persistedAccompanimentSegments,
-            persistedEntries: persistedEntries,
+            persistedEntries: persistedTimelineMetadata ? persistedEntries : undefined,
+            strictPatternMatching: Boolean(persistedTimelineMetadata),
             persistedVersion: persistedTimelineMetadata ? persistedTimelineMetadata.version : null,
             persistedSourceHash: persistedTimelineMetadata ? persistedTimelineMetadata.sourceHash : ''
         });
@@ -11999,9 +12037,8 @@ function onSVGLoaded(data) {
         }
     } catch (error) {
         console.warn('Timeline-Zustand konnte nach dem Laden nicht rekonstruiert werden', error);
+        throw error;
     }
-    clearHistorySnapshots();
-    rememberSavedScoreSnapshot();
 }
 
 function get_value(e) {

@@ -529,7 +529,14 @@
       "basses": "Tambours graves"
     },
     "untitledRhythm": "Rythme sans titre",
+    "confirm": {
+      "rebuild": "Remplacer l'arrangement existant par une nouvelle séquence par défaut issue de la partition ? Les positions et répétitions personnalisées seront remplacées."
+    },
     "error": {
+      "savedDataUnreadable": "Les données de l'arrangement enregistré sont incomplètes ou illisibles.",
+      "savedVersionUnsupported": "Le format d'arrangement {version} n'est pas pris en charge par cette version de BaraBeat. Ouvre le fichier avec une version compatible.",
+      "savedPatternsMissing": "Certains patterns de l'arrangement enregistré ne peuvent pas être associés avec certitude à la partition.",
+      "loadCancelled": "Le fichier n'a pas été ouvert afin de protéger l'arrangement enregistré. La partition actuelle a été conservée.\n\n{message}",
       "noPlayableArrangement": "Cette partition ne contient pas encore d'arrangement lisible.",
       "trackOccupied": "Un autre pattern occupe déjà cette position sur la même piste instrumentale. La modification n'a pas été appliquée.",
       "start": "Impossible de lancer l'arrangement : {message}",

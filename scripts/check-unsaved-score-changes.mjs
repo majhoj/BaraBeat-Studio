@@ -45,8 +45,13 @@ const context = vm.createContext({
       return write ? write(value) : { ...value, id: value.id || 'copy-1' };
     }
   },
-  Snap: { loadStr: (content, callback) => { loads++; score = JSON.parse(content); callback(); } },
-  onSVGLoaded: () => { context.rememberSavedScoreSnapshot(); }
+  Snap: { parseStr: content => JSON.parse(content) },
+  readTimelineMetadata: () => null,
+  getCurrentHistorySnapshot: () => clone(score),
+  restoreHistorySnapshot: snapshot => { score = clone(snapshot); },
+  practiceState: {}, updateTimelineMetadataNode() {}, renderPracticePanel() {},
+  clearHistorySnapshots() {},
+  onSVGLoaded: data => { loads++; score = data; }
 });
 loadFunctions(context, text, [
   'scoreSnapshotSignature', 'rememberSavedScoreSnapshot', 'hasUnsavedScoreChanges',

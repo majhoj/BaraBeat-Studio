@@ -2384,6 +2384,16 @@ body[data-ui-theme="earth"] .app-menu-panel #temporaryAccessButton.is-open {
     top: 16px;
 }
 
+.practice-note-symbol.is-flam.is-dreierbass-stack .practice-symbol-part-wrap:first-child,
+.practice-note-symbol.is-flam.is-bass-stack .practice-symbol-part-wrap:first-child {
+    transform: translateX(-72%);
+}
+
+.practice-note-symbol.is-flam.is-dreierbass-stack .practice-symbol-part-wrap:last-child,
+.practice-note-symbol.is-flam.is-bass-stack .practice-symbol-part-wrap:last-child {
+    transform: translateX(-28%);
+}
+
 .practice-symbol-part {
     display: block;
     width: 9px;

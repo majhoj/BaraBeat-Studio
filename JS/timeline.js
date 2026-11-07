@@ -1148,6 +1148,14 @@ function buildDefaultTimelineEntriesFromRhythmBars(rhythmBars, repeatRanges, pat
     const sheetLoopRepeatRanges = (Array.isArray(repeatRanges) ? repeatRanges : []).filter(function (repeatRange) {
         const firstAccompanimentBarIndex = getFirstTimelineAccompanimentBarIndex(rhythmBars);
         const accompanimentLoopEndBarIndex = getTimelineAccompanimentLoopEndBarIndex(rhythmBars);
+        const rangeBars = rhythmBars.slice(Number(repeatRange && repeatRange.startBar) - 1, Number(repeatRange && repeatRange.endBar));
+        // Each pattern expands its own repeats. Only repeats across pattern instances create more entries.
+        const isInternalPatternRepeat = rangeBars.length > 0 && rangeBars[0].patternSourceKey &&
+            rangeBars.every(function (bar, index) {
+                return bar.patternSourceKey === rangeBars[0].patternSourceKey &&
+                    Number(bar.patternBarIndex) === Number(rangeBars[0].patternBarIndex) + index;
+            });
+        if (isInternalPatternRepeat) return false;
         return !(repeatRange &&
             Number(repeatRange.startBar) === firstAccompanimentBarIndex &&
             normalizeTimelineLoopCountValue(repeatRange.count) &&
@@ -1530,20 +1538,59 @@ function readTimelineMetadata(data) {
         return null;
     }
 
+    if ((data || s).selectAll(timelineMetadataSelector).length !== 1) {
+        throw new Error(timelineText('arrangement.error.savedDataUnreadable'));
+    }
     const metadataText = metadataElement.attr('data-timeline') || metadataElement.attr('text') || metadataElement.node.textContent || '';
     if (!metadataText) {
-        return null;
+        throw new Error(timelineText('arrangement.error.savedDataUnreadable'));
     }
 
+    let metadata;
     try {
         const decodedText = metadataElement.node && metadataElement.node.tagName && metadataElement.node.tagName.toLowerCase() === 'desc'
             ? decodeURIComponent(escape(window.atob(metadataText)))
             : metadataText;
-        return JSON.parse(decodedText);
+        metadata = JSON.parse(decodedText);
     } catch (error) {
         console.warn('Timeline-Metadaten konnten nicht gelesen werden', error);
-        return null;
+        throw new Error(timelineText('arrangement.error.savedDataUnreadable'));
     }
+    validateTimelineMetadata(metadata);
+    return metadata;
+}
+
+function validateTimelineMetadata(metadata) {
+    if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata) ||
+            !Array.isArray(metadata.entries) ||
+            (metadata.accompanimentSegments !== undefined && !Array.isArray(metadata.accompanimentSegments))) {
+        throw new Error(timelineText('arrangement.error.savedDataUnreadable'));
+    }
+    const version = Number(metadata.version);
+    if (!Number.isInteger(version) || version < minimumCompatibleTimelineMetadataVersion || version > timelineMetadataVersion) {
+        throw new Error(timelineText('arrangement.error.savedVersionUnsupported', { version: String(metadata.version ?? '?') }));
+    }
+    const references = metadata.entries.concat(metadata.accompanimentSegments || []);
+    if (references.some(function (entry) {
+        return !entry || typeof entry !== 'object' || Array.isArray(entry) ||
+            !(typeof entry.patternSourceKey === 'string' && entry.patternSourceKey ||
+                typeof entry.patternId === 'string' && entry.patternId);
+    })) {
+        throw new Error(timelineText('arrangement.error.savedDataUnreadable'));
+    }
+}
+
+function validateTimelinePatternReferences(patternLibrary, entries, segments) {
+    const references = (entries || []).concat(segments || []);
+    const allMatched = references.every(function (entry) {
+        return patternLibrary.some(function (pattern) {
+            // A coincidentally reused P-number must not replace a missing saved pattern.
+            return entry.patternSourceKey
+                ? pattern.sourceKey === entry.patternSourceKey || (pattern.aliasSourceKeys || []).indexOf(entry.patternSourceKey) !== -1
+                : pattern.id === entry.patternId || (pattern.aliasPatternIds || []).indexOf(entry.patternId) !== -1;
+        });
+    });
+    if (!allMatched) throw new Error(timelineText('arrangement.error.savedPatternsMissing'));
 }
 
 function syncTimelineStateFromReadResult(readResult, options) {
@@ -1555,11 +1602,13 @@ function syncTimelineStateFromReadResult(readResult, options) {
     const hasCompatiblePersistedVersion = Number.isFinite(persistedVersion) &&
         persistedVersion >= minimumCompatibleTimelineMetadataVersion &&
         persistedVersion <= timelineMetadataVersion;
-    const canReusePersistedEntries = hasPersistedEntries &&
-        hasCompatiblePersistedVersion &&
-        (syncOptions.persistedSourceHash === newSourceHash ||
-            syncOptions.persistedEntries.length === 0 ||
-            timelineEntriesHavePatternMatch(patternLibrary, syncOptions.persistedEntries));
+    if (hasPersistedEntries && !hasCompatiblePersistedVersion) {
+        throw new Error(timelineText('arrangement.error.savedVersionUnsupported', { version: String(syncOptions.persistedVersion ?? '?') }));
+    }
+    if (syncOptions.strictPatternMatching) {
+        validateTimelinePatternReferences(patternLibrary, syncOptions.persistedEntries, syncOptions.persistedAccompanimentSegments);
+    }
+    const canReusePersistedEntries = hasPersistedEntries && hasCompatiblePersistedVersion;
     const fallbackEntries = buildDefaultTimelineEntriesFromRhythmBars(
         readResult.rhythmBars,
         readResult.repeatRanges,
@@ -1571,6 +1620,15 @@ function syncTimelineStateFromReadResult(readResult, options) {
     const syncedEntries = syncTimelineEntriesWithPatternLibrary(patternLibrary, currentEntries, {
         appendMissingPatterns: !canReusePersistedEntries
     });
+    if (syncOptions.strictPatternMatching && pruneTimelineOrphanOverlayEntries(syncedEntries).length !== syncedEntries.length) {
+        throw new Error(timelineText('arrangement.error.savedDataUnreadable'));
+    }
+    const syncedSegments = hasCompatiblePersistedVersion
+        ? syncTimelineAccompanimentSegmentsWithPatternLibrary(patternLibrary, syncOptions.persistedAccompanimentSegments)
+        : [];
+    if (syncOptions.strictPatternMatching && syncedSegments.length !== (syncOptions.persistedAccompanimentSegments || []).length) {
+        throw new Error(timelineText('arrangement.error.savedDataUnreadable'));
+    }
     const sheetLoopCount = getTimelineOuterRepeatCount(readResult, patternLibrary);
 
     timelineState.sourcePatterns = patternLibrary;
@@ -1580,12 +1638,7 @@ function syncTimelineStateFromReadResult(readResult, options) {
     timelineState.entries = canReusePersistedEntries
         ? syncedEntries
         : (syncedEntries.length > 0 ? syncedEntries : fallbackEntries);
-    timelineState.accompanimentSegments = hasCompatiblePersistedVersion
-        ? syncTimelineAccompanimentSegmentsWithPatternLibrary(
-            patternLibrary,
-            syncOptions.persistedAccompanimentSegments
-        )
-        : [];
+    timelineState.accompanimentSegments = syncedSegments;
     timelineState.minimumBarCount = hasCompatiblePersistedVersion
         ? normalizeTimelineMinimumBarCount(syncOptions.persistedMinimumBarCount)
         : 0;
