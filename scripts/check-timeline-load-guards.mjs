@@ -52,7 +52,7 @@ const loader = vm.createContext({
   rememberLastLoadedScore: () => { remembers++; }, setIoFieldValue() {},
   clearHistorySnapshots: () => { historyClears++; }, rememberSavedScoreSnapshot: () => { baseline = JSON.stringify(contents); }
 });
-loadFunctions(loader, source('index.php'), ['loadRhythmContent']);
+loadFunctions(loader, source('index.php'), ['offerTimelineRecovery', 'loadRhythmContent']);
 for (const bad of [{ preflightError: true }, { contents: { title: 'Wrong score' }, readError: true }]) {
   const before = JSON.stringify(contents);
   assert.equal(loader.loadRhythmContent('Wrong', JSON.stringify(bad), 'wrong-id'), false);
@@ -74,6 +74,7 @@ assert.equal(historyClears, 1);
 for (const language of ['de', 'en', 'fr', 'es', 'pt']) {
   const strings = JSON.parse(source('languages/' + language + '.json')).arrangement;
   assert(strings.confirm.rebuild);
+  assert(strings.confirm.openWithoutArrangement.includes('{message}'));
   for (const key of ['savedDataUnreadable', 'savedVersionUnsupported', 'savedPatternsMissing', 'loadCancelled']) assert(strings.error[key]);
 }
 console.log('Arrangement load guards: version/schema/encoding/duplicate metadata, strict references, atomic load cancellation, rollback and five languages checked.');
@@ -111,7 +112,7 @@ if (process.argv.includes('--browser')) {
         ['orphanOverlay', m => { m.entries[0].overlayRepeatIndex = 0; m.entries[0].parallelGroupId = ''; }]
       ];
       const oldConfirm = window.confirm;
-      window.confirm = () => true;
+      window.confirm = message => message === uiText('file.confirm.discardUnsaved');
       recordArrangementHistorySnapshot();
       timelineState.tempo += 1;
       practiceState.repeatCount += 1;

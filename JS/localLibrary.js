@@ -228,6 +228,20 @@
     });
   }
 
+  async function assertScoreNameAvailable(store, scoreId, title, folderId) {
+    const nameKey = normalizeSortName(title.normalize("NFC"));
+    const siblings = await getAllFromIndex(store, "folderId", folderId);
+    const conflicts = siblings.filter(function (other) {
+      return other.id !== scoreId && normalizeSortName(String(other.title || "").normalize("NFC")) === nameKey;
+    });
+    if (conflicts.length) {
+      const error = new Error(t("file.error.localNameExists", { title: title }));
+      error.code = "LOCAL_SCORE_NAME_EXISTS";
+      error.conflictingScoreIds = conflicts.map(function (other) { return other.id; });
+      throw error;
+    }
+  }
+
   async function saveScore(score) {
     if (!score || typeof score !== "object") {
       throw new Error(t("error.scoreObjectExpected"));
@@ -244,16 +258,7 @@
 
       // Check and write in one transaction, including competing windows. Existing duplicates stay editable by ID.
       if (!keepsIdentity) {
-        const siblings = await getAllFromIndex(stores.scores, "folderId", folderId);
-        const conflicts = siblings.filter(function (other) {
-          return other.id !== score.id && normalizeSortName(String(other.title || "").normalize("NFC")) === nameKey;
-        });
-        if (conflicts.length) {
-          const error = new Error(t("file.error.localNameExists", { title: title }));
-          error.code = "LOCAL_SCORE_NAME_EXISTS";
-          error.conflictingScoreIds = conflicts.map(function (other) { return other.id; });
-          throw error;
-        }
+        await assertScoreNameAvailable(stores.scores, score.id, title, folderId);
       }
 
       const savedScore = Object.assign({}, existingScore || {}, score, {
@@ -328,11 +333,22 @@
   }
 
   async function moveScore(scoreId, folderId) {
-    const score = await getByKey("scores", scoreId);
-    if (!score) {
-      throw new Error(t("error.scoreNotFound", { id: scoreId }));
-    }
-    return saveScore(Object.assign({}, score, { folderId: normalizeParentId(folderId) }));
+    const targetId = normalizeParentId(folderId);
+    return withStore(["scores", "folders"], "readwrite", async function (stores) {
+      const score = await promisifyRequest(stores.scores.get(scoreId));
+      if (!score) {
+        throw new Error(t("error.scoreNotFound", { id: scoreId }));
+      }
+      if (targetId !== ROOT_FOLDER_ID && !await promisifyRequest(stores.folders.get(targetId))) {
+        throw new Error(t("error.targetFolderNotFound", { id: targetId }));
+      }
+      if (normalizeParentId(score.folderId) === targetId) return score;
+      await assertScoreNameAvailable(stores.scores, score.id, String(score.title || ""), targetId);
+      // Moving changes only the location, never content, publication state or modification dates.
+      const movedScore = Object.assign({}, score, { folderId: targetId });
+      await promisifyRequest(stores.scores.put(movedScore));
+      return movedScore;
+    });
   }
 
   async function deleteScore(scoreId) {
@@ -348,22 +364,19 @@
       throw new Error(t("error.rootFolderDelete"));
     }
 
-    const folder = await getByKey("folders", normalizedFolderId);
-    if (!folder) {
-      throw new Error(t("error.folderNotFound", { id: normalizedFolderId }));
-    }
-
-    const childFolders = await listFolders(normalizedFolderId);
-    if (childFolders.length > 0) {
-      throw new Error(t("error.folderContainsFolders"));
-    }
-
-    const childScores = await listScores(normalizedFolderId);
-    if (childScores.length > 0) {
-      throw new Error(t("error.folderContainsScores"));
-    }
-
-    return withStore("folders", "readwrite", async function (stores) {
+    return withStore(["folders", "scores"], "readwrite", async function (stores) {
+      const folder = await promisifyRequest(stores.folders.get(normalizedFolderId));
+      if (!folder) {
+        throw new Error(t("error.folderNotFound", { id: normalizedFolderId }));
+      }
+      const childFolders = await getAllFromIndex(stores.folders, "parentId", normalizedFolderId);
+      if (childFolders.length > 0) {
+        throw new Error(t("error.folderContainsFolders"));
+      }
+      const childScores = await getAllFromIndex(stores.scores, "folderId", normalizedFolderId);
+      if (childScores.length > 0) {
+        throw new Error(t("error.folderContainsScores"));
+      }
       await promisifyRequest(stores.folders.delete(normalizedFolderId));
       return true;
     });

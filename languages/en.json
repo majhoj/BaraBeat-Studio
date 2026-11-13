@@ -125,6 +125,7 @@
     },
     "message": {
       "savedLocal": "\"{title}\" was saved locally.",
+      "movedLocal": "\"{title}\" was moved.",
       "renamedLocal": "\"{title}\" was renamed locally.",
       "deletedLocal": "\"{title}\" was deleted locally.",
       "published": "\"{title}\" was published.",
@@ -155,6 +156,7 @@
       "localNotFound": "The local file was not found.",
       "nameEmpty": "The name cannot be empty.",
       "localRename": "Could not rename the local file: {message}",
+      "localMove": "Could not move the file: {message}",
       "localDelete": "Could not delete the local file: {message}",
       "publish": "Could not publish the file: {message}",
       "serverVersionCancelled": "The server version was not loaded.",
@@ -530,6 +532,7 @@
     },
     "untitledRhythm": "Untitled rhythm",
     "confirm": {
+      "openWithoutArrangement": "The saved arrangement cannot be loaded.\n\n{message}\n\nOpen the score anyway and discard the arrangement? The timeline will be empty. The saved file will only change when you save again.",
       "rebuild": "Replace the existing arrangement with a new default sequence from the score? Custom positions and repetitions will be replaced."
     },
     "error": {

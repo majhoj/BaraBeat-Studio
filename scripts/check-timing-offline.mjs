@@ -124,6 +124,33 @@ stores.set(previousBalletFlamCacheName, new Map([
   [origin + 'app-shell.html', new Response('old shell ignoring Ballet Dununs Flams')],
   [origin + 'Audio/player.html', new Response('old player without Ballet Dununs Flams')]
 ]));
+const previousFileDragCacheName = 'barabeat-studio-offline-v106-ballet-dununs-flams';
+assert.notEqual(currentCacheName, previousFileDragCacheName, 'Folder moves need the new dialog and atomic storage operation');
+stores.set(previousFileDragCacheName, new Map([
+  [origin + 'app-shell.html', new Response('old dialog without folder drop targets')],
+  [origin + 'JS/localLibrary.js', new Response('old non-atomic move')]
+]));
+const previousRecoveryCacheName = 'barabeat-studio-offline-v107-file-folder-drag';
+assert.notEqual(currentCacheName, previousRecoveryCacheName, 'Score recovery needs updated shell and metadata helpers');
+stores.set(previousRecoveryCacheName, new Map([
+  [origin + 'app-shell.html', new Response('old shell rejecting incompatible arrangements')],
+  [origin + 'JS/timeline.js', new Response('old timeline without recovery metadata')]
+]));
+const previousInstrumentMigrationCacheName = 'barabeat-studio-offline-v108-score-recovery';
+assert.notEqual(currentCacheName, previousInstrumentMigrationCacheName, 'Known instrument renames need the new timeline loader');
+stores.set(previousInstrumentMigrationCacheName, new Map([
+  [origin + 'JS/timeline.js', new Response('old timeline rejecting known instrument aliases')]
+]));
+const previousAccompanimentCountInCacheName = 'barabeat-studio-offline-v109-instrument-migration';
+assert.notEqual(currentCacheName, previousAccompanimentCountInCacheName, 'Accompaniment pickups need the updated practice module');
+stores.set(previousAccompanimentCountInCacheName, new Map([
+  [origin + 'JS/practice.js', new Response('old practice requiring a solo IN to overlap the count-in')]
+]));
+const previousPracticeOpeningRepeatCacheName = 'barabeat-studio-offline-v110-accompaniment-count-in';
+assert.notEqual(currentCacheName, previousPracticeOpeningRepeatCacheName, 'Opening repeats need the corrected practice pickup rule');
+stores.set(previousPracticeOpeningRepeatCacheName, new Map([
+  [origin + 'JS/practice.js', new Response('old practice consuming the first opening repeat as pickup')]
+]));
 handlers.activate({ waitUntil: promise => { activationPromise = promise; } });
 await activationPromise;
 assert.equal(stores.size, 1);
@@ -142,6 +169,11 @@ assert(!stores.has(previousPracticePickupCacheName), 'Activation removes the sho
 assert(!stores.has(previousPracticeOutCacheName), 'Activation removes the shifted target OUT implementation');
 assert(!stores.has(previousArrangementLoadCacheName), 'Activation removes the unprotected arrangement loader');
 assert(!stores.has(previousBalletFlamCacheName), 'Activation removes the reader and player without Ballet Dununs Flams');
+assert(!stores.has(previousFileDragCacheName), 'Activation removes the old file dialog/storage implementation');
+assert(!stores.has(previousRecoveryCacheName), 'Activation removes the loader without confirmed recovery');
+assert(!stores.has(previousInstrumentMigrationCacheName), 'Activation removes the loader without instrument migration');
+assert(!stores.has(previousAccompanimentCountInCacheName), 'Activation removes the misplaced accompaniment count-in');
+assert(!stores.has(previousPracticeOpeningRepeatCacheName), 'Activation removes the practice rule losing an opening pass');
 
 async function request(path, mode = 'navigate', method = 'GET') {
   let response;
@@ -180,7 +212,11 @@ const offlineTimeline = await (await request('JS/timeline.js?v=changed')).text()
 const offlinePlayer = await (await request('Audio/player.html?launchReload=offline')).text();
 const offlinePractice = await (await request('JS/practice.js?v=changed')).text();
 const offlineShell = await (await request('index.php')).text();
+assert.equal(await (await request('JS/localLibrary.js')).text(), source('JS/localLibrary.js'), 'Offline folder moves use the current storage implementation');
+assert(offlineShell.includes('function moveFileDialogScore('), 'Offline file dialog includes folder moves');
+assert(offlineShell.includes('function offerTimelineRecovery('), 'Offline file loading offers confirmed recovery');
 assert.equal(offlineTimeline, source('JS/timeline.js'), 'Offline insertion must use the updated target assignment');
+assert(offlineTimeline.includes('function migrateTimelineInstrumentReferences('), 'Offline loading includes known instrument aliases');
 function quickPlayCode(text) {
   const start = text.indexOf('function buildSheetQuickPlayRepeatRanges(');
   const end = text.indexOf('function createSheetPatternMoveOverlayButton(', start);

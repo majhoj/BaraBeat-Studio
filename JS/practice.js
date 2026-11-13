@@ -2229,6 +2229,22 @@ function getPracticePatternPickupEndStep(pattern, notesLength) {
     return Math.min(sourceLength, (Math.floor(safeInStep / stepsPerBar) + 1) * stepsPerBar);
 }
 
+function hasPracticeOpeningRepeatPickup(pattern, notes, inStep) {
+    if (!(inStep > 0) || !notes.slice(0, inStep).some(isPlayablePracticeNote)) {
+        return false;
+    }
+    const bars = Array.isArray(pattern.bars) ? pattern.bars : [];
+    const inBarIndex = bars.findIndex(function (bar) {
+        return (Array.isArray(bar.controls) ? bar.controls : []).some(function (control) {
+            return control && control.type === 'in';
+        });
+    });
+    return inBarIndex >= 0 && buildPracticeRepeatRangesFromBars(bars).some(function (range) {
+        return range.startBar === 1 && range.endBar === inBarIndex + 1 &&
+            !isPracticeContinuationMarker(range.count) && Number(range.count) > 0;
+    });
+}
+
 function shiftPracticeBarStartStepsAfterOffset(sourceSteps, offset, notesLength) {
     const safeOffset = Math.max(0, Math.round(Number(offset) || 0));
     const safeLength = Math.max(0, Number(notesLength) || 0);
@@ -3104,7 +3120,7 @@ function buildPracticeSectionsFromEntries(entries) {
         pickupSection.isLeadIn = true;
         const labels = [];
         const labelNames = [];
-        let blockHasSoloCountInPickup = false;
+        let blockHasCountInPickup = false;
         const ignoreShortBarForRunningAccompaniment = practiceBlockShouldIgnoreShortBarForRunningAccompaniment(block);
         const blockHasPickup = !previousBlockEndedWithShortBar && block.entries.some(function (entry) {
             return practiceEntryAllowsPickup(entry, block);
@@ -3164,9 +3180,10 @@ function buildPracticeSectionsFromEntries(entries) {
                 ? null
                 : Math.max(0, Math.min(rawPatternNotes.length - 1, Math.round(Number(patternInStep) || 0)));
             const pickupWrapsToPatternStart = rawPatternPickupEndStep > 0 &&
-                rawPatternPickupEndStep >= rawPatternNotes.length &&
                 safePatternInStep !== null &&
-                safePatternInStep > 0;
+                safePatternInStep > 0 &&
+                (rawPatternPickupEndStep >= rawPatternNotes.length ||
+                    hasPracticeOpeningRepeatPickup(pattern, rawPatternNotes, safePatternInStep));
             const rawPatternMainStartStep = pickupWrapsToPatternStart ? 0 : rawPatternPickupEndStep;
             const shouldUseAccompanimentSegment = isAccompanimentEntry &&
                 blockPracticeLength > 0 &&
@@ -3183,7 +3200,7 @@ function buildPracticeSectionsFromEntries(entries) {
                 : shouldLoopAccompaniment
                     ? getPracticeLoopedSegment(rawPatternNotes, patternSegmentOffset, blockPracticeLength, 'f')
                     : rawPatternNotes.slice();
-            // A cyclic IN uses the previous bar for its pickup, then repeats the full pattern.
+            // A cyclic IN, including one in an opening repeat, must not consume a full pass.
             if (!shouldUseAccompanimentSegment && rawPatternPickupEndStep > 0 && !pickupWrapsToPatternStart) {
                 patternNotes = patternNotes.slice(rawPatternPickupEndStep);
             }
@@ -3231,13 +3248,15 @@ function buildPracticeSectionsFromEntries(entries) {
 
             if (blockHasPickup && patternInStep !== null && practiceEntryAllowsPickup(entry, block)) {
                 const pickupSingleNoteOnly = label === 'Call' || label === 'Intro';
-                if (entry.isPracticeTarget && /^Solo(?:\s|$)/i.test(String(label || ''))) {
-                    blockHasSoloCountInPickup = true;
-                }
                 const pickupNotes = buildPracticePickupNotes(rawPatternNotes, patternInStep, {
                     singleNoteOnly: pickupSingleNoteOnly,
                     limitToPickupBar: true
                 });
+                // Accompaniment pickups also precede beat one when the solo has no IN.
+                if ((entry.isPracticeTarget && /^Solo(?:\s|$)/i.test(String(label || ''))) ||
+                        (label === 'Begleitung' && !entry.suppressPlayback && pickupNotes.some(isPlayablePracticeNote))) {
+                    blockHasCountInPickup = true;
+                }
                 targetInstruments.forEach(function (instrumentName) {
                     pickupSection.trackNotes[instrumentName] = mergePracticeNotesIntoTrack(
                         pickupSection.trackNotes[instrumentName],
@@ -3312,7 +3331,7 @@ function buildPracticeSectionsFromEntries(entries) {
             section,
             pickupSection,
             blockHasPickup,
-            blockHasSoloCountInPickup
+            blockHasCountInPickup
         );
         if (!loopStartPickupSection && loopPickupSection && !section.isLeadIn) {
             loopStartPickupSection = loopPickupSection;

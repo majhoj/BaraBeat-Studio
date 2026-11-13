@@ -733,6 +733,9 @@ let fileShortcutInProgress = false;
 let currentFileSource = "local";
 let undoHistory = [];
 let redoHistory = [];
+let fileDialogDragState = null;
+let fileDialogMoveInProgress = false;
+const fileDialogScoreDragType = 'application/x-barabeat-local-score';
 const fileDialogState = {
     mode: 'open',
     source: 'local',
@@ -1406,6 +1409,16 @@ function updateFileDialogControls() {
         buttonEl.disabled = shouldDisable;
         buttonEl.classList.toggle('is-active', buttonEl.dataset.filter === fileDialogState.filter && !shouldDisable);
     });
+    if (fileDialogMoveInProgress) {
+        document.querySelectorAll('#fileDialog button:not(#fileDialogCancelButton), #fileDialog input, #fileDialog select').forEach(function (element) {
+            element.disabled = true;
+        });
+    } else {
+        document.querySelector('#fileDialogRefreshButton').disabled = false;
+        document.querySelector('#fileDialogSearch').disabled = false;
+        document.querySelector('#fileDialogTags').disabled = false;
+        document.querySelector('#fileDialogServerNotice button').disabled = false;
+    }
 }
 
 function getFilteredFileDialogEntries() {
@@ -1422,7 +1435,7 @@ function getFilteredFileDialogEntries() {
                 return false;
             }
         }
-        if (!searchText) {
+        if (!searchText || entry.entryType === 'parent-folder') {
             return true;
         }
         return String(entry.title || entry.name || entry.fileName || '').toLocaleLowerCase('de-DE').indexOf(searchText) !== -1;
@@ -1430,6 +1443,7 @@ function getFilteredFileDialogEntries() {
 }
 
 async function navigateFileDialogFolder(folderId) {
+    if (fileDialogMoveInProgress) return;
     fileDialogState.folderId = folderId || localLibrary.rootFolderId;
     fileDialogState.selectedId = null;
     await refreshFileDialogEntries();
@@ -1441,6 +1455,85 @@ function updateFileDialogRowSelection() {
     });
 }
 
+function clearFileDialogDrag() {
+    fileDialogDragState = null;
+    document.querySelectorAll('#fileDialog .is-file-dragging, #fileDialog .is-file-drop-target').forEach(function (element) {
+        element.classList.remove('is-file-dragging', 'is-file-drop-target');
+    });
+}
+
+function canDropFileDialogScore(folderId) {
+    return Boolean(fileDialogDragState && folderId &&
+        fileDialogState.source === 'local' && fileDialogState.mode !== 'export' &&
+        !fileDialogMoveInProgress && !document.querySelector('#fileDialog').hidden &&
+        folderId !== fileDialogDragState.folderId);
+}
+
+function bindFileDialogDropTarget(element, folderId) {
+    function allowDrop(event) {
+        if (!canDropFileDialogScore(folderId)) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+        element.classList.add('is-file-drop-target');
+    }
+    element.addEventListener('dragenter', allowDrop);
+    element.addEventListener('dragover', allowDrop);
+    element.addEventListener('dragleave', function (event) {
+        if (!element.contains(event.relatedTarget)) element.classList.remove('is-file-drop-target');
+    });
+    element.addEventListener('drop', function (event) {
+        if (!canDropFileDialogScore(folderId)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const scoreId = fileDialogDragState.scoreId;
+        const matchesDrag = event.dataTransfer.getData(fileDialogScoreDragType) === scoreId;
+        clearFileDialogDrag();
+        if (matchesDrag) moveFileDialogScore(scoreId, folderId);
+    });
+}
+
+function bindFileDialogScoreDrag(rowEl, entry) {
+    rowEl.draggable = true;
+    rowEl.addEventListener('dragstart', function (event) {
+        if (fileDialogMoveInProgress || fileDialogState.source !== 'local' ||
+                fileDialogState.mode === 'export' || !event.dataTransfer) {
+            event.preventDefault();
+            return;
+        }
+        clearFileDialogDrag();
+        fileDialogDragState = { scoreId: entry.id, folderId: entry.folderId || localLibrary.rootFolderId };
+        fileDialogState.selectedId = rowEl.dataset.id;
+        document.querySelector('#fileDialogName').value = entry.title || '';
+        updateFileDialogRowSelection();
+        updateFileDialogControls();
+        fileDialogState.serverNoticeRequest += 1;
+        setFileDialogServerNotice('', '');
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData(fileDialogScoreDragType, entry.id);
+        event.dataTransfer.setData('text/plain', entry.title || '');
+        rowEl.classList.add('is-file-dragging');
+    });
+    rowEl.addEventListener('dragend', clearFileDialogDrag);
+}
+
+async function moveFileDialogScore(scoreId, folderId) {
+    if (fileDialogMoveInProgress || fileDialogState.source !== 'local' || fileDialogState.mode === 'export') return;
+    fileDialogMoveInProgress = true;
+    updateFileDialogControls();
+    try {
+        const movedScore = await localLibrary.moveScore(scoreId, folderId);
+        if (fileDialogState.selectedId === scoreId) fileDialogState.selectedId = null;
+        setFileDialogServerNotice('', '');
+        await refreshFileDialogEntries();
+        showAutoDismissMessage(uiText('file.message.movedLocal', { title: movedScore.title }));
+    } catch (error) {
+        alert(uiText('file.error.localMove', { message: error.message || '' }));
+    } finally {
+        fileDialogMoveInProgress = false;
+        updateFileDialogControls();
+    }
+}
+
 function renderFileDialogList() {
     const listEl = document.querySelector('#fileDialogList');
     const emptyEl = document.querySelector('#fileDialogEmpty');
@@ -1449,6 +1542,7 @@ function renderFileDialogList() {
     }
 
     const entries = getFilteredFileDialogEntries();
+    clearFileDialogDrag();
     listEl.innerHTML = '';
 
     entries.forEach(function (entry) {
@@ -1458,6 +1552,10 @@ function renderFileDialogList() {
         rowEl.className = rowEl.dataset.id === fileDialogState.selectedId ? 'is-selected' : '';
         if (isFileDialogFolderEntry(entry)) {
             rowEl.classList.add('is-folder');
+        }
+        if (fileDialogState.source === 'local' && fileDialogState.mode !== 'export') {
+            if (entry.entryType === 'score') bindFileDialogScoreDrag(rowEl, entry);
+            else if (isFileDialogFolderEntry(entry)) bindFileDialogDropTarget(rowEl, entry.targetFolderId || entry.id);
         }
 
         const nameCell = document.createElement('td');
@@ -1479,6 +1577,7 @@ function renderFileDialogList() {
 
         rowEl.append(nameCell, statusCell, dateCell);
         rowEl.addEventListener('click', function () {
+            if (fileDialogMoveInProgress) return;
             fileDialogState.selectedId = rowEl.dataset.id;
             if (fileDialogState.mode === 'open' && fileDialogState.source === 'local' && entry.entryType === 'score') {
                 document.querySelector('#fileDialogName').value = entry.title || '';
@@ -1488,6 +1587,7 @@ function renderFileDialogList() {
             updateFileDialogServerNotice();
         });
         rowEl.addEventListener('dblclick', function () {
+            if (fileDialogMoveInProgress) return;
             if (fileDialogState.source === 'local' && isFileDialogFolderEntry(entry)) {
                 navigateFileDialogFolder(entry.targetFolderId || entry.id);
                 return;
@@ -1602,6 +1702,7 @@ function openFileDialog(mode) {
 }
 
 function closeFileDialog() {
+    clearFileDialogDrag();
     const dialogEl = document.querySelector('#fileDialog');
     if (dialogEl) {
         dialogEl.hidden = true;
@@ -1689,6 +1790,14 @@ function saveContentWithCheck(config) {
     }
 }
 
+function offerTimelineRecovery(error) {
+    if (error.code === 'TIMELINE_METADATA_INVALID') {
+        return window.confirm(uiText('arrangement.confirm.openWithoutArrangement', { message: error.message || '' }));
+    }
+    alert(uiText('arrangement.error.loadCancelled', { message: error.message || '' }));
+    return false;
+}
+
 function loadRhythmContent(title, content, scoreId, options) {
     if (!content) {
         return false;
@@ -1699,28 +1808,40 @@ function loadRhythmContent(title, content, scoreId, options) {
     }
     let data;
     let metadata;
+    let discardedArrangement = false;
     try {
         data = Snap.parseStr(content);
         metadata = readTimelineMetadata(data);
     } catch (error) {
-        alert(uiText('arrangement.error.loadCancelled', { message: error.message || '' }));
-        return false;
+        if (!offerTimelineRecovery(error)) return false;
+        metadata = buildRecoveredTimelineMetadata(error.timelineMetadata);
+        discardedArrangement = true;
     }
     const previousSnapshot = getCurrentHistorySnapshot();
     const previousPracticeState = JSON.parse(JSON.stringify(practiceState));
     const previousTitle = loadedTitle;
-    loadedTitle = title || uiText('editor.untitled');
-    try {
-        onSVGLoaded(data, metadata);
-    } catch (error) {
-        loadedTitle = previousTitle;
-        restoreHistorySnapshot(previousSnapshot);
-        // Restoring a saved scenario must not replace unsaved changes to its current settings.
-        Object.assign(practiceState, previousPracticeState);
-        updateTimelineMetadataNode();
-        renderPracticePanel();
-        alert(uiText('arrangement.error.loadCancelled', { message: error.message || '' }));
-        return false;
+    while (true) {
+        loadedTitle = title || uiText('editor.untitled');
+        try {
+            onSVGLoaded(data, metadata);
+            break;
+        } catch (error) {
+            loadedTitle = previousTitle;
+            restoreHistorySnapshot(previousSnapshot);
+            // Restoring a saved scenario must not replace unsaved changes to its current settings.
+            Object.assign(practiceState, previousPracticeState);
+            updateTimelineMetadataNode();
+            renderPracticePanel();
+            if (discardedArrangement) {
+                alert(uiText('arrangement.error.loadCancelled', { message: error.message || '' }));
+                return false;
+            }
+            if (!offerTimelineRecovery(error)) return false;
+            metadata = buildRecoveredTimelineMetadata(metadata);
+            discardedArrangement = true;
+            // The first attempt consumed the SVG nodes; retry with a fresh, detached document.
+            data = Snap.parseStr(content);
+        }
     }
     scoreDocumentGeneration += 1;
     currentScoreId = scoreId || null;
@@ -1729,7 +1850,12 @@ function loadRhythmContent(title, content, scoreId, options) {
     }
     setIoFieldValue(content);
     clearHistorySnapshots();
-    rememberSavedScoreSnapshot();
+    if (discardedArrangement) {
+        // No saved snapshot matches this recovered document until the user explicitly saves it.
+        savedScoreSnapshot = '';
+    } else {
+        rememberSavedScoreSnapshot();
+    }
     return true;
 }
 
@@ -10284,6 +10410,7 @@ async function loadFileDialogServerNoticeVersion() {
 }
 
 async function confirmFileDialog() {
+    if (fileDialogMoveInProgress) return;
     try {
         if (fileDialogState.mode === 'open') {
             const entry = getSelectedFileDialogEntry();
@@ -10786,6 +10913,9 @@ document.addEventListener('DOMContentLoaded', function () {
         updateFileDialogControls();
     });
     document.querySelectorAll('.file-dialog-source').forEach(function (sourceButton) {
+        if (sourceButton.dataset.source === 'local') {
+            bindFileDialogDropTarget(sourceButton, localLibrary.rootFolderId);
+        }
         sourceButton.addEventListener('click', function () {
             setSelectedFileSource(sourceButton.dataset.source);
             fileDialogState.selectedId = null;

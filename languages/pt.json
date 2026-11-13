@@ -125,6 +125,7 @@
     },
     "message": {
       "savedLocal": "\"{title}\" foi salvo localmente.",
+      "movedLocal": "\"{title}\" foi movido.",
       "renamedLocal": "\"{title}\" foi renomeado localmente.",
       "deletedLocal": "\"{title}\" foi excluído localmente.",
       "published": "\"{title}\" foi publicado.",
@@ -155,6 +156,7 @@
       "localNotFound": "O arquivo local não foi encontrado.",
       "nameEmpty": "O nome não pode ficar vazio.",
       "localRename": "Não foi possível renomear o arquivo local: {message}",
+      "localMove": "Não foi possível mover o arquivo: {message}",
       "localDelete": "Não foi possível excluir o arquivo local: {message}",
       "publish": "Não foi possível publicar o arquivo: {message}",
       "serverVersionCancelled": "A versão do servidor não foi carregada.",
@@ -530,6 +532,7 @@
     },
     "untitledRhythm": "Ritmo sem título",
     "confirm": {
+      "openWithoutArrangement": "Não foi possível carregar o arranjo salvo.\n\n{message}\n\nAbrir a partitura mesmo assim e descartar o arranjo? A linha do tempo ficará vazia. O arquivo salvo só será alterado quando você salvar novamente.",
       "rebuild": "Substituir o arranjo existente por uma nova sequência padrão da partitura? As posições e repetições personalizadas serão substituídas."
     },
     "error": {

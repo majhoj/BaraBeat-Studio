@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'barabeat-studio-offline-v106-ballet-dununs-flams';
+const CACHE_NAME = 'barabeat-studio-offline-v111-practice-opening-repeat';
 const APP_SHELL = [
   './app-shell.html',
   './manifest.webmanifest',

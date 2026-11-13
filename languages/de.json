@@ -125,6 +125,7 @@
     },
     "message": {
       "savedLocal": "\"{title}\" wurde lokal gespeichert.",
+      "movedLocal": "\"{title}\" wurde verschoben.",
       "renamedLocal": "\"{title}\" wurde lokal umbenannt.",
       "deletedLocal": "\"{title}\" wurde lokal gelöscht.",
       "published": "\"{title}\" wurde veröffentlicht.",
@@ -155,6 +156,7 @@
       "localNotFound": "Die lokale Datei wurde nicht gefunden.",
       "nameEmpty": "Der Name darf nicht leer sein.",
       "localRename": "Fehler beim lokalen Umbenennen: {message}",
+      "localMove": "Die Datei konnte nicht verschoben werden: {message}",
       "localDelete": "Fehler beim lokalen Löschen: {message}",
       "publish": "Fehler beim Veröffentlichen: {message}",
       "serverVersionCancelled": "Serverversion wurde nicht geladen.",
@@ -530,6 +532,7 @@
     },
     "untitledRhythm": "Unbenannter Rhythmus",
     "confirm": {
+      "openWithoutArrangement": "Das gespeicherte Arrangement kann nicht übernommen werden.\n\n{message}\n\nNotenblatt trotzdem öffnen und das Arrangement verwerfen? Die Timeline bleibt leer. Die gespeicherte Datei wird erst beim erneuten Speichern geändert.",
       "rebuild": "Das vorhandene Arrangement durch eine neue Standardfolge aus dem Notenblatt ersetzen? Eigene Positionen und Wiederholungen werden dabei ersetzt."
     },
     "error": {

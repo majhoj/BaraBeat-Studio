@@ -125,6 +125,7 @@
     },
     "message": {
       "savedLocal": "\"{title}\" a été enregistré localement.",
+      "movedLocal": "\"{title}\" a été déplacé.",
       "renamedLocal": "\"{title}\" a été renommé localement.",
       "deletedLocal": "\"{title}\" a été supprimé localement.",
       "published": "\"{title}\" a été publié.",
@@ -155,6 +156,7 @@
       "localNotFound": "Le fichier local est introuvable.",
       "nameEmpty": "Le nom ne peut pas être vide.",
       "localRename": "Impossible de renommer le fichier local : {message}",
+      "localMove": "Impossible de déplacer le fichier : {message}",
       "localDelete": "Impossible de supprimer le fichier local : {message}",
       "publish": "Impossible de publier le fichier : {message}",
       "serverVersionCancelled": "La version du serveur n'a pas été chargée.",
@@ -530,6 +532,7 @@
     },
     "untitledRhythm": "Rythme sans titre",
     "confirm": {
+      "openWithoutArrangement": "L'arrangement enregistré ne peut pas être chargé.\n\n{message}\n\nOuvrir quand même la partition et abandonner l'arrangement ? La timeline sera vide. Le fichier enregistré ne sera modifié que lors d'un nouvel enregistrement.",
       "rebuild": "Remplacer l'arrangement existant par une nouvelle séquence par défaut issue de la partition ? Les positions et répétitions personnalisées seront remplacées."
     },
     "error": {

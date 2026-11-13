@@ -1530,6 +1530,29 @@ function updateTimelineMetadataNode() {
     }
 }
 
+function createTimelineMetadataError(key, values) {
+    const error = new Error(timelineText(key, values));
+    error.code = 'TIMELINE_METADATA_INVALID';
+    return error;
+}
+
+function buildRecoveredTimelineMetadata(metadata) {
+    const saved = metadata && typeof metadata === 'object' && !Array.isArray(metadata) ? metadata : {};
+    return {
+        version: timelineMetadataVersion,
+        entries: [],
+        accompanimentSegments: [],
+        minimumBarCount: 0,
+        playbackStartBar: 1,
+        tempo: saved.tempo,
+        shekereBeatEnabled: saved.shekereBeatEnabled,
+        swingProfile: saved.swingProfile,
+        feelOffsets: saved.feelOffsets,
+        quickPlayInstrumentVolumes: saved.quickPlayInstrumentVolumes,
+        practice: saved.practice
+    };
+}
+
 function readTimelineMetadata(data) {
     const metadataElement = data && typeof data.select === 'function'
         ? data.select(timelineMetadataSelector)
@@ -1539,11 +1562,11 @@ function readTimelineMetadata(data) {
     }
 
     if ((data || s).selectAll(timelineMetadataSelector).length !== 1) {
-        throw new Error(timelineText('arrangement.error.savedDataUnreadable'));
+        throw createTimelineMetadataError('arrangement.error.savedDataUnreadable');
     }
     const metadataText = metadataElement.attr('data-timeline') || metadataElement.attr('text') || metadataElement.node.textContent || '';
     if (!metadataText) {
-        throw new Error(timelineText('arrangement.error.savedDataUnreadable'));
+        throw createTimelineMetadataError('arrangement.error.savedDataUnreadable');
     }
 
     let metadata;
@@ -1554,9 +1577,14 @@ function readTimelineMetadata(data) {
         metadata = JSON.parse(decodedText);
     } catch (error) {
         console.warn('Timeline-Metadaten konnten nicht gelesen werden', error);
-        throw new Error(timelineText('arrangement.error.savedDataUnreadable'));
+        throw createTimelineMetadataError('arrangement.error.savedDataUnreadable');
     }
-    validateTimelineMetadata(metadata);
+    try {
+        validateTimelineMetadata(metadata);
+    } catch (error) {
+        error.timelineMetadata = metadata;
+        throw error;
+    }
     return metadata;
 }
 
@@ -1564,11 +1592,11 @@ function validateTimelineMetadata(metadata) {
     if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata) ||
             !Array.isArray(metadata.entries) ||
             (metadata.accompanimentSegments !== undefined && !Array.isArray(metadata.accompanimentSegments))) {
-        throw new Error(timelineText('arrangement.error.savedDataUnreadable'));
+        throw createTimelineMetadataError('arrangement.error.savedDataUnreadable');
     }
     const version = Number(metadata.version);
     if (!Number.isInteger(version) || version < minimumCompatibleTimelineMetadataVersion || version > timelineMetadataVersion) {
-        throw new Error(timelineText('arrangement.error.savedVersionUnsupported', { version: String(metadata.version ?? '?') }));
+        throw createTimelineMetadataError('arrangement.error.savedVersionUnsupported', { version: String(metadata.version ?? '?') });
     }
     const references = metadata.entries.concat(metadata.accompanimentSegments || []);
     if (references.some(function (entry) {
@@ -1576,8 +1604,47 @@ function validateTimelineMetadata(metadata) {
             !(typeof entry.patternSourceKey === 'string' && entry.patternSourceKey ||
                 typeof entry.patternId === 'string' && entry.patternId);
     })) {
-        throw new Error(timelineText('arrangement.error.savedDataUnreadable'));
+        throw createTimelineMetadataError('arrangement.error.savedDataUnreadable');
     }
+}
+
+function migrateTimelineInstrumentReferences(patternLibrary, references) {
+    function currentInstrumentName(name) {
+        return name === 'Dununba' || name === 'Dundunba' ? 'Doundoun' : name;
+    }
+    function hasSourceKey(pattern, sourceKey) {
+        return pattern.sourceKey === sourceKey || (pattern.aliasSourceKeys || []).indexOf(sourceKey) !== -1;
+    }
+
+    return (references || []).map(function (reference) {
+        const migrated = Object.assign({}, reference);
+        const sourceKey = reference.patternSourceKey;
+        if (typeof sourceKey === 'string' && !patternLibrary.some(function (pattern) {
+            return hasSourceKey(pattern, sourceKey);
+        })) {
+            const separator = sourceKey.indexOf('|');
+            const oldInstrument = sourceKey.slice(0, separator);
+            const instrument = currentInstrumentName(oldInstrument);
+            if (separator > 0 && instrument !== oldInstrument) {
+                // Only the known instrument prefix changes; labels and occurrence numbers stay exact.
+                const currentKey = instrument + sourceKey.slice(separator);
+                const matches = patternLibrary.filter(function (pattern) {
+                    return hasSourceKey(pattern, currentKey);
+                });
+                if (matches.length !== 1) {
+                    throw createTimelineMetadataError('arrangement.error.savedPatternsMissing');
+                }
+                migrated.patternSourceKey = currentKey;
+            }
+        }
+        if (Array.isArray(reference.targetInstruments)) {
+            migrated.targetInstruments = reference.targetInstruments.map(currentInstrumentName);
+        }
+        if (typeof reference.targetInstrument === 'string') {
+            migrated.targetInstrument = currentInstrumentName(reference.targetInstrument);
+        }
+        return migrated;
+    });
 }
 
 function validateTimelinePatternReferences(patternLibrary, entries, segments) {
@@ -1590,11 +1657,11 @@ function validateTimelinePatternReferences(patternLibrary, entries, segments) {
                 : pattern.id === entry.patternId || (pattern.aliasPatternIds || []).indexOf(entry.patternId) !== -1;
         });
     });
-    if (!allMatched) throw new Error(timelineText('arrangement.error.savedPatternsMissing'));
+    if (!allMatched) throw createTimelineMetadataError('arrangement.error.savedPatternsMissing');
 }
 
 function syncTimelineStateFromReadResult(readResult, options) {
-    const syncOptions = options || {};
+    const syncOptions = Object.assign({}, options || {});
     const patternLibrary = buildPatternLibraryFromRhythmBars(readResult.rhythmBars);
     const newSourceHash = computePatternLibraryHash(patternLibrary);
     const hasPersistedEntries = Array.isArray(syncOptions.persistedEntries);
@@ -1603,9 +1670,11 @@ function syncTimelineStateFromReadResult(readResult, options) {
         persistedVersion >= minimumCompatibleTimelineMetadataVersion &&
         persistedVersion <= timelineMetadataVersion;
     if (hasPersistedEntries && !hasCompatiblePersistedVersion) {
-        throw new Error(timelineText('arrangement.error.savedVersionUnsupported', { version: String(syncOptions.persistedVersion ?? '?') }));
+        throw createTimelineMetadataError('arrangement.error.savedVersionUnsupported', { version: String(syncOptions.persistedVersion ?? '?') });
     }
     if (syncOptions.strictPatternMatching) {
+        syncOptions.persistedEntries = migrateTimelineInstrumentReferences(patternLibrary, syncOptions.persistedEntries);
+        syncOptions.persistedAccompanimentSegments = migrateTimelineInstrumentReferences(patternLibrary, syncOptions.persistedAccompanimentSegments);
         validateTimelinePatternReferences(patternLibrary, syncOptions.persistedEntries, syncOptions.persistedAccompanimentSegments);
     }
     const canReusePersistedEntries = hasPersistedEntries && hasCompatiblePersistedVersion;
@@ -1621,13 +1690,13 @@ function syncTimelineStateFromReadResult(readResult, options) {
         appendMissingPatterns: !canReusePersistedEntries
     });
     if (syncOptions.strictPatternMatching && pruneTimelineOrphanOverlayEntries(syncedEntries).length !== syncedEntries.length) {
-        throw new Error(timelineText('arrangement.error.savedDataUnreadable'));
+        throw createTimelineMetadataError('arrangement.error.savedDataUnreadable');
     }
     const syncedSegments = hasCompatiblePersistedVersion
         ? syncTimelineAccompanimentSegmentsWithPatternLibrary(patternLibrary, syncOptions.persistedAccompanimentSegments)
         : [];
     if (syncOptions.strictPatternMatching && syncedSegments.length !== (syncOptions.persistedAccompanimentSegments || []).length) {
-        throw new Error(timelineText('arrangement.error.savedDataUnreadable'));
+        throw createTimelineMetadataError('arrangement.error.savedDataUnreadable');
     }
     const sheetLoopCount = getTimelineOuterRepeatCount(readResult, patternLibrary);
 

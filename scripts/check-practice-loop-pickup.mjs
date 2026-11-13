@@ -80,6 +80,8 @@ for (const [rhythm, size] of [['binaer', 32], ['tenaer', 24], ['neunaer', 18]]) 
         assert.equal(lead.overlapsPracticeCountIn, true);
         assert.equal(ui.getPracticeSectionLength(lead), 2, 'Initial IN stays short and overlaps the count-in');
         assert.deepEqual(audible(lead.trackNotes.Djembe_3), [[0, 'bass']]);
+        assert.deepEqual(Array.from(sections.find(section => !section.isLeadIn).trackNotes.Djembe_3.slice(0, size * 3)),
+          Array.from({ length: 3 }, () => solo.bars[0].notes).flat(), 'The opening repeat remains three full passes after its pickup');
         const host = sections.at(-1);
         const hostLength = ui.getPracticeSectionLength(host);
         const loops = timerMinutes > 0 || repeatCount > 1;
@@ -90,7 +92,7 @@ for (const [rhythm, size] of [['binaer', 32], ['tenaer', 24], ['neunaer', 18]]) 
           if (loops) assert.equal(host.trackNotes.Djembe_3.length, size, 'Full bar including rests reaches player and scroller');
           assert.deepEqual(Array.from(host.trackNotes.Dreierbass), bass.bars[0].notes);
         } else {
-          assert.equal(hostLength, size * 4, 'Standalone Solo retains its existing body length');
+          assert.equal(hostLength, size * 5, 'Three opening passes plus two tail bars; the IN must not consume a pass');
           assert.equal(host.trackNotes.Djembe_3[hostLength - size], 'tone', 'Loop pickup must not overwrite the start of the last bar');
           assert.equal(host.trackNotes.Djembe_3[hostLength - 2], loops ? 'bass' : 'f');
         }
@@ -156,7 +158,7 @@ if (process.argv.includes('--browser')) {
     });
     assert.equal(results.immutable, true);
     for (const { withBass, payload, moving, sectionLengths } of results.results) {
-      assert.deepEqual(sectionLengths, withBass ? [2, 160, 32] : [2, 128], 'Existing timing and count-in stay unchanged');
+      assert.deepEqual(sectionLengths, withBass ? [2, 160, 32] : [2, 160], 'Short count-in pickup plus all five solo bars');
       const sections = payload[0].PracticeSections;
       if (withBass) {
         assert.deepEqual(audible(sections.at(-1).trackNotes.Djembe_3), [[30, 'bass']]);

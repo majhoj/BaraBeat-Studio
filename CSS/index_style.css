@@ -1138,6 +1138,26 @@ body[data-ui-theme="earth"] .app-menu-panel #temporaryAccessButton.is-open {
     color: white;
 }
 
+.file-dialog-table tbody tr[draggable="true"] {
+    cursor: grab;
+}
+
+.file-dialog-table tbody tr.is-file-dragging {
+    opacity: 0.55;
+}
+
+.file-dialog-table tbody tr.is-file-drop-target,
+.file-dialog-source.is-file-drop-target {
+    background: #dcefe2;
+    color: #185f3d;
+    outline: 2px solid #238753;
+    outline-offset: -2px;
+}
+
+.file-dialog-table tbody tr.is-file-drop-target td:first-child::before {
+    color: #185f3d;
+}
+
 .file-dialog-empty {
     position: absolute;
     top: 64px;
